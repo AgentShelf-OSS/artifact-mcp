@@ -36,7 +36,8 @@ reference for release testing.
 ## Screenshots
 
 *Screenshots are from an isolated Rust release-candidate server seeded with fictional organizations
-(acme / globex / initech / umbrella). Both light and dark themes ship; light shown here.*
+(acme / globex / initech / umbrella) and captured with the optional preview renderer enabled. Both
+light and dark themes ship; light shown here.*
 
 | Administrator gallery | Card actions |
 |---|---|
