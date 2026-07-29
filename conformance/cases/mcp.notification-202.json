@@ -1,0 +1,17 @@
+{
+  "id": "mcp.notification-202",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "notification (no id) yields 202 no body",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "method": "ping" }
+      },
+      "expect": { "status": 202 }
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+# Copy this file to mcp-proxy.yaml and replace the tunnel domain before enabling
+# the `anthropic-tunnel` Compose profile. The proxy forwards paths unchanged, so
+# Artifact MCP remains available at https://artifacts.<tunnel-domain>/mcp.
+listen_addr: ":8080"
+log_level: info
+shutdown_timeout: 30s
+tunnel_domain: REPLACE_WITH_TUNNEL_DOMAIN
+tls:
+  cert_file: /run/secrets/anthropic_tunnel_tls_cert
+  key_file: /run/secrets/anthropic_tunnel_tls_key
+routes:
+  artifacts: http://artifact-mcp:3480
+upstream:
+  # Docker bridge addresses normally live in this range. Narrow it further if
+  # the production Compose network has a pinned subnet.
+  allowed_ips:
+    - 172.16.0.0/12

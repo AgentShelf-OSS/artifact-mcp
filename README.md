@@ -4,8 +4,8 @@
 > data, your rules.**
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-![CI](https://img.shields.io/badge/CI-node--test-2088FF.svg)
-![MCP server](https://img.shields.io/badge/MCP-server-6E56CF.svg)
+![CI](https://img.shields.io/badge/CI-Rust%20%2B%20Node-2088FF.svg)
+![MCP 2026](https://img.shields.io/badge/MCP-2025--06--18%20%2B%202026--07--28-6E56CF.svg)
 
 Your agents already generate HTML — dashboards, reports, one-pagers, whole mini-sites.
 **artifact-mcp is where that output lives.** An agent calls an MCP tool, gets back a real URL on
@@ -14,9 +14,10 @@ Around every artifact you get an org-scoped gallery, version history, viewer fee
 analytics, public share links, and per-org notifications.
 
 Not a hosted primitive that publishes to someone else's cloud — **a platform you run**, with real
-multi-organization tenancy, for teams that want to own their work. One container, SQLite + files on
-disk, no third-party lock-in. The default deployment is one core container; preview thumbnails add
-an optional browser sidecar.
+multi-organization tenancy, for teams that want to own their work. The production runtime is one
+native Rust/Axum container with SQLite + files on disk and no third-party lock-in. Preview
+thumbnails add an optional browser sidecar; the Node implementation remains a behavioral parity
+reference for release testing.
 
 ### Built for teams, not just a publish button
 
@@ -29,26 +30,33 @@ an optional browser sidecar.
   commentable — an index your team actually uses, not a pile of orphan links.
 - **Agent-native _and_ human-native.** Agents publish over MCP; humans review, comment (pinned to
   the exact spot on the page), and share — behind Cloudflare Access SSO.
+- **Role-aware by construction.** Administrators can operate across organizations. Members see one
+  organization, and Hide/Show or Delete appears only on files attributed to that verified uploader.
 
 ## Screenshots
 
-*Screenshots are from a demo instance seeded with fictional orgs (acme / globex / initech /
-umbrella). Both light and dark themes ship; light shown here.*
+*Screenshots are from an isolated Rust release-candidate server seeded with fictional organizations
+(acme / globex / initech / umbrella). Both light and dark themes ship; light shown here.*
 
-| Org-scoped gallery | Viewer shell + feedback threads |
+| Administrator gallery | Card actions |
 |---|---|
-| [![gallery](docs/screenshots/01-gallery-light.png)](docs/screenshots/01-gallery-light.png) | [![feedback](docs/screenshots/05-feedback-light.png)](docs/screenshots/05-feedback-light.png) |
-| Per-org sections and categories, static artifact thumbnails, colored org filters. | Sandboxed artifact with anchored, threaded viewer feedback (resolve / delete / reply). |
+| [![administrator gallery](docs/screenshots/01-gallery-admin-grid.png)](docs/screenshots/01-gallery-admin-grid.png) | [![administrator card actions](docs/screenshots/02-gallery-admin-actions.png)](docs/screenshots/02-gallery-admin-actions.png) |
+| One searchable collection with organization, category, favorites, and review filters. | Grid and list cards keep Open, Save, Share, download, Hide/Show, and More; destructive actions live behind confirmation. |
 
-| Version history | Public share link |
+| List layout | Member gallery |
 |---|---|
-| [![history](docs/screenshots/06-history-light.png)](docs/screenshots/06-history-light.png) | [![share](docs/screenshots/07-share-panel-light.png)](docs/screenshots/07-share-panel-light.png) |
-| Browse and restore any retained revision. | Create an unlisted, expiring, revocable `/s/:token` link. |
+| [![list layout](docs/screenshots/03-gallery-admin-list.png)](docs/screenshots/03-gallery-admin-list.png) | [![member gallery](docs/screenshots/04-gallery-member-grid.png)](docs/screenshots/04-gallery-member-grid.png) |
+| A compact list with a fixed preview column and non-overlapping metadata/actions. | Members get honest org-scoped counts and filters; ownership controls appear only on their uploads. |
 
-| Admin settings | Branded sign-in |
+| Anchored review | Version history |
 |---|---|
-| [![settings](docs/screenshots/03-settings-light.png)](docs/screenshots/03-settings-light.png) | [![signin](docs/screenshots/02-signin-light.png)](docs/screenshots/02-signin-light.png) |
-| Manage orgs, domains, categories, per-org color, webhooks, and upload keys. | The Access-gated front door before SSO. |
+| [![feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) | [![history inspector](docs/screenshots/06-viewer-history.png)](docs/screenshots/06-viewer-history.png) |
+| The sandboxed artifact stays visible while the trusted inspector handles anchored, threaded feedback. | Browse current and retained revisions, open an older body, or restore it as a new revision. |
+
+| Organization administration | Publisher credentials |
+|---|---|
+| [![organization administration](docs/screenshots/07-admin-organizations.png)](docs/screenshots/07-admin-organizations.png) | [![publisher keys](docs/screenshots/08-admin-publisher-keys.png)](docs/screenshots/08-admin-publisher-keys.png) |
+| Search organizations and edit routing, color, categories, and delivery from one selected detail. | Issue/revoke scoped keys, assign a verified owner, and explicitly preview legacy-owner backfills. |
 
 ## Features
 
@@ -76,14 +84,17 @@ umbrella). Both light and dark themes ship; light shown here.*
   email identity. Cross-org reads return 404; cross-org mutations for a known id return 403. Admins see every org.
 
 ### Organize
-- **Categories** — group an org's artifacts into per-category carousels; edit an artifact's
-  category from the viewer shell or by dragging its card in the gallery.
-- **Show / hide** — unlist an artifact (`set_visibility`): it drops from the gallery, carousels,
-  and prev/next nav, but its direct URL still opens for anyone with org access (unlisted, not a
-  security boundary). Admins still see hidden ones, marked.
-- **Drag to organize** — drag a card between categories within your own org (any member); admins
-  can also drag a card onto another org's section to **re-tenant** it (the artifact and all its
-  feedback, revisions, and view records move atomically).
+- **One role-scoped collection** — search titles, publishers, and categories; switch grid/list
+  layout; combine organization/category/favorites/review filters; keep compact result counts honest.
+- **Categories** — group an org's artifacts and edit an artifact's category from its More menu or
+  the Viewer Details inspector.
+- **Show / hide** — unlist an artifact (`set_visibility`): it drops from the member collection and
+  prev/next nav, but its direct URL still opens for anyone with org access (unlisted, not a
+  security boundary). Administrators may act on every authorized artifact; members receive the eye
+  only for artifacts whose server-recorded owner matches their verified identity.
+- **Move and delete safely** — administrators can re-tenant an artifact from its More menu; owner
+  or administrator deletion requires an explicit confirmation and removes the artifact's related
+  revisions, feedback, reactions, audience records, and active shares.
 
 ### Collaborate
 - **Viewer feedback threads** — in-org viewers leave feedback from the trusted shell; each comment
@@ -114,10 +125,19 @@ umbrella). Both light and dark themes ship; light shown here.*
 
 ### Operate
 - **Settings (admin)** — manage orgs / domains / categories / webhooks, and generate/revoke
-  per-org upload keys with a human display label (keys hashed, secrets shown once, revocable
-  without a redeploy).
+  per-org upload keys with a human display label and optional verified owner (keys hashed, secrets
+  shown once, revocable without a redeploy). Task tabs separate Organizations, Publisher keys, and
+  Notifications.
 - **Crash-safe storage** — staging→rename lifecycle, commit-then-swap updates, and startup audit
   recovery reconcile the DB and files on disk after an interrupted operation.
+- **MCP observability** — privacy-safe Prometheus metrics, opaque request correlation, bounded
+  result-size signals, and deployable alert rules. See
+  [`docs/ops/mcp-observability.md`](docs/ops/mcp-observability.md) and the repeatable
+  [`connector-readiness checklist`](docs/ops/connector-readiness.md).
+- **Optional private MCP ingress** — an isolated, digest-pinned Compose profile for Anthropic's
+  MCP Tunnels research preview, with file-backed secrets, independent health signals,
+  Anthropic-side validation, and a one-command local rollback. See the
+  [`Anthropic MCP Tunnel runbook`](docs/ops/anthropic-mcp-tunnel.md).
 - **No database server** — SQLite (versioned migrations) + files on disk. One container.
 
 ## How it compares
@@ -146,14 +166,22 @@ this.
 <sub>Comparison based on each project's publicly documented features as of July 2026; verify against
 their current docs.</sub>
 
-## MCP tools (`POST /mcp`, bearer key)
+## MCP protocol and tools (`POST /mcp`, bearer key or OAuth token)
+
+Artifact MCP serves the existing stateful `2025-06-18` contract and the stateless `2026-07-28`
+contract side by side. Modern clients can use `server/discover`, private-cache-aware artifact
+resources (`resources/list`, `resources/read`, and templates), typed/validated tool outputs,
+negotiated MCP Apps, and durable preview tasks. Clients that do not advertise those capabilities
+retain the ordinary text/structured fallback.
 
 | Tool | Purpose |
 |---|---|
 | `publish_artifact(html, title, description, category, org)` | Publish one self-contained HTML page |
 | `publish_bundle(files, entry, title, description, category, org)` | Publish a multi-file artifact; `files` is `{ "path": "content" }` |
 | `list_artifacts()` | List what this key has published (with URLs) |
+| `read_artifact(id, path?, revision?, offset?, limit?)` | Read one artifact, retained revision, or bundle file with bounded UTF-8 paging |
 | `update_artifact(id, html\|files, entry, title, description, category)` | Replace content/metadata in place; bumps its revision (owner or admin) |
+| `patch_artifact(id, expected_revision, edits, path?)` | Apply an atomic, revision-guarded batch of UTF-8-safe partial edits |
 | `set_visibility(id, hidden)` | Unlist / relist an artifact (owner or admin) |
 | `list_categories(org?)` | List your org's categories (admin may pass an org) |
 | `set_category(id, category)` | Move an artifact to a category — no revision bump; auto-registers it (owner or admin) |
@@ -168,6 +196,7 @@ their current docs.</sub>
 | `list_feedback(id?)` | List viewer feedback + anchors + thread structure (owner or admin; admin sees all) |
 | `resolve_feedback(feedback_id)` | Mark viewer feedback resolved (owner or admin) |
 | `reopen_feedback(feedback_id)` | Reopen a resolved comment (owner or admin) |
+| `regenerate_artifact_preview(id)` | Regenerate a current single-file thumbnail (owner or admin; MCP 2026 clients with Tasks support receive a durable task) |
 
 All MCP tools use `Authorization: Bearer <API key>`. Org keys are locked to their own org; an
 **admin** key may target any org with the `org` argument and can see all feedback. Tools that
@@ -176,14 +205,27 @@ mutate an artifact or read another owner's data require the artifact owner or an
 > MCP clients cache `tools/list` at connect — after a server update, reconnect the integration to
 > pick up new tools/fields.
 
+Modern clients that advertise `io.modelcontextprotocol/tasks` may receive a durable task from
+`regenerate_artifact_preview`; poll it with `tasks/get`, acknowledge input updates with
+`tasks/update`, or request cooperative cancellation with `tasks/cancel`. Task state is persisted
+under the data volume and resumed after restart. Clients without Tasks support receive the same
+operation as a bounded synchronous tool result. No other artifact operation is task-augmented.
+
+The legacy catalog contains 21 tools. MCP 2026 adds `regenerate_artifact_preview` for 22; an
+MCP-App-capable client additionally receives the app-only `submit_feedback` action.
+
 ## Architecture
 
 ```
 Agent ──(MCP, API key)──▶ /mcp ──┐
-                                 ├─▶ artifact-mcp (Node/Express) ─▶ SQLite + files on disk
+                                 ├─▶ artifact-mcp (Rust · Axum + Askama) ─▶ SQLite + files on disk
 Human ──(Cloudflare Access)──▶ gallery / /:id / /raw/:id/… ──┘   served at https://domain/<id>
 Public ──(share token)────────▶ /s/:token[/…] ──────────────────┘
 ```
+
+The production image is a stripped static Rust binary in a non-root distroless container. The Node
+runtime is retained as an independent compatibility twin and test oracle; it is not the default
+Compose service.
 
 Two access surfaces, deliberately split:
 - **Upload** (`/mcp`) — API-key auth, Access-bypassed (agents can't do interactive SSO).
@@ -196,7 +238,8 @@ Two access surfaces, deliberately split:
 ### Routes
 | Route | Role |
 |---|---|
-| `POST /mcp` | MCP JSON-RPC (upload), API-key auth |
+| `POST /mcp` | MCP JSON-RPC, API-key or configured OAuth bearer authentication |
+| `GET /metrics` | Prometheus MCP request, outcome, latency, cancellation, and bounded result-size metrics |
 | `GET /` | org-scoped gallery (admin: all orgs, incl. empty ones as drop targets) |
 | `GET /:id` | viewer shell (chrome + sandboxed iframe) |
 | `GET /thumbnails/:id?v=<body_sha256>` | authenticated current-revision thumbnail or no-store placeholder |
@@ -208,21 +251,21 @@ Two access surfaces, deliberately split:
 | `POST /:id/feedback` · `DELETE /:id/feedback/:fid` · `POST /:id/feedback/:fid/resolve` | threaded viewer feedback (own-or-admin manage) |
 | `POST /:id/category` | set category (same-org member or admin) |
 | `POST /:id/share` · `GET /:id/shares` · `DELETE /:id/shares/:token` | create, list, or revoke public share links (same-org member or admin) |
-| `POST /:id/visibility` | hide / show (same-org member or admin) |
+| `POST /:id/visibility` | hide / show (verified uploader-owner or admin) |
 | `POST /:id/move` | category or org move — **admin** (org move re-tenants) |
-| `DELETE /:id` | delete (admin or same-org viewer) |
-| `GET /settings` + `/settings/keys*` + `/settings/orgs*` (specific emails, domains, categories, webhooks) | admin management (all admin-only) |
+| `DELETE /:id` | delete (verified uploader-owner or admin) |
+| `GET /settings` + `/settings/keys*` + `/settings/orgs*` (owners, specific emails, domains, categories, webhooks) | admin management (all admin-only) |
 
 ### Key files
-`server.js` (composition) · `lib/app.js` (routes) · `lib/access.js` (tenant policy) ·
-`lib/identity.js` (Access JWT → org) · `lib/mcp.js` + `lib/contracts.js` (tools + runtime contracts) ·
-`lib/store.js` (artifact lifecycle, history, crash-safety) · `lib/orgs.js` (org/email/domain/category
-registry) · `lib/feedback.js` (threaded feedback + anchors) · `lib/views.js` (analytics) ·
-`lib/webhooks.js` + `lib/notify.js` (Discord notifications) · `lib/reactions.js` (favorites/votes) ·
-`lib/keys.js` + `lib/auth.js` (hashed keys) · `lib/portal.js` (gallery + shell + anchor bridge) ·
-`lib/settings.js` (admin page) · `lib/artifact-http.js` (raw headers + bridge) · `lib/shares.js`
-(public-link lifecycle) ·
-`lib/db.js` + `lib/migrations.js` (SQLite lifecycle).
+`src/main.rs` + `src/app.rs` (composition) · `src/http/routes/` (HTTP surface) ·
+`src/security/` (Access, API-key, OAuth, and tenant policy) · `src/mcp/` (protocol negotiation,
+tools, resources, Apps, and Tasks) · `src/artifacts/` (lifecycle, history, reads, and recovery) ·
+`src/persistence/` (SQLite repositories and migrations) · `src/render/` + `templates/` + `assets/`
+(Gallery, Viewer, and Administration) · `src/integrations/` (notifications and previews) ·
+`src/observability.rs` (privacy-safe metrics).
+
+The matching `server.js` and `lib/` modules form the Node compatibility twin exercised by
+conformance and browser parity tests.
 
 For domain language, invariants, module seams, and workflows, see [`CONTEXT.md`](CONTEXT.md).
 
@@ -231,6 +274,10 @@ For domain language, invariants, module seams, and workflows, see [`CONTEXT.md`]
 | Var | Purpose |
 |---|---|
 | `ARTIFACT_API_KEYS` | Bootstrap keys, `clientId:org:secret` comma-separated (DB is authoritative after first boot) |
+| `MCP_OAUTH_ISSUER` + `MCP_OAUTH_AUDIENCE` + `MCP_OAUTH_JWKS_URL` | Optional OAuth client-credentials resource-server mode; all three are required together |
+| `MCP_OAUTH_ALLOWED_ALGS` | Asymmetric JWT algorithm allowlist; defaults to `RS256` |
+| `MCP_OAUTH_MAX_TOKEN_LIFETIME_S` / `MCP_OAUTH_CLOCK_TOLERANCE_S` | Access-token maximum lifetime (default `3600`) and clock tolerance (default `30`) |
+| `MCP_API_KEYS_ENABLED` | API-key compatibility switch; defaults to `1`, and may be `0` only with complete OAuth configuration |
 | `WEBHOOK_ENC_KEY` | Optional 32-byte base64 AES-256-GCM key for Discord webhook URLs; unset preserves plaintext fallback with a startup warning |
 | `PREVIEW_RENDERER_URL` | Optional internal renderer base URL; unset keeps gallery placeholders and Discord text-only |
 | `PREVIEW_RENDER_TIMEOUT_MS` / `PREVIEW_VIEWPORT` | Optional renderer timeout (default `8000`) and social-card crop (default `1200x630`) |
@@ -250,6 +297,13 @@ For domain language, invariants, module seams, and workflows, see [`CONTEXT.md`]
 | `MCP_JSON_LIMIT` | Optional JSON-envelope override; defaults above the configured bundle cap |
 
 See `.env.example`.
+
+OAuth service tokens must carry `sub` or `client_id`, `org`, integer `iat`/`exp`, and an explicit
+`scope` string (or `scp` string/array). ArtifactShelf recognizes `artifacts:read`,
+`artifacts:publish`, `artifacts:review`, `artifacts:visibility`, and `artifacts:delete`.
+Configured deployments publish RFC 9728 metadata at
+`/.well-known/oauth-protected-resource`; insufficient token scope returns HTTP 403 with a
+`WWW-Authenticate` challenge naming the required scope.
 
 Generate `WEBHOOK_ENC_KEY` once with `openssl rand -base64 32`, store it outside the repository,
 and retain it with encrypted backups. Existing plaintext webhook rows are encrypted in place on
@@ -307,7 +361,7 @@ step (and written so an AI agent can drive it).
 
 ```bash
 cp .env.example .env      # set ARTIFACT_API_KEYS; add prod CF_ACCESS_* after Access bootstrap
-docker compose up -d --build
+docker compose up -d --build  # builds and runs the native Rust image
 ```
 
 Publish (raw MCP call):
@@ -341,10 +395,14 @@ the exact bootstrap sequence, policy requirements, and troubleshooting.
 
 Cloudflare Access guards the tunnel hostname, not an origin port reached directly. Do not publish
 the origin on the LAN. The shipped Compose file defaults to the loopback-only
-`127.0.0.1:3480:3480` mapping (controlled explicitly with `HOST_BIND`). The preferred fully-private
-setup is the commented same-project `cloudflared` service: configure its tunnel origin as
-`http://artifact-mcp:3480`, uncomment it, and remove the app's `ports:` section entirely. The
-tunnel then reaches the app over Compose's default network without any host port.
+`127.0.0.1:3480:3480` mapping (controlled explicitly with `HOST_BIND`). A host-level public
+Cloudflare Tunnel can safely target that loopback port. A same-network, operator-owned public
+tunnel overlay may instead target `http://artifact-mcp:3480` and remove the host publish entirely.
+
+The opt-in `anthropic-tunnel` profile is different: it is Anthropic's research-preview private MCP
+transport, not the public ingress for the gallery. It leaves the default path untouched until an
+operator validates from Anthropic's side and deliberately changes the external `/mcp` edge policy.
+See [`docs/ops/anthropic-mcp-tunnel.md`](docs/ops/anthropic-mcp-tunnel.md).
 
 Onboard a viewer org: create it in **Settings**, then add an email domain or a specific address.
 Viewer tenant resolution is: configured admin identity → explicit email mapping → registered
@@ -371,8 +429,10 @@ Let an org **publish**: generate a key for it in Settings.
   cold direct-link navigation during the Access propagation window gets a single auto-reload instead of
   a dead-end 404. None of this widens the tenant boundary — every path still verifies the JWT (same
   JWKS, issuer, and audience) and applies the normal org concealment.
-- Every artifact is attributed to its uploading key; revoke a key to cut off a collaborator
-  instantly. Org move re-tenants an artifact and all its child rows atomically.
+- Every artifact is attributed to its uploading key and snapshots that key's optional
+  server-verified human owner. Revoke a key to cut off a collaborator instantly. The owner snapshot
+  gates member Hide/Show and Delete without trusting publisher labels or caller-supplied identity.
+  Org move re-tenants an artifact and all its child rows atomically.
 - **Sandboxed rendering** — every raw and shared response carries a CSP sandbox without `allow-same-origin`
   (including `.svg`/`.xml` and downloads), so uploaded content runs in a null origin.
 - **Anchored-comment bridge** — the comment/position script is injected **only** into the

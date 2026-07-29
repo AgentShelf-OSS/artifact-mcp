@@ -1,0 +1,21 @@
+{
+  "id": "mcp.mixed-batch-order",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "mixed batch keeps request order and omits the notification response",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": [
+          { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } },
+          { "jsonrpc": "2.0", "method": "ping" },
+          { "jsonrpc": "2.0", "id": 2, "method": "ping" }
+        ]
+      },
+      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}

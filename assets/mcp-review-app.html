@@ -1,0 +1,857 @@
+<!doctype html>
+<html lang="en" data-app-version="1.0.0">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'">
+  <title>Artifact review</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --canvas: light-dark(#eef1f5, #101723);
+      --surface: light-dark(#fbfcfe, #172131);
+      --surface-raised: light-dark(#ffffff, #1d293b);
+      --ink: light-dark(#142338, #f1f5fa);
+      --muted: light-dark(#63738a, #a9b6c8);
+      --line: light-dark(#d0d9e4, #334257);
+      --navy: light-dark(#14273f, #e7eef8);
+      --blue: #2e6da7;
+      --gold: #a36a17;
+      --gold-soft: light-dark(#f4e8d4, #3c3020);
+      --danger: #9e433f;
+      --radius: 16px;
+      --sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+      font-family: var(--sans);
+      background: var(--canvas);
+      color: var(--ink);
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-width: 0; background: var(--canvas); }
+    button { font: inherit; }
+
+    .app {
+      min-height: 278px;
+      padding: 14px;
+    }
+
+    .frame {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      grid-template-columns: minmax(180px, .85fr) minmax(260px, 1.15fr);
+      min-height: 250px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: 0 14px 34px color-mix(in srgb, #07111f 14%, transparent);
+    }
+
+    .frame::before {
+      content: "";
+      position: absolute;
+      inset: 0 auto 0 0;
+      z-index: 2;
+      width: 5px;
+      background: linear-gradient(var(--blue), #224f7a);
+    }
+
+    .preview {
+      position: relative;
+      min-height: 250px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      border-right: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, color-mix(in srgb, var(--surface-raised) 91%, var(--gold-soft)), var(--surface));
+    }
+
+    .preview::after {
+      content: "TRUSTED THUMBNAIL";
+      position: absolute;
+      left: 14px;
+      bottom: 12px;
+      padding: 5px 8px;
+      border-radius: 5px;
+      color: #fff;
+      background: color-mix(in srgb, #101b2b 88%, transparent);
+      font: 700 10px/1 var(--sans);
+      letter-spacing: .1em;
+    }
+
+    .preview img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 250px;
+      object-fit: cover;
+    }
+
+    .preview-fallback {
+      width: min(74%, 260px);
+      text-align: center;
+      color: var(--muted);
+    }
+
+    .preview-mark {
+      display: grid;
+      place-items: center;
+      width: 58px;
+      height: 58px;
+      margin: 0 auto 12px;
+      border: 1px solid color-mix(in srgb, var(--blue) 25%, var(--line));
+      border-radius: 50%;
+      background: color-mix(in srgb, var(--blue) 10%, var(--surface-raised));
+      color: var(--blue);
+      font: 400 36px/1 var(--serif);
+    }
+
+    .details {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 22px 22px 16px;
+    }
+
+    .eyebrow {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+      margin-bottom: 10px;
+      color: var(--blue);
+      font: 700 11px/1.2 var(--sans);
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .eyebrow span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .dot {
+      flex: 0 0 auto;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--blue);
+    }
+
+    h1 {
+      margin: 0;
+      color: var(--navy);
+      font: 700 clamp(24px, 4vw, 36px)/.98 var(--serif);
+      letter-spacing: -.025em;
+      overflow-wrap: anywhere;
+    }
+
+    .description {
+      margin: 12px 0 16px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      display: -webkit-box;
+      overflow: hidden;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+    }
+
+    .facts {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin: auto 0 16px;
+    }
+
+    .fact {
+      min-width: 0;
+      padding-top: 9px;
+      border-top: 1px solid var(--line);
+    }
+
+    .fact-label {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--muted);
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+    }
+
+    .fact-value {
+      display: block;
+      overflow: hidden;
+      color: var(--ink);
+      font: 650 12px/1.3 var(--sans);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 13px;
+      border-top: 1px solid var(--line);
+    }
+
+    .review-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+      margin: 0 0 12px;
+    }
+
+    .secondary {
+      min-height: 34px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-raised);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .secondary:hover { border-color: color-mix(in srgb, var(--blue) 55%, var(--line)); }
+    .secondary:focus-visible, textarea:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--blue) 38%, transparent);
+      outline-offset: 2px;
+    }
+    .secondary.danger { color: var(--danger); }
+    .secondary:disabled { cursor: wait; opacity: .55; }
+
+    .panel {
+      margin: 0 0 12px;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: color-mix(in srgb, var(--surface-raised) 88%, var(--canvas));
+    }
+
+    .panel-title {
+      margin: 0 0 8px;
+      color: var(--ink);
+      font-size: 12px;
+      font-weight: 800;
+    }
+
+    .feedback-form textarea {
+      display: block;
+      width: 100%;
+      min-height: 82px;
+      resize: vertical;
+      padding: 9px 10px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+      color: var(--ink);
+      font: 13px/1.4 var(--sans);
+    }
+
+    .panel-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 7px;
+      margin-top: 9px;
+    }
+
+    .revision-list {
+      display: grid;
+      gap: 6px;
+      max-height: 170px;
+      overflow: auto;
+    }
+
+    .revision-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface);
+    }
+
+    .revision-copy { min-width: 0; flex: 1; }
+    .revision-copy strong, .revision-copy small { display: block; }
+    .revision-copy strong { font-size: 11px; }
+    .revision-copy small {
+      overflow: hidden;
+      color: var(--muted);
+      font-size: 10px;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .confirm-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .open {
+      min-height: 40px;
+      padding: 0 17px;
+      border: 1px solid #14273f;
+      border-radius: 8px;
+      background: #14273f;
+      color: #fff;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .open:hover { background: #203b5d; }
+    .open:focus-visible, .nav:focus-visible {
+      outline: 3px solid color-mix(in srgb, var(--blue) 45%, transparent);
+      outline-offset: 2px;
+    }
+    .open:disabled { cursor: not-allowed; opacity: .5; }
+
+    .pager {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .position {
+      min-width: 44px;
+      color: var(--muted);
+      text-align: center;
+      font: 650 11px/1 var(--sans);
+    }
+
+    .nav {
+      width: 38px;
+      height: 38px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface-raised);
+      color: var(--ink);
+      cursor: pointer;
+      font-size: 18px;
+    }
+
+    .nav:disabled { cursor: default; opacity: .4; }
+
+    .notice {
+      margin: 8px 3px 0;
+      min-height: 16px;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .notice[data-tone="error"] { color: var(--danger); }
+
+    .loading {
+      animation: pulse 1.6s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: .55; }
+      50% { opacity: 1; }
+    }
+
+    @media (max-width: 560px) {
+      .app { padding: 8px; }
+      .frame { grid-template-columns: 1fr; }
+      .preview {
+        min-height: 154px;
+        max-height: 190px;
+        border-right: 0;
+        border-bottom: 1px solid var(--line);
+      }
+      .preview img { min-height: 154px; max-height: 190px; }
+      .details { padding: 18px 17px 14px; }
+      h1 { font-size: 27px; }
+      .facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .actions { flex-wrap: wrap; }
+      .open { flex: 1 1 140px; }
+      .pager { margin-left: 0; }
+      .review-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .secondary { padding-inline: 8px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .loading { animation: none; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" aria-labelledby="artifact-title">
+    <section class="frame" aria-live="polite">
+      <div class="preview" id="preview">
+        <div class="preview-fallback loading" id="preview-fallback">
+          <div class="preview-mark" aria-hidden="true">A</div>
+          <span>Waiting for the trusted preview</span>
+        </div>
+      </div>
+      <div class="details">
+        <div class="eyebrow">
+          <i class="dot" aria-hidden="true"></i>
+          <span id="eyebrow">ArtifactShelf · Review</span>
+        </div>
+        <h1 id="artifact-title">Preparing artifact…</h1>
+        <p class="description" id="description">The host is securely connecting this review surface.</p>
+        <div class="facts" aria-label="Artifact details">
+          <div class="fact"><span class="fact-label">Published by</span><span class="fact-value" id="publisher">—</span></div>
+          <div class="fact"><span class="fact-label">Visibility</span><span class="fact-value" id="visibility">—</span></div>
+          <div class="fact"><span class="fact-label">Revision</span><span class="fact-value" id="revision">—</span></div>
+        </div>
+        <div class="review-actions" id="review-actions">
+          <button class="secondary" id="feedback-action" type="button">Leave feedback</button>
+          <button class="secondary" id="revisions-action" type="button">Revisions</button>
+          <button class="secondary" id="visibility-action" type="button" hidden>Hide</button>
+          <button class="secondary" id="share-action" type="button" hidden>Create share link</button>
+          <button class="secondary danger" id="delete-action" type="button" hidden>Delete</button>
+        </div>
+        <form class="panel feedback-form" id="feedback-panel" hidden>
+          <p class="panel-title">Feedback for this revision</p>
+          <label>
+            <span class="fact-label">Comment</span>
+            <textarea id="feedback-body" maxlength="4000" required placeholder="What should the publisher know?"></textarea>
+          </label>
+          <div class="panel-buttons">
+            <button class="secondary" id="feedback-cancel" type="button">Cancel</button>
+            <button class="secondary" id="feedback-submit" type="submit">Submit feedback</button>
+          </div>
+        </form>
+        <section class="panel" id="revisions-panel" aria-label="Artifact revisions" hidden>
+          <p class="panel-title">Revision history</p>
+          <div class="revision-list" id="revision-list"></div>
+        </section>
+        <section class="panel" id="delete-panel" aria-label="Confirm artifact deletion" hidden>
+          <p class="panel-title">Delete this artifact?</p>
+          <p class="confirm-copy">This permanently removes the artifact, its revisions, feedback, reactions, audience history, and public share links.</p>
+          <div class="panel-buttons">
+            <button class="secondary" id="delete-cancel" type="button">Cancel</button>
+            <button class="secondary danger" id="delete-confirm" type="button">Delete permanently</button>
+          </div>
+        </section>
+        <div class="actions">
+          <button class="open" id="open" type="button" disabled>Open artifact ↗</button>
+          <div class="pager" id="pager" hidden>
+            <button class="nav" id="previous" type="button" aria-label="Previous artifact">‹</button>
+            <span class="position" id="position">1 / 1</span>
+            <button class="nav" id="next" type="button" aria-label="Next artifact">›</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    <p class="notice" id="notice">Only trusted metadata and a server-owned thumbnail are shown here.</p>
+  </main>
+  <script>
+    (() => {
+      "use strict";
+
+      const APP_PROTOCOL_VERSION = "2026-01-26";
+      const REVIEW_META = "com.agentshelf.artifact-mcp/review";
+      const elements = Object.fromEntries(
+        ["preview", "preview-fallback", "eyebrow", "artifact-title", "description",
+          "publisher", "visibility", "revision", "open", "pager", "previous",
+          "next", "position", "notice", "feedback-action", "revisions-action",
+          "visibility-action", "share-action", "delete-action", "feedback-panel",
+          "feedback-body", "feedback-cancel", "feedback-submit", "revisions-panel",
+          "revision-list", "delete-panel", "delete-cancel", "delete-confirm"
+        ].map((id) => [id, document.getElementById(id)])
+      );
+      const pending = new Map();
+      let nextRequestId = 1;
+      let artifacts = [];
+      let selected = 0;
+      let hostCapabilities = {};
+
+      function post(message) {
+        window.parent.postMessage(message, "*");
+      }
+
+      function request(method, params) {
+        const id = nextRequestId++;
+        post({ jsonrpc: "2.0", id, method, params });
+        return new Promise((resolve, reject) => {
+          pending.set(id, { resolve, reject });
+          window.setTimeout(() => {
+            if (!pending.has(id)) return;
+            pending.delete(id);
+            reject(new Error("The host did not respond."));
+          }, 10000);
+        });
+      }
+
+      function notify(method, params = {}) {
+        post({ jsonrpc: "2.0", method, params });
+      }
+
+      function clean(value, fallback = "") {
+        return typeof value === "string" && value.trim() ? value.trim() : fallback;
+      }
+
+      function normalizeArtifact(candidate) {
+        if (!candidate || typeof candidate !== "object") return null;
+        const id = clean(candidate.id);
+        if (!id) return null;
+        return {
+          id,
+          url: clean(candidate.url),
+          title: clean(candidate.title, id),
+          description: clean(candidate.description, "No description supplied."),
+          org: clean(candidate.org, "Uncategorized"),
+          category: clean(candidate.category, "Uncategorized"),
+          publisher: clean(candidate.publisher || candidate.uploader_label, "Unknown publisher"),
+          revision: Number.isSafeInteger(candidate.revision) ? candidate.revision : null,
+          hidden: candidate.hidden === true || candidate.hidden === 1,
+          isBundle: candidate.isBundle === true || candidate.is_bundle === true,
+          canManage: candidate.canManage === true,
+          canFeedback: candidate.canFeedback !== false,
+          thumbnailResourceUri: clean(candidate.thumbnailResourceUri, `artifact://${id}/thumbnail`)
+        };
+      }
+
+      function resultArtifacts(result) {
+        const explicit = result && result._meta && result._meta[REVIEW_META];
+        const candidates = Array.isArray(explicit && explicit.artifacts)
+          ? explicit.artifacts
+          : Array.isArray(result && result.structuredContent && result.structuredContent.artifacts)
+            ? result.structuredContent.artifacts
+            : [result && result.structuredContent];
+        return candidates.map(normalizeArtifact).filter(Boolean);
+      }
+
+      function setNotice(message, tone = "") {
+        elements.notice.textContent = message;
+        elements.notice.dataset.tone = tone;
+      }
+
+      function callTool(name, args) {
+        return request("tools/call", { name, arguments: args });
+      }
+
+      function closePanels(except = "") {
+        for (const id of ["feedback-panel", "revisions-panel", "delete-panel"]) {
+          if (id !== except) elements[id].hidden = true;
+        }
+      }
+
+      function setBusy(element, busy) {
+        element.disabled = busy;
+        element.setAttribute("aria-busy", busy ? "true" : "false");
+      }
+
+      async function refreshArtifact(id) {
+        const result = await callTool("list_artifacts", {});
+        const refreshed = resultArtifacts(result).find((artifact) => artifact.id === id);
+        if (!refreshed) return false;
+        artifacts[selected] = refreshed;
+        render();
+        return true;
+      }
+
+      function revisionUrl(artifact, revision) {
+        try {
+          const target = new URL(artifact.url);
+          target.pathname = `/raw/${encodeURIComponent(artifact.id)}/rev/${revision}${artifact.isBundle ? "/" : ""}`;
+          target.search = "";
+          target.hash = "";
+          return target.toString();
+        } catch {
+          return "";
+        }
+      }
+
+      function appendRevisionRow(artifact, row, current) {
+        const item = document.createElement("div");
+        item.className = "revision-row";
+        const copy = document.createElement("span");
+        copy.className = "revision-copy";
+        const title = document.createElement("strong");
+        title.textContent = `v${row.revision}${current ? " · current" : ""}`;
+        const detail = document.createElement("small");
+        detail.textContent = clean(row.title, artifact.title);
+        copy.append(title, detail);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "secondary";
+        button.textContent = "Open";
+        button.addEventListener("click", async () => {
+          const url = current ? artifact.url : revisionUrl(artifact, row.revision);
+          if (!url) return;
+          try {
+            await request("ui/open-link", { url });
+          } catch {
+            setNotice("The host did not allow this revision to open.", "error");
+          }
+        });
+        item.append(copy, button);
+        elements["revision-list"].append(item);
+      }
+
+      function clearPreview() {
+        const oldImage = elements.preview.querySelector("img");
+        if (oldImage) oldImage.remove();
+        elements["preview-fallback"].hidden = false;
+        elements["preview-fallback"].classList.remove("loading");
+        elements["preview-fallback"].querySelector("span").textContent =
+          "Preview unavailable — metadata remains safe to review";
+      }
+
+      async function loadPreview(artifact) {
+        clearPreview();
+        if (!hostCapabilities.serverResources) return;
+        try {
+          const result = await request("resources/read", { uri: artifact.thumbnailResourceUri });
+          const content = result && Array.isArray(result.contents) ? result.contents[0] : null;
+          if (!content || typeof content.blob !== "string") return;
+          const image = document.createElement("img");
+          image.alt = `Thumbnail of ${artifact.title}`;
+          image.src = `data:${clean(content.mimeType, "application/octet-stream")};base64,${content.blob}`;
+          image.addEventListener("load", () => { elements["preview-fallback"].hidden = true; });
+          image.addEventListener("error", clearPreview, { once: true });
+          elements.preview.append(image);
+        } catch {
+          clearPreview();
+        }
+      }
+
+      function render() {
+        const artifact = artifacts[selected];
+        if (!artifact) {
+          elements["artifact-title"].textContent = "No artifacts to review";
+          elements.description.textContent = "The tool completed without returning an artifact.";
+          elements.open.disabled = true;
+          elements["feedback-action"].hidden = true;
+          elements["revisions-action"].hidden = true;
+          elements["visibility-action"].hidden = true;
+          elements["share-action"].hidden = true;
+          elements["delete-action"].hidden = true;
+          closePanels();
+          clearPreview();
+          return;
+        }
+        elements.eyebrow.textContent = `${artifact.org} · ${artifact.category}`;
+        elements["artifact-title"].textContent = artifact.title;
+        elements.description.textContent = artifact.description;
+        elements.publisher.textContent = artifact.publisher;
+        elements.visibility.textContent = artifact.hidden ? "Hidden" : "Shared";
+        elements.revision.textContent = artifact.revision ? `v${artifact.revision}` : "Current";
+        elements.open.disabled = !artifact.url;
+        elements["feedback-action"].hidden = !artifact.canFeedback;
+        elements["revisions-action"].hidden = false;
+        elements["visibility-action"].hidden = !artifact.canManage;
+        elements["visibility-action"].textContent = artifact.hidden ? "Share" : "Hide";
+        elements["share-action"].hidden = !artifact.canManage;
+        elements["delete-action"].hidden = !artifact.canManage;
+        elements.pager.hidden = artifacts.length < 2;
+        elements.position.textContent = `${selected + 1} / ${artifacts.length}`;
+        elements.previous.disabled = selected === 0;
+        elements.next.disabled = selected === artifacts.length - 1;
+        setNotice("Only trusted metadata and a server-owned thumbnail are shown here.");
+        void loadPreview(artifact);
+      }
+
+      function acceptToolResult(result) {
+        artifacts = resultArtifacts(result);
+        selected = 0;
+        render();
+      }
+
+      elements.open.addEventListener("click", async () => {
+        const artifact = artifacts[selected];
+        if (!artifact || !artifact.url) return;
+        try {
+          await request("ui/open-link", { url: artifact.url });
+        } catch {
+          setNotice("The host did not allow this link to open.", "error");
+        }
+      });
+      elements["feedback-action"].addEventListener("click", () => {
+        closePanels("feedback-panel");
+        elements["feedback-panel"].hidden = !elements["feedback-panel"].hidden;
+        if (!elements["feedback-panel"].hidden) elements["feedback-body"].focus();
+      });
+      elements["feedback-cancel"].addEventListener("click", () => {
+        elements["feedback-panel"].hidden = true;
+      });
+      elements["feedback-panel"].addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const artifact = artifacts[selected];
+        const body = elements["feedback-body"].value.trim();
+        if (!artifact || !body) return;
+        setBusy(elements["feedback-submit"], true);
+        try {
+          const result = await callTool("submit_feedback", { id: artifact.id, body });
+          if (result?.structuredContent?.submitted !== true) throw new Error("Feedback was not accepted.");
+          elements["feedback-body"].value = "";
+          elements["feedback-panel"].hidden = true;
+          setNotice(`Feedback submitted for v${result.structuredContent.revision}.`);
+        } catch (error) {
+          setNotice(clean(error.message, "Feedback could not be submitted."), "error");
+        } finally {
+          setBusy(elements["feedback-submit"], false);
+        }
+      });
+      elements["revisions-action"].addEventListener("click", async () => {
+        const artifact = artifacts[selected];
+        if (!artifact) return;
+        closePanels("revisions-panel");
+        if (!elements["revisions-panel"].hidden) {
+          elements["revisions-panel"].hidden = true;
+          return;
+        }
+        elements["revisions-panel"].hidden = false;
+        elements["revision-list"].replaceChildren();
+        setBusy(elements["revisions-action"], true);
+        try {
+          const result = await callTool("list_revisions", { id: artifact.id });
+          const structured = result?.structuredContent || {};
+          appendRevisionRow(artifact, {
+            revision: Number.isSafeInteger(structured.current)
+              ? structured.current
+              : artifact.revision,
+            title: artifact.title
+          }, true);
+          for (const revision of Array.isArray(structured.revisions) ? structured.revisions : []) {
+            if (revision.revision !== structured.current) {
+              appendRevisionRow(artifact, revision, false);
+            }
+          }
+        } catch (error) {
+          elements["revisions-panel"].hidden = true;
+          setNotice(clean(error.message, "Revision history is unavailable."), "error");
+        } finally {
+          setBusy(elements["revisions-action"], false);
+        }
+      });
+      elements["visibility-action"].addEventListener("click", async () => {
+        const artifact = artifacts[selected];
+        if (!artifact || !artifact.canManage) return;
+        setBusy(elements["visibility-action"], true);
+        try {
+          const hidden = !artifact.hidden;
+          await callTool("set_visibility", { id: artifact.id, hidden });
+          artifact.hidden = hidden;
+          await refreshArtifact(artifact.id);
+          setNotice(hidden ? "Artifact hidden from the gallery." : "Artifact shared in the gallery.");
+        } catch (error) {
+          setNotice(clean(error.message, "Visibility could not be changed."), "error");
+        } finally {
+          setBusy(elements["visibility-action"], false);
+        }
+      });
+      elements["share-action"].addEventListener("click", async () => {
+        const artifact = artifacts[selected];
+        if (!artifact || !artifact.canManage) return;
+        if (artifact.shareUrl) {
+          try {
+            await request("ui/open-link", { url: artifact.shareUrl });
+          } catch {
+            setNotice("The host did not allow the share link to open.", "error");
+          }
+          return;
+        }
+        setBusy(elements["share-action"], true);
+        try {
+          const result = await callTool("create_share", { id: artifact.id, expires: "24h" });
+          artifact.shareUrl = clean(result?.structuredContent?.url);
+          elements["share-action"].textContent = artifact.shareUrl ? "Open share link" : "Share link ready";
+          setNotice("A read-only share link is ready for 24 hours.");
+        } catch (error) {
+          setNotice(clean(error.message, "A share link could not be created."), "error");
+        } finally {
+          setBusy(elements["share-action"], false);
+        }
+      });
+      elements["delete-action"].addEventListener("click", () => {
+        closePanels("delete-panel");
+        elements["delete-panel"].hidden = false;
+        elements["delete-confirm"].focus();
+      });
+      elements["delete-cancel"].addEventListener("click", () => {
+        elements["delete-panel"].hidden = true;
+        elements["delete-action"].focus();
+      });
+      elements["delete-confirm"].addEventListener("click", async () => {
+        const artifact = artifacts[selected];
+        if (!artifact || !artifact.canManage) return;
+        setBusy(elements["delete-confirm"], true);
+        try {
+          const result = await callTool("delete_artifact", { id: artifact.id });
+          const audit = result?._meta?.["com.agentshelf.artifact-mcp/audit"];
+          if (result?.structuredContent?.deleted !== true || audit?.outcome !== "deleted") {
+            throw new Error("The server did not confirm deletion.");
+          }
+          artifacts.splice(selected, 1);
+          selected = Math.min(selected, Math.max(artifacts.length - 1, 0));
+          closePanels();
+          render();
+          setNotice(`Artifact ${audit.artifactId} was deleted and recorded.`);
+        } catch (error) {
+          setNotice(clean(error.message, "Artifact deletion failed."), "error");
+        } finally {
+          setBusy(elements["delete-confirm"], false);
+        }
+      });
+      elements.previous.addEventListener("click", () => {
+        if (selected > 0) { selected -= 1; closePanels(); render(); }
+      });
+      elements.next.addEventListener("click", () => {
+        if (selected + 1 < artifacts.length) { selected += 1; closePanels(); render(); }
+      });
+
+      window.addEventListener("message", (event) => {
+        if (event.source !== window.parent) return;
+        const message = event.data;
+        if (!message || message.jsonrpc !== "2.0") return;
+        if (message.id !== undefined && pending.has(message.id)) {
+          const handlers = pending.get(message.id);
+          pending.delete(message.id);
+          if (message.error) handlers.reject(new Error(clean(message.error.message, "Host error")));
+          else handlers.resolve(message.result);
+          return;
+        }
+        if (message.method === "ui/notifications/tool-result") {
+          acceptToolResult(message.params);
+        } else if (message.method === "ui/notifications/host-context-changed") {
+          if (message.params && typeof message.params === "object") {
+            document.documentElement.dataset.theme = clean(message.params.theme);
+          }
+        } else if (message.method === "ui/resource-teardown" && message.id !== undefined) {
+          clearPreview();
+          post({ jsonrpc: "2.0", id: message.id, result: {} });
+        }
+      });
+
+      request("ui/initialize", {
+        protocolVersion: APP_PROTOCOL_VERSION,
+        clientInfo: { name: "artifact-mcp-review", version: "1.0.0" },
+        capabilities: {},
+        appCapabilities: {}
+      }).then((result) => {
+        hostCapabilities = result && result.hostCapabilities ? result.hostCapabilities : {};
+        const context = result && result.hostContext;
+        if (context && context.theme) document.documentElement.dataset.theme = context.theme;
+        notify("ui/notifications/initialized");
+      }).catch(() => {
+        setNotice("This host could not initialize the interactive review.", "error");
+      });
+
+      if ("ResizeObserver" in window) {
+        new ResizeObserver(() => notify("ui/notifications/size-changed", {
+          width: document.documentElement.scrollWidth,
+          height: document.documentElement.scrollHeight
+        })).observe(document.body);
+      }
+    })();
+  </script>
+</body>
+</html>

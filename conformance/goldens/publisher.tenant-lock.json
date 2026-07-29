@@ -1,0 +1,80 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_beta}\",\"url\":\"http://conformance.test/${artifact_id_beta}\",\"org\":\"beta\",\"bytes\":24,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 24,
+              "category": "",
+              "id": "${artifact_id_beta}",
+              "org": "beta",
+              "url": "http://conformance.test/${artifact_id_beta}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_admin}\",\"url\":\"http://conformance.test/${artifact_id_admin}\",\"org\":\"acme\",\"bytes\":28,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 28,
+              "category": "",
+              "id": "${artifact_id_admin}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_admin}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "<h1>beta tried acme</h1>"
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "artifact_orgs": [
+        {
+          "client_id": "pub-admin",
+          "id": "${artifact_id_admin}",
+          "org": "acme",
+          "title": "Admin Target"
+        },
+        {
+          "client_id": "pub-beta",
+          "id": "${artifact_id_beta}",
+          "org": "beta",
+          "title": "Override Attempt"
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "id": "raw.anchor-bridge",
+  "tags": ["raw", "csp", "invariant-4"],
+  "fixture": "empty-v21",
+  "note": "The ?anchor=1 representation adds ONLY the server-owned bridge script, injected before the last </body>. The golden freezes those exact bytes.",
+  "steps": [
+    {
+      "name": "publish a single-file artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": { "html": "<!doctype html><html><body><p>anchor me</p></body></html>", "title": "Anchor" }
+          }
+        }
+      },
+      "capture": { "artifact_id_1": "result.structuredContent.id" },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "plain raw representation",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": { "status": 200, "body": { "mode": "exact-bytes" } }
+    },
+    {
+      "name": "anchor representation adds only the bridge",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}?anchor=1", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "mode": "exact-header",
+          "forbid": ["allow-same-origin"],
+          "require": { "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" }
+        },
+        "body": { "mode": "exact-bytes" }
+      }
+    }
+  ]
+}

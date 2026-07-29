@@ -1,0 +1,19 @@
+# Structural enforcement of the blocking discipline (blueprint §A4).
+#
+# The rule: every SQLite + filesystem operation runs as one synchronous closure inside
+# `spawn_blocking`; a connection or transaction must NEVER be held across an `.await`. Holding one
+# parks a pooled connection on a worker thread while the task is suspended, which at pool size 4
+# deadlocks under concurrency.
+#
+# Rust already enforces half of this for free: `rusqlite::Transaction<'_>` is `!Send`, so holding a
+# transaction across `.await` is a compile error in any spawned task. But `rusqlite::Connection` and
+# `r2d2::PooledConnection` ARE `Send`, so the case we actually care about compiles fine. This lint
+# closes that gap and is denied in CI.
+#
+# Generic types are written WITHOUT generic arguments: paths resolve to DefIds and match on the ADT,
+# so `r2d2::PooledConnection` catches every instantiation.
+await-holding-invalid-types = [
+  { path = "rusqlite::Connection", reason = "hold a SQLite connection only inside spawn_blocking; use persistence::db::interact" },
+  { path = "rusqlite::Transaction", reason = "a transaction must never span an await point" },
+  { path = "r2d2::PooledConnection", reason = "a pooled connection parked across an await starves the pool (max_size = 4)" },
+]

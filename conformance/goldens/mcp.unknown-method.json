@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32601,
+            "message": "Method not found: does/not/exist"
+          },
+          "id": 3,
+          "jsonrpc": "2.0"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

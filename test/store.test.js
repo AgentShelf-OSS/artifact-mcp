@@ -48,18 +48,23 @@ test("single-file publication exposes metadata and body without staging residue"
   }
 });
 
-test("hidden artifacts are excluded from member listings and navigation but remain available to admins", () => {
+test("hidden artifacts stay discoverable only to their recorded owner and administrators", () => {
   const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-visibility-"));
   const runtime = openDatabase({ dataDir });
-  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "hidden1" });
+  const ids = ["hidden1", "hidden2"];
+  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => ids.shift() });
 
   try {
-    store.publish({ clientId: "publisher", org: "acme", html: "<h1>Hidden</h1>" });
+    store.publish({ clientId: "publisher", org: "acme", ownerEmail: "owner@acme.test", html: "<h1>Hidden</h1>" });
+    store.publish({ clientId: "publisher-2", org: "acme", ownerEmail: "other@acme.test", html: "<h1>Other</h1>" });
     store.setHidden("hidden1", true);
+    store.setHidden("hidden2", true);
     assert.deepEqual(store.listOrgArtifacts("acme").map((row) => row.id), []);
     assert.deepEqual(store.listOrgIds("acme"), []);
-    assert.deepEqual(store.listOrgArtifacts("acme", { includeHidden: true }).map((row) => row.id), ["hidden1"]);
-    assert.deepEqual(store.listOrgIds("acme", { includeHidden: true }), ["hidden1"]);
+    assert.deepEqual(store.listOrgArtifacts("acme", { ownerEmail: "owner@acme.test" }).map((row) => row.id), ["hidden1"]);
+    assert.deepEqual(store.listOrgIds("acme", { ownerEmail: "owner@acme.test" }), ["hidden1"]);
+    assert.deepEqual(store.listOrgArtifacts("acme", { includeHidden: true }).map((row) => row.id), ["hidden1", "hidden2"]);
+    assert.deepEqual(store.listOrgIds("acme", { includeHidden: true }), ["hidden2", "hidden1"]);
   } finally {
     runtime.db.close();
     rmSync(dataDir, { recursive: true, force: true });
@@ -176,7 +181,9 @@ test("identical single-file and bundle updates do not create revisions or replac
 
     assert.equal(single.revision, 1);
     assert.equal(bundle.revision, 1);
-    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_revisions").pluck().get(), 0);
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_revisions").pluck().get(), 2);
+    assert.equal(store.listRevisions("noop01").revisions.length, 0);
+    assert.equal(store.listRevisions("noop02").revisions.length, 0);
     assert.equal(existsSync(path.join(runtime.artifactDir, ".history")), false);
     assert.equal(store.readArtifact("noop01").html, html);
     assert.equal(store.readBundleFile("noop02", "other.html").content.toString(), bundleFiles["other.html"]);
@@ -356,7 +363,7 @@ test("deleting an artifact removes its history rows and bodies", () => {
   try {
     store.publish({ clientId: "publisher", org: "acme", html: "<h1>a</h1>" });
     store.update({ id: "del123", clientId: "publisher", org: "acme", html: "<h1>b</h1>" });
-    assert.equal(runtime.db.prepare("SELECT COUNT(*) c FROM artifact_revisions WHERE artifact_id='del123'").get().c, 1);
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) c FROM artifact_revisions WHERE artifact_id='del123'").get().c, 2);
 
     assert.equal(store.deleteArtifactById("del123"), true);
     assert.equal(runtime.db.prepare("SELECT COUNT(*) c FROM artifact_revisions WHERE artifact_id='del123'").get().c, 0);
@@ -391,7 +398,7 @@ test("audit recovers a committed-but-uninstalled staged body after a mid-update 
   }
 });
 
-test("audit recovers a committed same-length body by digest without snapshotting stale history", () => {
+test("audit recovers a committed same-length body while preserving outgoing history", () => {
   const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-auditdigest-"));
   let runtime = openDatabase({ dataDir });
   const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "digest1" });
@@ -405,7 +412,7 @@ test("audit recovers a committed same-length body by digest without snapshotting
     // Reproduce the durable state after update() commits metadata and its outgoing revision
     // row, but before it moves the old body to history and installs the staged new body.
     runtime.db.exec(`
-      INSERT INTO artifact_revisions
+      INSERT OR REPLACE INTO artifact_revisions
         (artifact_id, org, revision, title, description, category, bytes, is_bundle, entry, body_sha256)
       SELECT id, org, revision, title, description, category, bytes, is_bundle, entry, body_sha256
       FROM artifacts WHERE id = 'digest1';
@@ -424,12 +431,57 @@ test("audit recovers a committed same-length body by digest without snapshotting
 
     assert.ok(report.recoveredPaths.includes(".digest1.staging-crash"));
     assert.equal(recovered.readArtifact("digest1").html, newBody);
+    const outgoing = recovered.readHistoryArtifact("digest1", 1);
+    assert.equal(outgoing.html, oldBody, "recovery snapshots revision 1 before installing revision 2");
+    assert.equal(outgoing.meta.body_sha256, sha256(oldBody));
 
-    recovered.update({ id: "digest1", clientId: "publisher", org: "acme", html: "<h1>END</h1>", title: "End" });
-    assert.equal(recovered.readHistoryArtifact("digest1", 1), null, "crash must not snapshot the stale body");
+    const restored = recovered.restore({ id: "digest1", revision: 1, clientId: "publisher" });
+    assert.equal(restored.ok, true);
+    assert.equal(restored.revision, 3);
+    assert.equal(restored.restoredFrom, 1);
+    assert.equal(recovered.readArtifact("digest1").html, oldBody);
+
     const recoveredHistory = recovered.readHistoryArtifact("digest1", 2);
-    assert.equal(recoveredHistory.html, newBody, "next update snapshots the recovered body");
+    assert.equal(recoveredHistory.html, newBody, "restore snapshots the recovered revision 2 body");
     assert.equal(recoveredHistory.meta.body_sha256, sha256(newBody));
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("audit preserves and reports zero-length staging without replacing an intact final body", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-audittorn-"));
+  const runtime = openDatabase({ dataDir });
+  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "torn123" });
+
+  try {
+    const oldBody = "<h1>OLD</h1>";
+    const newBody = "<h1>NEW</h1>";
+    store.publish({ clientId: "publisher", org: "acme", html: oldBody, title: "Old" });
+    runtime.db.exec(`
+      INSERT OR REPLACE INTO artifact_revisions
+        (artifact_id, org, revision, title, description, category, bytes, is_bundle, entry, body_sha256)
+      SELECT id, org, revision, title, description, category, bytes, is_bundle, entry, body_sha256
+      FROM artifacts WHERE id = 'torn123';
+    `);
+    runtime.db.prepare(`
+      UPDATE artifacts
+      SET title = 'New', bytes = ?, body_sha256 = ?, revision = 2
+      WHERE id = 'torn123'
+    `).run(Buffer.byteLength(newBody), sha256(newBody));
+
+    const stagingName = ".torn123.staging-crash";
+    const stagingPath = path.join(runtime.artifactDir, stagingName);
+    fs.writeFileSync(stagingPath, "");
+
+    const report = store.auditStorage({ cleanTransient: true });
+
+    assert.equal(store.readArtifact("torn123").html, oldBody);
+    assert.equal(fs.readFileSync(stagingPath, "utf8"), "", "zero-length staging is preserved");
+    assert.deepEqual(report.transientPaths, [stagingName]);
+    assert.deepEqual(report.recoveredPaths, []);
+    assert.deepEqual(report.divergentBodies, ["torn123"]);
   } finally {
     runtime.db.close();
     rmSync(dataDir, { recursive: true, force: true });

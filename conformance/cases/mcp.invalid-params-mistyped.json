@@ -1,0 +1,17 @@
+{
+  "id": "mcp.invalid-params-mistyped",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "mistyped required arg returns -32602",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "id": 8, "method": "tools/call", "params": { "name": "publish_artifact", "arguments": { "html": 123 } } }
+      },
+      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}

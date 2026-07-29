@@ -1,0 +1,158 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark"><link rel="icon" href="{{ favicon }}"><title>{{ app_name }} &middot; {{ site_host }}</title>
+<script>{{ theme_boot }}</script>
+<style>{{ css }}</style></head>
+<body>
+<a class="skip-link" href="#stage">Skip to artifacts</a>
+<div class="wrap">
+  <header class="masthead" data-ui="app-frame">
+    <a class="brand" href="/" aria-label="{{ app_name }} home"><span class="brand-mark">{{ app_brand }}</span><span><strong>{{ app_name }}</strong><small>{{ site_host }}</small></span></a>
+    <nav class="primary-nav" aria-label="Primary">
+      <a class="nav-link active" href="/" aria-current="page" data-ui="nav-artifacts">Artifacts</a>
+      {% if viewer_is_admin %}<a class="nav-link" href="/settings" data-ui="nav-administration">Administration</a>{% endif %}
+    </nav>
+    <nav class="header-actions" aria-label="Account">
+      <div class="notif-wrap">
+        <button class="header-link notif-toggle" id="notif-toggle" type="button" aria-label="Notifications" aria-expanded="false" aria-controls="notif-panel">{{ icons.bell }}<b class="notif-count" {% if unread_notifications == 0 %}hidden{% endif %}>{{ unread_notifications }}</b></button>
+        <section class="notif-panel" id="notif-panel" aria-label="Notifications" hidden>
+          <div class="notif-head"><strong>Feedback</strong><button id="notif-seen" type="button">Mark all read</button></div>
+          <div class="notif-list">{% if notifications.is_empty() %}<div class="notif-empty">No feedback yet.</div>{% else %}{% for notification in notifications %}<a class="notif-row{% if notification.unread %} unread{% endif %}" href="{{ notification.href }}">
+          <span class="notif-meta"><strong>{{ notification.viewer_email }}</strong><time>{{ notification.relative_time }}</time></span>
+          <span class="notif-artifact">{{ notification.artifact_title }}</span>
+          <span class="notif-snippet">{{ notification.snippet }}</span>
+        </a>{% endfor %}{% endif %}</div>
+        </section>
+      </div>
+      <button class="header-link theme-toggle" id="theme" type="button" aria-label="Change color theme">{{ icons.theme }}<span>Theme</span></button>
+      <span class="identity" style="--identity-k:{{ identity_color }};--identity-accent:color-mix(in oklab,var(--identity-k) 72%,var(--ink))"><span class="identity-dot"></span><span class="identity-email">{{ viewer_email }}</span><strong>{{ role }}</strong></span>
+      <a class="header-link signout" href="/cdn-cgi/access/logout">{{ icons.signout }}<span>Sign out</span></a>
+    </nav>
+  </header>
+
+  <main id="stage">
+    <section class="collection-head" aria-labelledby="page-title">
+      <div>
+        <p class="eyebrow">Private artifact collection</p>
+        <h1 id="page-title">{% if viewer_is_admin %}Artifacts{% else %}{{ viewer_org }} artifacts{% endif %}</h1>
+        <p class="intro-copy">{% if viewer_is_admin %}Published work across every organization you can access, including hidden artifacts.{% else %}Visible {{ viewer_org }} work, plus uploads you have hidden.{% endif %}</p>
+      </div>
+      <div class="collection-stats" aria-label="{{ total }} artifacts, {{ favorite_total }} favorites, {{ unread_notifications }} unread notifications">
+        <span><strong>{{ total }}</strong>artifacts</span>
+        <span><strong>{{ favorite_total }}</strong>favorites</span>
+        <span><strong>{{ unread_notifications }}</strong>unread</span>
+      </div>
+    </section>
+
+    <div class="collection-tools">
+      <label class="search">{{ icons.search }}
+        <input id="q" type="search" placeholder="Search artifacts, publishers, categories" aria-label="Search artifacts" autocomplete="off">
+        <kbd aria-hidden="true">/</kbd>
+      </label>
+      <button class="filter-toggle" id="filter-toggle" type="button" aria-expanded="false" aria-controls="filter-rail">Filters</button>
+      <div class="layout-toggle" aria-label="Collection layout">
+        <button type="button" data-layout="grid" aria-pressed="true">Grid</button>
+        <button type="button" data-layout="list" aria-pressed="false">List</button>
+      </div>
+    </div>
+
+    <div class="collection-layout">
+      <aside class="filter-rail" id="filter-rail" aria-label="Artifact filters">
+        <div class="filter-group" id="view-filters">
+          <p class="filter-title">View</p>
+          <button class="filter-choice" data-filter-view="all" aria-pressed="true">All artifacts <span>{{ total }}</span></button>
+          <button class="filter-choice" data-filter-view="favorites" aria-pressed="false">Favorites <span>{{ favorite_total }}</span></button>
+          <button class="filter-choice" data-filter-view="review" aria-pressed="false">{% if viewer_is_admin %}Needs review{% else %}My needs-work votes{% endif %} <span>{{ needs_review_total }}</span></button>
+        </div>
+        {% if show_chips %}<div class="filter-group" id="org-filters" aria-label="Filter by organization">
+          <p class="filter-title">Organization</p>
+          <button class="filter-choice" data-filter-org="all" aria-pressed="true">All organizations <span>{{ total }}</span></button>
+          {% for chip in chips %}<button class="filter-choice" data-filter-org="{{ chip.org }}" aria-pressed="false"><span><span class="dot" style="background:{{ chip.color }}"></span>{{ chip.org }}</span><span>{{ chip.count }}</span></button>{% endfor %}
+        </div>{% endif %}
+        {% if !categories.is_empty() %}<div class="filter-group" id="category-filters" aria-label="Filter by category">
+          <p class="filter-title">Category</p>
+          <button class="filter-choice" data-filter-category="all" aria-pressed="true">All categories <span>{{ total }}</span></button>
+          {% for category in categories %}<button class="filter-choice" data-filter-category="{{ category.key }}" aria-pressed="false"><span>{{ category.label }}</span><span>{{ category.count }}</span></button>{% endfor %}
+        </div>{% endif %}
+      </aside>
+
+      <section class="collection-results" aria-label="Artifact results">
+        <div class="result-summary">
+          <span>{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %} · Updated recently</span>
+          <span class="count" id="count" aria-live="polite">Showing {{ total }} of {{ total }}</span>
+        </div>
+
+        {% if total == 0 %}<div class="empty-all">
+          <div class="empty-mark" aria-hidden="true">{{ app_brand }}<span>00</span></div>
+          <p class="empty-kicker">The index is ready</p>
+          <h2>No artifacts have been published yet.</h2>
+          <p>Use <code>publish_artifact</code> for a single HTML page or <code>publish_bundle</code> for a multi-file experience. The first publication will appear here automatically.</p>
+        </div>{% else %}<div class="artifact-grid" id="artifact-grid" data-layout="grid">
+          {% for card in cards %}<article class="card{% if card.hidden %} is-hidden{% endif %}" data-ui="artifact-card" data-id="{{ card.id }}" data-org="{{ card.org }}" data-category="{{ card.category }}" data-hidden="{% if card.hidden %}1{% else %}0{% endif %}" data-fav="{% if card.favorite %}1{% else %}0{% endif %}" data-vote="{{ card.vote }}" data-needs-review="{% if card.needs_review %}1{% else %}0{% endif %}" data-owned="{% if card.is_owned_by_viewer %}1{% else %}0{% endif %}"
+             data-q="{{ card.search_text }}" data-updated="{{ card.updated_datetime }}"
+             style="--org-k:{{ card.color }};--k:color-mix(in oklab,var(--org-k) 72%,var(--ink))">
+            <div class="preview">
+              <img class="pv" src="{{ card.thumbnail_src }}" loading="lazy" decoding="async" width="1200" height="750" alt="" aria-hidden="true">
+              <div class="preview-skeleton" aria-hidden="true"><span></span><span></span><span></span></div>
+              <div class="glass" aria-hidden="true"></div>
+              <a class="preview-hit" href="/{{ card.id }}" aria-label="Open {{ card.title }}"></a>
+              <span class="format-badge {% if card.is_bundle %}bundle{% else %}single{% endif %}">{% if card.is_bundle %}Bundle{% else %}HTML{% endif %}</span>
+              {% if card.favorite %}<span class="fav-badge" title="In your favorites">{{ icons.heart }}<span class="sr-only">Favorited</span></span>{% endif %}
+              <span class="pid">/{{ card.id }}</span>
+            </div>
+            <div class="label">
+              <div class="card-overline"><span class="org-tag"><span class="org-dot"></span>{{ card.org }} · {{ card.category_label }}</span><time datetime="{{ card.updated_datetime }}">{{ card.updated_label }}</time></div>
+              <h3 class="card-title"><a href="/{{ card.id }}">{{ card.title }}</a></h3>
+              {% if card.has_description %}<p class="desc">{{ card.description }}</p>{% else %}<p class="desc desc-empty">No description supplied.</p>{% endif %}
+              <div class="facts">
+                <span><span class="fact-label">Published by</span>{{ card.who }}</span>
+                <span><span class="fact-label">Format</span>{% if card.is_bundle %}Multi-file{% else %}{{ card.bytes_label }}{% endif %}</span>
+                {% if card.has_views %}<span class="view-badge" title="{{ card.unique_viewers }} unique viewer{% if card.unique_viewers_plural %}s{% endif %}">👁 {{ card.views }}</span>{% endif %}
+                {% if card.show_admin %}<div class="sentiment" aria-label="Aggregate reactions: {{ card.sentiment_favorites }} favorites, {{ card.sentiment_up }} positive, {{ card.sentiment_down }} negative">
+                  <span title="Favorites">{{ icons.heart }}{{ card.sentiment_favorites }}</span><span title="Positive votes">{{ icons.up }}{{ card.sentiment_up }}</span><span title="Negative votes">{{ icons.down }}{{ card.sentiment_down }}</span>
+                </div>{% else if card.vote > 0 %}<span class="your-vote positive">Approved</span>{% else if card.vote < 0 %}<span class="your-vote negative">Needs work</span>{% endif %}
+              </div>
+              <div class="actions">
+                <a class="act open" href="/{{ card.id }}">{{ icons.open }}<span>Open</span></a>
+                <button class="act save{% if card.favorite %} active{% endif %}" data-action="favorite" type="button" aria-pressed="{% if card.favorite %}true{% else %}false{% endif %}" aria-label="{% if card.favorite %}Remove{% else %}Save{% endif %} {{ card.title }} {% if card.favorite %}from{% else %}to{% endif %} favorites">{{ icons.heart }}<span>{% if card.favorite %}Saved{% else %}Save{% endif %}</span></button>
+                <button class="act share" data-action="share" type="button" aria-label="Share {{ card.title }}">{{ icons.share }}<span>Share</span></button>
+                {% if card.is_bundle %}<button class="act card-download" type="button" disabled title="Bundles open in the Viewer and do not have a single HTML download" aria-label="HTML download unavailable for {{ card.title }}">{{ icons.download }}<span>HTML</span></button>{% else %}<a class="act card-download dl" href="/raw/{{ card.id }}?download" download aria-label="Download {{ card.title }} as HTML" title="Download HTML">{{ icons.download }}<span>HTML</span></a>{% endif %}
+                {% if card.show_visibility %}<button class="act icon-act visibility" data-action="visibility" type="button" aria-label="{% if card.hidden %}Show{% else %}Hide{% endif %} {{ card.title }} in the gallery" title="{% if card.hidden %}Show in gallery{% else %}Hide from gallery{% endif %}">{% if card.hidden %}{{ icons.eye_off }}{% else %}{{ icons.eye }}{% endif %}</button>{% endif %}
+                <button class="act icon-act more" data-action="more" type="button" aria-label="More actions for {{ card.title }}" aria-expanded="false" aria-controls="card-menu-{{ card.id }}">{{ icons.more }}</button>
+                <div class="card-menu" id="card-menu-{{ card.id }}" data-ui="card-menu" hidden>
+                  <label>Category<select class="category-menu" data-action="category" aria-label="Change category for {{ card.title }}"><option value="">{{ card.category_label }}</option>{% for option in card.category_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+                  {% if viewer_is_admin && !card.org_options.is_empty() %}<label>Organization<select class="org-menu" data-action="move-org" aria-label="Move {{ card.title }} to another organization"><option value="">{{ card.org }}</option>{% for option in card.org_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>{% endif %}
+                  {% if card.show_delete %}<button class="menu-action del" data-action="delete" type="button">Delete artifact</button>{% endif %}
+                  <div class="move-confirm" role="group" aria-label="Confirm organization move" hidden><span class="move-question"></span><button class="move-yes" type="button">Move</button><button class="move-no" type="button">Cancel</button></div>
+                </div>
+              </div>
+            </div>
+          </article>{% endfor %}
+        </div>{% endif %}
+      </section>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="empty" id="empty" hidden><p class="empty-kicker">No matches</p><h2>Nothing in the collection fits those filters.</h2><p>Try another title, publisher, category, or organization.</p></div>
+    <dialog class="share-dialog" id="share-dialog" aria-labelledby="share-title">
+      <form method="dialog" class="dialog-head"><div><p class="eyebrow">Public access</p><h2 id="share-title">Share artifact</h2></div><button class="dialog-close" value="cancel" aria-label="Close share dialog">×</button></form>
+      <p class="share-copy" id="share-copy">Create and revoke public links. Hiding an artifact from Gallery does not revoke these links.</p>
+      <form class="share-form" id="share-form"><label>Expiry<select id="share-expiry"><option value="">No expiry</option><option value="1h">1 hour</option><option value="1d">1 day</option><option value="7d">7 days</option></select></label><button class="act open" type="submit">Create link</button></form>
+      <div class="share-list" id="share-list" aria-live="polite"></div>
+    </dialog>
+    {% if has_delete_actions %}<dialog class="delete-dialog" id="delete-dialog" aria-labelledby="delete-title" aria-describedby="delete-copy">
+      <form method="dialog" class="delete-panel">
+        <div class="dialog-head"><div><p class="eyebrow">Permanent action</p><h2 id="delete-title">Delete artifact?</h2></div><button class="dialog-close" value="cancel" aria-label="Close delete dialog">×</button></div>
+        <div class="delete-body">
+          <p class="delete-context" id="delete-context"></p>
+          <p class="delete-copy" id="delete-copy">Deleting removes the artifact, revision history, feedback, reactions, audience history, and active public share links. This cannot be undone.</p>
+          <p class="delete-error" id="delete-error" role="status" aria-live="polite"></p>
+        </div>
+        <div class="delete-actions"><button class="delete-cancel" value="cancel" type="submit">Cancel</button><button class="delete-confirm" id="delete-confirm" type="button">Delete artifact</button></div>
+      </form>
+    </dialog>{% endif %}
+  </main>
+  <footer class="footer"><span>{{ app_name }}</span><span>Private · tenant-scoped · live HTML</span></footer>
+</div>
+<script>{{ script }}</script>
+</body></html>

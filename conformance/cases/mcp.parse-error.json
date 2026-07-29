@@ -1,0 +1,17 @@
+{
+  "id": "mcp.parse-error",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "authorized but invalid JSON",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "rawBody": "{ this is not json"
+      },
+      "expect": { "status": 400, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}

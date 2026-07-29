@@ -1,0 +1,189 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${publisher_write_id}\",\"url\":\"http://conformance.test/${publisher_write_id}\",\"org\":\"acme\",\"bytes\":36,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 36,
+              "category": "",
+              "id": "${publisher_write_id}",
+              "org": "acme",
+              "url": "http://conformance.test/${publisher_write_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "deleted": true,
+          "id": "${publisher_write_id}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 39,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "artifact_and_share_counts": [
+        {
+          "artifacts": 0,
+          "shares": 0
+        }
+      ]
+    }
+  }
+}

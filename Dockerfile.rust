@@ -1,0 +1,40 @@
+# syntax=docker/dockerfile:1.7
+
+FROM rust:1.97.1-alpine3.23 AS builder
+
+RUN apk add --no-cache binutils build-base ca-certificates cmake \
+    && rustup target add x86_64-unknown-linux-musl \
+    && mkdir -p /runtime-data
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+COPY src ./src
+COPY templates ./templates
+COPY assets ./assets
+COPY conformance/mcp.tool-output-schemas.json ./conformance/mcp.tool-output-schemas.json
+
+ENV RUSTUP_TOOLCHAIN=1.97.1 \
+    CC_x86_64_unknown_linux_musl=cc \
+    AR_x86_64_unknown_linux_musl=ar \
+    RUSTFLAGS="-C strip=symbols"
+RUN cargo build --release --locked --target x86_64-unknown-linux-musl \
+    && strip target/x86_64-unknown-linux-musl/release/artifact-mcp
+
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder --chown=nonroot:nonroot /runtime-data /data-rust
+COPY --from=builder --chown=nonroot:nonroot \
+    /build/target/x86_64-unknown-linux-musl/release/artifact-mcp /artifact-mcp
+
+USER nonroot:nonroot
+EXPOSE 3480
+ENV PORT=3480 \
+    DATA_DIR=/data-rust \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    RUST_LOG=artifact_mcp=info,tower_http=info
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=5 \
+    CMD ["/artifact-mcp", "healthcheck"]
+
+ENTRYPOINT ["/artifact-mcp"]

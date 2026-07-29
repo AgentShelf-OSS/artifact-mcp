@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createApp } from "../lib/app.js";
+import { createMcpTelemetry } from "../lib/observability.js";
 import { createArtifactPreviewNotifier } from "../lib/preview.js";
 import { renderSettings } from "../lib/settings.js";
 
@@ -160,6 +161,75 @@ test("signed-in viewers can advance only their own notification watermark", asyn
   assert.deepEqual(seen, ["viewer@acme.test"]);
 });
 
+test("human artifact deletion is limited to administrators and recorded owners", async () => {
+  async function attempt(viewer, ownerEmail) {
+    const deleted = [];
+    const artifact = {
+      id: "abc123",
+      org: "acme",
+      title: "Artifact",
+      client_id: "publisher",
+      owner_email: ownerEmail,
+      is_bundle: 0,
+    };
+    const base = dependencies({ resolveViewer: async () => viewer });
+    base.artifacts = {
+      ...base.artifacts,
+      getArtifactMeta: () => artifact,
+      deleteArtifactById: (id) => {
+        deleted.push(id);
+        return true;
+      },
+    };
+    const response = await invokeRoute(createApp(base), "delete", "/:id", {
+      params: { id: artifact.id },
+    });
+    return { response, deleted };
+  }
+
+  const owner = await attempt(
+    { email: "OWNER@ACME.TEST", org: "acme", isAdmin: false },
+    "owner@acme.test",
+  );
+  assert.equal(owner.response.status, 200);
+  assert.deepEqual(owner.response.body, { id: "abc123", deleted: true });
+  assert.deepEqual(owner.deleted, ["abc123"]);
+
+  for (const ownerEmail of ["owner@acme.test", null]) {
+    const member = await attempt(
+      { email: "member@acme.test", org: "acme", isAdmin: false },
+      ownerEmail,
+    );
+    assert.equal(member.response.status, 403);
+    assert.deepEqual(member.response.body, { error: "Forbidden" });
+    assert.deepEqual(member.deleted, []);
+  }
+
+  const admin = await attempt(
+    { email: "admin@example.test", org: "admin", isAdmin: true },
+    null,
+  );
+  assert.equal(admin.response.status, 200);
+  assert.deepEqual(admin.deleted, ["abc123"]);
+});
+
+test("organization deletion surfaces artifact refusal as an actionable 400", async () => {
+  const message = 'Cannot delete organization "acme" while it owns 1 artifact. Move its artifacts to another organization first.';
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    orgs: {
+      ...dependencies().orgs,
+      remove: () => { throw new Error(message); }
+    }
+  }));
+
+  const response = await invokeRoute(app, "delete", "/settings/orgs/:name", {
+    params: { name: "acme" }
+  });
+  assert.equal(response.status, 400);
+  assert.deepEqual(response.body, { error: message });
+});
+
 test("TRUST_ACCESS_HEADERS=1 explicitly restores local-development header identity", async () => {
   await withIdentityEnv(
     { TRUST_ACCESS_HEADERS: "1", ADMIN_EMAILS: "admin@example.test" },
@@ -187,7 +257,7 @@ test("MCP keys and share tokens remain identity-independent in every Access mode
     await withIdentityEnv(env, async (identity) => {
       assert.equal(identity.ACCESS_IDENTITY_MODE, expectedMode);
       const app = createApp(dependencies({
-        checkPublisherKey: () => ({ ok: true, clientId: "publisher", org: "acme", label: "Agent" }),
+        checkPublisherKey: () => ({ ok: true, clientId: "publisher", org: "acme", label: "Agent", role: "author" }),
         handleMcp: async () => ({ jsonrpc: "2.0", id: 1, result: { ok: true } }),
         shares: { resolve: () => ({ artifact_id: "abc123", org: "acme" }) },
         resolveViewer: async () => { throw new Error("identity-independent route resolved viewer"); }
@@ -203,6 +273,63 @@ test("MCP keys and share tokens remain identity-independent in every Access mode
       assert.equal(share.body, "<h1>Artifact</h1>");
     });
   }
+});
+
+test("MCP HTTP telemetry records success and failure paths with opaque correlation ids", async () => {
+  const logs = [];
+  const telemetry = createMcpTelemetry({
+    logger: { info(message, fields) { logs.push({ message, fields }); } },
+    createRequestId: (() => {
+      let sequence = 0;
+      return () => `mcp_test_${++sequence}`;
+    })()
+  });
+  const successApp = createApp(dependencies({
+    checkPublisherKey: () => ({ ok: true, clientId: "publisher", org: "acme", label: "Agent", role: "author" }),
+    validateMcpHttpRequest: () => ({ ok: true, protocolVersion: null, modern: false }),
+    handleMcp: async () => ({ jsonrpc: "2.0", id: 1, result: { ok: true } }),
+    mcpTelemetry: telemetry
+  }));
+  await serve(successApp, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer must-not-be-logged",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list" })
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("x-request-id"), "mcp_test_1");
+  });
+
+  const failureApp = createApp(dependencies({
+    checkPublisherKey: () => ({ ok: false }),
+    mcpTelemetry: telemetry
+  }));
+  await serve(failureApp, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: {
+        authorization: "Bearer another-secret",
+        "content-type": "application/json"
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 2, method: "tools/list" })
+    });
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get("x-request-id"), "mcp_test_2");
+  });
+
+  await serve(successApp, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/metrics`);
+    const metrics = await response.text();
+    assert.equal(response.status, 200);
+    assert.match(metrics, /operation="listing",method="tools\/list",name="none",outcome="success"/);
+    assert.match(metrics, /outcome="authentication_failure"/);
+    assert.doesNotMatch(metrics, /must-not-be-logged|another-secret|publisher|acme/);
+  });
+  assert.equal(logs.length, 2);
+  assert.doesNotMatch(JSON.stringify(logs), /must-not-be-logged|another-secret|publisher|acme/);
 });
 
 test("REQUIRE_ACCESS_JWT=1 rejects startup readiness without complete JWT configuration", async () => {
@@ -288,12 +415,97 @@ test("share management requires artifact access and bundle shares guard paths", 
     assert.equal((await fetch(`${baseUrl}/s/token/missing.js`)).status, 404);
   });
   assert.equal(calls[0].createdBy, "member@acme.test");
+  // Invariant 3: a cross-org viewer and an unsigned viewer are told the artifact is not there,
+  // never that it is there but forbidden — a 403 here would confirm the id exists elsewhere.
   await serve(createApp({ ...base, resolveViewer: async () => ({ email: "other@other.test", org: "other", isAdmin: false }) }), async (baseUrl) => {
-    assert.equal((await fetch(`${baseUrl}/abc123/shares`)).status, 403);
+    assert.equal((await fetch(`${baseUrl}/abc123/shares`)).status, 404);
   });
   await serve(createApp({ ...base, resolveViewer: async () => ({ email: "", org: "", isAdmin: false }) }), async (baseUrl) => {
-    assert.equal((await fetch(`${baseUrl}/abc123/shares`)).status, 401);
+    assert.equal((await fetch(`${baseUrl}/abc123/shares`)).status, 404);
   });
+});
+
+test("a foreign artifact is indistinguishable from a nonexistent one on every artifact route", async () => {
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher", is_bundle: 0, revision: 1 };
+  const subordinateReads = [];
+  // Same dependencies twice; only whether getArtifactMeta finds a row differs. Every other
+  // adapter records the reads that must NOT happen before the access decision.
+  const build = (exists, viewer) => {
+    const base = dependencies({
+      resolveViewer: async () => viewer,
+      shares: {
+        resolve: () => null,
+        create: () => { subordinateReads.push("share.create"); return {}; },
+        listForArtifact: () => { subordinateReads.push("shares.list"); return []; },
+        revoke: () => { subordinateReads.push("shares.revoke"); return true; }
+      },
+      feedback: { listForArtifact: () => { subordinateReads.push("feedback.list"); return []; } },
+      views: {
+        record: () => subordinateReads.push("views.record"),
+        countsFor: () => { subordinateReads.push("views.counts"); return null; },
+        countsForOrg: () => new Map(),
+        viewersFor: () => [],
+        topForOrg: () => []
+      },
+      thumbnails: {
+        readThumbnail: async () => { subordinateReads.push("thumbnail.read"); return null; },
+        removeArtifact: async () => {},
+        placeholder: () => { subordinateReads.push("thumbnail.placeholder"); return Buffer.from("png"); }
+      }
+    });
+    base.artifacts = {
+      ...base.artifacts,
+      getArtifactMeta: () => exists ? artifact : null,
+      readArtifact: () => { subordinateReads.push("artifact.bytes"); return { meta: artifact, html: "<h1>Secret</h1>" }; },
+      listRevisions: () => { subordinateReads.push("artifact.history"); return { current: 1, revisions: [] }; },
+      deleteArtifactById: () => { subordinateReads.push("artifact.delete"); return true; }
+    };
+    return createApp(base);
+  };
+
+  const probes = [
+    ["GET", "/:id"],
+    ["GET", "/:id/shares"],
+    ["GET", "/:id/history"],
+    ["GET", "/:id/feedback"],
+    ["GET", "/thumbnails/:id"],
+    ["GET", "/raw/:id"],
+    ["DELETE", "/:id"],
+    ["POST", "/:id/react"],
+    ["POST", "/:id/feedback"],
+    ["POST", "/:id/category"],
+    ["POST", "/:id/share"],
+    ["POST", "/:id/visibility"],
+    ["POST", "/:id/move"],
+    ["POST", "/:id/restore"],
+    ["DELETE", "/:id/shares/:token"],
+    ["DELETE", "/:id/feedback/:fid"],
+    ["POST", "/:id/feedback/:fid/resolve"]
+  ];
+  // Both unauthorized personas: the signed-out probe used to leak 401-vs-404 and the cross-org
+  // probe 403-vs-404. Neither may distinguish an existing foreign id from a nonexistent one.
+  const personas = {
+    unsigned: { email: null, org: null, isAdmin: false },
+    "cross-org": { email: "intruder@other.test", org: "other", isAdmin: false }
+  };
+  for (const [persona, viewer] of Object.entries(personas)) {
+    const foreignApp = build(true, viewer);
+    const missingApp = build(false, viewer);
+    for (const [method, path] of probes) {
+      const params = { id: "abc123", token: "t".repeat(24), fid: "feedback1" };
+      const options = { params, body: { hidden: true, category: "x", expires: "never", revision: 1, body: "note" } };
+      const foreign = await invokeRoute(foreignApp, method.toLowerCase(), path, options);
+      const missing = await invokeRoute(missingApp, method.toLowerCase(), path, options);
+      assert.equal(foreign.status, 404, `${persona} ${method} ${path} conceals a foreign artifact`);
+      assert.deepEqual(
+        { status: foreign.status, body: foreign.body, headers: foreign.headers },
+        { status: missing.status, body: missing.body, headers: missing.headers },
+        `${persona} ${method} ${path} answers a foreign artifact exactly like a nonexistent one`
+      );
+    }
+  }
+  // Concealment is decided before any subordinate read, so timing/side effects leak nothing.
+  assert.deepEqual(subordinateReads, []);
 });
 
 test("administrators can open artifacts across organizations", async () => {
@@ -309,8 +521,8 @@ test("administrators can open artifacts across organizations", async () => {
   });
 });
 
-test("hidden direct URLs still render, while visibility mutations use artifact access", async () => {
-  const artifact = { id: "abc123", org: "acme", title: "Hidden", client_id: "publisher", is_bundle: 0, hidden: 1 };
+test("hidden direct URLs still render, while visibility mutations require the recorded owner", async () => {
+  const artifact = { id: "abc123", org: "acme", owner_email: "member@acme.test", title: "Hidden", client_id: "publisher", is_bundle: 0, hidden: 1 };
   let hidden;
   const base = dependencies({
     resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false })
@@ -325,8 +537,28 @@ test("hidden direct URLs still render, while visibility mutations use artifact a
 
   base.resolveViewer = async () => ({ email: "member@other.test", org: "other", isAdmin: false });
   await serve(createApp(base), async (baseUrl) => {
+    // Concealed, not forbidden: the mutation must not confirm the artifact exists elsewhere.
     const denied = await fetch(`${baseUrl}/abc123/visibility`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hidden: false }) });
+    assert.equal(denied.status, 404);
+    assert.deepEqual(await denied.json(), { error: "Not found" });
+  });
+});
+
+test("same-org non-owners cannot change visibility while owners can restore their hidden upload", async () => {
+  const artifact = { id: "abc124", org: "acme", owner_email: "owner@acme.test", title: "Owned", client_id: "publisher", is_bundle: 0, hidden: 1 };
+  let calls = 0;
+  const base = dependencies({ resolveViewer: async () => ({ email: "peer@acme.test", org: "acme", isAdmin: false }) });
+  base.artifacts = { ...base.artifacts, getArtifactMeta: () => artifact, setHidden() { calls += 1; return { hidden: false }; } };
+  await serve(createApp(base), async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/abc124/visibility`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hidden: false }) });
     assert.equal(denied.status, 403);
+    assert.equal(calls, 0);
+  });
+  base.resolveViewer = async () => ({ email: "OWNER@acme.test", org: "acme", isAdmin: false });
+  await serve(createApp(base), async (baseUrl) => {
+    const allowed = await fetch(`${baseUrl}/abc124/visibility`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ hidden: false }) });
+    assert.equal(allowed.status, 200);
+    assert.equal(calls, 1);
   });
 });
 
@@ -344,6 +576,7 @@ test("non-admins cannot re-tenant artifacts", async () => {
 test("artifact shell records named member views but never records admin views", async () => {
   const calls = [];
   let shellAnalytics;
+  let shellViewer;
   const base = dependencies({
     resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
     views: {
@@ -355,7 +588,11 @@ test("artifact shell records named member views but never records admin views", 
     },
     pages: {
       ...dependencies().pages,
-      shell(_meta, _nav, _reaction, _feedback, analytics) { shellAnalytics = analytics; return "shell"; }
+      shell(_meta, _nav, _reaction, _feedback, analytics, viewer) {
+        shellAnalytics = analytics;
+        shellViewer = viewer;
+        return "shell";
+      }
     }
   });
   await serve(createApp(base), async (baseUrl) => {
@@ -364,6 +601,7 @@ test("artifact shell records named member views but never records admin views", 
   });
   assert.deepEqual(calls, [["abc123", "acme", "member@acme.test"]]);
   assert.deepEqual(shellAnalytics.viewers, null);
+  assert.deepEqual(shellViewer, { email: "member@acme.test", org: "acme", isAdmin: false });
 
   base.resolveViewer = async () => ({ email: "admin@example.test", org: "admin", isAdmin: true });
   await serve(createApp(base), async (baseUrl) => {
@@ -372,6 +610,7 @@ test("artifact shell records named member views but never records admin views", 
   });
   assert.equal(calls.length, 1);
   assert.deepEqual(shellAnalytics.viewers, [{ email: "audience@acme.test" }]);
+  assert.deepEqual(shellViewer, { email: "admin@example.test", org: "admin", isAdmin: true });
 });
 
 test("raw artifact fetches never record a view", async () => {
@@ -398,7 +637,7 @@ test("unsigned artifact reads are concealed as not found", async () => {
   });
 });
 
-test("publisher-key creation preserves its display label", async () => {
+test("publisher-key creation preserves its display label and selected role", async () => {
   let received;
   const app = createApp(dependencies({
     resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
@@ -416,12 +655,46 @@ test("publisher-key creation preserves its display label", async () => {
     const response = await fetch(`${baseUrl}/settings/keys`, {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ clientId: "agent-one", org: "acme", label: "Acme research agent" })
+      body: JSON.stringify({
+        clientId: "agent-one",
+        org: "acme",
+        label: "Acme research agent",
+        role: "collaborator"
+      })
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(received, { clientId: "agent-one", org: "acme", label: "Acme research agent" });
-    assert.equal((await response.json()).label, "Acme research agent");
+    assert.deepEqual(received, {
+      clientId: "agent-one",
+      org: "acme",
+      label: "Acme research agent",
+      role: "collaborator"
+    });
+    const created = await response.json();
+    assert.equal(created.label, "Acme research agent");
+    assert.equal(created.role, "collaborator");
   });
+});
+
+test("owner management requires an admin and makes backfill an explicit confirmation", async () => {
+  const calls = [];
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    keys: {
+      list: () => [], create: () => ({}), revoke: () => false,
+      setOwner(id, ownerEmail) { calls.push(["set", id, ownerEmail]); return { clientId: id, org: "acme", ownerEmail }; },
+      backfillOwner(id, ownerEmail, options) { calls.push(["backfill", id, ownerEmail, options.confirm]); return { clientId: id, org: "acme", ownerEmail, matched: 2, updated: options.confirm ? 2 : 0, confirmed: options.confirm }; }
+    }
+  }));
+  await serve(app, async (baseUrl) => {
+    const changed = await fetch(`${baseUrl}/settings/keys/acme-key/owner`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerEmail: "owner@acme.test" }) });
+    assert.equal(changed.status, 200);
+    assert.deepEqual(await changed.json(), { clientId: "acme-key", org: "acme", ownerEmail: "owner@acme.test" });
+    const preview = await fetch(`${baseUrl}/settings/keys/acme-key/owner/backfill`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerEmail: "owner@acme.test" }) });
+    assert.deepEqual(await preview.json(), { clientId: "acme-key", org: "acme", ownerEmail: "owner@acme.test", matched: 2, updated: 0, confirmed: false });
+    const confirmed = await fetch(`${baseUrl}/settings/keys/acme-key/owner/backfill`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ownerEmail: "owner@acme.test", confirm: true }) });
+    assert.deepEqual(await confirmed.json(), { clientId: "acme-key", org: "acme", ownerEmail: "owner@acme.test", matched: 2, updated: 2, confirmed: true });
+  });
+  assert.deepEqual(calls, [["set", "acme-key", "owner@acme.test"], ["backfill", "acme-key", "owner@acme.test", false], ["backfill", "acme-key", "owner@acme.test", true]]);
 });
 
 test("non-admins cannot create organizations", async () => {
@@ -541,7 +814,7 @@ test("Settings renders escaped explicit email chips and explains Access policy",
   const html = renderSettings(
     { email: "admin@example.test", org: "admin", isAdmin: true },
     [],
-    [{ name: "acme", label: "", color: null, domains: [], emails: ["person+tag@example.com", '"><script>alert(1)</script>@example.com'], categories: [], keyCount: 0 }]
+    [{ name: "legacy.example", label: "", color: null, domains: [], emails: ["person+tag@example.com", '"><script>alert(1)</script>@example.com'], categories: [], keyCount: 0 }]
   );
   assert.match(html, /Specific emails/);
   assert.match(html, /person\+tag@example\.com/);
@@ -549,6 +822,32 @@ test("Settings renders escaped explicit email chips and explains Access policy",
   assert.match(html, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
   assert.match(html, /override domain routing/i);
   assert.match(html, /Cloudflare Access Allow policy/i);
+  assert.match(html, /Legacy domain-shaped organization/);
+  assert.match(html, /data-ui="app-frame"/);
+  assert.match(html, /data-ui="nav-artifacts"/);
+  assert.match(html, /data-ui="nav-administration"/);
+  assert.match(html, /aria-current="page"/);
+  assert.doesNotMatch(html, /<span>Gallery<\/span>/);
+});
+
+test("legacy same-name domain removal fails loudly through the admin route", async () => {
+  const message = 'Cannot remove domain "legacy.example" from organization "legacy.example": implicit domain access would remain. Migrate to a non-domain organization first.';
+  const base = dependencies({
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true })
+  });
+  base.orgs = {
+    ...base.orgs,
+    removeDomain() { throw new Error(message); }
+  };
+
+  const response = await invokeRoute(
+    createApp(base),
+    "delete",
+    "/settings/orgs/:name/domains/:domain",
+    { params: { name: "legacy.example", domain: "legacy.example" } }
+  );
+  assert.equal(response.status, 400);
+  assert.deepEqual(response.body, { error: message });
 });
 
 test("issuing a key to an unregistered org is refused", async () => {
@@ -868,7 +1167,14 @@ test("valid reaction updates are normalized and persisted", async () => {
 test("authorized MCP requests retain their JSON-RPC response contract", async () => {
   let context;
   const app = createApp(dependencies({
-    checkPublisherKey: () => ({ ok: true, clientId: "publisher", org: "acme", label: "Agent" }),
+    checkPublisherKey: () => ({
+      ok: true,
+      clientId: "publisher",
+      org: "acme",
+      label: "Agent",
+      role: "author",
+      ownerEmail: "owner@acme.test",
+    }),
     async handleMcp(_payload, auth) {
       context = auth;
       return { jsonrpc: "2.0", id: 7, result: { accepted: true } };
@@ -882,8 +1188,127 @@ test("authorized MCP requests retain their JSON-RPC response contract", async ()
       body: JSON.stringify({ jsonrpc: "2.0", id: 7, method: "ping" })
     });
     assert.equal(response.status, 200);
-    assert.deepEqual(context, { clientId: "publisher", org: "acme", label: "Agent" });
+    // Role and verified owner must survive the handleMcp handoff. The latter is the immutable,
+    // server-authenticated snapshot used for member visibility ownership.
+    assert.deepEqual(context, {
+      clientId: "publisher",
+      org: "acme",
+      label: "Agent",
+      role: "author",
+      ownerEmail: "owner@acme.test",
+    });
     assert.deepEqual(await response.json(), { jsonrpc: "2.0", id: 7, result: { accepted: true } });
+  });
+});
+
+test("MCP parser failures preserve the frozen compact HTTP envelope", async () => {
+  const app = createApp(dependencies({
+    limits: { mcpJson: "1kb" },
+    checkPublisherKey: () => ({
+      ok: true,
+      clientId: "publisher",
+      org: "acme",
+      label: "Agent",
+      role: "author",
+      ownerEmail: null,
+    }),
+  }));
+
+  await serve(app, async (baseUrl) => {
+    const malformed = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer secret" },
+      body: "{",
+    });
+    assert.equal(malformed.status, 400);
+    assert.deepEqual(await malformed.json(), { error: "invalid JSON" });
+
+    const oversized = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer secret" },
+      body: JSON.stringify({ payload: "x".repeat(2048) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.deepEqual(await oversized.json(), { error: "payload too large" });
+  });
+});
+
+test("OAuth MCP routes publish resource metadata and return a scoped 403 challenge", async () => {
+  const oauth = {
+    enabled: true,
+    issuer: "https://auth.example.test"
+  };
+  let handled = 0;
+  const app = createApp(dependencies({
+    publicBase: "https://artifacts.example.test",
+    oauth,
+    checkPublisherKey: async () => ({
+      ok: true,
+      clientId: "reader-service",
+      org: "acme",
+      label: "Reader service",
+      role: "reader",
+      scopes: new Set(["artifacts:read"]),
+      authType: "oauth"
+    }),
+    async handleMcp(payload) {
+      handled += 1;
+      return { jsonrpc: "2.0", id: payload.id, result: { accepted: true } };
+    }
+  }));
+
+  await serve(app, async (baseUrl) => {
+    const metadata = await fetch(`${baseUrl}/.well-known/oauth-protected-resource`);
+    assert.equal(metadata.status, 200);
+    assert.deepEqual(await metadata.json(), {
+      resource: "https://artifacts.example.test/mcp",
+      authorization_servers: ["https://auth.example.test"],
+      bearer_methods_supported: ["header"],
+      scopes_supported: [
+        "artifacts:read",
+        "artifacts:publish",
+        "artifacts:review",
+        "artifacts:visibility",
+        "artifacts:delete"
+      ]
+    });
+
+    const denied = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer scoped-token" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 73,
+        method: "tools/call",
+        params: { name: "publish_artifact", arguments: { html: "<h1>No</h1>" } }
+      })
+    });
+    assert.equal(denied.status, 403);
+    assert.match(denied.headers.get("www-authenticate"), /error="insufficient_scope"/);
+    assert.match(denied.headers.get("www-authenticate"), /scope="artifacts:publish"/);
+    assert.deepEqual(await denied.json(), {
+      jsonrpc: "2.0",
+      id: 73,
+      error: {
+        code: -32003,
+        message: "insufficient_scope",
+        data: { requiredScope: "artifacts:publish" }
+      }
+    });
+    assert.equal(handled, 0);
+
+    const allowed = await fetch(`${baseUrl}/mcp`, {
+      method: "POST",
+      headers: { "content-type": "application/json", authorization: "Bearer scoped-token" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 74,
+        method: "tools/call",
+        params: { name: "read_artifact", arguments: { id: "abc123" } }
+      })
+    });
+    assert.equal(allowed.status, 200);
+    assert.equal(handled, 1);
   });
 });
 
@@ -981,7 +1406,7 @@ test("thumbnail delivery is digest-bound, authenticated, and uses no-store place
 test("artifact deletion triggers best-effort thumbnail cleanup", async () => {
   const removed = [];
   const app = createApp(dependencies({
-    resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
     thumbnails: {
       readThumbnail: async () => null,
       placeholder: () => Buffer.from("placeholder"),

@@ -1,0 +1,1149 @@
+{
+  "id": "human-concealment.invariant3",
+  "tags": [
+    "human",
+    "concealment",
+    "invariant-3",
+    "CONF-ACCESS"
+  ],
+  "fixture": "empty-v21",
+  "note": "Invariant 3 / blueprint B6. For an unsigned or cross-org human, an EXISTING artifact id and a NONEXISTENT artifact id must return the same status, content type, cache policy and body on EVERY artifact-scoped route. Each 'nonexistent' step is paired to its 'existing-foreign' predecessor with sameAsStep, so the matrix fails loudly wherever the two are distinguishable. This case is EXPECTED TO FAIL against current Node \u2014 several mutation routes return 403 for a foreign-but-existing artifact and 404 for a nonexistent one, which is exactly the leak B6 asks to close. A sibling leg centralizes lookup + concealed access; its golden is recorded from that patched reference, after which `pending` is removed and this case becomes gating.",
+  "steps": [
+    {
+      "name": "publish an artifact into acme (the foreign tenant for every probe below)",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<h1>acme private</h1>",
+              "title": "Concealed"
+            }
+          }
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET viewer shell \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET viewer shell \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "[unsigned] GET raw delivery \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/raw/${artifact_id_1}"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET raw delivery \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/raw/zzzzzzzzzzzz"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 3
+      }
+    },
+    {
+      "name": "[unsigned] GET thumbnail \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/thumbnails/${artifact_id_1}"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET thumbnail \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/thumbnails/zzzzzzzzzzzz"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 5
+      }
+    },
+    {
+      "name": "[unsigned] GET list shares \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/shares"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET list shares \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/shares"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 7
+      }
+    },
+    {
+      "name": "[unsigned] GET revision history \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/history"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET revision history \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/history"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 9
+      }
+    },
+    {
+      "name": "[unsigned] GET list feedback \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/feedback"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] GET list feedback \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/feedback"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 11
+      }
+    },
+    {
+      "name": "[unsigned] POST add feedback \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/feedback",
+        "json": {
+          "body": "probe"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST add feedback \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/feedback",
+        "json": {
+          "body": "probe"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 13
+      }
+    },
+    {
+      "name": "[unsigned] POST react \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/react",
+        "json": {
+          "favorite": true
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST react \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/react",
+        "json": {
+          "favorite": true
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 15
+      }
+    },
+    {
+      "name": "[unsigned] POST set visibility \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/visibility",
+        "json": {
+          "hidden": true
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST set visibility \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/visibility",
+        "json": {
+          "hidden": true
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 17
+      }
+    },
+    {
+      "name": "[unsigned] POST set category \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/category",
+        "json": {
+          "category": "probe"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST set category \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/category",
+        "json": {
+          "category": "probe"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 19
+      }
+    },
+    {
+      "name": "[unsigned] POST move org (admin-only route) \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/move",
+        "json": {
+          "org": "beta"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST move org (admin-only route) \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/move",
+        "json": {
+          "org": "beta"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 21
+      }
+    },
+    {
+      "name": "[unsigned] POST create share \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/share",
+        "json": {
+          "expires": "never"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST create share \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/share",
+        "json": {
+          "expires": "never"
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 23
+      }
+    },
+    {
+      "name": "[unsigned] POST restore revision \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/restore",
+        "json": {
+          "revision": 1
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] POST restore revision \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/restore",
+        "json": {
+          "revision": 1
+        },
+        "headers": {
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 25
+      }
+    },
+    {
+      "name": "[unsigned] DELETE delete \u2014 existing-foreign",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[unsigned] DELETE delete \u2014 nonexistent",
+      "request": {
+        "method": "DELETE",
+        "path": "/zzzzzzzzzzzz"
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 27
+      }
+    },
+    {
+      "name": "[cross-org] GET viewer shell \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET viewer shell \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 29
+      }
+    },
+    {
+      "name": "[cross-org] GET raw delivery \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/raw/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET raw delivery \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/raw/zzzzzzzzzzzz",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 31
+      }
+    },
+    {
+      "name": "[cross-org] GET thumbnail \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/thumbnails/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET thumbnail \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/thumbnails/zzzzzzzzzzzz",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 33
+      }
+    },
+    {
+      "name": "[cross-org] GET list shares \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/shares",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET list shares \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/shares",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 35
+      }
+    },
+    {
+      "name": "[cross-org] GET revision history \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/history",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET revision history \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/history",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 37
+      }
+    },
+    {
+      "name": "[cross-org] GET list feedback \u2014 existing-foreign",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/feedback",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] GET list feedback \u2014 nonexistent",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/feedback",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 39
+      }
+    },
+    {
+      "name": "[cross-org] POST add feedback \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/feedback",
+        "json": {
+          "body": "probe"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST add feedback \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/feedback",
+        "json": {
+          "body": "probe"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 41
+      }
+    },
+    {
+      "name": "[cross-org] POST react \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/react",
+        "json": {
+          "favorite": true
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST react \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/react",
+        "json": {
+          "favorite": true
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 43
+      }
+    },
+    {
+      "name": "[cross-org] POST set visibility \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/visibility",
+        "json": {
+          "hidden": true
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST set visibility \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/visibility",
+        "json": {
+          "hidden": true
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 45
+      }
+    },
+    {
+      "name": "[cross-org] POST set category \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/category",
+        "json": {
+          "category": "probe"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST set category \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/category",
+        "json": {
+          "category": "probe"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 47
+      }
+    },
+    {
+      "name": "[cross-org] POST move org (admin-only route) \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/move",
+        "json": {
+          "org": "beta"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST move org (admin-only route) \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/move",
+        "json": {
+          "org": "beta"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 49
+      }
+    },
+    {
+      "name": "[cross-org] POST create share \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/share",
+        "json": {
+          "expires": "never"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST create share \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/share",
+        "json": {
+          "expires": "never"
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 51
+      }
+    },
+    {
+      "name": "[cross-org] POST restore revision \u2014 existing-foreign",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/restore",
+        "json": {
+          "revision": 1
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] POST restore revision \u2014 nonexistent",
+      "request": {
+        "method": "POST",
+        "path": "/zzzzzzzzzzzz/restore",
+        "json": {
+          "revision": 1
+        },
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "content-type": "application/json"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 53
+      }
+    },
+    {
+      "name": "[cross-org] DELETE delete \u2014 existing-foreign",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "[cross-org] DELETE delete \u2014 nonexistent",
+      "request": {
+        "method": "DELETE",
+        "path": "/zzzzzzzzzzzz",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 55
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "artifact_untouched",
+        "query": "SELECT id, org, client_id, title, category, hidden, revision FROM artifacts"
+      },
+      {
+        "name": "no_side_effects",
+        "query": "SELECT (SELECT COUNT(*) FROM feedback) AS feedback, (SELECT COUNT(*) FROM artifact_shares) AS shares, (SELECT COUNT(*) FROM reactions) AS reactions"
+      }
+    ]
+  }
+}

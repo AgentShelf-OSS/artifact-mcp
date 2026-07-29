@@ -17,8 +17,10 @@ moving on.
 - An MCP endpoint (`POST /mcp`) where authorized agents publish HTML artifacts and get back a URL.
 - A private, org-scoped gallery for humans, gated by Cloudflare Access (SSO).
 - Optional public, unguessable share links under `/s/:token`.
-- One core container by default, SQLite + files on disk, no database server. Preview thumbnails add
-  an optional browser sidecar.
+- One native Rust core container by default, SQLite + files on disk, no database server. Preview
+  thumbnails add an optional browser sidecar.
+- Dual MCP compatibility: existing `2025-06-18` clients keep working while `2026-07-28` clients can
+  negotiate typed outputs, resources, MCP Apps, and durable preview tasks.
 
 ## Prerequisites
 
@@ -47,6 +49,8 @@ Open `.env`. The only value you must set to boot is a bootstrap publishing key.
 | Var | Needed | Notes |
 |---|---|---|
 | `ARTIFACT_API_KEYS` | **yes** | `clientId:org:secret` (comma-separated for several). The DB is authoritative after first boot; this just seeds the first key. Use a long random secret. |
+| `MCP_OAUTH_ISSUER` + `MCP_OAUTH_AUDIENCE` + `MCP_OAUTH_JWKS_URL` | optional | Enables short-lived OAuth machine credentials for `/mcp`. Configure the complete triple; keep API keys enabled during rollout. |
+| `MCP_API_KEYS_ENABLED` | optional | Defaults to `1`. Set to `0` only after OAuth clients are verified; startup refuses to disable the only authentication path. |
 | `WEBHOOK_ENC_KEY` | recommended | A 32-byte base64 key that encrypts Discord webhook URLs in SQLite with AES-256-GCM. If omitted, webhooks remain zero-config but are stored in plaintext and startup warns loudly. |
 | `PREVIEW_RENDERER_URL` | optional | Enables persistent gallery/Discord PNGs for single-file publish/update/restore events. Leave unset for gallery placeholders and text-only Discord. |
 | `PUBLIC_BASE_URL` | prod | Your real `https://artifact.your-domain`. Defaults to `http://localhost:3480`. Used to build share URLs. |
@@ -87,13 +91,14 @@ For a first local run with no Cloudflare, enable loopback header-trust so you ca
 ```bash
 echo 'TRUST_ACCESS_HEADERS=1' >> .env      # loopback dev only
 docker compose up -d --build
-docker logs artifact-mcp | grep "Access identity"
+docker logs artifact-mcp 2>&1 | grep "viewer identity mode ready"
 ```
 
-> Prefer running without Docker? `npm install && npm run dev` starts the server directly with
-> loopback header-trust already enabled (equivalent to setting `TRUST_ACCESS_HEADERS=1`).
+> Need the compatibility twin for development? `npm install && npm run dev` starts the Node
+> reference runtime directly with loopback header-trust already enabled. The shipped Compose
+> service and production image use Rust.
 
-You should see `Access identity: HEADER-TRUST (…)`. Publish a test artifact:
+You should see a structured log with `"identity_mode":"header-trust"`. Publish a test artifact:
 
 ```bash
 KEY=REPLACE_WITH_LONG_RANDOM_SECRET   # the secret from ARTIFACT_API_KEYS
@@ -176,15 +181,19 @@ boot log must now read `Access identity: JWT-verified`.
 Cloudflare Access only guards the **tunnel hostname**. A directly-reachable origin port bypasses it
 entirely. Two ways to close that, best first:
 
-**Option A — tunnel-only (no host port at all):** run `cloudflared` in this Compose project (an
-example service is commented at the bottom of `docker-compose.yml`), on the same default network as
-the app. Set the tunnel's **origin service** to `http://artifact-mcp:3480` (the container name,
-resolved over Docker's network), uncomment the service, and delete the app's `ports:` block. Nothing
-is published on the host.
+**Option A — tunnel-only (no host port at all):** use an operator-owned public Cloudflare Tunnel
+Compose overlay on the app's default network. Set its origin service to
+`http://artifact-mcp:3480` and use a Compose override to reset the app's `ports` list only after the
+public hostname has been verified. Nothing is then published on the host.
 
 **Option B — loopback bind:** keep the default `HOST_BIND=127.0.0.1`, so the port is reachable only
 from the host, and point the tunnel at `http://localhost:3480` from a `cloudflared` running on that
 host.
+
+Do not confuse either public-gallery option with the optional `anthropic-tunnel` profile. That
+profile is Anthropic's research-preview, outbound-only private MCP transport and does not serve the
+human gallery. Its staged enablement and rollback are documented in
+[`docs/ops/anthropic-mcp-tunnel.md`](docs/ops/anthropic-mcp-tunnel.md).
 
 **Check:**
 ```bash

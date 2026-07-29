@@ -1,0 +1,29 @@
+{
+  "id": "mcp.oversized-413",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "env": { "MCP_JSON_LIMIT": "1mb" },
+  "note": "MCP_JSON_LIMIT is pinned small so the oversize boundary is exercised in milliseconds. The production default is mcpJsonLimitFor(MAX_BUNDLE_BYTES) = MAX_BUNDLE_BYTES*6 + 256KB; this case freezes the 413 envelope and the auth-before-buffering ordering, not the default byte count.",
+  "steps": [
+    {
+      "name": "unauthenticated oversize body is rejected 401 by the key gate BEFORE the parser buffers it",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "content-type": "application/json" },
+        "genBody": { "kind": "oversize-json", "bytes": 2000000 }
+      },
+      "expect": { "status": 401, "body": { "mode": "canonical-json" } }
+    },
+    {
+      "name": "authorized oversize body returns 413 at the buffering boundary",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "genBody": { "kind": "oversize-json", "bytes": 2000000 }
+      },
+      "expect": { "status": 413, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}
