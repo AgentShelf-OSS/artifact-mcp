@@ -6,13 +6,13 @@ import { createApp } from "./lib/app.js";
 import { MCP_JSON_LIMIT } from "./lib/config.js";
 import db, { ARTIFACT_DIR, seedKeysFromEnv } from "./lib/db.js";
 import { sha256Hex, checkKey } from "./lib/auth.js";
-import { handleMcp } from "./lib/mcp.js";
+import { executePreviewTask, handleMcp, validateMcpHttpRequest } from "./lib/mcp.js";
 import * as artifactStore from "./lib/store.js";
 import { ACCESS_IDENTITY_MODE, assertReady, resolveViewer } from "./lib/identity.js";
 import { accessRetryTarget } from "./lib/access-retry.js";
 import { accessSessionRetryPage, renderGallery, renderArtifactShell, notFoundPage, notSignedInPage } from "./lib/portal.js";
 import { renderSettings } from "./lib/settings.js";
-import { listKeys, createKey, revokeKey } from "./lib/keys.js";
+import { listKeys, createKey, revokeKey, setKeyOwner, backfillKeyOwner } from "./lib/keys.js";
 import * as orgs from "./lib/orgs.js";
 import { getReaction, setReaction, reactionsFor, sentimentMap } from "./lib/reactions.js";
 import * as views from "./lib/views.js";
@@ -23,10 +23,20 @@ import * as notify from "./lib/notify.js";
 import * as notifications from "./lib/notifications.js";
 import { createArtifactPreviewNotifier, createPreviewRenderer } from "./lib/preview.js";
 import { createThumbnailQueue, createThumbnailStore } from "./lib/thumbnails.js";
+import {
+  createPublisherAuthenticator,
+  oauthConfigFromEnv
+} from "./lib/oauth.js";
+import { createPreviewTaskStore } from "./lib/tasks.js";
 
 const PORT = Number(process.env.PORT || 3480);
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:3480";
 const ACCESS_RETRY_PARAM = "cf_access_retry";
+const oauthConfig = oauthConfigFromEnv();
+const authenticatePublisher = createPublisherAuthenticator({
+  config: oauthConfig,
+  checkApiKey: checkKey
+});
 
 function withNoTransform(value) {
   const current = Array.isArray(value) ? value.join(", ") : String(value || "");
@@ -107,6 +117,8 @@ if (digestBackfill.updated) {
 const previewRenderer = createPreviewRenderer();
 const thumbnails = createThumbnailStore({ renderer: previewRenderer });
 const thumbnailQueue = createThumbnailQueue({ thumbnails });
+const previewTasks = createPreviewTaskStore();
+previewTasks.resume((task) => executePreviewTask(task, { preview: thumbnails }));
 // The audit is best-effort cleanup and must never block core startup: a read-only or
 // unwritable previews path degrades thumbnails, it does not take the service down.
 try {
@@ -147,13 +159,20 @@ if (thumbnails.enabled) {
 }
 
 const app = createApp({
-  checkPublisherKey: checkKey,
-  handleMcp: (payload, auth) => handleMcp(payload, auth, { notify: artifactNotifier.emit }),
+  checkPublisherKey: authenticatePublisher,
+  handleMcp: (payload, auth, options = {}) =>
+    handleMcp(payload, auth, {
+      ...options,
+      notify: artifactNotifier.emit,
+      preview: thumbnails,
+      tasks: previewTasks
+    }),
+  validateMcpHttpRequest,
   resolveViewer,
   artifacts: artifactStore,
   thumbnails,
   shares,
-  keys: { list: listKeys, create: createKey, revoke: revokeKey },
+  keys: { list: listKeys, create: createKey, revoke: revokeKey, setOwner: setKeyOwner, backfillOwner: backfillKeyOwner },
   orgs: {
     list: orgs.listOrgs,
     names: orgs.listOrgNames,
@@ -177,6 +196,7 @@ const app = createApp({
   feedback: { add: addFeedback, listForArtifact: feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer },
   pages: { gallery: renderGallery, shell: renderArtifactShell, notFound: notFoundPage, notSignedIn: notSignedInPage, settings: renderSettings },
   publicBase: PUBLIC_BASE,
+  oauth: oauthConfig,
   healthCheck() {
     db.prepare("SELECT 1").get();
     accessSync(ARTIFACT_DIR, constants.R_OK | constants.W_OK);

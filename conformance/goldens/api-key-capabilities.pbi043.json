@@ -1,0 +1,133 @@
+{
+  "steps": [
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    }
+  ],
+  "postState": {
+    "sql": {
+      "roles": [
+        {
+          "client_id": "conf-collaborator",
+          "role": "collaborator"
+        },
+        {
+          "client_id": "pub-acme",
+          "role": "author"
+        },
+        {
+          "client_id": "pub-acme2",
+          "role": "reader"
+        }
+      ],
+      "matrix_effects": [
+        {
+          "author_own": 0,
+          "collaborator_own": 0,
+          "reader_own": 1,
+          "shared_actor": "conf-collaborator",
+          "shared_revision": 2
+        }
+      ]
+    }
+  }
+}

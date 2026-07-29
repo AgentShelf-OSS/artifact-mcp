@@ -1,0 +1,17 @@
+{
+  "id": "mcp.tool-exec-error-isError",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "tool execution error stays an isError result, not a protocol error",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "id": 9, "method": "tools/call", "params": { "name": "set_visibility", "arguments": { "id": "missing123456", "hidden": true } } }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    }
+  ]
+}

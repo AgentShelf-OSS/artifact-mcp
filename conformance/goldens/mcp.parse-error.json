@@ -1,0 +1,14 @@
+{
+  "steps": [
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid JSON"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

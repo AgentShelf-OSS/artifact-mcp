@@ -1,0 +1,312 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_single_id}\",\"url\":\"http://conformance.test/${read_single_id}\",\"org\":\"acme\",\"bytes\":6,\"category\":\"Reports\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 6,
+              "category": "Reports",
+              "id": "${read_single_id}",
+              "org": "acme",
+              "url": "http://conformance.test/${read_single_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"count\":1,\"artifacts\":[{\"id\":\"${read_single_id}\",\"url\":\"http://conformance.test/${read_single_id}\",\"title\":\"Readable\",\"description\":\"\",\"created_at\":\"<volatile>\",\"org\":\"acme\",\"category\":\"Reports\",\"revision\":1,\"updated_at\":\"<volatile>\",\"bytes\":6,\"is_bundle\":0,\"entry\":\"\",\"hidden\":0,\"uploader_label\":\"\"}]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "bytes": 6,
+                  "category": "Reports",
+                  "created_at": "<volatile>",
+                  "description": "",
+                  "entry": "",
+                  "hidden": 0,
+                  "id": "${read_single_id}",
+                  "is_bundle": 0,
+                  "org": "acme",
+                  "revision": 1,
+                  "title": "Readable",
+                  "updated_at": "<volatile>",
+                  "uploader_label": "",
+                  "url": "http://conformance.test/${read_single_id}"
+                }
+              ],
+              "count": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_single_id}\",\"org\":\"acme\",\"is_bundle\":false,\"revision\":1,\"content_type\":\"text/html; charset=utf-8\",\"bytes_total\":6,\"offset\":0,\"bytes_returned\":1,\"truncated\":true,\"content\":\"A\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes_returned": 1,
+              "bytes_total": 6,
+              "content": "A",
+              "content_type": "text/html; charset=utf-8",
+              "id": "${read_single_id}",
+              "is_bundle": false,
+              "offset": 0,
+              "org": "acme",
+              "revision": 1,
+              "truncated": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_single_id}\",\"url\":\"http://conformance.test/${read_single_id}\",\"revision\":2,\"bytes\":6,\"entry\":\"\",\"category\":\"Reports\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 6,
+              "category": "Reports",
+              "entry": "",
+              "id": "${read_single_id}",
+              "revision": 2,
+              "url": "http://conformance.test/${read_single_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_single_id}\",\"org\":\"acme\",\"is_bundle\":false,\"revision\":1,\"content_type\":\"text/html; charset=utf-8\",\"bytes_total\":6,\"offset\":0,\"bytes_returned\":6,\"truncated\":false,\"content\":\"A🎉B\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes_returned": 6,
+              "bytes_total": 6,
+              "content": "A🎉B",
+              "content_type": "text/html; charset=utf-8",
+              "id": "${read_single_id}",
+              "is_bundle": false,
+              "offset": 0,
+              "org": "acme",
+              "revision": 1,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_bundle_id}\",\"url\":\"http://conformance.test/${read_bundle_id}\",\"org\":\"acme\",\"entry\":\"index.html\",\"files\":2,\"bytes\":25,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 25,
+              "category": "",
+              "entry": "index.html",
+              "files": 2,
+              "id": "${read_bundle_id}",
+              "org": "acme",
+              "url": "http://conformance.test/${read_bundle_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_bundle_id}\",\"org\":\"acme\",\"is_bundle\":true,\"entry\":\"index.html\",\"revision\":1,\"content_type\":\"application/json\",\"bytes_total\":25,\"offset\":0,\"bytes_returned\":0,\"truncated\":false,\"files\":[{\"path\":\"assets/note.txt\",\"bytes\":10,\"entry\":false},{\"path\":\"index.html\",\"bytes\":15,\"entry\":true}]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes_returned": 0,
+              "bytes_total": 25,
+              "content_type": "application/json",
+              "entry": "index.html",
+              "files": [
+                {
+                  "bytes": 10,
+                  "entry": false,
+                  "path": "assets/note.txt"
+                },
+                {
+                  "bytes": 15,
+                  "entry": true,
+                  "path": "index.html"
+                }
+              ],
+              "id": "${read_bundle_id}",
+              "is_bundle": true,
+              "offset": 0,
+              "org": "acme",
+              "revision": 1,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 8,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${read_bundle_id}\",\"org\":\"acme\",\"is_bundle\":true,\"entry\":\"index.html\",\"revision\":1,\"content_type\":\"text/plain; charset=utf-8\",\"bytes_total\":10,\"offset\":0,\"bytes_returned\":10,\"truncated\":false,\"content\":\"hello 🎉\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes_returned": 10,
+              "bytes_total": 10,
+              "content": "hello 🎉",
+              "content_type": "text/plain; charset=utf-8",
+              "entry": "index.html",
+              "id": "${read_bundle_id}",
+              "is_bundle": true,
+              "offset": 0,
+              "org": "acme",
+              "revision": 1,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown bundle file: ../index.html",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 10,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown artifact: ${read_single_id}",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 11,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown artifact: missing1",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "status": 401,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32001,
+            "message": "unauthorized"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

@@ -1,0 +1,53 @@
+{
+  "id": "publisher.tenant-lock",
+  "tags": ["publisher", "tenant", "invariant-1"],
+  "fixture": "empty-v21",
+  "note": "Invariant 1: a non-admin publisher key is welded to the org on the key. An `org` argument cannot override it. An admin key MAY target an org explicitly. Proven by the MCP response AND by the persisted row.",
+  "steps": [
+    {
+      "name": "non-admin beta key tries to publish INTO acme — the org argument must be ignored",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": { "name": "publish_artifact", "arguments": { "html": "<h1>beta tried acme</h1>", "title": "Override Attempt", "org": "acme" } }
+        }
+      },
+      "capture": { "artifact_id_beta": "result.structuredContent.id" },
+      "assertSymbols": [
+        { "symbol": "artifact_id_beta", "length": 12, "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz" }
+      ],
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "admin key MAY target an explicit org",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_admin}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+          "params": { "name": "publish_artifact", "arguments": { "html": "<h1>admin targeted acme</h1>", "title": "Admin Target", "org": "acme" } }
+        }
+      },
+      "capture": { "artifact_id_admin": "result.structuredContent.id" },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "a beta viewer can read the beta-locked artifact",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_beta}", "headers": { "cf-access-authenticated-user-email": "${viewer_beta}" } },
+      "expect": { "status": 200, "body": { "mode": "exact-bytes" } }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "artifact_orgs",
+        "query": "SELECT id, org, client_id, title FROM artifacts ORDER BY org, title",
+        "volatileFields": []
+      }
+    ]
+  }
+}

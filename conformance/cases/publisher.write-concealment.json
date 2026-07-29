@@ -1,0 +1,166 @@
+{
+  "id": "publisher.write-concealment",
+  "tags": ["publisher", "tenant", "invariant-3", "CONF-ACCESS", "CONF-MCP"],
+  "fixture": "empty-v21",
+  "note": "A valid publisher key must not distinguish a foreign artifact from the same id after it is deleted. Each of the five artifact-id write tools is probed while the artifact exists in another tenant, the owner deletes it, then the identical requests are replayed and paired with sameAsStep.",
+  "steps": [
+    {
+      "name": "acme publishes the artifact used by every foreign write probe",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": { "html": "<h1>publisher write concealment</h1>", "title": "Write concealment" }
+          }
+        }
+      },
+      "capture": { "publisher_write_id": "result.structuredContent.id" },
+      "afterSql": [
+        "UPDATE artifacts SET owner_email = '${viewer_acme}' WHERE id = '${publisher_write_id}'"
+      ],
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "delete_artifact — foreign existing id",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "delete_artifact", "arguments": { "id": "${publisher_write_id}" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "set_visibility — foreign existing id",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "set_visibility", "arguments": { "id": "${publisher_write_id}", "hidden": true } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "set_category — foreign existing id",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "set_category", "arguments": { "id": "${publisher_write_id}", "category": "Probe" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "create_share — foreign existing id",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "create_share", "arguments": { "id": "${publisher_write_id}", "expires": "never" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "restore_artifact — foreign existing id",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "restore_artifact", "arguments": { "id": "${publisher_write_id}", "revision": 1 } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "the owning human deletes the artifact so the same id is now nonexistent",
+      "request": {
+        "method": "DELETE",
+        "path": "/${publisher_write_id}",
+        "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" }
+      },
+      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+    },
+    {
+      "name": "delete_artifact — same id now nonexistent",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "delete_artifact", "arguments": { "id": "${publisher_write_id}" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" }, "sameAsStep": 1 }
+    },
+    {
+      "name": "set_visibility — same id now nonexistent",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "set_visibility", "arguments": { "id": "${publisher_write_id}", "hidden": true } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" }, "sameAsStep": 2 }
+    },
+    {
+      "name": "set_category — same id now nonexistent",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "set_category", "arguments": { "id": "${publisher_write_id}", "category": "Probe" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" }, "sameAsStep": 3 }
+    },
+    {
+      "name": "create_share — same id now nonexistent",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "create_share", "arguments": { "id": "${publisher_write_id}", "expires": "never" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" }, "sameAsStep": 4 }
+    },
+    {
+      "name": "restore_artifact — same id now nonexistent",
+      "request": {
+        "method": "POST", "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_beta}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 39, "method": "tools/call",
+          "params": { "name": "restore_artifact", "arguments": { "id": "${publisher_write_id}", "revision": 1 } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" }, "sameAsStep": 5 }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "artifact_and_share_counts",
+        "query": "SELECT (SELECT COUNT(*) FROM artifacts) AS artifacts, (SELECT COUNT(*) FROM artifact_shares) AS shares",
+        "volatileFields": []
+      }
+    ]
+  }
+}

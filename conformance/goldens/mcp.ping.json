@@ -1,0 +1,16 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {}
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

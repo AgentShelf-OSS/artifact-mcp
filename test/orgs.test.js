@@ -9,6 +9,7 @@ const dir = mkdtempSync(path.join(tmpdir(), "artifact-orgs-"));
 process.env.DATA_DIR = dir;
 const { default: db } = await import("../lib/db.js");
 const orgs = await import("../lib/orgs.js");
+const auth = await import("../lib/auth.js");
 
 after(() => {
   db.close();
@@ -59,6 +60,26 @@ test("duplicate orgs, bad domains, reserved names, and taken domains are rejecte
   assert.throws(() => orgs.createOrg({ name: "gamma", domain: "beta.test" }), /already mapped to "beta"/);
 });
 
+test("domain-shaped org names are rejected without weakening the implicit-domain fallback", () => {
+  assert.throws(
+    () => orgs.createOrg({ name: "tenant.example" }),
+    { message: 'Org name must not be an email domain. Use a tenant id such as "acme" and add the domain separately.' }
+  );
+});
+
+test("a legacy domain-named org cannot report a domain removal that leaves implicit access", () => {
+  db.prepare("INSERT INTO orgs (name, label) VALUES (?, ?)").run("legacy.example", "Legacy");
+  db.prepare("INSERT INTO org_domains (domain, org) VALUES (?, ?)").run("legacy.example", "legacy.example");
+
+  assert.throws(
+    () => orgs.removeDomain("legacy.example", "legacy.example"),
+    {
+      message: 'Cannot remove domain "legacy.example" from organization "legacy.example": implicit domain access would remain. Migrate to a non-domain organization first.'
+    }
+  );
+  assert.equal(orgs.orgForDomain("legacy.example"), "legacy.example");
+});
+
 test("domains and categories can be added and removed independently", () => {
   orgs.createOrg({ name: "delta" });
   orgs.addDomain("delta", "delta.test");
@@ -86,6 +107,48 @@ test("deleting an org cascades its domains, email members, and categories", () =
   assert.equal(orgs.orgForDomain("epsilon.test"), null);
   assert.equal(orgs.orgForEmail("member@shared.test"), null);
   assert.deepEqual(orgs.categoriesFor("epsilon"), []);
+});
+
+test("org deletion refuses owned artifacts, then revokes keys atomically with deletion", () => {
+  const secret = "offboard-secret";
+  orgs.createOrg({ name: "offboard", domain: "offboard.test" });
+  db.prepare("INSERT INTO api_keys (client_id, org, key_hash) VALUES (?, ?, ?)")
+    .run("offboard-key", "offboard", auth.sha256Hex(secret));
+  db.prepare("INSERT INTO artifacts (id, client_id, org, title) VALUES (?, ?, ?, ?)")
+    .run("offboard-artifact", "offboard-key", "offboard", "Keep me");
+
+  assert.throws(
+    () => orgs.deleteOrg("offboard"),
+    { message: 'Cannot delete organization "offboard" while it owns 1 artifact. Move its artifacts to another organization first.' }
+  );
+  assert.equal(orgs.orgExists("offboard"), true);
+  assert.equal(db.prepare("SELECT revoked_at FROM api_keys WHERE client_id = ?").get("offboard-key").revoked_at, null);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM artifacts WHERE org = ?").get("offboard").n, 1);
+  assert.equal(auth.checkKey({ headers: { authorization: `Bearer ${secret}` } }).ok, true);
+
+  db.prepare("DELETE FROM artifacts WHERE id = ?").run("offboard-artifact");
+  assert.equal(orgs.deleteOrg("offboard"), true);
+  assert.equal(orgs.orgExists("offboard"), false);
+  assert.ok(db.prepare("SELECT revoked_at FROM api_keys WHERE client_id = ?").get("offboard-key").revoked_at);
+  assert.deepEqual(auth.checkKey({ headers: { authorization: `Bearer ${secret}` } }), { ok: false });
+});
+
+test("org deletion rolls key revocation back when the registry delete fails", () => {
+  const secret = "rollback-secret";
+  orgs.createOrg({ name: "rollback-org" });
+  db.prepare("INSERT INTO api_keys (client_id, org, key_hash) VALUES (?, ?, ?)")
+    .run("rollback-key", "rollback-org", auth.sha256Hex(secret));
+  db.exec(`
+    CREATE TRIGGER block_rollback_org_delete
+    BEFORE DELETE ON orgs WHEN OLD.name = 'rollback-org'
+    BEGIN SELECT RAISE(ABORT, 'blocked delete'); END
+  `);
+
+  assert.throws(() => orgs.deleteOrg("rollback-org"), /blocked delete/);
+  assert.equal(orgs.orgExists("rollback-org"), true);
+  assert.equal(db.prepare("SELECT revoked_at FROM api_keys WHERE client_id = ?").get("rollback-key").revoked_at, null);
+  assert.equal(auth.checkKey({ headers: { authorization: `Bearer ${secret}` } }).ok, true);
+  db.exec("DROP TRIGGER block_rollback_org_delete");
 });
 
 test("org names are case-folded so a tenant cannot be split by casing", () => {

@@ -1,0 +1,396 @@
+{
+  "id": "mcp.read-artifact",
+  "tags": [
+    "CONF-MCP",
+    "mcp",
+    "contracts",
+    "artifact-read",
+    "invariant-3"
+  ],
+  "fixture": "empty-v21",
+  "note": "PBI-035/PBI-036 coordinated contract: enriched metadata, UTF-8 byte paging, retained revisions, bundle listing/file reads, traversal rejection, and publisher concealment.",
+  "steps": [
+    {
+      "name": "publish a UTF-8 single-file artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "A\ud83c\udf89B",
+              "title": "Readable",
+              "category": "Reports"
+            }
+          }
+        }
+      },
+      "capture": {
+        "read_single_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "read_single_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "list_artifacts returns the enriched row",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "list_artifacts",
+            "arguments": {}
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "byte limit retreats from the middle of an emoji",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_single_id}",
+              "offset": 0,
+              "limit": 4
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "update the single-file artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "update_artifact",
+            "arguments": {
+              "id": "${read_single_id}",
+              "html": "second"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "read the retained first revision",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_single_id}",
+              "revision": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "publish a bundle",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_bundle",
+            "arguments": {
+              "files": {
+                "index.html": "<h1>Bundle</h1>",
+                "assets/note.txt": "hello \ud83c\udf89"
+              }
+            }
+          }
+        }
+      },
+      "capture": {
+        "read_bundle_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "read_bundle_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a bundle read without path returns its file listing",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_bundle_id}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a bundle path returns only that file",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_bundle_id}",
+              "path": "assets/note.txt"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "bundle traversal is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 9,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_bundle_id}",
+              "path": "../index.html"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a foreign publisher sees only unknown artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 10,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${read_single_id}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "a nonexistent artifact has the same concealed error shape",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 11,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "missing1"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

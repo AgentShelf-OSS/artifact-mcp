@@ -1,0 +1,236 @@
+{
+  "submit_feedback": {
+    "type": "object",
+    "properties": {
+      "feedback_id": { "type": "string" },
+      "artifact_id": { "type": "string" },
+      "revision": { "type": "integer" },
+      "submitted": { "type": "boolean" }
+    },
+    "required": ["feedback_id", "artifact_id", "revision", "submitted"]
+  },
+  "regenerate_artifact_preview": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "regenerated": { "type": "boolean" },
+      "digest": { "type": "string" },
+      "reason": { "type": "string" }
+    },
+    "required": ["id", "regenerated", "digest"]
+  },
+  "publish_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "url": { "type": "string" },
+      "org": { "type": "string" },
+      "bytes": { "type": "integer" },
+      "category": { "type": "string" }
+    },
+    "required": ["id", "url", "org", "bytes", "category"]
+  },
+  "publish_bundle": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "url": { "type": "string" },
+      "org": { "type": "string" },
+      "entry": { "type": "string" },
+      "files": { "type": "integer" },
+      "bytes": { "type": "integer" },
+      "category": { "type": "string" }
+    },
+    "required": ["id", "url", "org", "entry", "files", "bytes", "category"]
+  },
+  "list_artifacts": {
+    "type": "object",
+    "properties": {
+      "count": { "type": "integer" },
+      "artifacts": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": ["count", "artifacts"]
+  },
+  "delete_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "deleted": { "type": "boolean" }
+    },
+    "required": ["id", "deleted"]
+  },
+  "update_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "url": { "type": "string" },
+      "revision": { "type": "integer" },
+      "bytes": { "type": "integer" },
+      "entry": { "type": "string" },
+      "category": { "type": "string" }
+    },
+    "required": ["id", "url", "revision", "bytes", "entry", "category"]
+  },
+  "set_visibility": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "hidden": { "type": "boolean" }
+    },
+    "required": ["id", "hidden"]
+  },
+  "list_categories": {
+    "type": "object",
+    "properties": {
+      "org": { "type": "string" },
+      "categories": { "type": "array", "items": { "type": "string" } }
+    },
+    "required": ["org", "categories"]
+  },
+  "set_category": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "category": { "type": "string" }
+    },
+    "required": ["id", "category"]
+  },
+  "create_category": {
+    "type": "object",
+    "properties": {
+      "org": { "type": "string" },
+      "name": { "type": "string" }
+    },
+    "required": ["org", "name"]
+  },
+  "delete_category": {
+    "type": "object",
+    "properties": {
+      "org": { "type": "string" },
+      "name": { "type": "string" },
+      "removed": { "type": "boolean" }
+    },
+    "required": ["org", "name", "removed"]
+  },
+  "list_revisions": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "current": { "type": "integer" },
+      "revisions": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": ["id", "current", "revisions"]
+  },
+  "create_share": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "token": { "type": "string" },
+      "expires_at": {},
+      "url": { "type": "string" }
+    },
+    "required": ["id", "token", "expires_at", "url"]
+  },
+  "list_shares": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "shares": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": ["id", "shares"]
+  },
+  "revoke_share": {
+    "type": "object",
+    "properties": {
+      "token": { "type": "string" },
+      "revoked": { "type": "boolean" }
+    },
+    "required": ["token", "revoked"]
+  },
+  "artifact_stats": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "views": { "type": "integer" },
+      "unique_viewers": { "type": "integer" },
+      "last_viewed_at": {},
+      "viewers": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": ["id", "views", "unique_viewers", "last_viewed_at", "viewers"]
+  },
+  "restore_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "url": { "type": "string" },
+      "revision": { "type": "integer" },
+      "restoredFrom": { "type": "integer" },
+      "bytes": { "type": "integer" }
+    },
+    "required": ["id", "url", "revision", "restoredFrom", "bytes"]
+  },
+  "list_feedback": {
+    "type": "object",
+    "properties": {
+      "artifact_id": { "type": "string" },
+      "count": { "type": "integer" },
+      "feedback": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": ["count", "feedback"]
+  },
+  "resolve_feedback": {
+    "type": "object",
+    "properties": {
+      "feedback_id": { "type": "string" },
+      "resolved": { "type": "boolean" }
+    },
+    "required": ["feedback_id", "resolved"]
+  },
+  "reopen_feedback": {
+    "type": "object",
+    "properties": {
+      "feedback_id": { "type": "string" },
+      "reopened": { "type": "boolean" }
+    },
+    "required": ["feedback_id", "reopened"]
+  },
+  "read_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "org": { "type": "string" },
+      "is_bundle": { "type": "boolean" },
+      "entry": { "type": "string" },
+      "revision": { "type": "integer" },
+      "content_type": { "type": "string" },
+      "bytes_total": { "type": "integer" },
+      "offset": { "type": "integer" },
+      "bytes_returned": { "type": "integer" },
+      "truncated": { "type": "boolean" },
+      "content": { "type": "string" },
+      "files": { "type": "array", "items": { "type": "object" } }
+    },
+    "required": [
+      "id",
+      "org",
+      "is_bundle",
+      "revision",
+      "content_type",
+      "bytes_total",
+      "offset",
+      "bytes_returned",
+      "truncated"
+    ]
+  },
+  "patch_artifact": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "revision": { "type": "integer" },
+      "bytes_before": { "type": "integer" },
+      "bytes_after": { "type": "integer" },
+      "edits_applied": { "type": "integer" }
+    },
+    "required": ["id", "revision", "bytes_before", "bytes_after", "edits_applied"]
+  }
+}

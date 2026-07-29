@@ -1,6 +1,9 @@
 services:
   artifact-mcp:
-    build: .
+    image: ${ARTIFACT_MCP_IMAGE:-artifact-mcp:1.6.0}
+    build:
+      context: .
+      dockerfile: Dockerfile.rust
     container_name: artifact-mcp
     restart: unless-stopped
     ports:
@@ -15,7 +18,7 @@ services:
     volumes:
       - ./data:/data
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3480/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      test: ["CMD", "/artifact-mcp", "healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -54,18 +57,88 @@ services:
       retries: 3
       start_period: 15s
 
-  # Uncomment for tunnel-only ingress; then remove the app's `ports:` publish entirely.
-  # Configure the tunnel's origin service as http://artifact-mcp:3480.
-  # cloudflared:
-  #   image: cloudflare/cloudflared
-  #   container_name: artifact-mcp-cloudflared
-  #   restart: unless-stopped
-  #   command: tunnel run
-  #   environment:
-  #     - TUNNEL_TOKEN=${TUNNEL_TOKEN}
-  #   depends_on:
-  #     - artifact-mcp
+  # Anthropic MCP Tunnels are a research preview. This profile is inert unless
+  # explicitly enabled and does not change the default Streamable HTTP path.
+  anthropic-mcp-proxy:
+    profiles: ["anthropic-tunnel"]
+    image: us-docker.pkg.dev/anthropic-public-registry/images/mcp-proxy@sha256:efb27b299d627e4134815663cb8896641eeaee025d734c0f695582b4df38f013
+    container_name: artifact-mcp-anthropic-proxy
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: 256m
+    cpus: "0.50"
+    stop_grace_period: 30s
+    volumes:
+      - ${ANTHROPIC_TUNNEL_CONFIG_FILE:-./ops/anthropic-tunnel/mcp-proxy.example.yaml}:/etc/mcp-gateway/config.yaml:ro
+    secrets:
+      - anthropic_tunnel_tls_cert
+      - anthropic_tunnel_tls_key
+    depends_on:
+      artifact-mcp:
+        condition: service_healthy
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  anthropic-mcp-cloudflared:
+    profiles: ["anthropic-tunnel"]
+    image: cloudflare/cloudflared@sha256:6b599ca3e974349ead3286d178da61d291961182ec3fe9c505e1dd02c8ac31b0
+    container_name: artifact-mcp-anthropic-cloudflared
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    mem_limit: 256m
+    cpus: "0.50"
+    stop_grace_period: 30s
+    command:
+      - tunnel
+      - --no-autoupdate
+      - --metrics
+      - 0.0.0.0:2000
+      - run
+      - --url
+      - http://localhost:8080
+      - --token-file
+      - /run/secrets/anthropic_tunnel_token
+    # Share the proxy's network namespace so localhost:8080 reaches only the
+    # inner-TLS proxy. Neither service publishes a host port.
+    network_mode: "service:anthropic-mcp-proxy"
+    secrets:
+      - anthropic_tunnel_token
+    depends_on:
+      anthropic-mcp-proxy:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 networks:
   preview_internal:
     internal: true
+
+secrets:
+  anthropic_tunnel_token:
+    file: ${ANTHROPIC_TUNNEL_TOKEN_FILE:-./ops/anthropic-tunnel/data/tunnel-token}
+  anthropic_tunnel_tls_cert:
+    file: ${ANTHROPIC_TUNNEL_TLS_CERT_FILE:-./ops/anthropic-tunnel/data/tls.crt}
+  anthropic_tunnel_tls_key:
+    file: ${ANTHROPIC_TUNNEL_TLS_KEY_FILE:-./ops/anthropic-tunnel/data/tls.key}

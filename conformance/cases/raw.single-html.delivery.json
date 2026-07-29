@@ -1,0 +1,78 @@
+{
+  "id": "raw.single-html.delivery",
+  "tags": ["raw", "csp", "invariant-4"],
+  "fixture": "empty-v21",
+  "note": "Every raw response carries the exact enforcing sandbox and egress CSP and never allow-same-origin.",
+  "steps": [
+    {
+      "name": "publish a single-file artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><head><title>Raw</title></head><body><h1>Conformance raw</h1></body></html>",
+              "title": "Raw Case",
+              "description": "single file raw delivery"
+            }
+          }
+        }
+      },
+      "capture": { "artifact_id_1": "result.structuredContent.id" },
+      "assertSymbols": [
+        { "symbol": "artifact_id_1", "length": 12, "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz" }
+      ],
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "raw html carries the exact CSP sandbox and egress policy with no allow-same-origin",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "mode": "exact-header",
+          "forbid": ["allow-same-origin"],
+          "require": {
+            "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+            "content-type": "text/html; charset=utf-8",
+            "x-content-type-options": "nosniff",
+            "referrer-policy": "no-referrer",
+            "cache-control": "private, max-age=60, no-transform"
+          }
+        },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "download representation keeps the sandbox and adds a disposition",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}?download", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "mode": "exact-header",
+          "forbid": ["allow-same-origin"],
+          "require": {
+            "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+            "content-disposition": "attachment; filename=\"Raw-Case.html\""
+          }
+        },
+        "body": { "mode": "exact-bytes" }
+      }
+    }
+  ],
+  "postState": {
+    "files": [{ "path": "artifacts/${artifact_id_1}.html" }],
+    "dirEntries": [{ "path": "artifacts" }],
+    "sql": [
+      {
+        "name": "artifact_row",
+        "query": "SELECT id, org, client_id, title, description, category, is_bundle, revision, bytes, hidden FROM artifacts",
+        "volatileFields": []
+      }
+    ]
+  }
+}

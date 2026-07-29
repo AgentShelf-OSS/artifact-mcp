@@ -1,0 +1,89 @@
+{
+  "id": "share.public-delivery",
+  "tags": ["raw", "share", "csp", "invariant-4"],
+  "fixture": "empty-v21",
+  "note": "Public share links are Access-bypassed: the token IS the authorization boundary. A live share serves the artifact with the enforcing sandbox and egress CSP plus no-store + noindex; an invalid token and a revoked token must be the SAME 404 (sameAsStep), so a token probe is never an existence oracle.",
+  "steps": [
+    {
+      "name": "publish an artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": { "name": "publish_artifact", "arguments": { "html": "<!doctype html><html><body><h1>Shared</h1></body></html>", "title": "Shared Case" } }
+        }
+      },
+      "capture": { "artifact_id_1": "result.structuredContent.id" },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "create a non-expiring share",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 2, "method": "tools/call",
+          "params": { "name": "create_share", "arguments": { "id": "${artifact_id_1}", "expires": "never" } }
+        }
+      },
+      "capture": { "share_token_1": "result.structuredContent.token" },
+      "assertSymbols": [
+        { "symbol": "share_token_1", "length": 24, "alphabet": "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-" }
+      ],
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "live share serves the artifact with sandbox CSP, no-store and noindex, without any viewer identity",
+      "request": { "method": "GET", "path": "/s/${share_token_1}" },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "mode": "exact-header",
+          "forbid": ["allow-same-origin"],
+          "require": {
+            "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+            "cache-control": "no-store, no-transform",
+            "x-robots-tag": "noindex",
+            "content-type": "text/html; charset=utf-8"
+          }
+        },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "invalid token is a plain 404",
+      "request": { "method": "GET", "path": "/s/AAAAAAAAAAAAAAAAAAAAAAAA" },
+      "expect": { "status": 404, "headers": { "mode": "exact-header" }, "body": { "mode": "exact-bytes" } }
+    },
+    {
+      "name": "revoke the share",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 3, "method": "tools/call",
+          "params": { "name": "revoke_share", "arguments": { "token": "${share_token_1}" } }
+        }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "revoked token is indistinguishable from an invalid token",
+      "request": { "method": "GET", "path": "/s/${share_token_1}" },
+      "expect": { "status": 404, "headers": { "mode": "exact-header" }, "body": { "mode": "exact-bytes" }, "sameAsStep": 3 }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "share_rows",
+        "query": "SELECT artifact_id, org, created_by, expires_at, (revoked_at IS NOT NULL) AS is_revoked FROM artifact_shares",
+        "volatileFields": []
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32602,
+            "message": "Invalid arguments: files.index.html must be a string"
+          },
+          "id": 6,
+          "jsonrpc": "2.0"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

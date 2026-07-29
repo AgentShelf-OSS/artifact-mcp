@@ -1,0 +1,17 @@
+{
+  "id": "mcp.tools-list",
+  "tags": ["mcp", "contracts", "invariant-8", "golden-frozen"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "tools/list freezes the full advertised tool schema",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "id": 1, "method": "tools/list" }
+      },
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    }
+  ]
+}

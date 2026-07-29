@@ -1,0 +1,17 @@
+{
+  "id": "mcp.ping",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "ping returns empty result",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "id": 7, "method": "ping" }
+      },
+      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}

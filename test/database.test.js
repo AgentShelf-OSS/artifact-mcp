@@ -12,6 +12,7 @@ const ALL_VERSIONS = Array.from({ length: LATEST_SCHEMA_VERSION }, (_, i) => i +
 const importDataDir = mkdtempSync(path.join(tmpdir(), "artifact-db-import-"));
 process.env.DATA_DIR = importDataDir;
 const { default: defaultDb, openDatabase } = await import("../lib/db.js");
+const keys = await import("../lib/keys.js");
 
 after(() => {
   defaultDb.close();
@@ -35,6 +36,31 @@ test("fresh databases apply ordered migrations with foreign keys enabled", () =>
     assert.deepEqual(
       runtime.db.prepare("PRAGMA table_info(org_email_members)").all().map((column) => column.name),
       ["email", "org", "created_at"]
+    );
+    assert.deepEqual(
+      runtime.db.prepare("PRAGMA table_info(api_keys)").all().map((column) => column.name),
+      ["client_id", "key_hash", "org", "created_at", "revoked_at", "label", "role", "owner_email"]
+    );
+    assert.deepEqual(
+      runtime.db.prepare("PRAGMA table_info(artifact_revisions)").all().map((column) => column.name),
+      [
+        "artifact_id", "org", "revision", "title", "description", "category", "bytes",
+        "is_bundle", "entry", "created_at", "body_sha256", "client_id"
+      ]
+    );
+    runtime.db.prepare("INSERT INTO api_keys (client_id, key_hash) VALUES (?, ?)")
+      .run("pre-v22-author", "pre-v22-hash");
+    runtime.db.prepare("INSERT INTO artifacts (id, client_id, org, title) VALUES (?, ?, ?, ?)")
+      .run("pre-v22-artifact", "pre-v22-author", "default", "Existing revision");
+    runtime.db.prepare(
+      "INSERT INTO artifact_revisions (artifact_id, org, revision, title) VALUES (?, ?, ?, ?)"
+    ).run("pre-v22-artifact", "default", 1, "Existing revision");
+    assert.equal(
+      runtime.db.prepare(
+        "SELECT client_id FROM artifact_revisions WHERE artifact_id = 'pre-v22-artifact'"
+      ).pluck().get(),
+      null,
+      "an unattributed pre-v22 revision remains readable as null"
     );
     assert.ok(
       runtime.db.prepare("PRAGMA index_list(org_email_members)").all()
@@ -105,6 +131,7 @@ test("legacy databases upgrade without losing valid keys, artifacts, or reaction
   const runtime = openDatabase({ dataDir });
   try {
     assert.equal(runtime.db.prepare("SELECT org FROM api_keys WHERE client_id = 'legacy-key'").pluck().get(), "default");
+    assert.equal(runtime.db.prepare("SELECT role FROM api_keys WHERE client_id = 'legacy-key'").pluck().get(), "author");
     assert.equal(runtime.db.prepare("SELECT title FROM artifacts WHERE id = 'abc123'").pluck().get(), "Legacy artifact");
     assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM reactions").pluck().get(), 1);
     runtime.db.prepare("DELETE FROM artifacts WHERE id = 'abc123'").run();
@@ -113,6 +140,31 @@ test("legacy databases upgrade without losing valid keys, artifacts, or reaction
     runtime.db.close();
     rmSync(dataDir, { recursive: true, force: true });
   }
+});
+
+test("key creation validates, persists, lists, and defaults capability roles", () => {
+  const reader = keys.createKey({ clientId: "db-role-reader", org: "acme", label: "Reader", role: "reader" });
+  const collaborator = keys.createKey({
+    clientId: "db-role-collaborator",
+    org: "acme",
+    label: "Collaborator",
+    role: "collaborator"
+  });
+  const defaulted = keys.createKey({ clientId: "db-role-default", org: "acme", label: "Default" });
+
+  assert.equal(reader.role, "reader");
+  assert.equal(collaborator.role, "collaborator");
+  assert.equal(defaulted.role, "author");
+  assert.throws(
+    () => keys.createKey({ clientId: "db-role-invalid", org: "acme", role: "owner" }),
+    { message: keys.INVALID_KEY_ROLE_MESSAGE }
+  );
+  const listed = keys.listKeys();
+  assert.equal(listed.find((key) => key.client_id === reader.clientId).role, "reader");
+  assert.equal(
+    listed.find((key) => key.client_id === collaborator.clientId).role,
+    "collaborator"
+  );
 });
 
 test("existing plaintext webhook rows are encrypted in place when a key is configured", () => {

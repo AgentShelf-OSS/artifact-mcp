@@ -1,0 +1,24 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown artifact: missing123456",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

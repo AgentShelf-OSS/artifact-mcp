@@ -1,0 +1,17 @@
+{
+  "id": "mcp.unknown-method",
+  "tags": ["mcp", "contracts", "invariant-8"],
+  "fixture": "empty-v21",
+  "steps": [
+    {
+      "name": "unknown method returns -32601",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": { "jsonrpc": "2.0", "id": 3, "method": "does/not/exist" }
+      },
+      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+    }
+  ]
+}

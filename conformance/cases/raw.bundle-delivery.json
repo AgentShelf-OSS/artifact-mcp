@@ -1,0 +1,114 @@
+{
+  "id": "raw.bundle-delivery",
+  "tags": ["raw", "csp", "bundle", "invariant-4", "invariant-5"],
+  "fixture": "empty-v21",
+  "note": "Every raw bundle response — html, css, svg, xml, image, text — carries the exact enforcing sandbox and egress CSP and never allow-same-origin. SVG and XML matter most: they execute as documents on direct navigation.",
+  "steps": [
+    {
+      "name": "publish a multi-type bundle",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
+        "json": {
+          "jsonrpc": "2.0", "id": 1, "method": "tools/call",
+          "params": {
+            "name": "publish_bundle",
+            "arguments": {
+              "title": "Bundle Case",
+              "entry": "index.html",
+              "files": {
+                "index.html": "<!doctype html><html><body><h1>Bundle entry</h1></body></html>",
+                "style.css": "body{color:#123456}",
+                "vector.svg": "<svg xmlns=\"http://www.w3.org/2000/svg\"><text x=\"0\" y=\"10\">svg</text></svg>",
+                "data.xml": "<?xml version=\"1.0\"?><root><node>xml</node></root>",
+                "pixel.png": "PNG-PLACEHOLDER-BYTES",
+                "notes.txt": "plain text"
+              }
+            }
+          }
+        }
+      },
+      "capture": { "artifact_id_1": "result.structuredContent.id" },
+      "assertSymbols": [
+        { "symbol": "artifact_id_1", "length": 12, "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz" }
+      ],
+      "expect": { "status": 200, "body": { "mode": "exact-json-text" } }
+    },
+    {
+      "name": "bundle root redirects to the entry directory",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": { "status": 302, "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"] } }
+    },
+    {
+      "name": "entry html",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "text/html; charset=utf-8", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "css",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/style.css", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "text/css; charset=utf-8", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "svg executes as a document — sandbox is mandatory",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/vector.svg", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "image/svg+xml", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "xml",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/data.xml", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "application/xml", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "image",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/pixel.png", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "image/png", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "text",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/notes.txt", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": {
+        "status": 200,
+        "headers": { "mode": "exact-header", "forbid": ["allow-same-origin"], "require": { "content-type": "text/plain; charset=utf-8", "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:" } },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "encoded traversal out of the bundle is rejected",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/%2e%2e%2f%2e%2e%2fartifacts.db", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": { "status": 404, "headers": { "mode": "exact-header" }, "body": { "mode": "exact-bytes" } }
+    },
+    {
+      "name": "missing bundle file is the same 404 as a traversal attempt",
+      "request": { "method": "GET", "path": "/raw/${artifact_id_1}/no-such-file.css", "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" } },
+      "expect": { "status": 404, "headers": { "mode": "exact-header" }, "body": { "mode": "exact-bytes" }, "sameAsStep": 8 }
+    }
+  ],
+  "postState": {
+    "dirEntries": [{ "path": "artifacts" }, { "path": "artifacts/${artifact_id_1}" }],
+    "sql": [
+      { "name": "artifact_row", "query": "SELECT id, org, client_id, title, is_bundle, entry, revision, bytes FROM artifacts" }
+    ]
+  }
+}

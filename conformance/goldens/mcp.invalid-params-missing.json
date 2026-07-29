@@ -1,0 +1,19 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32602,
+            "message": "Invalid arguments: html is required; surprise is not allowed"
+          },
+          "id": 5,
+          "jsonrpc": "2.0"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

@@ -1,0 +1,49 @@
+groups:
+  - name: artifact-mcp
+    interval: 30s
+    rules:
+      - alert: ArtifactMcpAuthenticationFailuresHigh
+        expr: |
+          (
+            sum(rate(artifact_mcp_requests_total{outcome="authentication_failure"}[5m]))
+            /
+            clamp_min(sum(rate(artifact_mcp_requests_total[5m])), 0.001)
+          ) > 0.25
+          and sum(rate(artifact_mcp_requests_total{outcome="authentication_failure"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP authentication failures are elevated
+          runbook: docs/ops/mcp-observability.md#authentication-failures
+
+      - alert: ArtifactMcpServerErrors
+        expr: sum(rate(artifact_mcp_requests_total{outcome="server_failure"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP is returning server failures
+          runbook: docs/ops/mcp-observability.md#server-errors
+
+      - alert: ArtifactMcpLatencyHigh
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(artifact_mcp_request_duration_seconds_bucket[10m]))
+          ) > 2
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP p95 latency is above two seconds
+          runbook: docs/ops/mcp-observability.md#latency
+
+      - alert: ArtifactMcpOutputValidationFailure
+        expr: increase(artifact_mcp_requests_total{outcome="output_validation_failure"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP emitted an output that failed its schema
+          runbook: docs/ops/mcp-observability.md#output-validation

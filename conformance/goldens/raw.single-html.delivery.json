@@ -1,0 +1,99 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":96,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 96,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "private, max-age=60, no-transform",
+          "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+          "content-type": "text/html; charset=utf-8",
+          "etag": "W/\"60-HKd+2owqUm5U1U8TALiXCXZxNXw\"",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "<!doctype html><html><head><title>Raw</title></head><body><h1>Conformance raw</h1></body></html>"
+      }
+    },
+    {
+      "status": 200,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "private, max-age=60, no-transform",
+          "content-disposition": "attachment; filename=\"Raw-Case.html\"",
+          "content-security-policy": "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:",
+          "content-type": "text/html; charset=utf-8",
+          "etag": "W/\"60-HKd+2owqUm5U1U8TALiXCXZxNXw\"",
+          "referrer-policy": "no-referrer",
+          "x-content-type-options": "nosniff"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "<!doctype html><html><head><title>Raw</title></head><body><h1>Conformance raw</h1></body></html>"
+      }
+    }
+  ],
+  "postState": {
+    "files": {
+      "artifacts/${artifact_id_1}.html": {
+        "present": true,
+        "type": "file",
+        "size": 96,
+        "sha256": "2040e53a9ce069ff6c4ca42f79e9f5c8a175c160e04066793c12d4cd95d385e9"
+      }
+    },
+    "dirEntries": {
+      "artifacts": [
+        "${artifact_id_1}.html"
+      ]
+    },
+    "sql": {
+      "artifact_row": [
+        {
+          "bytes": 96,
+          "category": "",
+          "client_id": "pub-acme",
+          "description": "single file raw delivery",
+          "hidden": 0,
+          "id": "${artifact_id_1}",
+          "is_bundle": 0,
+          "org": "acme",
+          "revision": 1,
+          "title": "Raw Case"
+        }
+      ]
+    }
+  }
+}

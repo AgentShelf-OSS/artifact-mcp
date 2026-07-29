@@ -1,8 +1,12 @@
 node_modules/
+node_modules
 data/
+ops/anthropic-tunnel/data/
+ops/anthropic-tunnel/mcp-proxy.yaml
 .env
 .local/
 .codex/
 .devdata/
 *.log
 marketing/
+/target
