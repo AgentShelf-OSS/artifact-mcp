@@ -47,3 +47,101 @@ groups:
         annotations:
           summary: Artifact MCP emitted an output that failed its schema
           runbook: docs/ops/mcp-observability.md#output-validation
+
+      - alert: ArtifactMcpSecurityAuditIntegrityFailure
+        expr: increase(artifact_mcp_security_audit_signals_total{signal=~"integrity_failure|reconciliation_failure"}[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP audit integrity or reconciliation failure
+
+      - alert: ArtifactMcpUnexpectedAdminActions
+        expr: increase(artifact_mcp_security_audit_signals_total{signal="admin_action"}[15m]) > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP recorded unexpected administrative activity
+
+      - alert: ArtifactMcpSustainedRateLimiting
+        expr: sum(rate(artifact_mcp_security_audit_signals_total{signal="rate_limit"}[5m])) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP rate limiting is sustained
+
+      # Durable provider delivery emits no tenant, webhook, event, or payload labels. Prometheus
+      # target labels (job/instance) retain the only per-process association needed below.
+      - alert: ArtifactMcpDeliveryDeadLetterPresent
+        expr: artifact_mcp_delivery_queue_dead_letter > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP has a durable Discord delivery in dead letter
+          runbook: docs/ops/discord-durable-delivery.md#dead-letter
+
+      - alert: ArtifactMcpDeliveryWorkersUnavailableWithActiveQueue
+        expr: |
+          sum by (job, instance) (artifact_mcp_delivery_queue_active) > 0
+          and on (job, instance)
+          sum by (job, instance) (artifact_mcp_delivery_workers_healthy) == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP has active durable deliveries but no healthy worker
+          runbook: docs/ops/discord-durable-delivery.md#no-healthy-workers
+
+      - alert: ArtifactMcpDeliveryQueueStuck
+        expr: |
+          artifact_mcp_delivery_queue_active > 0
+          and artifact_mcp_delivery_oldest_active_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP's oldest active durable delivery has been queued for over 15 minutes
+          runbook: docs/ops/discord-durable-delivery.md#stuck-or-old-queue
+
+      - alert: ArtifactMcpDeliveryRateLimitBlocked
+        expr: sum by (job, instance) (artifact_mcp_delivery_rate_limit_blocked) > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Discord rate limiting has blocked Artifact MCP durable delivery for 10 minutes
+          runbook: docs/ops/discord-durable-delivery.md#sustained-discord-rate-limiting
+
+      # Discussion-mirror state is deliberately aggregate-only. Pending state without stuck
+      # root work, paused, and local-only artifacts do not alert.
+      - alert: ArtifactMcpDiscussionMirrorFailed
+        expr: artifact_mcp_discussion_mirrors{state="failed"} > 0
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP has a failed Discord discussion mirror
+          runbook: docs/ops/discord-durable-delivery.md#discussion-mirror-pilot
+
+      - alert: ArtifactMcpDiscussionPendingThreadStuck
+        expr: |
+          artifact_mcp_discussion_pending_threads > 0
+          and artifact_mcp_discussion_oldest_pending_thread_age_seconds > 900
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Artifact MCP's oldest pending Discord discussion thread is over 15 minutes old
+          runbook: docs/ops/discord-durable-delivery.md#discussion-mirror-pilot
+
+      - alert: ArtifactMcpDiscussionTerminalFailure
+        expr: artifact_mcp_discussion_terminal_failures > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Artifact MCP retained a terminal Discord discussion delivery failure
+          runbook: docs/ops/discord-durable-delivery.md#discussion-mirror-pilot

@@ -24,6 +24,7 @@ use std::{
 };
 
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use ipnet::IpNet;
 use time::OffsetDateTime;
 
 use crate::{
@@ -181,6 +182,34 @@ pub const DEFAULT_CATEGORY_JSON_LIMIT: u64 = 8 * 1024;
 /// [lib/app.js:152]
 pub const DEFAULT_MCP_JSON_FALLBACK_LIMIT: u64 = 8 * 1024 * 1024;
 
+/// Origin-side ingress defaults. These are deliberately smaller than the proxy defaults so the
+/// service remains safe when it is reached directly during maintenance or a proxy misconfiguration.
+pub const DEFAULT_INGRESS_MAX_HEADERS: u64 = 64;
+pub const DEFAULT_INGRESS_MAX_HEADER_BYTES: u64 = 32 * 1024;
+pub const DEFAULT_INGRESS_MAX_URI_BYTES: u64 = 8 * 1024;
+pub const DEFAULT_INGRESS_READ_TIMEOUT_MS: u64 = 15_000;
+pub const DEFAULT_INGRESS_READ_HANDLER_TIMEOUT_MS: u64 = 30_000;
+pub const DEFAULT_INGRESS_SHUTDOWN_GRACE_MS: u64 = 30_000;
+pub const DEFAULT_INGRESS_MAX_CONNECTIONS: u64 = 256;
+pub const DEFAULT_INGRESS_MAX_CONCURRENT_REQUESTS: u64 = 128;
+pub const DEFAULT_INGRESS_MAX_CONCURRENT_MUTATIONS: u64 = 16;
+pub const DEFAULT_INGRESS_RENDER_QUEUE_JOBS: u64 = 64;
+pub const DEFAULT_INGRESS_RENDER_QUEUE_BYTES: u64 = 16 * 1024 * 1024;
+pub const DEFAULT_INGRESS_JSON_MAX_DEPTH: u64 = 32;
+pub const DEFAULT_INGRESS_JSON_MAX_NODES: u64 = 10_000;
+pub const DEFAULT_INGRESS_JSON_MAX_MEMBERS: u64 = 1_000;
+pub const DEFAULT_INGRESS_JSON_MAX_BATCH: u64 = 100;
+pub const DEFAULT_INGRESS_RATE_WINDOW_SECONDS: u64 = 60;
+pub const DEFAULT_INGRESS_READS_PER_WINDOW: u64 = 120;
+pub const DEFAULT_INGRESS_MUTATIONS_PER_WINDOW: u64 = 30;
+pub const DEFAULT_INGRESS_MCP_PER_WINDOW: u64 = 60;
+pub const DEFAULT_INGRESS_UPLOADS_PER_WINDOW: u64 = 10;
+pub const DEFAULT_INGRESS_FEEDBACK_PER_WINDOW: u64 = 30;
+pub const DEFAULT_INGRESS_ADMIN_PER_WINDOW: u64 = 20;
+pub const DEFAULT_INGRESS_VERIFIED_VIEWERS_PER_WINDOW: u64 = 120;
+pub const DEFAULT_INGRESS_SHARES_PER_WINDOW: u64 = 60;
+pub const DEFAULT_INGRESS_AUTH_FAILURES_PER_WINDOW: u64 = 20;
+
 /// `Number(process.env.ACCESS_CLOCK_TOLERANCE_S) || 60` — [lib/identity.js:22]
 pub const DEFAULT_ACCESS_CLOCK_TOLERANCE_SECONDS: u64 = 60;
 /// OAuth access-token clock tolerance. Service credentials use a narrower window than browser
@@ -243,6 +272,19 @@ pub const FEEDBACK_ID_LENGTH: usize = 16;
 pub const WEBHOOK_ID_ALPHABET: &str = ARTIFACT_ID_ALPHABET;
 /// Webhook id length — [lib/webhooks.js:11]
 pub const WEBHOOK_ID_LENGTH: usize = 12;
+
+/// Whether a value has the exact persisted webhook-row identifier shape.
+///
+/// Audit records may retain this server-generated path identifier, but never the webhook URL or
+/// another arbitrary identifier-shaped value. Keeping this validator beside the generator avoids
+/// the two runtimes drifting on alphabet or length.
+#[must_use]
+pub fn is_valid_webhook_id(value: &str) -> bool {
+    value.len() == WEBHOOK_ID_LENGTH
+        && value
+            .bytes()
+            .all(|byte| WEBHOOK_ID_ALPHABET.as_bytes().contains(&byte))
+}
 
 /// `const ARTIFACT_ID = /^[0-9a-z]{6,24}$/` — the real validator every generated artifact
 /// id must satisfy before a thumbnail path is derived from it. [lib/thumbnails.js:19]
@@ -469,6 +511,252 @@ impl BodyLimits {
         Ok(Self {
             mcp_json,
             ..Self::default()
+        })
+    }
+}
+
+/// Origin-side request admission limits.
+///
+/// These controls complement (rather than replace) Cloudflare and reverse-proxy limits.  The
+/// values are intentionally plain integers so they can be set safely in deployment manifests;
+/// callers must not derive a value from request data.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct IngressConfig {
+    /// Maximum parsed HTTP header fields per HTTP/1 request.
+    pub max_headers: u64,
+    /// Maximum aggregate request-header bytes, including names and values.
+    pub max_header_bytes: u64,
+    /// Maximum request target (path plus query) bytes.
+    pub max_uri_bytes: u64,
+    /// Deadline while receiving a request body. This is not a handler deadline.
+    pub read_timeout_ms: u64,
+    /// Handler deadline for read-only routes; durable mutations are never cancelled mid-flight.
+    pub read_handler_timeout_ms: u64,
+    /// Grace before process shutdown aborts remaining connection tasks for crash recovery.
+    pub shutdown_grace_ms: u64,
+    /// Whole-request admission permits.
+    pub max_concurrent_requests: u64,
+    /// Accepted TCP connections, including peers that are still sending headers.
+    pub max_connections: u64,
+    /// Additional permits for unsafe HTTP methods.
+    pub max_concurrent_mutations: u64,
+    /// Bounded pending preview-render jobs, excluding the active job.
+    pub render_queue_jobs: u64,
+    /// Total declared source bytes reserved by pending and active preview jobs.
+    pub render_queue_bytes: u64,
+    /// JSON nesting depth accepted by any JSON endpoint.
+    pub json_max_depth: u64,
+    /// Total JSON values accepted by any JSON endpoint.
+    pub json_max_nodes: u64,
+    /// Object fields or array entries accepted in a single JSON container.
+    pub json_max_members: u64,
+    /// JSON-RPC batch entries accepted by `/mcp`.
+    pub json_max_batch: u64,
+    /// Refill duration used for the bounded token buckets.
+    pub rate_window_seconds: u64,
+    /// Read requests per principal/source window.
+    pub reads_per_window: u64,
+    /// Unsafe requests per principal/source window.
+    pub mutations_per_window: u64,
+    /// MCP transport requests per source window, before a verified publisher is available.
+    pub mcp_per_window: u64,
+    /// Artifact content writes per verified publisher/source window.
+    pub uploads_per_window: u64,
+    /// Viewer feedback mutations per source window.
+    pub feedback_per_window: u64,
+    /// Administrative requests per source window.
+    pub admin_per_window: u64,
+    /// Requests per verified Access viewer/source window.
+    pub verified_viewers_per_window: u64,
+    /// Public-share requests per token/source window.
+    pub shares_per_window: u64,
+    /// Candidate credential attempts per source window.
+    pub auth_failures_per_window: u64,
+    /// Trusted Cloudflare/proxy peers allowed to supply the single `CF-Connecting-IP` address.
+    /// `X-Forwarded-For` is never position-guessed.
+    pub trusted_proxy_cidrs: Vec<IpNet>,
+}
+
+impl Default for IngressConfig {
+    fn default() -> Self {
+        Self {
+            max_headers: DEFAULT_INGRESS_MAX_HEADERS,
+            max_header_bytes: DEFAULT_INGRESS_MAX_HEADER_BYTES,
+            max_uri_bytes: DEFAULT_INGRESS_MAX_URI_BYTES,
+            read_timeout_ms: DEFAULT_INGRESS_READ_TIMEOUT_MS,
+            read_handler_timeout_ms: DEFAULT_INGRESS_READ_HANDLER_TIMEOUT_MS,
+            shutdown_grace_ms: DEFAULT_INGRESS_SHUTDOWN_GRACE_MS,
+            max_concurrent_requests: DEFAULT_INGRESS_MAX_CONCURRENT_REQUESTS,
+            max_connections: DEFAULT_INGRESS_MAX_CONNECTIONS,
+            max_concurrent_mutations: DEFAULT_INGRESS_MAX_CONCURRENT_MUTATIONS,
+            render_queue_jobs: DEFAULT_INGRESS_RENDER_QUEUE_JOBS,
+            render_queue_bytes: DEFAULT_INGRESS_RENDER_QUEUE_BYTES,
+            json_max_depth: DEFAULT_INGRESS_JSON_MAX_DEPTH,
+            json_max_nodes: DEFAULT_INGRESS_JSON_MAX_NODES,
+            json_max_members: DEFAULT_INGRESS_JSON_MAX_MEMBERS,
+            json_max_batch: DEFAULT_INGRESS_JSON_MAX_BATCH,
+            rate_window_seconds: DEFAULT_INGRESS_RATE_WINDOW_SECONDS,
+            reads_per_window: DEFAULT_INGRESS_READS_PER_WINDOW,
+            mutations_per_window: DEFAULT_INGRESS_MUTATIONS_PER_WINDOW,
+            mcp_per_window: DEFAULT_INGRESS_MCP_PER_WINDOW,
+            uploads_per_window: DEFAULT_INGRESS_UPLOADS_PER_WINDOW,
+            feedback_per_window: DEFAULT_INGRESS_FEEDBACK_PER_WINDOW,
+            admin_per_window: DEFAULT_INGRESS_ADMIN_PER_WINDOW,
+            verified_viewers_per_window: DEFAULT_INGRESS_VERIFIED_VIEWERS_PER_WINDOW,
+            shares_per_window: DEFAULT_INGRESS_SHARES_PER_WINDOW,
+            auth_failures_per_window: DEFAULT_INGRESS_AUTH_FAILURES_PER_WINDOW,
+            trusted_proxy_cidrs: Vec::new(),
+        }
+    }
+}
+
+impl IngressConfig {
+    fn from_source(env: &dyn EnvSource) -> Result<Self, AppError> {
+        let trusted_proxy_cidrs = present(env, "TRUSTED_PROXY_CIDRS")
+            .map(|raw| {
+                raw.split(',')
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                    .map(|value| {
+                        value.parse::<IpNet>().map_err(|_| {
+                            invalid("TRUSTED_PROXY_CIDRS", value, "a comma-separated CIDR list")
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            })
+            .transpose()?
+            .unwrap_or_default();
+        let max_header_bytes = positive_integer(
+            env,
+            "INGRESS_MAX_HEADER_BYTES",
+            DEFAULT_INGRESS_MAX_HEADER_BYTES,
+        )?;
+        if max_header_bytes < 8 * 1024 {
+            return Err(invalid(
+                "INGRESS_MAX_HEADER_BYTES",
+                &max_header_bytes.to_string(),
+                "at least 8192 bytes for Hyper HTTP/1 parsing",
+            ));
+        }
+        Ok(Self {
+            max_headers: positive_integer(env, "INGRESS_MAX_HEADERS", DEFAULT_INGRESS_MAX_HEADERS)?,
+            max_header_bytes,
+            max_uri_bytes: positive_integer(
+                env,
+                "INGRESS_MAX_URI_BYTES",
+                DEFAULT_INGRESS_MAX_URI_BYTES,
+            )?,
+            read_timeout_ms: positive_integer(
+                env,
+                "INGRESS_READ_TIMEOUT_MS",
+                DEFAULT_INGRESS_READ_TIMEOUT_MS,
+            )?,
+            read_handler_timeout_ms: positive_integer(
+                env,
+                "INGRESS_READ_HANDLER_TIMEOUT_MS",
+                DEFAULT_INGRESS_READ_HANDLER_TIMEOUT_MS,
+            )?,
+            shutdown_grace_ms: positive_integer(
+                env,
+                "INGRESS_SHUTDOWN_GRACE_MS",
+                DEFAULT_INGRESS_SHUTDOWN_GRACE_MS,
+            )?,
+            max_concurrent_requests: positive_integer(
+                env,
+                "INGRESS_MAX_CONCURRENT_REQUESTS",
+                DEFAULT_INGRESS_MAX_CONCURRENT_REQUESTS,
+            )?,
+            max_connections: positive_integer(
+                env,
+                "INGRESS_MAX_CONNECTIONS",
+                DEFAULT_INGRESS_MAX_CONNECTIONS,
+            )?,
+            max_concurrent_mutations: positive_integer(
+                env,
+                "INGRESS_MAX_CONCURRENT_MUTATIONS",
+                DEFAULT_INGRESS_MAX_CONCURRENT_MUTATIONS,
+            )?,
+            render_queue_jobs: positive_integer(
+                env,
+                "INGRESS_RENDER_QUEUE_JOBS",
+                DEFAULT_INGRESS_RENDER_QUEUE_JOBS,
+            )?,
+            render_queue_bytes: positive_integer(
+                env,
+                "INGRESS_RENDER_QUEUE_BYTES",
+                DEFAULT_INGRESS_RENDER_QUEUE_BYTES,
+            )?,
+            json_max_depth: positive_integer(
+                env,
+                "INGRESS_JSON_MAX_DEPTH",
+                DEFAULT_INGRESS_JSON_MAX_DEPTH,
+            )?,
+            json_max_nodes: positive_integer(
+                env,
+                "INGRESS_JSON_MAX_NODES",
+                DEFAULT_INGRESS_JSON_MAX_NODES,
+            )?,
+            json_max_members: positive_integer(
+                env,
+                "INGRESS_JSON_MAX_MEMBERS",
+                DEFAULT_INGRESS_JSON_MAX_MEMBERS,
+            )?,
+            json_max_batch: positive_integer(
+                env,
+                "INGRESS_JSON_MAX_BATCH",
+                DEFAULT_INGRESS_JSON_MAX_BATCH,
+            )?,
+            rate_window_seconds: positive_integer(
+                env,
+                "INGRESS_RATE_WINDOW_SECONDS",
+                DEFAULT_INGRESS_RATE_WINDOW_SECONDS,
+            )?,
+            reads_per_window: positive_integer(
+                env,
+                "INGRESS_READS_PER_WINDOW",
+                DEFAULT_INGRESS_READS_PER_WINDOW,
+            )?,
+            mutations_per_window: positive_integer(
+                env,
+                "INGRESS_MUTATIONS_PER_WINDOW",
+                DEFAULT_INGRESS_MUTATIONS_PER_WINDOW,
+            )?,
+            mcp_per_window: positive_integer(
+                env,
+                "INGRESS_MCP_PER_WINDOW",
+                DEFAULT_INGRESS_MCP_PER_WINDOW,
+            )?,
+            uploads_per_window: positive_integer(
+                env,
+                "INGRESS_UPLOADS_PER_WINDOW",
+                DEFAULT_INGRESS_UPLOADS_PER_WINDOW,
+            )?,
+            feedback_per_window: positive_integer(
+                env,
+                "INGRESS_FEEDBACK_PER_WINDOW",
+                DEFAULT_INGRESS_FEEDBACK_PER_WINDOW,
+            )?,
+            admin_per_window: positive_integer(
+                env,
+                "INGRESS_ADMIN_PER_WINDOW",
+                DEFAULT_INGRESS_ADMIN_PER_WINDOW,
+            )?,
+            verified_viewers_per_window: positive_integer(
+                env,
+                "INGRESS_VERIFIED_VIEWERS_PER_WINDOW",
+                DEFAULT_INGRESS_VERIFIED_VIEWERS_PER_WINDOW,
+            )?,
+            shares_per_window: positive_integer(
+                env,
+                "INGRESS_SHARES_PER_WINDOW",
+                DEFAULT_INGRESS_SHARES_PER_WINDOW,
+            )?,
+            auth_failures_per_window: positive_integer(
+                env,
+                "INGRESS_AUTH_FAILURES_PER_WINDOW",
+                DEFAULT_INGRESS_AUTH_FAILURES_PER_WINDOW,
+            )?,
+            trusted_proxy_cidrs,
         })
     }
 }
@@ -964,6 +1252,8 @@ pub struct AppConfig {
     pub storage: StorageLimits,
     /// Per-route JSON body limits, in bytes.
     pub body: BodyLimits,
+    /// Request admission, complexity, and trusted-proxy controls.
+    pub ingress: IngressConfig,
     /// Optional preview renderer configuration.
     pub preview: PreviewConfig,
     /// Cloudflare Access identity configuration.
@@ -972,6 +1262,15 @@ pub struct AppConfig {
     pub oauth: OAuthConfig,
     /// `WEBHOOK_ENC_KEY`, validated as canonical 32-byte base64. [lib/crypto.js:9-18]
     pub webhook_enc_key: Option<Secret>,
+    /// `DISCORD_BOT_TOKEN`, used only for Discord's authenticated thread-management REST calls.
+    /// The token is never rendered, logged, or persisted.
+    pub discord_bot_token: Option<Secret>,
+    /// `DISCORD_INBOUND_ENABLED` — incident kill switch for the optional Gateway integration.
+    /// It defaults off; local feedback and outbound durable delivery do not depend on it.
+    pub discord_inbound_enabled: bool,
+    /// `AUDIT_LEDGER_HMAC_KEY`, a canonical base64 HMAC key. The executable refuses to serve
+    /// without it; keeping this optional here preserves deterministic route/unit fixtures.
+    pub audit_ledger_hmac_key: Option<Secret>,
     /// `ARTIFACT_API_KEYS` bootstrap entries. [lib/db.js:30]
     pub seed_keys: SeedKeys,
 }
@@ -995,6 +1294,7 @@ impl AppConfig {
             app_brand: DEFAULT_APP_BRAND.to_owned(),
             storage: StorageLimits::default(),
             body: BodyLimits::default(),
+            ingress: IngressConfig::default(),
             preview: PreviewConfig::default(),
             access: AccessConfig {
                 clock_tolerance_seconds: DEFAULT_ACCESS_CLOCK_TOLERANCE_SECONDS,
@@ -1002,6 +1302,9 @@ impl AppConfig {
             },
             oauth: OAuthConfig::default(),
             webhook_enc_key: None,
+            discord_bot_token: None,
+            discord_inbound_enabled: false,
+            audit_ledger_hmac_key: None,
             seed_keys: SeedKeys::default(),
         }
     }
@@ -1048,10 +1351,18 @@ impl AppConfig {
             app_brand: non_empty_string(env, "APP_BRAND", DEFAULT_APP_BRAND),
             storage,
             body,
+            ingress: IngressConfig::from_source(env)?,
             preview: PreviewConfig::from_source(env)?,
             access: AccessConfig::from_source(env)?,
             oauth: OAuthConfig::from_source(env)?,
             webhook_enc_key: parse_webhook_enc_key(present(env, "WEBHOOK_ENC_KEY").as_deref())?,
+            discord_bot_token: parse_discord_bot_token(
+                present(env, "DISCORD_BOT_TOKEN").as_deref(),
+            )?,
+            discord_inbound_enabled: disabled_unless_one(env, "DISCORD_INBOUND_ENABLED")?,
+            audit_ledger_hmac_key: parse_audit_ledger_hmac_key(
+                present(env, "AUDIT_LEDGER_HMAC_KEY").as_deref(),
+            )?,
             seed_keys: SeedKeys::parse(&env.get("ARTIFACT_API_KEYS").unwrap_or_default()),
         })
     }
@@ -1158,6 +1469,52 @@ fn parse_webhook_enc_key(value: Option<&str>) -> Result<Option<Secret>, AppError
 
 fn webhook_key_error() -> AppError {
     AppError::Validation("WEBHOOK_ENC_KEY must be a 32-byte base64 value.".to_owned())
+}
+
+fn parse_discord_bot_token(value: Option<&str>) -> Result<Option<Secret>, AppError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let token = raw.trim();
+    if token.is_empty()
+        || token.len() > 512
+        || !token
+            .bytes()
+            .all(|byte| byte.is_ascii_graphic() && !matches!(byte, b'"' | b'\\'))
+    {
+        return Err(AppError::Validation(
+            "DISCORD_BOT_TOKEN must be a non-empty printable token up to 512 bytes.".to_owned(),
+        ));
+    }
+    Ok(Some(Secret::new(token)))
+}
+
+fn disabled_unless_one(env: &dyn EnvSource, key: &str) -> Result<bool, AppError> {
+    match present(env, key).as_deref().map(str::trim) {
+        None | Some("0") => Ok(false),
+        Some("1") => Ok(true),
+        Some(raw) => Err(invalid(key, raw, "\"0\" or \"1\"")),
+    }
+}
+
+fn parse_audit_ledger_hmac_key(value: Option<&str>) -> Result<Option<Secret>, AppError> {
+    let Some(raw) = value else {
+        return Ok(None);
+    };
+    let encoded = raw.trim();
+    let decoded = BASE64_STANDARD
+        .decode(encoded)
+        .map_err(|_| audit_ledger_key_error())?;
+    if decoded.len() != 32 || BASE64_STANDARD.encode(&decoded) != encoded {
+        return Err(audit_ledger_key_error());
+    }
+    Ok(Some(Secret::new(encoded)))
+}
+
+fn audit_ledger_key_error() -> AppError {
+    AppError::Validation(
+        "AUDIT_LEDGER_HMAC_KEY must be canonical base64 encoding of exactly 32 bytes.".to_owned(),
+    )
 }
 
 // ---------------------------------------------------------------------------
@@ -1613,6 +1970,8 @@ mod tests {
             assert!(is_valid_artifact_id(&artifact.0), "{artifact}");
             assert_eq!(artifact.0.len(), ARTIFACT_ID_LENGTH);
             assert!(!RESERVED_ARTIFACT_IDS.contains(&artifact.0.as_str()));
+            let webhook = ids.webhook_id().expect("webhook id");
+            assert!(is_valid_webhook_id(&webhook.0), "{webhook}");
         }
     }
 

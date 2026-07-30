@@ -27,12 +27,18 @@ pub const SCOPE_PUBLISH: &str = "artifacts:publish";
 pub const SCOPE_REVIEW: &str = "artifacts:review";
 pub const SCOPE_VISIBILITY: &str = "artifacts:visibility";
 pub const SCOPE_DELETE: &str = "artifacts:delete";
-pub const SUPPORTED_SCOPES: [&str; 5] = [
+pub const SCOPE_AUDIT_READ: &str = "audit:read";
+pub const SCOPE_AUDIT_EXPORT: &str = "audit:export";
+pub const SCOPE_AUDIT_GLOBAL: &str = "audit:global";
+pub const SUPPORTED_SCOPES: [&str; 8] = [
     SCOPE_READ,
     SCOPE_PUBLISH,
     SCOPE_REVIEW,
     SCOPE_VISIBILITY,
     SCOPE_DELETE,
+    SCOPE_AUDIT_READ,
+    SCOPE_AUDIT_EXPORT,
+    SCOPE_AUDIT_GLOBAL,
 ];
 
 #[derive(Clone, PartialEq, Eq)]

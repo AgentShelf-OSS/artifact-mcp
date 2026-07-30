@@ -4,6 +4,7 @@ use std::{
     collections::{BTreeMap, HashMap},
     fs::OpenOptions,
     future::Future,
+    net::SocketAddr,
     path::PathBuf,
     process::ExitCode,
     sync::{
@@ -19,36 +20,65 @@ use artifact_mcp::{
     build_router,
     config::{AccessIdentityMode, AppConfig, Clock, IdSource, NanoIdSource, SeedKeys, SystemClock},
     error::AppError,
-    http::middleware::{AccessRetryState, access_session_retry, prevent_response_transforms},
+    http::middleware::{
+        AccessRetryState, access_session_retry, attach_audit_request_id,
+        prevent_response_transforms,
+    },
     integrations::{
+        delivery_runtime::{DeliveryRuntime, DeliveryTelemetry},
+        delivery_worker::{ArtifactDeliveryPreviewResolver, OrganizationDiscordDiscussionProvider},
+        discord_delivery::DiscordProviderTransport,
+        discord_discussion::{DiscordDiscussionTransport, DiscussionResult},
+        discord_gateway_runtime::{DiscordInboundReadinessRest, DiscordInboundRuntime},
+        discord_history_recovery::DiscordHistoryRest,
+        discord_recovery_runtime::DiscordRecoveryRuntime,
         notify::{DiscordNotifier, HttpTransport},
-        thumbnails::{PreviewArtifactIndex, PreviewArtifactRef, PreviewHtml, PreviewIntegration},
+        preview_notifier::ArtifactPreviewNotifier,
+        thumbnails::{
+            PersistentThumbnailScheduler, PreviewArtifactIndex, PreviewArtifactRef, PreviewHtml,
+            PreviewIntegration,
+        },
     },
     model::{
         ArtifactId, ClientId, CreateOrganization, CreatePublisherKey, CreateShare, CreateWebhook,
-        CreatedPublisherKey, DeliveryResult, EmailAddress, Feedback, FeedbackId, FeedbackMutation,
-        FeedbackRef, NotificationPayload, OrgId, Organization, PublicShare, PublisherIdentity,
-        PublisherKeySummary, Reaction, ReactionUpdate, Sentiment, ShareGrant, ShareToken,
-        SubmitFeedback, TopViewedArtifact, ViewCounts, Viewer, ViewerNotification, ViewerView,
-        WebhookDelivery, WebhookEvent, WebhookId, WebhookSummary,
+        CreatedPublisherKey, EmailAddress, Feedback, FeedbackId, FeedbackMutation, FeedbackRef,
+        OrgId, Organization, PublicShare, PublisherIdentity, PublisherKeySummary, Reaction,
+        ReactionUpdate, Sentiment, ShareGrant, ShareToken, SubmitFeedback, TopViewedArtifact,
+        ViewCounts, Viewer, ViewerNotification, ViewerView, WebhookDelivery, WebhookEvent,
+        WebhookId, WebhookSummary,
     },
     persistence::{
         db::{self, Database, DbPool},
-        feedback,
+        discord_inbound::DiscordInboundStore,
+        discord_organization::{
+            ArtifactDiscussionOverride, DiscordCredentialReadiness, OrganizationDiscordStore,
+        },
+        discussions::{
+            ArtifactDiscussion, CreateNotificationThreadConnection, DiscussionConnectionStrategy,
+            DiscussionMode, DiscussionState, DiscussionStore,
+        },
+        feedback, feedback_delivery,
+        feedback_delivery::DeliveryPlanningContext,
         keys::{self, KeyStore},
         migrations::{self, MigrationContext},
         notifications,
         orgs::OrgStore,
+        outbox::OutboxRepository,
         reactions, shares, views,
         webhooks::WebhookStore,
     },
     ports::{
-        AdminService, ArtifactService, BoxFuture, EngagementService, HealthProbe, NotificationSink,
-        PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
+        AdminService, ArtifactDiscussionOverrideView, ArtifactDiscussionView, ArtifactService,
+        BoxFuture, DiscussionConnectionView, DiscussionModeRequest, DiscussionOverrideRequest,
+        DiscussionService, EngagementService, HealthProbe, NotificationSink,
+        OrganizationThreadingView, PreviewService, PublisherAuthenticator, ShareService,
+        ViewerIdentity,
+        discussions::OrganizationDiscordCredentialService,
         integrations::{HealthReport, PreviewPriority},
     },
     render::portal::AskamaPageRenderer,
     security::{
+        audit::{AuditAccess, AuditEvent, MutationAudit, parse_hmac_key},
         auth::{KeyAuthenticator, KeyHash, PublisherKeyDirectory, PublisherKeyRecord},
         crypto::{WebhookUrlProtection, warn_if_webhook_encryption_disabled},
         identity::{AccessViewerIdentity, OrgDirectory, assert_ready},
@@ -61,9 +91,13 @@ use axum::{
     http::{HeaderName, Request},
     middleware,
 };
+use hyper::server::conn::http1;
+use hyper_util::rt::{TokioIo, TokioTimer};
+use hyper_util::service::TowerToHyperService;
 use rusqlite::OptionalExtension as _;
 use thiserror::Error;
-use tokio::net::TcpListener;
+use tokio::{net::TcpListener, sync::watch, task::JoinSet};
+use tower::ServiceExt as _;
 use tower_http::{
     request_id::{MakeRequestUuid, RequestId, SetRequestIdLayer},
     trace::TraceLayer,
@@ -89,6 +123,7 @@ pub(crate) enum RuntimeError {
 pub(crate) enum StartupStage {
     DatabaseReady,
     StorageReconciled,
+    DeliveryWorkersStarted,
     ListenerBindRequested,
 }
 
@@ -178,6 +213,7 @@ struct ProductionAdmin {
     keys: KeyStore,
     orgs: OrgStore,
     webhooks: WebhookStore,
+    audit_key: [u8; 32],
 }
 
 impl AdminService for ProductionAdmin {
@@ -188,20 +224,32 @@ impl AdminService for ProductionAdmin {
     fn create_key(
         &self,
         request: CreatePublisherKey,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<CreatedPublisherKey, AppError>> {
-        Box::pin(self.keys.create_key(request))
+        Box::pin(self.keys.create_key_audited(request, audit, self.audit_key))
     }
 
-    fn revoke_key<'a>(&'a self, client_id: &'a ClientId) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.keys.revoke_key(client_id))
+    fn revoke_key<'a>(
+        &'a self,
+        client_id: &'a ClientId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
+        Box::pin(
+            self.keys
+                .revoke_key_audited(client_id.clone(), audit, self.audit_key),
+        )
     }
 
     fn set_key_owner(
         &self,
         client_id: ClientId,
         owner_email: Option<String>,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<Option<artifact_mcp::model::KeyOwnerUpdate>, AppError>> {
-        Box::pin(self.keys.set_key_owner(client_id, owner_email))
+        Box::pin(
+            self.keys
+                .set_key_owner_audited(client_id, owner_email, audit, self.audit_key),
+        )
     }
 
     fn backfill_key_owner(
@@ -209,11 +257,21 @@ impl AdminService for ProductionAdmin {
         client_id: ClientId,
         owner_email: String,
         confirm: bool,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<Option<artifact_mcp::model::OwnerBackfillResult>, AppError>> {
-        Box::pin(
-            self.keys
-                .backfill_key_owner(client_id, owner_email, confirm),
-        )
+        // A preview is intentionally not ledgered: it changes no state and must not become a
+        // target-existence oracle. Confirmed backfills are atomically ledgered.
+        if confirm {
+            Box::pin(self.keys.backfill_key_owner_audited(
+                client_id,
+                owner_email,
+                true,
+                audit,
+                self.audit_key,
+            ))
+        } else {
+            Box::pin(self.keys.backfill_key_owner(client_id, owner_email, false))
+        }
     }
 
     fn org_exists<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
@@ -245,44 +303,76 @@ impl AdminService for ProductionAdmin {
     fn create_org(
         &self,
         request: CreateOrganization,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<Organization, AppError>> {
-        Box::pin(self.orgs.create_org(request))
+        Box::pin(self.orgs.create_org_audited(request, audit, self.audit_key))
     }
 
-    fn delete_org<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.orgs.delete_org(org))
+    fn delete_org<'a>(
+        &'a self,
+        org: &'a OrgId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
+        Box::pin(
+            self.orgs
+                .delete_org_audited(org.clone(), audit, self.audit_key),
+        )
     }
 
     fn add_domain<'a>(
         &'a self,
         org: &'a OrgId,
         domain: &'a str,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
-        Box::pin(self.orgs.add_domain(org, domain))
+        Box::pin(self.orgs.add_domain_audited(
+            org.clone(),
+            domain.to_owned(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn remove_domain<'a>(
         &'a self,
         org: &'a OrgId,
         domain: &'a str,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.orgs.remove_domain(org, domain))
+        Box::pin(self.orgs.remove_domain_audited(
+            org.clone(),
+            domain.to_owned(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn add_email_member<'a>(
         &'a self,
         org: &'a OrgId,
         email: &'a EmailAddress,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
-        Box::pin(self.orgs.add_email_member(org, email))
+        Box::pin(self.orgs.add_email_member_audited(
+            org.clone(),
+            email.clone(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn remove_email_member<'a>(
         &'a self,
         org: &'a OrgId,
         email: &'a EmailAddress,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.orgs.remove_email_member(org, email))
+        Box::pin(self.orgs.remove_email_member_audited(
+            org.clone(),
+            email.clone(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn categories<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<Vec<String>, AppError>> {
@@ -293,16 +383,28 @@ impl AdminService for ProductionAdmin {
         &'a self,
         org: &'a OrgId,
         name: &'a str,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
-        Box::pin(self.orgs.add_category(org, name))
+        Box::pin(self.orgs.add_category_audited(
+            org.clone(),
+            name.to_owned(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn remove_category<'a>(
         &'a self,
         org: &'a OrgId,
         name: &'a str,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.orgs.remove_category(org, name))
+        Box::pin(self.orgs.remove_category_audited(
+            org.clone(),
+            name.to_owned(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn color_map(&self) -> BoxFuture<'_, Result<BTreeMap<OrgId, Option<String>>, AppError>> {
@@ -313,8 +415,14 @@ impl AdminService for ProductionAdmin {
         &'a self,
         org: &'a OrgId,
         color: Option<&'a str>,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
-        Box::pin(self.orgs.set_color(org, color))
+        Box::pin(self.orgs.set_color_audited(
+            org.clone(),
+            color.map(str::to_owned),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn list_webhooks<'a>(
@@ -327,16 +435,21 @@ impl AdminService for ProductionAdmin {
     fn create_webhook(
         &self,
         request: CreateWebhook,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<WebhookSummary, AppError>> {
-        Box::pin(self.webhooks.create(request))
+        Box::pin(self.webhooks.create_audited(request, audit, self.audit_key))
     }
 
     fn remove_webhook<'a>(
         &'a self,
         org: &'a OrgId,
         id: &'a WebhookId,
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.webhooks.remove(org, id))
+        Box::pin(
+            self.webhooks
+                .remove_audited(org.clone(), id.clone(), audit, self.audit_key),
+        )
     }
 
     fn set_webhook_events<'a>(
@@ -344,8 +457,15 @@ impl AdminService for ProductionAdmin {
         org: &'a OrgId,
         id: &'a WebhookId,
         events: &'a [WebhookEvent],
+        audit: MutationAudit,
     ) -> BoxFuture<'a, Result<Option<WebhookSummary>, AppError>> {
-        Box::pin(self.webhooks.set_events(org, id, events))
+        Box::pin(self.webhooks.set_events_audited(
+            org.clone(),
+            id.clone(),
+            events.to_vec(),
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn webhook_delivery<'a>(
@@ -354,6 +474,750 @@ impl AdminService for ProductionAdmin {
     ) -> BoxFuture<'a, Result<Option<WebhookDelivery>, AppError>> {
         Box::pin(self.webhooks.delivery(id))
     }
+
+    fn audit_webhook_test<'a>(
+        &'a self,
+        org: &'a OrgId,
+        id: &'a WebhookId,
+        outcome: Option<bool>,
+        audit: MutationAudit,
+    ) -> BoxFuture<'a, Result<(), AppError>> {
+        Box::pin(
+            self.webhooks
+                .audit_test(org.clone(), id.clone(), outcome, audit, self.audit_key),
+        )
+    }
+}
+
+#[derive(Clone)]
+struct ProductionDiscussions {
+    store: DiscussionStore,
+    organization: OrganizationDiscordStore,
+    inbound: DiscordInboundStore,
+    webhooks: Arc<WebhookStore>,
+    public_base_url: String,
+    audit_key: [u8; 32],
+}
+
+impl ProductionDiscussions {
+    fn connection_view(
+        summary: Option<artifact_mcp::persistence::discussions::DiscussionConnectionSummary>,
+        bot_configured: bool,
+    ) -> DiscussionConnectionView {
+        summary.map_or_else(
+            || DiscussionConnectionView {
+                configured: false,
+                label: String::new(),
+                destination: String::new(),
+                strategy: "notification_thread".to_owned(),
+                webhook_id: None,
+                bot_configured,
+                last_error: None,
+            },
+            |summary| DiscussionConnectionView {
+                configured: true,
+                label: summary.label,
+                destination: summary.destination,
+                strategy: match summary.strategy {
+                    DiscussionConnectionStrategy::ForumWebhook => "forum_webhook",
+                    DiscussionConnectionStrategy::NotificationThread => "notification_thread",
+                }
+                .to_owned(),
+                webhook_id: summary.notification_webhook_id,
+                bot_configured,
+                last_error: summary.last_error,
+            },
+        )
+    }
+
+    fn discussion_view(discussion: ArtifactDiscussion) -> ArtifactDiscussionView {
+        let mode = match discussion.mode {
+            DiscussionMode::ArtifactMcpOnly => "artifact_only",
+            DiscussionMode::DiscordMirror => "discord_mirror",
+        };
+        let state = match discussion.state {
+            DiscussionState::Local => "local",
+            DiscussionState::Pending => "pending",
+            DiscussionState::Connected => "connected",
+            DiscussionState::Paused => "paused",
+            DiscussionState::Failed => "failed",
+        };
+        ArtifactDiscussionView {
+            mode: mode.to_owned(),
+            state: state.to_owned(),
+            enabled: discussion.mode == DiscussionMode::DiscordMirror,
+            connection_configured: discussion.connection_id.is_some(),
+            // Provider diagnostics may contain remote body text. The route exposes only a stable
+            // state, never that untrusted detail.
+            last_error: None,
+        }
+    }
+
+    fn organization_view(
+        status: artifact_mcp::persistence::discord_organization::OrganizationThreadingStatus,
+    ) -> OrganizationThreadingView {
+        OrganizationThreadingView {
+            credential: match status.credential_readiness {
+                DiscordCredentialReadiness::Configured => "configured",
+                DiscordCredentialReadiness::LegacyFallback => "fallback",
+                DiscordCredentialReadiness::Unconfigured
+                | DiscordCredentialReadiness::Deactivated => "missing",
+            }
+            .to_owned(),
+            enabled: status.outbound_enabled,
+            degraded: status.recovery_state == "degraded"
+                || matches!(
+                    status.credential_readiness,
+                    DiscordCredentialReadiness::Unconfigured
+                        | DiscordCredentialReadiness::Deactivated
+                ),
+            recovery_state: status.recovery_state.to_owned(),
+            recovery_pending: status.recovery_pending,
+        }
+    }
+
+    async fn validate_credential(
+        &self,
+        org: &OrgId,
+        token: artifact_mcp::config::Secret,
+    ) -> Result<(), AppError> {
+        let transport = DiscordDiscussionTransport::with_bot_token(Some(token))?;
+        let Some(summary) = self.store.connection_summary(org).await? else {
+            return transport.validate_bot_token().await;
+        };
+        let delivery = self
+            .store
+            .connection_for_delivery(&summary.id, org)
+            .await?
+            .ok_or_else(|| {
+                AppError::Validation(
+                    "Configure an organization notification destination first.".to_owned(),
+                )
+            })?;
+        if delivery.strategy != DiscussionConnectionStrategy::NotificationThread {
+            return Err(AppError::Validation(
+                "Select a notification-thread destination.".to_owned(),
+            ));
+        }
+        let destination = transport
+            .inspect_notification_webhook(&delivery.url)
+            .await?;
+        if delivery.channel_id.as_deref() != Some(destination.channel_id.as_str())
+            || delivery.guild_id.as_deref() != Some(destination.guild_id.as_str())
+        {
+            return Err(AppError::Validation(
+                "The credential does not match the selected Discord destination.".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
+    async fn artifact_override_view(
+        &self,
+        artifact: &artifact_mcp::model::ArtifactMeta,
+    ) -> Result<ArtifactDiscussionOverrideView, AppError> {
+        let policy = self
+            .organization
+            .effective_policy(&artifact.id, &artifact.org)
+            .await?;
+        let discussion = self
+            .store
+            .get_discussion(&artifact.id, &artifact.org)
+            .await?;
+        let inbound = self
+            .inbound
+            .policy_status(&artifact.id, &artifact.org)
+            .await?;
+        let effective_outbound = policy.effective_outbound
+            || discussion
+                .as_ref()
+                .is_some_and(|row| row.mode == DiscussionMode::DiscordMirror);
+        let state = discussion.as_ref().map_or("local", |row| match row.state {
+            DiscussionState::Local => "local",
+            DiscussionState::Pending => "pending",
+            DiscussionState::Connected => "connected",
+            DiscussionState::Paused => "local",
+            DiscussionState::Failed => "failed",
+        });
+        Ok(ArtifactDiscussionOverrideView {
+            override_mode: if inbound.enabled {
+                "discord_two_way"
+            } else {
+                match policy.artifact_override {
+                    ArtifactDiscussionOverride::Inherit => "inherit",
+                    ArtifactDiscussionOverride::ArtifactOnly => "artifact_only",
+                }
+            }
+            .to_owned(),
+            effective_mode: if inbound.enabled {
+                "discord_two_way"
+            } else if effective_outbound {
+                "discord_mirror"
+            } else {
+                "artifact_only"
+            }
+            .to_owned(),
+            state: if inbound.enabled {
+                inbound.health
+            } else {
+                state.to_owned()
+            },
+            actionable_error: if inbound.enabled && !inbound.safe_error.is_empty() {
+                Some(inbound.safe_error)
+            } else if policy.outbound_enabled
+                && !effective_outbound
+                && policy.artifact_override == ArtifactDiscussionOverride::Inherit
+            {
+                Some("threading_unavailable".to_owned())
+            } else {
+                None
+            },
+        })
+    }
+
+    async fn recovery_destination(
+        &self,
+        org: &OrgId,
+    ) -> Result<artifact_mcp::persistence::discord_organization::RecoveryDestination, AppError>
+    {
+        let summary = self.store.connection_summary(org).await?.ok_or_else(|| {
+            AppError::Validation(
+                "Configure a notification-thread destination before enabling threading.".to_owned(),
+            )
+        })?;
+        let delivery = self
+            .store
+            .connection_for_delivery(&summary.id, org)
+            .await?
+            .ok_or(AppError::Internal)?;
+        if delivery.strategy != DiscussionConnectionStrategy::NotificationThread {
+            return Err(AppError::Validation(
+                "Select a notification-thread destination.".to_owned(),
+            ));
+        }
+        Ok(
+            artifact_mcp::persistence::discord_organization::RecoveryDestination {
+                connection_id: summary.id,
+                notification_webhook_id: delivery
+                    .notification_webhook_id
+                    .ok_or(AppError::Internal)?,
+                provider_webhook_id: delivery.notification_provider_webhook_id.ok_or_else(
+                    || {
+                        AppError::Conflict(
+                            "Re-save the selected Discord destination before enabling threading."
+                                .to_owned(),
+                        )
+                    },
+                )?,
+                guild_id: delivery.guild_id.ok_or(AppError::Internal)?,
+                channel_id: delivery.channel_id.ok_or(AppError::Internal)?,
+            },
+        )
+    }
+}
+
+impl DiscussionService for ProductionDiscussions {
+    fn organization_threading<'a>(
+        &'a self,
+        org: &'a OrgId,
+    ) -> BoxFuture<'a, Result<OrganizationThreadingView, AppError>> {
+        Box::pin(async move {
+            self.organization
+                .organization_status(org)
+                .await
+                .map(Self::organization_view)
+        })
+    }
+
+    fn save_organization_threading(
+        &self,
+        org: OrgId,
+        bot_token: String,
+        enabled: bool,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<OrganizationThreadingView, AppError>> {
+        Box::pin(async move {
+            let recovery_destination = if enabled {
+                Some(self.recovery_destination(&org).await?)
+            } else {
+                None
+            };
+            let rotating = !bot_token.trim().is_empty();
+            // Disabling the organization default is an entirely local safety action. It must
+            // remain available while Discord is down and before any credential exists. A token
+            // rotation still requires provider validation even when the outbound policy remains
+            // disabled.
+            let rotation = if rotating {
+                let token = artifact_mcp::config::Secret::new(bot_token);
+                self.validate_credential(&org, token.clone()).await?;
+                Some(token)
+            } else if enabled {
+                let token = self
+                    .organization
+                    .credential_for_provider(&org)
+                    .await?
+                    .ok_or_else(|| {
+                        AppError::Validation(
+                            "A Discord bot credential is required before enabling threading."
+                                .to_owned(),
+                        )
+                    })?;
+                self.validate_credential(&org, token).await?;
+                None
+            } else {
+                None
+            };
+            self.organization
+                .save_validated_credential_and_policy_audited(
+                    org.clone(),
+                    rotation,
+                    enabled,
+                    audit.clone(),
+                    self.audit_key,
+                )
+                .await?;
+            if let Some(destination) = recovery_destination {
+                self.organization
+                    .queue_recoveries_for_org_audited(
+                        org.clone(),
+                        destination,
+                        self.public_base_url.clone(),
+                        audit,
+                        self.audit_key,
+                    )
+                    .await?;
+            }
+            self.organization
+                .organization_status(&org)
+                .await
+                .map(Self::organization_view)
+        })
+    }
+
+    fn test_organization_credential(
+        &self,
+        org: OrgId,
+        _audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move {
+            let token = self
+                .organization
+                .credential_for_provider(&org)
+                .await?
+                .ok_or_else(|| {
+                    AppError::Validation(
+                        "No organization Discord credential is configured.".to_owned(),
+                    )
+                })?;
+            self.validate_credential(&org, token).await?;
+            Ok(true)
+        })
+    }
+
+    fn remove_organization_credential(
+        &self,
+        org: OrgId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move {
+            self.organization
+                .deactivate_credential_audited(org, audit, self.audit_key)
+                .await
+        })
+    }
+
+    fn queue_historical_recovery(
+        &self,
+        org: OrgId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move {
+            let destination = self.recovery_destination(&org).await?;
+            let queued = self
+                .organization
+                .queue_recoveries_for_org_audited(
+                    org,
+                    destination,
+                    self.public_base_url.clone(),
+                    audit,
+                    self.audit_key,
+                )
+                .await?;
+            Ok(queued > 0)
+        })
+    }
+
+    fn artifact_override<'a>(
+        &'a self,
+        artifact: &'a artifact_mcp::model::ArtifactMeta,
+    ) -> BoxFuture<'a, Result<ArtifactDiscussionOverrideView, AppError>> {
+        Box::pin(async move { self.artifact_override_view(artifact).await })
+    }
+
+    fn set_artifact_override(
+        &self,
+        artifact: artifact_mcp::model::ArtifactMeta,
+        override_mode: DiscussionOverrideRequest,
+        _actor: String,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<ArtifactDiscussionOverrideView, AppError>> {
+        Box::pin(async move {
+            match override_mode {
+                DiscussionOverrideRequest::DiscordTwoWay => {
+                    let effective = self
+                        .organization
+                        .effective_policy(&artifact.id, &artifact.org)
+                        .await?;
+                    let credential = self
+                        .organization
+                        .credential_for_provider(&artifact.org)
+                        .await?;
+                    if !effective.effective_outbound || credential.is_none() {
+                        return Err(AppError::Conflict(
+                            "The organization Discord credential and outbound threading policy must be ready before enabling two-way sync."
+                                .to_owned(),
+                        ));
+                    }
+                    let thread_id = self
+                        .store
+                        .get_discussion(&artifact.id, &artifact.org)
+                        .await?
+                        .filter(|discussion| {
+                            discussion.mode == DiscussionMode::DiscordMirror
+                                && discussion.state == DiscussionState::Connected
+                        })
+                        .and_then(|discussion| discussion.thread_id)
+                        .ok_or_else(|| {
+                            AppError::Conflict(
+                                "A mapped Discord thread must be connected before enabling two-way sync."
+                                    .to_owned(),
+                            )
+                        })?;
+                    DiscordInboundReadinessRest::new()?
+                        .validate_thread(credential.as_ref().ok_or(AppError::Internal)?, &thread_id)
+                        .await?;
+                    let mut gateway_ready = self
+                        .inbound
+                        .request_gateway_readiness(&artifact.id, &artifact.org)
+                        .await?;
+                    for _ in 0..20 {
+                        if gateway_ready {
+                            break;
+                        }
+                        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                        gateway_ready = self.inbound.gateway_ready(&artifact.org).await?;
+                    }
+                    if !gateway_ready {
+                        return Err(AppError::Conflict(
+                            "The Discord Gateway is connecting or unavailable. Verify the Message Content intent and retry two-way sync."
+                                .to_owned(),
+                        ));
+                    }
+                    self.organization
+                        .set_artifact_override_audited(
+                            artifact.id.clone(),
+                            artifact.org.clone(),
+                            ArtifactDiscussionOverride::Inherit,
+                            audit.clone(),
+                            self.audit_key,
+                        )
+                        .await?;
+                    self.inbound
+                        .set_policy_audited(
+                            artifact.id.clone(),
+                            artifact.org.clone(),
+                            true,
+                            audit,
+                            self.audit_key,
+                        )
+                        .await?;
+                }
+                DiscussionOverrideRequest::Inherit | DiscussionOverrideRequest::ArtifactOnly => {
+                    self.inbound
+                        .set_policy_audited(
+                            artifact.id.clone(),
+                            artifact.org.clone(),
+                            false,
+                            audit.clone(),
+                            self.audit_key,
+                        )
+                        .await?;
+                    self.organization
+                        .set_artifact_override_audited(
+                            artifact.id.clone(),
+                            artifact.org.clone(),
+                            match override_mode {
+                                DiscussionOverrideRequest::Inherit => {
+                                    ArtifactDiscussionOverride::Inherit
+                                }
+                                DiscussionOverrideRequest::ArtifactOnly => {
+                                    ArtifactDiscussionOverride::ArtifactOnly
+                                }
+                                DiscussionOverrideRequest::DiscordTwoWay => unreachable!(),
+                            },
+                            audit,
+                            self.audit_key,
+                        )
+                        .await?;
+                }
+            }
+            self.artifact_override_view(&artifact).await
+        })
+    }
+
+    fn connection<'a>(
+        &'a self,
+        org: &'a OrgId,
+    ) -> BoxFuture<'a, Result<DiscussionConnectionView, AppError>> {
+        Box::pin(async move {
+            let configured = self
+                .organization
+                .credential_readiness(org)
+                .await
+                .is_ok_and(|value| {
+                    matches!(
+                        value,
+                        DiscordCredentialReadiness::Configured
+                            | DiscordCredentialReadiness::LegacyFallback
+                    )
+                });
+            Ok(Self::connection_view(
+                self.store.connection_summary(org).await?,
+                configured,
+            ))
+        })
+    }
+
+    fn configure_connection(
+        &self,
+        org: OrgId,
+        webhook_id: String,
+        label: String,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<DiscussionConnectionView, AppError>> {
+        Box::pin(async move {
+            let token = self
+                .organization
+                .credential_for_provider(&org)
+                .await?
+                .ok_or_else(|| {
+                    AppError::Validation(
+                        "Save an organization Discord credential before selecting a destination."
+                            .to_owned(),
+                    )
+                })?;
+            let transport = DiscordDiscussionTransport::with_bot_token(Some(token))?;
+            let webhook_id = WebhookId(webhook_id);
+            let delivery = self
+                .webhooks
+                .delivery(&webhook_id)
+                .await?
+                .filter(|delivery| delivery.org == org)
+                .ok_or_else(|| {
+                    AppError::Validation(
+                        "Select an existing webhook for this organization.".to_owned(),
+                    )
+                })?;
+            if !delivery.events.contains(&WebhookEvent::Published) {
+                return Err(AppError::Validation(
+                    "The selected webhook must subscribe to published artifacts.".to_owned(),
+                ));
+            }
+            let destination = transport
+                .inspect_notification_webhook(&delivery.url)
+                .await?;
+            let summary = self
+                .store
+                .upsert_notification_thread_connection_audited(
+                    CreateNotificationThreadConnection {
+                        org,
+                        notification_webhook_id: webhook_id.0,
+                        notification_provider_webhook_id: destination.webhook_id,
+                        channel_id: destination.channel_id,
+                        guild_id: destination.guild_id,
+                        label,
+                    },
+                    audit,
+                    self.audit_key,
+                )
+                .await?;
+            Ok(Self::connection_view(Some(summary), true))
+        })
+    }
+
+    fn remove_connection(
+        &self,
+        org: OrgId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move {
+            self.store
+                .remove_connection_audited(org, audit, self.audit_key)
+                .await
+        })
+    }
+
+    fn test_connection(
+        &self,
+        org: OrgId,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move {
+            let transport = DiscordDiscussionTransport::with_bot_token(
+                self.organization.credential_for_provider(&org).await?,
+            )?;
+            let Some(summary) = self.store.connection_summary(&org).await? else {
+                return Err(AppError::Validation(
+                    "Discord discussion connection is not configured.".to_owned(),
+                ));
+            };
+            // Commit requested evidence before making the external call. The URL is resolved only
+            // below this boundary and never enters an audit event, response, error, or debug log.
+            self.store
+                .audit_connection_test(
+                    org.clone(),
+                    summary.id.clone(),
+                    None,
+                    audit.clone(),
+                    self.audit_key,
+                )
+                .await?;
+            // Every post-request failure is converted to a fixed failed outcome so the completed
+            // audit marker is attempted even when lookup, decrypt, request construction, or
+            // transport delivery fails. The only early return remaining is an audit failure.
+            let success = match self.store.connection_for_delivery(&summary.id, &org).await {
+                Ok(Some(delivery))
+                    if delivery.strategy == DiscussionConnectionStrategy::NotificationThread =>
+                {
+                    match delivery.channel_id {
+                        Some(channel_id) => {
+                            transport
+                                .test_notification_thread(
+                                    &delivery.url,
+                                    &format!("discussion:{}", summary.id),
+                                    &channel_id,
+                                    &delivery.label,
+                                )
+                                .await
+                        }
+                        None => false,
+                    }
+                }
+                Ok(Some(delivery)) => {
+                    let operation = artifact_mcp::integrations::discord_discussion::DiscussionOperation::create_thread(
+                        "Artifact MCP connection test".to_owned(),
+                        "Artifact MCP Discord discussion connection test. This visible post confirms delivery and is not linked to an artifact.".to_owned(),
+                    );
+                    match operation.and_then(|operation| {
+                        artifact_mcp::integrations::discord_discussion::discussion_request(
+                            &delivery.url,
+                            format!("discussion:{}", summary.id),
+                            operation,
+                        )
+                    }) {
+                        Ok(request) => matches!(
+                            transport.deliver(request).await,
+                            DiscussionResult::Accepted { .. }
+                        ),
+                        Err(_) => false,
+                    }
+                }
+                Ok(None) | Err(_) => false,
+            };
+            self.store
+                .audit_connection_test(org, summary.id, Some(success), audit, self.audit_key)
+                .await?;
+            if success {
+                Ok(true)
+            } else {
+                Err(AppError::Unavailable(
+                    "discord discussion unavailable".to_owned(),
+                ))
+            }
+        })
+    }
+
+    fn status<'a>(
+        &'a self,
+        artifact: &'a artifact_mcp::model::ArtifactMeta,
+    ) -> BoxFuture<'a, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            let discussion = self
+                .store
+                .get_discussion(&artifact.id, &artifact.org)
+                .await?
+                .unwrap_or_else(|| {
+                    ArtifactDiscussion::local_only(artifact.id.clone(), artifact.org.clone())
+                });
+            let mut view = Self::discussion_view(discussion);
+            view.connection_configured = self
+                .store
+                .connection_summary(&artifact.org)
+                .await?
+                .is_some();
+            Ok(view)
+        })
+    }
+
+    fn set_mode(
+        &self,
+        artifact: artifact_mcp::model::ArtifactMeta,
+        mode: DiscussionModeRequest,
+        actor: String,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            let desired = match mode {
+                DiscussionModeRequest::ArtifactOnly => DiscussionMode::ArtifactMcpOnly,
+                DiscussionModeRequest::DiscordMirror => DiscussionMode::DiscordMirror,
+            };
+            let next = self
+                .store
+                .set_mode_audited(
+                    artifact.id,
+                    artifact.org.clone(),
+                    desired,
+                    actor,
+                    audit,
+                    self.audit_key,
+                )
+                .await?;
+            let mut view = Self::discussion_view(next);
+            view.connection_configured = self
+                .store
+                .connection_summary(&artifact.org)
+                .await?
+                .is_some();
+            Ok(view)
+        })
+    }
+
+    fn retry(
+        &self,
+        artifact: artifact_mcp::model::ArtifactMeta,
+        actor: String,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            let next = self
+                .store
+                .retry_audited(
+                    artifact.id,
+                    artifact.org.clone(),
+                    actor,
+                    audit,
+                    self.audit_key,
+                )
+                .await?;
+            let mut view = Self::discussion_view(next);
+            view.connection_configured = self
+                .store
+                .connection_summary(&artifact.org)
+                .await?
+                .is_some();
+            Ok(view)
+        })
+    }
 }
 
 #[derive(Clone)]
@@ -361,6 +1225,8 @@ struct ProductionEngagement {
     pool: DbPool,
     ids: Arc<dyn IdSource>,
     feedback_max_body: u64,
+    public_base_url: String,
+    delivery_planning: DeliveryPlanningContext,
 }
 
 impl EngagementService for ProductionEngagement {
@@ -488,19 +1354,18 @@ impl EngagementService for ProductionEngagement {
         let ids = Arc::clone(&self.ids);
         let max_body = self.feedback_max_body;
         let meta = artifact.into_meta();
+        let public_base_url = self.public_base_url.clone();
+        let planning = self.delivery_planning.clone();
         Box::pin(async move {
             db::interact(&pool, move |conn| {
-                feedback::add(
+                feedback_delivery::submit(
                     conn,
                     ids.as_ref(),
-                    &feedback::NewFeedback {
-                        artifact_id: &meta.id,
-                        org: &meta.org,
-                        artifact_revision: meta.revision,
-                        anchor_page: submission.anchor_page.as_deref(),
-                        submission: &submission,
-                        max_body,
-                    },
+                    &planning,
+                    &public_base_url,
+                    &meta,
+                    &submission,
+                    max_body,
                 )
             })
             .await
@@ -515,15 +1380,12 @@ impl EngagementService for ProductionEngagement {
     ) -> BoxFuture<'_, Result<FeedbackMutation, AppError>> {
         let pool = self.pool.clone();
         let meta = artifact.into_meta();
+        let planning = self.delivery_planning.clone();
         Box::pin(async move {
-            let scope = FeedbackRef {
-                id,
-                artifact_id: meta.id,
-                org: meta.org,
-            };
-            let email = viewer.email.unwrap_or_default();
             db::interact(&pool, move |conn| {
-                feedback::delete_as_viewer(conn, &scope, &email, viewer.is_admin)
+                feedback_delivery::delete_as_viewer_with_delivery(
+                    conn, &planning, &meta, &viewer, id,
+                )
             })
             .await
         })
@@ -537,15 +1399,18 @@ impl EngagementService for ProductionEngagement {
     ) -> BoxFuture<'_, Result<FeedbackMutation, AppError>> {
         let pool = self.pool.clone();
         let meta = artifact.into_meta();
+        let public_base_url = self.public_base_url.clone();
+        let planning = self.delivery_planning.clone();
         Box::pin(async move {
-            let scope = FeedbackRef {
-                id,
-                artifact_id: meta.id,
-                org: meta.org,
-            };
-            let email = viewer.email.unwrap_or_default();
             db::interact(&pool, move |conn| {
-                feedback::resolve_as_viewer(conn, &scope, &email, viewer.is_admin)
+                feedback_delivery::resolve_as_viewer(
+                    conn,
+                    &planning,
+                    &public_base_url,
+                    &meta,
+                    &viewer,
+                    id,
+                )
             })
             .await
         })
@@ -580,14 +1445,24 @@ impl EngagementService for ProductionEngagement {
 
     fn resolve_feedback_as_publisher(
         &self,
-        _artifact: artifact_mcp::security::access::OwnedArtifact,
+        artifact: artifact_mcp::security::access::OwnedArtifact,
         id: FeedbackId,
         resolved_by: String,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
         let pool = self.pool.clone();
+        let meta = artifact.meta().clone();
+        let public_base_url = self.public_base_url.clone();
+        let planning = self.delivery_planning.clone();
         Box::pin(async move {
             db::interact(&pool, move |conn| {
-                feedback::resolve_as_publisher(conn, &id, &resolved_by)
+                feedback_delivery::resolve_as_publisher(
+                    conn,
+                    &planning,
+                    &public_base_url,
+                    &meta,
+                    id,
+                    &resolved_by,
+                )
             })
             .await
         })
@@ -595,11 +1470,18 @@ impl EngagementService for ProductionEngagement {
 
     fn reopen_feedback_as_publisher(
         &self,
-        _artifact: artifact_mcp::security::access::OwnedArtifact,
+        artifact: artifact_mcp::security::access::OwnedArtifact,
         id: FeedbackId,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
         let pool = self.pool.clone();
-        Box::pin(async move { db::interact(&pool, move |conn| feedback::reopen(conn, &id)).await })
+        let meta = artifact.meta().clone();
+        let planning = self.delivery_planning.clone();
+        Box::pin(async move {
+            db::interact(&pool, move |conn| {
+                feedback_delivery::reopen_as_publisher_with_delivery(conn, &planning, &meta, id)
+            })
+            .await
+        })
     }
 
     fn recent_notifications<'a>(
@@ -637,6 +1519,7 @@ struct ProductionShares {
     pool: DbPool,
     ids: Arc<dyn IdSource>,
     clock: Arc<dyn Clock>,
+    audit_key: [u8; 32],
 }
 
 impl ShareService for ProductionShares {
@@ -655,24 +1538,19 @@ impl ShareService for ProductionShares {
         &self,
         artifact: artifact_mcp::security::access::AuthorizedArtifact,
         request: CreateShare,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<PublicShare, AppError>> {
-        let pool = self.pool.clone();
         let ids = Arc::clone(&self.ids);
         let clock = Arc::clone(&self.clock);
-        let meta = artifact.into_meta();
-        Box::pin(async move {
-            db::interact(&pool, move |conn| {
-                shares::create(
-                    conn,
-                    ids.as_ref(),
-                    clock.as_ref(),
-                    &meta.id,
-                    &meta.org,
-                    &request,
-                )
-            })
-            .await
-        })
+        Box::pin(shares::create_audited_pooled(
+            &self.pool,
+            ids,
+            clock,
+            artifact,
+            request,
+            audit,
+            self.audit_key,
+        ))
     }
 
     fn list<'a>(
@@ -690,89 +1568,15 @@ impl ShareService for ProductionShares {
         &self,
         artifact: artifact_mcp::security::access::AuthorizedArtifact,
         token: ShareToken,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
-        let pool = self.pool.clone();
-        let id = artifact.into_meta().id;
-        Box::pin(
-            async move { db::interact(&pool, move |conn| shares::revoke(conn, &id, &token)).await },
-        )
-    }
-}
-
-#[derive(Clone)]
-struct ArtifactPreviewNotifier {
-    artifacts: Arc<ArtifactStore>,
-    previews: Arc<PreviewIntegration>,
-    discord: Arc<DiscordNotifier>,
-}
-
-impl ArtifactPreviewNotifier {
-    async fn emit_detached(self, event: WebhookEvent, org: OrgId, payload: NotificationPayload) {
-        if event == WebhookEvent::Deleted {
-            self.previews
-                .store()
-                .remove_artifact(&payload.artifact_id)
-                .await;
-            self.discord
-                .emit_with_preview(event, org, payload, None)
-                .await;
-            return;
-        }
-
-        if !matches!(
-            event,
-            WebhookEvent::Published | WebhookEvent::Updated | WebhookEvent::Restored
-        ) {
-            self.discord
-                .emit_with_preview(event, org, payload, None)
-                .await;
-            return;
-        }
-
-        let preview = match self.artifacts.find_meta(&payload.artifact_id).await {
-            Ok(Some(meta)) if !meta.is_bundle => match self.artifacts.read_body_for(&meta).await {
-                Ok(Some(file)) => self
-                    .previews
-                    .queue()
-                    .enqueue(
-                        meta,
-                        PreviewHtml::Ready(String::from_utf8_lossy(&file.content).into_owned()),
-                        PreviewPriority::High,
-                    )
-                    .await
-                    .map(Arc::new),
-                _ => None,
-            },
-            _ => None,
-        };
-        self.discord
-            .emit_with_preview(event, org, payload, preview)
-            .await;
-    }
-}
-
-impl NotificationSink for ArtifactPreviewNotifier {
-    fn emit(
-        &self,
-        event: WebhookEvent,
-        org: OrgId,
-        payload: NotificationPayload,
-    ) -> BoxFuture<'_, Result<(), AppError>> {
-        let notifier = self.clone();
-        Box::pin(async move {
-            tokio::spawn(
-                async move { notifier.emit_detached(event, org, payload).await }
-                    .instrument(info_span!("notification.prepare")),
-            );
-            Ok(())
-        })
-    }
-
-    fn test<'a>(
-        &'a self,
-        webhook: &'a WebhookDelivery,
-    ) -> BoxFuture<'a, Result<DeliveryResult, AppError>> {
-        self.discord.test(webhook)
+        Box::pin(shares::revoke_audited_pooled(
+            &self.pool,
+            artifact,
+            token,
+            audit,
+            self.audit_key,
+        ))
     }
 }
 
@@ -831,6 +1635,9 @@ struct Bootstrapped {
     router: Router,
     host: String,
     port: u16,
+    delivery_runtime: DeliveryRuntime,
+    recovery_runtime: DiscordRecoveryRuntime,
+    inbound_runtime: DiscordInboundRuntime,
 }
 
 #[tracing::instrument(skip_all)]
@@ -881,7 +1688,11 @@ fn migration_context(config: &AppConfig) -> MigrationContext {
 }
 
 #[tracing::instrument(skip_all)]
-async fn seed_configured_keys(pool: &DbPool, seed_keys: SeedKeys) -> Result<u64, AppError> {
+async fn seed_configured_keys(
+    pool: &DbPool,
+    seed_keys: SeedKeys,
+    audit_key: [u8; 32],
+) -> Result<u64, AppError> {
     for client_id in &seed_keys.ignored_placeholders {
         tracing::warn!(
             client_id = %client_id,
@@ -890,7 +1701,8 @@ async fn seed_configured_keys(pool: &DbPool, seed_keys: SeedKeys) -> Result<u64,
     }
     let pool = pool.clone();
     db::interact(&pool, move |conn| {
-        let mut statement = conn
+        let tx = conn.transaction().map_err(|_| AppError::Internal)?;
+        let mut statement = tx
             .prepare(
                 "INSERT INTO api_keys (client_id, org, key_hash) VALUES (?1, ?2, ?3) \
                  ON CONFLICT(client_id) DO NOTHING",
@@ -910,6 +1722,26 @@ async fn seed_configured_keys(pool: &DbPool, seed_keys: SeedKeys) -> Result<u64,
                 })?;
             seeded = seeded.saturating_add(u64::try_from(changed).unwrap_or(u64::MAX));
         }
+        drop(statement);
+        if seeded > 0 {
+            let audit = MutationAudit::maintenance()?;
+            let event = AuditEvent {
+                operation: "key.seed".to_owned(),
+                target_type: "key_set".to_owned(),
+                target_id: String::new(),
+                result: "success".to_owned(),
+                classification: "bootstrap_key_seed".to_owned(),
+                revision: None,
+            };
+            artifact_mcp::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+        }
+        tx.commit().map_err(|_| AppError::Internal)?;
         Ok(seeded)
     })
     .await
@@ -1062,6 +1894,7 @@ fn runtime_router(deps: AppDeps) -> Router {
             access_retry,
             access_session_retry,
         ))
+        .layer(middleware::from_fn(attach_audit_request_id))
         .layer(trace)
         .layer(SetRequestIdLayer::new(REQUEST_ID_HEADER, MakeRequestUuid))
         .layer(middleware::from_fn(prevent_response_transforms))
@@ -1109,7 +1942,10 @@ async fn bootstrap(
         "effective database pragmas"
     );
 
-    let seeded = seed_configured_keys(&pool, config.seed_keys.clone()).await?;
+    let audit_key = parse_hmac_key(
+        config.audit_ledger_hmac_key.as_ref().ok_or_else(|| AppError::Validation("AUDIT_LEDGER_HMAC_KEY is required; refusing to start without a tamper-evident audit ledger".to_owned()))?.expose(),
+    )?;
+    let seeded = seed_configured_keys(&pool, config.seed_keys.clone(), audit_key).await?;
     tracing::info!(seeded_keys = seeded, "publisher key seed complete");
     let key_store = KeyStore::new(pool.clone());
     if seeded == 0
@@ -1123,13 +1959,23 @@ async fn bootstrap(
     }
 
     let ids: Arc<dyn IdSource> = Arc::new(NanoIdSource::default());
-    let artifacts = Arc::new(ArtifactStore::from_config(
-        pool.clone(),
+    let ingress = Arc::new(artifact_mcp::http::ingress::IngressState::from_config(
         &config,
-        Arc::clone(&ids),
     ));
-
-    let storage = artifacts.audit_storage(true).await?;
+    let previews = Arc::new(PreviewIntegration::from_config_with_queue_counter(
+        &config,
+        Some(ingress.preview_queue_rejection_counter()),
+        Some(ingress.preview_queue_pressure()),
+    ));
+    let artifacts = Arc::new(
+        ArtifactStore::from_config(pool.clone(), &config, Arc::clone(&ids))?
+            .with_post_commit_preview_scheduler(Arc::new(PersistentThumbnailScheduler::new(
+                Arc::clone(&previews),
+            ))),
+    );
+    let storage = artifacts.audit_storage(true).await.inspect_err(|_error| {
+        artifact_mcp::observability::record_global_security_signal("reconciliation_failure");
+    })?;
     observer.stage(StartupStage::StorageReconciled);
     tracing::info!(
         recovered = storage.recovered_paths.len(),
@@ -1141,14 +1987,18 @@ async fn bootstrap(
         "storage reconciliation complete"
     );
 
-    let digests = artifacts.backfill_body_digests().await?;
+    let digests = artifacts
+        .backfill_body_digests()
+        .await
+        .inspect_err(|_error| {
+            artifact_mcp::observability::record_global_security_signal("reconciliation_failure");
+        })?;
     tracing::info!(
         scanned = digests.scanned,
         updated = digests.updated,
         "artifact digest backfill complete"
     );
 
-    let previews = Arc::new(PreviewIntegration::from_config(&config));
     let grouped = artifacts.list_all_grouped_by_org(true).await?;
     let all_artifacts = grouped
         .into_iter()
@@ -1194,33 +2044,94 @@ async fn bootstrap(
     let webhooks = Arc::new(WebhookStore::new(
         pool.clone(),
         Arc::clone(&ids),
-        protection,
+        Arc::clone(&protection),
     ));
+    let discussions = Arc::new(DiscussionStore::new(pool.clone(), Arc::clone(&protection)));
+    let organization_discord = OrganizationDiscordStore::new(
+        pool.clone(),
+        Arc::clone(&protection),
+        config.discord_bot_token.clone(),
+    );
     let discord = Arc::new(DiscordNotifier::new(
         Arc::clone(&webhooks),
         Arc::new(HttpTransport::new()?),
     ));
-    let notifications: Arc<dyn NotificationSink> = Arc::new(ArtifactPreviewNotifier {
-        artifacts: Arc::clone(&artifacts),
-        previews: Arc::clone(&previews),
-        discord,
+    let notifications: Arc<dyn NotificationSink> =
+        Arc::new(ArtifactPreviewNotifier::from_artifact_store(
+            Arc::clone(&artifacts),
+            Arc::clone(&previews),
+            discord,
+        ));
+    // Durable workers start only after storage reconciliation, digest recovery, and preview
+    // cache reconciliation have finished.
+    let delivery_telemetry = DeliveryTelemetry::default();
+    let worker_discussions: Arc<
+        dyn artifact_mcp::integrations::delivery_worker::WorkerDiscussions,
+    > = discussions.clone();
+    let inbound_store = DiscordInboundStore::new(pool.clone());
+    let discussion_service: Arc<dyn DiscussionService> = Arc::new(ProductionDiscussions {
+        store: discussions.as_ref().clone(),
+        organization: organization_discord.clone(),
+        inbound: inbound_store.clone(),
+        webhooks: Arc::clone(&webhooks),
+        public_base_url: config.public_base_url.clone(),
+        audit_key,
     });
+    let worker_discussion_provider: Arc<
+        dyn artifact_mcp::integrations::delivery_worker::WorkerDiscussionProvider,
+    > = Arc::new(OrganizationDiscordDiscussionProvider::new(Arc::new(
+        organization_discord.clone(),
+    )));
+    let (delivery_runtime, delivery_wake) = DeliveryRuntime::start(
+        Arc::new(OutboxRepository::new(pool.clone())),
+        Arc::clone(&webhooks),
+        Arc::new(DiscordProviderTransport::new()?),
+        worker_discussions,
+        worker_discussion_provider,
+        Arc::new(ArtifactDeliveryPreviewResolver::new(
+            Arc::clone(&artifacts),
+            Arc::clone(&previews),
+        )),
+        delivery_telemetry.clone(),
+    );
+    let recovery_runtime = DiscordRecoveryRuntime::start(
+        organization_discord.clone(),
+        Arc::new(DiscordHistoryRest::new()?),
+        audit_key,
+    );
+    let inbound_runtime = DiscordInboundRuntime::start(
+        config.discord_inbound_enabled,
+        inbound_store,
+        Arc::new(organization_discord),
+    );
+    observer.stage(StartupStage::DeliveryWorkersStarted);
     let admin: Arc<dyn AdminService> = Arc::new(ProductionAdmin {
         keys: key_store,
         orgs: OrgStore::new(pool.clone()),
         webhooks: webhooks.as_ref().clone(),
+        audit_key,
     });
     let engagement: Arc<dyn EngagementService> = Arc::new(ProductionEngagement {
         pool: pool.clone(),
         ids: Arc::clone(&ids),
         feedback_max_body: config.storage.feedback_max_body,
+        public_base_url: config.public_base_url.clone(),
+        delivery_planning: DeliveryPlanningContext::production(),
     });
     let shares: Arc<dyn ShareService> = Arc::new(ProductionShares {
         pool: pool.clone(),
         ids,
         clock: Arc::new(SystemClock),
+        audit_key,
     });
-    let health: Arc<dyn HealthProbe> = Arc::new(ProductionHealth::new(pool, config.artifact_dir()));
+    let health: Arc<dyn HealthProbe> =
+        Arc::new(ProductionHealth::new(pool.clone(), config.artifact_dir()));
+    let audit_access = config
+        .audit_ledger_hmac_key
+        .as_ref()
+        .map(|encoded| parse_hmac_key(encoded.expose()))
+        .transpose()?
+        .map(|key| Arc::new(AuditAccess::new(pool, key)));
 
     let host = config.listen_host.clone();
     let port = config.port;
@@ -1229,22 +2140,35 @@ async fn bootstrap(
         viewer_identity,
         artifacts,
         admin,
+        discussions: discussion_service,
         engagement,
         shares,
         pages: Arc::new(AskamaPageRenderer::from_config(&config)),
         previews,
         notifications,
         health,
+        ingress,
         preview_tasks: artifact_mcp::mcp::tasks::PreviewTaskStore::new(&config.data_dir),
         mcp_telemetry: artifact_mcp::observability::McpTelemetry::default(),
+        delivery_telemetry,
+        delivery_wake,
+        audit_access,
         config,
     };
     artifact_mcp::mcp::tasks::resume_preview_tasks(deps.clone());
     let router = runtime_router(deps);
-    Ok(Bootstrapped { router, host, port })
+    Ok(Bootstrapped {
+        router,
+        host,
+        port,
+        delivery_runtime,
+        recovery_runtime,
+        inbound_runtime,
+    })
 }
 
 #[tracing::instrument(skip_all)]
+#[allow(dead_code)] // exercised by the listener-free native runtime tests
 pub(crate) async fn run_with_bind<B, F>(
     config: AppConfig,
     observer: Arc<dyn StartupObserver>,
@@ -1256,25 +2180,185 @@ where
 {
     let bootstrapped = bootstrap(config, Arc::clone(&observer)).await?;
     observer.stage(StartupStage::ListenerBindRequested);
-    bind_and_serve(bootstrapped.host, bootstrapped.port, bootstrapped.router).await
+    let result = bind_and_serve(bootstrapped.host, bootstrapped.port, bootstrapped.router).await;
+    bootstrapped.delivery_runtime.shutdown().await;
+    bootstrapped.recovery_runtime.shutdown().await;
+    bootstrapped.inbound_runtime.shutdown().await;
+    result
 }
 
 #[tracing::instrument(skip_all)]
 async fn serve(config: AppConfig) -> Result<(), RuntimeError> {
-    run_with_bind(
-        config,
-        Arc::new(NoopStartupObserver),
-        |host, port, router| async move {
-            let listener = TcpListener::bind((host.as_str(), port)).await?;
-            tracing::info!(listen_host = %host, port, "listener ready");
-            axum::serve(listener, router)
-                .with_graceful_shutdown(shutdown_signal())
-                .await?;
-            tracing::info!("listener stopped");
-            Ok(())
-        },
+    let ingress = config.ingress.clone();
+    let observer = Arc::new(NoopStartupObserver);
+    let bootstrapped = bootstrap(config, observer.clone()).await?;
+    observer.stage(StartupStage::ListenerBindRequested);
+    serve_listener(
+        bootstrapped.host,
+        bootstrapped.port,
+        bootstrapped.router,
+        ingress,
+        bootstrapped.delivery_runtime,
+        bootstrapped.recovery_runtime,
+        bootstrapped.inbound_runtime,
     )
     .await
+}
+
+/// HTTP/1 listener boundary. Hyper owns header parsing here so slowloris/header limits apply
+/// before Axum constructs a request; body deadlines remain in the JSON/MCP readers because a
+/// blanket handler timeout would make durable mutations ambiguously succeed after a client-side
+/// timeout.
+async fn serve_listener(
+    host: String,
+    port: u16,
+    router: Router,
+    ingress: artifact_mcp::config::IngressConfig,
+    delivery_runtime: DeliveryRuntime,
+    recovery_runtime: DiscordRecoveryRuntime,
+    inbound_runtime: DiscordInboundRuntime,
+) -> Result<(), RuntimeError> {
+    let listener = TcpListener::bind((host.as_str(), port)).await?;
+    tracing::info!(listen_host = %host, port, "listener ready");
+    serve_listener_with_shutdown_inner(
+        listener,
+        router,
+        ingress,
+        Some(delivery_runtime),
+        Some(recovery_runtime),
+        Some(inbound_runtime),
+        shutdown_signal(),
+    )
+    .await
+}
+
+/// Serve an already-bound listener until the supplied shutdown future resolves. Keeping this
+/// seam separate lets the runtime test exercise Hyper's actual header deadline and connection
+/// permits without binding a process-wide signal handler.
+#[allow(dead_code)] // exercised by the listener-free native runtime tests
+pub(crate) async fn serve_listener_with_shutdown<F>(
+    listener: TcpListener,
+    router: Router,
+    ingress: artifact_mcp::config::IngressConfig,
+    shutdown: F,
+) -> Result<(), RuntimeError>
+where
+    F: Future<Output = ()> + Send,
+{
+    serve_listener_with_shutdown_inner(listener, router, ingress, None, None, None, shutdown).await
+}
+
+async fn serve_listener_with_shutdown_inner<F>(
+    listener: TcpListener,
+    router: Router,
+    ingress: artifact_mcp::config::IngressConfig,
+    delivery_runtime: Option<DeliveryRuntime>,
+    recovery_runtime: Option<DiscordRecoveryRuntime>,
+    inbound_runtime: Option<DiscordInboundRuntime>,
+    shutdown: F,
+) -> Result<(), RuntimeError>
+where
+    F: Future<Output = ()> + Send,
+{
+    tokio::pin!(shutdown);
+    let connection_permits = Arc::new(tokio::sync::Semaphore::new(
+        usize::try_from(ingress.max_connections).unwrap_or(usize::MAX),
+    ));
+    let (stop_send, stop_receive) = watch::channel(());
+    let mut connections = JoinSet::new();
+    loop {
+        tokio::select! {
+            () = &mut shutdown => break,
+            Some(joined) = connections.join_next(), if !connections.is_empty() => {
+                if let Err(error) = joined {
+                    tracing::warn!(error = %error, "connection task ended unexpectedly");
+                }
+            }
+            accepted = listener.accept() => {
+                let (stream, peer) = match accepted {
+                    Ok(accepted) => accepted,
+                    Err(error) => {
+                        tracing::warn!(error = %error, "listener accept failed");
+                        continue;
+                    }
+                };
+                let router = router.clone();
+                let ingress = ingress.clone();
+                let mut stop = stop_receive.clone();
+                let Some(connection_permit) = connection_permits.clone().try_acquire_owned().ok() else {
+                    tracing::warn!("connection admission limit reached; dropping socket");
+                    drop(stream);
+                    continue;
+                };
+                connections.spawn(async move {
+                    let _connection_permit = connection_permit;
+                    let service = match router
+                        .into_make_service_with_connect_info::<SocketAddr>()
+                        .oneshot(peer)
+                        .await
+                    {
+                        Ok(service) => service,
+                        Err(never) => match never {},
+                    };
+                    let mut builder = http1::Builder::new();
+                    builder
+                        .max_headers(usize::try_from(ingress.max_headers).unwrap_or(usize::MAX))
+                        .max_buf_size(usize::try_from(ingress.max_header_bytes).unwrap_or(usize::MAX))
+                        .timer(TokioTimer::new())
+                        .header_read_timeout(Duration::from_millis(ingress.read_timeout_ms));
+                    let mut connection = Box::pin(
+                        builder.serve_connection(TokioIo::new(stream), TowerToHyperService::new(service)),
+                    );
+                    let result = tokio::select! {
+                        result = &mut connection => result,
+                        _ = stop.changed() => {
+                            connection.as_mut().graceful_shutdown();
+                            connection.await
+                        }
+                    };
+                    if let Err(error) = result {
+                        tracing::debug!(error = %error, "HTTP connection ended");
+                    }
+                });
+            }
+        }
+    }
+    // Stop accepting new sockets and ask each HTTP/1 connection to leave keep-alive mode. We
+    // join rather than abort: a mutation already admitted may complete its durable work, while
+    // new requests are no longer accepted on that connection.
+    if let Some(delivery_runtime) = delivery_runtime {
+        delivery_runtime.shutdown().await;
+    }
+    if let Some(recovery_runtime) = recovery_runtime {
+        recovery_runtime.shutdown().await;
+    }
+    if let Some(inbound_runtime) = inbound_runtime {
+        inbound_runtime.shutdown().await;
+    }
+    drop(listener);
+    let _ = stop_send.send(());
+    let grace = Duration::from_millis(ingress.shutdown_grace_ms);
+    if tokio::time::timeout(grace, async {
+        while let Some(joined) = connections.join_next().await {
+            if let Err(error) = joined {
+                tracing::warn!(error = %error, "connection task ended during graceful shutdown");
+            }
+        }
+    })
+    .await
+    .is_err()
+    {
+        // This is process termination, not a success/failure response to a durable mutation.
+        // The lifecycle's crash recovery path reconciles any interrupted staging work on restart.
+        tracing::warn!(
+            grace_ms = ingress.shutdown_grace_ms,
+            "graceful shutdown deadline exceeded; terminating remaining connections"
+        );
+        connections.abort_all();
+        while connections.join_next().await.is_some() {}
+    }
+    tracing::info!("listener stopped");
+    Ok(())
 }
 
 async fn shutdown_signal() {
@@ -1376,6 +2460,9 @@ async fn main() -> ExitCode {
     let result = match is_healthcheck(&args) {
         Ok(true) => healthcheck().await,
         Ok(false) => match AppConfig::from_env() {
+            Ok(config) if config.audit_ledger_hmac_key.is_none() => Err(RuntimeError::Application(
+                AppError::Validation("AUDIT_LEDGER_HMAC_KEY is required; refusing to start without a tamper-evident audit ledger".to_owned()),
+            )),
             Ok(config) => serve(config).await,
             Err(error) => Err(RuntimeError::from(error)),
         },

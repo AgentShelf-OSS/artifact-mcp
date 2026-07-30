@@ -687,3 +687,494 @@ test("backfillBodyDigests skips rows whose body is missing from disk", () => {
     rmSync(dataDir, { recursive: true, force: true });
   }
 });
+
+test("prepared durability intents conceal direct reads and every overview projection", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-intent-"));
+  const runtime = openDatabase({ dataDir });
+  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "intent01" });
+  try {
+    const created = store.publish({ clientId: "publisher", org: "acme", html: "<h1>stable</h1>" });
+    runtime.db.prepare(`INSERT INTO artifact_durability_intents
+      (id, artifact_id, operation, state, expected_sha256, prior_sha256, staging_path)
+      VALUES (?, ?, 'update', 'prepared', ?, ?, ?)`)
+      .run("intent-test", created.id, sha256("<h1>next</h1>"), sha256("<h1>stable</h1>"), "pending");
+
+    assert.equal(store.getArtifactMeta(created.id), null);
+    assert.equal(store.readArtifact(created.id), null);
+    assert.deepEqual(store.listForClient("publisher", "acme"), []);
+    assert.deepEqual(store.listOrgArtifacts("acme"), []);
+    assert.deepEqual(store.listOrgIds("acme"), []);
+    assert.deepEqual(store.listAllGroupedByOrg(), new Map());
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node afterRename fault seam keeps publish, update, and delete recoverable", () => {
+  // The hook fires after renameSync has changed the namespace but before syncParent can fsync
+  // the containing directory. This is the JS equivalent of the Rust post-kernel-rename barrier.
+  for (const operation of ["publish", "update", "delete"]) {
+    const dataDir = mkdtempSync(path.join(tmpdir(), `artifact-store-after-rename-${operation}-`));
+    const runtime = openDatabase({ dataDir });
+    let armed = operation === "publish";
+    const store = createArtifactStore({
+      db: runtime.db,
+      artifactDir: runtime.artifactDir,
+      idFactory: () => "rename01",
+      files: {
+        ...fs,
+        afterRename: () => {
+          if (armed) throw new Error("simulated post-rename directory sync failure");
+        }
+      }
+    });
+
+    try {
+      if (operation === "publish") {
+        assert.throws(
+          () => store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" }),
+          /post-rename directory sync/
+        );
+        assert.equal(store.getArtifactMeta("rename01"), null, "in-flight publish is concealed");
+        armed = false;
+        store.auditStorage({ cleanTransient: true });
+        assert.equal(store.readArtifact("rename01").html, "<h1>old</h1>");
+      } else {
+        armed = false;
+        store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" });
+        armed = true;
+        if (operation === "update") {
+          assert.throws(
+            () => store.update({ id: "rename01", clientId: "publisher", org: "acme", expectedRevision: 1, html: "<h1>new</h1>" }),
+            /post-rename directory sync/
+          );
+          assert.equal(store.getArtifactMeta("rename01"), null, "in-flight update is concealed");
+          armed = false;
+          store.auditStorage({ cleanTransient: true });
+          assert.equal(store.readArtifact("rename01").html, "<h1>new</h1>");
+        } else {
+          assert.throws(
+            () => store.remove({ id: "rename01", clientId: "publisher" }),
+            /post-rename directory sync/
+          );
+          assert.equal(store.getArtifactMeta("rename01"), null, "in-flight delete is concealed");
+          armed = false;
+          store.auditStorage({ cleanTransient: true });
+          assert.equal(store.readArtifact("rename01").html, "<h1>old</h1>");
+        }
+      }
+      assert.deepEqual(store.auditStorage({ cleanTransient: true }).transientPaths, []);
+    } finally {
+      runtime.db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Node delete retains its intent when durable history removal fails", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-history-cleanup-"));
+  const runtime = openDatabase({ dataDir });
+  let failHistoryRemove = false;
+  const history = path.join(runtime.artifactDir, ".history", "hist001");
+  const store = createArtifactStore({
+    db: runtime.db,
+    artifactDir: runtime.artifactDir,
+    idFactory: () => "hist001",
+    files: {
+      ...fs,
+      rmSync: (target, options) => {
+        if (failHistoryRemove && target === history) throw new Error("simulated history directory fsync failure");
+        return fs.rmSync(target, options);
+      }
+    }
+  });
+
+  try {
+    store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" });
+    store.update({ id: "hist001", clientId: "publisher", org: "acme", expectedRevision: 1, html: "<h1>new</h1>" });
+    assert.equal(existsSync(history), true, "update created revision history");
+
+    failHistoryRemove = true;
+    assert.throws(
+      () => store.remove({ id: "hist001", clientId: "publisher" }),
+      /history directory fsync/
+    );
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 1);
+    assert.equal(existsSync(history), true, "history is still tracked by the intent");
+
+    failHistoryRemove = false;
+    store.auditStorage({ cleanTransient: true });
+    assert.equal(existsSync(history), false);
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node staging file and directory fsync failures clear only uncommitted work", () => {
+  for (const failAt of [1, 2]) {
+    const dataDir = mkdtempSync(path.join(tmpdir(), `artifact-store-stage-fsync-${failAt}-`));
+    const runtime = openDatabase({ dataDir });
+    let syncCalls = 0;
+    const store = createArtifactStore({
+      db: runtime.db,
+      artifactDir: runtime.artifactDir,
+      idFactory: () => "sync001",
+      files: {
+        ...fs,
+        fsyncSync: (fd) => {
+          syncCalls += 1;
+          if (syncCalls === failAt) throw new Error(`simulated ${failAt === 1 ? "file" : "directory"} fsync failure`);
+          return fs.fsyncSync(fd);
+        }
+      }
+    });
+    try {
+      assert.throws(() => store.publish({ clientId: "publisher", org: "acme", html: "<h1>body</h1>" }), /fsync failure/);
+      assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifacts").pluck().get(), 0);
+      assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+      assert.deepEqual(store.auditStorage({ cleanTransient: true }).transientPaths, []);
+    } finally {
+      runtime.db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Node recovery completes metadata-only history before releasing its intent", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-metadata-history-"));
+  const runtime = openDatabase({ dataDir });
+  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "meta001" });
+  try {
+    const created = store.publish({ clientId: "publisher", org: "acme", html: "<h1>stable</h1>", title: "Original" });
+    runtime.db.prepare("UPDATE artifacts SET title = ?, revision = 2 WHERE id = ?").run("Retitled", created.id);
+    runtime.db.prepare(`INSERT INTO artifact_durability_intents
+      (id, artifact_id, operation, state, expected_sha256, prior_sha256, staging_path)
+      VALUES (?, ?, 'update', 'metadata_committed', ?, ?, ?)`)
+      .run("update:meta001:2", created.id, sha256("<h1>stable</h1>"), sha256("<h1>stable</h1>"), ".meta001.staging-history");
+
+    assert.equal(store.readArtifact(created.id), null, "the incomplete metadata revision is concealed");
+    const history = path.join(runtime.artifactDir, ".history", created.id, "1.html");
+    assert.equal(existsSync(history), false);
+    store.auditStorage({ cleanTransient: true });
+    assert.equal(store.readArtifact(created.id).html, "<h1>stable</h1>");
+    assert.equal(fs.readFileSync(history, "utf8"), "<h1>stable</h1>");
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node recovers metadata-only snapshot sync and cleanup failures without blocking retry", () => {
+  for (const [isBundle, cleanupMode] of [
+    [false, "unlink"],
+    [true, "unlink"],
+    [false, "barrier"],
+    [true, "barrier"]
+  ]) {
+    const kind = isBundle ? "bundle" : "single";
+    const id = isBundle ? "tempb01" : "temps01";
+    const context = `${kind}/${cleanupMode}`;
+    const dataDir = mkdtempSync(path.join(tmpdir(), `artifact-store-snapshot-temp-${kind}-${cleanupMode}-`));
+    const runtime = openDatabase({ dataDir });
+    const snapshotTemp = path.join(
+      runtime.artifactDir,
+      ".history",
+      id,
+      isBundle ? "1.snapshot-tmp" : "1.html.snapshot-tmp"
+    );
+    const openPaths = new Map();
+    let failSnapshotSync = false;
+    let failSnapshotCleanup = false;
+    const store = createArtifactStore({
+      db: runtime.db,
+      artifactDir: runtime.artifactDir,
+      idFactory: () => id,
+      files: {
+        ...fs,
+        openSync: (target, flags) => {
+          const fd = fs.openSync(target, flags);
+          openPaths.set(fd, path.resolve(target));
+          return fd;
+        },
+        fsyncSync: (fd) => {
+          const target = openPaths.get(fd);
+          if (
+            failSnapshotCleanup
+            && cleanupMode === "barrier"
+            && !failSnapshotSync
+            && target === path.dirname(snapshotTemp)
+            && !existsSync(snapshotTemp)
+          ) {
+            failSnapshotCleanup = false;
+            throw new Error("simulated snapshot temporary cleanup barrier failure");
+          }
+          if (
+            failSnapshotSync
+            && target
+            && (target === snapshotTemp || target.startsWith(`${snapshotTemp}${path.sep}`))
+          ) {
+            failSnapshotSync = false;
+            throw new Error("simulated snapshot temporary file-sync failure");
+          }
+          return fs.fsyncSync(fd);
+        },
+        closeSync: (fd) => {
+          try {
+            return fs.closeSync(fd);
+          } finally {
+            openPaths.delete(fd);
+          }
+        },
+        rmSync: (target, options) => {
+          if (
+            failSnapshotCleanup
+            && cleanupMode === "unlink"
+            && path.resolve(target) === snapshotTemp
+          ) {
+            failSnapshotCleanup = false;
+            throw new Error("simulated snapshot temporary cleanup failure");
+          }
+          return fs.rmSync(target, options);
+        }
+      }
+    });
+
+    try {
+      if (isBundle) {
+        store.publishBundle({
+          clientId: "publisher",
+          org: "acme",
+          files: { "index.html": "<h1>stable</h1>", "app.js": "stable();" },
+          entry: "index.html"
+        });
+      } else {
+        store.publish({ clientId: "publisher", org: "acme", html: "<h1>stable</h1>" });
+      }
+      failSnapshotSync = true;
+      failSnapshotCleanup = true;
+      assert.throws(
+        () => store.update({
+          id,
+          clientId: "publisher",
+          org: "acme",
+          expectedRevision: 1,
+          title: "Interrupted title"
+        }),
+        /snapshot temporary cleanup (?:barrier )?failure/,
+        `${context}: compensation must not hide its cleanup failure`
+      );
+      assert.equal(failSnapshotSync, false, `${context}: snapshot file-sync failure fired`);
+      assert.equal(failSnapshotCleanup, false, `${context}: cleanup failure fired`);
+      assert.equal(
+        runtime.db.prepare("SELECT revision FROM artifacts WHERE id = ?").pluck().get(id),
+        1,
+        `${context}: metadata compensation restored revision one`
+      );
+      assert.equal(store.getArtifactMeta(id), null, `${context}: retained intent conceals the row`);
+      assert.equal(
+        existsSync(snapshotTemp),
+        cleanupMode === "unlink",
+        `${context}: temp presence reflects the exact cleanup boundary`
+      );
+      assert.equal(
+        runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(),
+        1,
+        `${context}: cleanup failure retains the durability intent`
+      );
+
+      const restarted = createArtifactStore({
+        db: runtime.db,
+        artifactDir: runtime.artifactDir,
+        idFactory: () => id
+      });
+      restarted.auditStorage({ cleanTransient: true });
+      assert.equal(existsSync(snapshotTemp), false, `${context}: restart audit confirms removal`);
+      assert.equal(
+        runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(),
+        0,
+        `${context}: restart clears the marker after cleanup`
+      );
+      assert.equal(restarted.getArtifactMeta(id).revision, 1, `${context}: artifact is visible again`);
+
+      const retried = restarted.update({
+        id,
+        clientId: "publisher",
+        org: "acme",
+        expectedRevision: 1,
+        title: "Retried title"
+      });
+      assert.equal(retried.revision, 2, `${context}: subsequent update succeeds`);
+      assert.equal(existsSync(snapshotTemp), false, `${context}: no orphan temp remains`);
+      assert.equal(
+        runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(),
+        0,
+        `${context}: successful retry leaves no hidden marker`
+      );
+    } finally {
+      runtime.db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Node prepared marker with committed metadata-only target still reconstructs history", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-prepared-metadata-"));
+  const runtime = openDatabase({ dataDir });
+  const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "prepare01" });
+  try {
+    const created = store.publish({ clientId: "publisher", org: "acme", html: "<h1>stable</h1>", title: "Original" });
+    const digest = sha256("<h1>stable</h1>");
+    runtime.db.prepare("UPDATE artifacts SET title = ?, revision = 2 WHERE id = ?").run("Retitled", created.id);
+    runtime.db.prepare(`INSERT INTO artifact_durability_intents
+      (id, artifact_id, operation, state, expected_sha256, prior_sha256, staging_path)
+      VALUES (?, ?, 'update', 'prepared', ?, ?, ?)`)
+      .run(`update:${created.id}:2`, created.id, digest, digest, `.${created.id}.staging-prepared`);
+
+    assert.equal(store.getArtifactMeta(created.id), null, "legacy commit→marker window is concealed");
+    store.auditStorage({ cleanTransient: true });
+    assert.equal(store.getArtifactMeta(created.id).revision, 2);
+    assert.equal(fs.readFileSync(path.join(runtime.artifactDir, ".history", created.id, "1.html"), "utf8"), "<h1>stable</h1>");
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node clears a compensated metadata-only marker only for an unambiguous next revision", () => {
+  for (const [label, target, clears] of [["reverted", "2", true], ["malformed", "later", false]]) {
+    const dataDir = mkdtempSync(path.join(tmpdir(), `artifact-store-metadata-marker-${label}-`));
+    const runtime = openDatabase({ dataDir });
+    const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "rollback1" });
+    try {
+      const created = store.publish({ clientId: "publisher", org: "acme", html: "<h1>stable</h1>" });
+      const digest = sha256("<h1>stable</h1>");
+      runtime.db.prepare(`INSERT INTO artifact_durability_intents
+        (id, artifact_id, operation, state, expected_sha256, prior_sha256, staging_path)
+        VALUES (?, ?, 'update', 'metadata_committed', ?, ?, ?)`)
+        .run(`update:${created.id}:${target}`, created.id, digest, digest, `.${created.id}.staging-rollback`);
+      assert.equal(store.getArtifactMeta(created.id), null, `${label}: marker initially conceals`);
+
+      store.auditStorage({ cleanTransient: true });
+      assert.equal(
+        runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(),
+        clears ? 0 : 1,
+        `${label}: only the well-formed next-revision target is proven reverted`
+      );
+      assert.equal(store.getArtifactMeta(created.id) !== null, clears, `${label}: visibility follows marker classification`);
+      assert.equal(existsSync(path.join(runtime.artifactDir, ".history")), false, "reverted revision creates no revision-zero history");
+    } finally {
+      runtime.db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+});
+
+test("Node history-directory creation barrier fails closed and a retry snapshots safely", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-history-create-barrier-"));
+  const runtime = openDatabase({ dataDir });
+  let armed = false;
+  const historyRoot = path.join(runtime.artifactDir, ".history");
+  const store = createArtifactStore({
+    db: runtime.db,
+    artifactDir: runtime.artifactDir,
+    idFactory: () => "dirhist1",
+    files: {
+      ...fs,
+      afterDirectoryCreate: (directory) => {
+        if (armed && directory === historyRoot) throw new Error("simulated history directory creation barrier failure");
+      }
+    }
+  });
+  try {
+    store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" });
+    armed = true;
+    assert.throws(
+      () => store.update({ id: "dirhist1", clientId: "publisher", org: "acme", expectedRevision: 1, title: "Retitled" }),
+      /history directory creation barrier/
+    );
+    assert.equal(store.getArtifactMeta("dirhist1").revision, 1);
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+
+    armed = false;
+    assert.equal(
+      store.update({ id: "dirhist1", clientId: "publisher", org: "acme", expectedRevision: 1, title: "Retried" }).revision,
+      2
+    );
+    assert.equal(fs.readFileSync(path.join(historyRoot, "dirhist1", "1.html"), "utf8"), "<h1>old</h1>");
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node metadata-only snapshot rename partial recovers instead of blocking every retry", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-store-metadata-snapshot-partial-"));
+  const runtime = openDatabase({ dataDir });
+  let armed = false;
+  const store = createArtifactStore({
+    db: runtime.db,
+    artifactDir: runtime.artifactDir,
+    idFactory: () => "metapart1",
+    files: {
+      ...fs,
+      afterRename: () => {
+        if (armed) throw new Error("simulated metadata snapshot parent fsync failure");
+      }
+    }
+  });
+  try {
+    store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" });
+    armed = true;
+    assert.throws(
+      () => store.update({ id: "metapart1", clientId: "publisher", org: "acme", expectedRevision: 1, title: "Retitled" }),
+      /metadata snapshot parent fsync/
+    );
+    assert.equal(store.getArtifactMeta("metapart1"), null, "partial revision remains concealed");
+    const history = path.join(runtime.artifactDir, ".history", "metapart1", "1.html");
+    assert.equal(fs.readFileSync(history, "utf8"), "<h1>old</h1>");
+
+    armed = false;
+    store.auditStorage({ cleanTransient: true });
+    assert.equal(store.getArtifactMeta("metapart1").revision, 2);
+    assert.equal(
+      store.update({ id: "metapart1", clientId: "publisher", org: "acme", expectedRevision: 2, title: "Retried" }).revision,
+      3
+    );
+    assert.deepEqual(store.auditStorage({ cleanTransient: true }).transientPaths, []);
+  } finally {
+    runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("Node updates reject missing and divergent predecessors before a revision is committed", () => {
+  for (const [label, replacement, message] of [
+    ["missing", null, /body_missing/],
+    ["divergent", "<h1>tampered</h1>", /body_digest_mismatch/]
+  ]) {
+    const dataDir = mkdtempSync(path.join(tmpdir(), `artifact-store-predecessor-${label}-`));
+    const runtime = openDatabase({ dataDir });
+    const store = createArtifactStore({ db: runtime.db, artifactDir: runtime.artifactDir, idFactory: () => "prior01" });
+    try {
+      store.publish({ clientId: "publisher", org: "acme", html: "<h1>old</h1>" });
+      const body = path.join(runtime.artifactDir, "prior01.html");
+      if (replacement === null) fs.rmSync(body);
+      else fs.writeFileSync(body, replacement);
+      assert.throws(
+        () => store.update({ id: "prior01", clientId: "publisher", org: "acme", expectedRevision: 1, title: "must not commit" }),
+        message
+      );
+      assert.equal(store.getArtifactMeta("prior01").revision, 1);
+      assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_revisions").pluck().get(), 1);
+      assert.equal(runtime.db.prepare("SELECT COUNT(*) FROM artifact_durability_intents").pluck().get(), 0);
+    } finally {
+      runtime.db.close();
+      rmSync(dataDir, { recursive: true, force: true });
+    }
+  }
+});

@@ -127,7 +127,7 @@ fn body_is_trimmed_and_bounded_by_feedback_max_body() {
     let stored = add(&submission("  hello  "), MAX_BODY).expect("add feedback");
     assert_eq!(stored.body, "hello");
     assert_eq!(stored.artifact_revision, 3);
-    assert_eq!(stored.viewer_email, EmailAddress::from(VIEWER));
+    assert_eq!(stored.viewer_email, Some(EmailAddress::from(VIEWER)));
     assert_eq!(stored.parent_id, None);
     assert_eq!(stored.resolved_at, None);
     assert_eq!(stored.anchor_x, None);

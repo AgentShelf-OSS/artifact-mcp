@@ -14,7 +14,9 @@ export default defineConfig({
   globalSetup: "./global-setup.mjs",
   globalTeardown: "./global-teardown.mjs",
   use: {
-    extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": process.env.PW_ADMIN_EMAIL || "admin@example.test" },
+    extraHTTPHeaders: {
+      "Cf-Access-Authenticated-User-Email": process.env.PW_ADMIN_EMAIL || "admin@example.test"
+    },
     headless: true,
     ...(process.env.PW_USE_BUNDLED_CHROMIUM === "1" ? {} : { channel: "chrome" }),
     ignoreHTTPSErrors: true,

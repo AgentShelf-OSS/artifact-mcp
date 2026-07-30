@@ -2,12 +2,15 @@ use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
     process::Command,
-    sync::{Arc, Mutex},
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicU64, Ordering},
+    },
 };
 
 use artifact_mcp::{
     AppDeps,
-    config::AppConfig,
+    config::{AppConfig, Secret},
     error::AppError,
     model::*,
     ports::{
@@ -24,6 +27,15 @@ use axum::{
 };
 use serde_json::{Value, json};
 use tower::ServiceExt;
+
+static NEXT_AUDIT_ROUTE_TEMP: AtomicU64 = AtomicU64::new(0);
+const AUDIT_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
+
+struct AuditStartupObserver;
+
+impl super::u20_runtime::runtime::StartupObserver for AuditStartupObserver {
+    fn stage(&self, _stage: super::u20_runtime::runtime::StartupStage) {}
+}
 
 fn unavailable<'a, T>() -> BoxFuture<'a, Result<T, AppError>> {
     Box::pin(async {
@@ -43,6 +55,7 @@ struct Harness {
     deliveries: Mutex<BTreeMap<WebhookId, WebhookDelivery>>,
     tested_webhooks: Mutex<Vec<WebhookDelivery>>,
     delivery_result: Mutex<DeliveryResult>,
+    publisher: Mutex<Option<PublisherIdentity>>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -63,6 +76,7 @@ enum AdminCall {
     RemoveWebhook(OrgId, WebhookId),
     SetWebhookEvents(OrgId, WebhookId, Vec<WebhookEvent>),
     LookupWebhook(WebhookId),
+    AuditWebhookTest(OrgId, WebhookId, Option<bool>),
 }
 
 impl Harness {
@@ -84,6 +98,7 @@ impl Harness {
                 ok: true,
                 error: None,
             }),
+            publisher: Mutex::new(None),
         })
     }
 
@@ -92,23 +107,46 @@ impl Harness {
     }
 
     fn deps_with_config(self: &Arc<Self>, config: AppConfig) -> AppDeps {
+        let audit_access = config.audit_ledger_hmac_key.as_ref().map(|encoded| {
+            let pool = artifact_mcp::persistence::db::Database::open(&config)
+                .expect("open pooled audit route database");
+            let key = artifact_mcp::security::audit::parse_hmac_key(encoded.expose())
+                .expect("validated audit key");
+            Arc::new(artifact_mcp::security::audit::AuditAccess::new(pool, key))
+        });
         AppDeps {
             publisher_auth: self.clone(),
             viewer_identity: self.clone(),
             artifacts: self.clone(),
             admin: self.clone(),
+            discussions: Arc::new(artifact_mcp::ports::InertDiscussionService),
             engagement: self.clone(),
             shares: self.clone(),
             pages: self.clone(),
             previews: self.clone(),
             notifications: self.clone(),
             health: self.clone(),
+            ingress: Arc::new(artifact_mcp::http::ingress::IngressState::from_config(
+                &config,
+            )),
             preview_tasks: artifact_mcp::mcp::tasks::PreviewTaskStore::new(
                 std::env::temp_dir().join(format!("artifact-mcp-u18-tasks-{}", std::process::id())),
             ),
             mcp_telemetry: artifact_mcp::observability::McpTelemetry::default(),
+            delivery_telemetry:
+                artifact_mcp::integrations::delivery_runtime::DeliveryTelemetry::default(),
+            delivery_wake:
+                artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
+            audit_access,
             config: Arc::new(config),
         }
+    }
+
+    fn set_publisher(&self, publisher: Option<PublisherIdentity>) {
+        *self
+            .publisher
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = publisher;
     }
 }
 
@@ -117,7 +155,16 @@ impl PublisherAuthenticator for Harness {
         &'a self,
         _headers: &'a HeaderMap,
     ) -> BoxFuture<'a, Result<PublisherIdentity, AppError>> {
-        unavailable()
+        let publisher = self
+            .publisher
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        Box::pin(async move {
+            publisher.ok_or_else(|| {
+                AppError::Unauthorized("publisher authentication required".to_owned())
+            })
+        })
     }
 }
 
@@ -145,6 +192,7 @@ impl AdminService for Harness {
     fn create_key(
         &self,
         request: CreatePublisherKey,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<CreatedPublisherKey, AppError>> {
         self.calls
             .lock()
@@ -162,7 +210,11 @@ impl AdminService for Harness {
         })
     }
 
-    fn revoke_key<'a>(&'a self, client_id: &'a ClientId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn revoke_key<'a>(
+        &'a self,
+        client_id: &'a ClientId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -215,6 +267,7 @@ impl AdminService for Harness {
     fn create_org(
         &self,
         request: CreateOrganization,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<Organization, AppError>> {
         self.calls
             .lock()
@@ -234,7 +287,11 @@ impl AdminService for Harness {
         })
     }
 
-    fn delete_org<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn delete_org<'a>(
+        &'a self,
+        org: &'a OrgId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -246,6 +303,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         self.calls
             .lock()
@@ -259,6 +317,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
@@ -271,6 +330,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
         self.calls
             .lock()
@@ -284,6 +344,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
@@ -300,6 +361,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         self.calls
             .lock()
@@ -313,6 +375,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
@@ -329,6 +392,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         color: Option<&'a str>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
         self.calls
             .lock()
@@ -355,6 +419,7 @@ impl AdminService for Harness {
     fn create_webhook(
         &self,
         request: CreateWebhook,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<WebhookSummary, AppError>> {
         self.calls
             .lock()
@@ -385,6 +450,7 @@ impl AdminService for Harness {
         &'a self,
         org: &'a OrgId,
         id: &'a WebhookId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         self.calls
             .lock()
@@ -398,6 +464,7 @@ impl AdminService for Harness {
         org: &'a OrgId,
         id: &'a WebhookId,
         events: &'a [WebhookEvent],
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<WebhookSummary>, AppError>> {
         self.calls
             .lock()
@@ -437,6 +504,24 @@ impl AdminService for Harness {
             .cloned();
         Box::pin(async move { Ok(delivery) })
     }
+
+    fn audit_webhook_test<'a>(
+        &'a self,
+        org: &'a OrgId,
+        id: &'a WebhookId,
+        outcome: Option<bool>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<(), AppError>> {
+        self.calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(AdminCall::AuditWebhookTest(
+                org.clone(),
+                id.clone(),
+                outcome,
+            ));
+        Box::pin(async { Ok(()) })
+    }
 }
 
 impl ArtifactService for Harness {
@@ -450,6 +535,7 @@ impl ArtifactService for Harness {
     fn publish(
         &self,
         _request: PublishArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
         unavailable()
     }
@@ -527,6 +613,7 @@ impl ArtifactService for Harness {
         &self,
         _artifact: AuthorizedArtifact,
         _update: ArtifactUpdate,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
         unavailable()
     }
@@ -536,11 +623,16 @@ impl ArtifactService for Harness {
         _artifact: AuthorizedArtifact,
         _revision: u64,
         _acting_client_id: Option<ClientId>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
         unavailable()
     }
 
-    fn delete(&self, _artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
+    fn delete(
+        &self,
+        _artifact: AuthorizedArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
         unavailable()
     }
 
@@ -548,6 +640,7 @@ impl ArtifactService for Harness {
         &self,
         _artifact: AuthorizedArtifact,
         _category: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unavailable()
     }
@@ -556,6 +649,7 @@ impl ArtifactService for Harness {
         &self,
         _artifact: AuthorizedArtifact,
         _hidden: bool,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unavailable()
     }
@@ -565,6 +659,7 @@ impl ArtifactService for Harness {
         _artifact: AuthorizedArtifact,
         _target_org: OrgId,
         _category: Option<String>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unavailable()
     }
@@ -747,6 +842,7 @@ impl ShareService for Harness {
         &self,
         _artifact: AuthorizedArtifact,
         _request: CreateShare,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublicShare, AppError>> {
         unavailable()
     }
@@ -762,6 +858,7 @@ impl ShareService for Harness {
         &self,
         _artifact: AuthorizedArtifact,
         _token: ShareToken,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
         unavailable()
     }
@@ -1477,7 +1574,7 @@ async fn settings_json_uses_the_exact_key_limit_and_parse_error_envelopes() {
 }
 
 #[tokio::test]
-async fn settings_json_parse_failures_precede_the_admin_role_check_like_express_middleware() {
+async fn settings_authorization_precedes_json_body_parsing() {
     const LIMIT: usize = 64 * 1024;
     let harness = Harness::admin();
     *harness
@@ -1490,13 +1587,9 @@ async fn settings_json_parse_failures_precede_the_admin_role_check_like_express_
     };
     let app = artifact_mcp::build_router(harness.deps());
 
-    for (body, expected_status, expected_error) in [
-        ("{".to_owned(), StatusCode::BAD_REQUEST, "invalid JSON"),
-        (
-            json!({ "pad": "x".repeat(LIMIT) }).to_string(),
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "payload too large",
-        ),
+    for body in [
+        "{".to_owned(),
+        json!({ "pad": "x".repeat(LIMIT) }).to_string(),
     ] {
         let response = app
             .clone()
@@ -1507,14 +1600,14 @@ async fn settings_json_parse_failures_precede_the_admin_role_check_like_express_
                     .expect("valid request"),
             )
             .await
-            .expect("parse failure response");
-        assert_eq!(response.status(), expected_status);
+            .expect("authorization response");
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
         let body = to_bytes(response.into_body(), 1024)
             .await
-            .expect("parse failure body");
+            .expect("authorization body");
         assert_eq!(
-            serde_json::from_slice::<Value>(&body).expect("parse failure JSON"),
-            json!({ "error": expected_error })
+            serde_json::from_slice::<Value>(&body).expect("authorization JSON"),
+            json!({ "error": "Admins only" })
         );
     }
     assert!(
@@ -1523,7 +1616,7 @@ async fn settings_json_parse_failures_precede_the_admin_role_check_like_express_
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .is_empty(),
-        "parse failures must not reach AdminService"
+        "authorization failures must not reach AdminService or parse the body"
     );
 }
 
@@ -1682,6 +1775,63 @@ async fn webhook_test_checks_the_org_and_omits_a_null_error_on_success() {
             .as_slice(),
         [delivery]
     );
+    assert_eq!(
+        harness
+            .calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_slice(),
+        [
+            AdminCall::LookupWebhook(WebhookId::from("wh0000000001")),
+            AdminCall::AuditWebhookTest(OrgId::from("acme"), WebhookId::from("wh0000000001"), None,),
+            AdminCall::AuditWebhookTest(
+                OrgId::from("acme"),
+                WebhookId::from("wh0000000001"),
+                Some(true),
+            ),
+        ]
+    );
+
+    *harness
+        .delivery_result
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = DeliveryResult {
+        ok: false,
+        error: Some("remote rejected test".to_owned()),
+    };
+    let failed = app
+        .clone()
+        .oneshot(
+            Request::post("/settings/orgs/acme/webhooks/wh0000000001/test")
+                .body(Body::empty())
+                .expect("valid failed test request"),
+        )
+        .await
+        .expect("failed test-webhook response");
+    assert_eq!(failed.status(), StatusCode::OK);
+    let failed = to_bytes(failed.into_body(), 1024)
+        .await
+        .expect("failed test-webhook body");
+    assert_eq!(
+        serde_json::from_slice::<Value>(&failed).expect("failed test-webhook JSON"),
+        json!({ "ok": false, "error": "remote rejected test" })
+    );
+    assert_eq!(
+        &harness
+            .calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_slice()[3..],
+        [
+            AdminCall::LookupWebhook(WebhookId::from("wh0000000001")),
+            AdminCall::AuditWebhookTest(OrgId::from("acme"), WebhookId::from("wh0000000001"), None,),
+            AdminCall::AuditWebhookTest(
+                OrgId::from("acme"),
+                WebhookId::from("wh0000000001"),
+                Some(false),
+            ),
+        ]
+    );
 
     let foreign = app
         .oneshot(
@@ -1705,8 +1855,19 @@ async fn webhook_test_checks_the_org_and_omits_a_null_error_on_success() {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .len(),
-        1,
+        2,
         "a foreign org must not reach NotificationSink"
+    );
+    assert_eq!(
+        harness
+            .calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .filter(|call| matches!(call, AdminCall::AuditWebhookTest(..)))
+            .count(),
+        4,
+        "concealed foreign webhook probes must not reach the audit ledger"
     );
 }
 
@@ -2056,4 +2217,508 @@ async fn node_app_route_handlers_match_the_rust_admin_contract() {
     let node = run_node_app(&root, &cases);
     let rust = run_rust_app(&harness, &cases).await;
     assert_eq!(rust, node, "Rust U18 routes diverged from lib/app.js");
+}
+
+fn audit_route_config(label: &str) -> (AppConfig, PathBuf) {
+    let sequence = NEXT_AUDIT_ROUTE_TEMP.fetch_add(1, Ordering::Relaxed);
+    let data_dir = std::env::temp_dir().join(format!(
+        "artifact-mcp-u58-{label}-{}-{sequence}",
+        std::process::id()
+    ));
+    let config = AppConfig {
+        data_dir: data_dir.clone(),
+        audit_ledger_hmac_key: Some(Secret::new(AUDIT_KEY)),
+        ..AppConfig::defaults()
+    };
+    (config, data_dir)
+}
+
+fn oauth_publisher(org: &str, scopes: &[&str]) -> PublisherIdentity {
+    PublisherIdentity {
+        client_id: ClientId::from("audit-reader"),
+        org: OrgId::from(org),
+        label: "Audit reader".to_owned(),
+        role: "reader".to_owned(),
+        scopes: Some(scopes.iter().map(|scope| (*scope).to_owned()).collect()),
+    }
+}
+
+fn append_audit_events(config: &AppConfig, acme: usize, other: usize) {
+    let pool = artifact_mcp::persistence::db::Database::open(config).expect("audit database");
+    let mut conn = pool.get().expect("audit connection");
+    let key = artifact_mcp::security::audit::parse_hmac_key(AUDIT_KEY).expect("audit key");
+    artifact_mcp::security::audit::initialize_head(&conn, &key).expect("seal audit head");
+    for (tenant, count) in [("acme", acme), ("other", other)] {
+        for sequence in 0..count {
+            let transaction = conn.transaction().expect("audit transaction");
+            artifact_mcp::security::audit::append_in_transaction(
+                &transaction,
+                &key,
+                &format!("event-{tenant}-{sequence}"),
+                &artifact_mcp::security::audit::AuditContext {
+                    tenant: tenant.to_owned(),
+                    actor_type: "api_key".to_owned(),
+                    actor_id: "credential-secret-must-not-leak".to_owned(),
+                    actor_role: "author".to_owned(),
+                    source: "mcp".to_owned(),
+                    request_id: format!("request-{tenant}-{sequence}"),
+                },
+                &artifact_mcp::security::audit::AuditEvent {
+                    operation: "artifact.update".to_owned(),
+                    target_type: "artifact".to_owned(),
+                    target_id: format!("artifact-{tenant}-{sequence}"),
+                    result: "success".to_owned(),
+                    classification: "internal".to_owned(),
+                    revision: Some(u64::try_from(sequence).expect("sequence fits")),
+                },
+            )
+            .expect("append audit event");
+            transaction.commit().expect("commit audit event");
+        }
+    }
+}
+
+async fn request(router: &axum::Router, uri: &str) -> axum::response::Response {
+    router
+        .clone()
+        .oneshot(
+            Request::get(uri)
+                .body(Body::empty())
+                .expect("audit route request"),
+        )
+        .await
+        .expect("audit route response")
+}
+
+async fn mcp_list_artifacts(router: &axum::Router, id: u64) -> axum::response::Response {
+    router
+        .clone()
+        .oneshot(
+            Request::post("/mcp")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    serde_json::json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "method": "tools/call",
+                        "params": { "name": "list_artifacts", "arguments": {} }
+                    })
+                    .to_string(),
+                ))
+                .expect("MCP list request"),
+        )
+        .await
+        .expect("MCP list response")
+}
+
+#[tokio::test]
+async fn audit_routes_require_scoped_oauth_and_preserve_tenant_boundaries() {
+    let (config, data_dir) = audit_route_config("access");
+    append_audit_events(&config, 501, 1);
+    let harness = Harness::admin();
+    let router = artifact_mcp::build_router(harness.deps_with_config(config));
+
+    let unauthenticated = request(&router, "/audit/events").await;
+    assert_eq!(unauthenticated.status(), StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        request(&router, "/audit/export").await.status(),
+        StatusCode::UNAUTHORIZED
+    );
+    let unauthenticated_metrics = request(&router, "/metrics").await;
+    let unauthenticated_metrics = String::from_utf8(
+        to_bytes(unauthenticated_metrics.into_body(), usize::MAX)
+            .await
+            .expect("audit auth metrics body")
+            .to_vec(),
+    )
+    .expect("audit auth metrics text");
+    assert!(signal_value(&unauthenticated_metrics, "auth_failure") >= 2);
+
+    harness.set_publisher(Some(PublisherIdentity {
+        client_id: ClientId::from("legacy"),
+        org: OrgId::from("acme"),
+        label: "Legacy key".to_owned(),
+        role: "author".to_owned(),
+        scopes: None,
+    }));
+    assert_eq!(
+        request(&router, "/audit/events").await.status(),
+        StatusCode::FORBIDDEN,
+        "legacy API keys must never inherit audit capabilities"
+    );
+    assert_eq!(
+        request(&router, "/audit/export").await.status(),
+        StatusCode::FORBIDDEN,
+        "legacy API keys must never inherit audit capabilities"
+    );
+
+    harness.set_publisher(Some(oauth_publisher("acme", &["audit:read"])));
+    let page = request(&router, "/audit/events?limit=10000").await;
+    assert_eq!(page.status(), StatusCode::OK);
+    let page_body = to_bytes(page.into_body(), usize::MAX)
+        .await
+        .expect("read audit page");
+    let page_json: Value = serde_json::from_slice(&page_body).expect("audit page JSON");
+    assert_eq!(page_json["events"].as_array().map(Vec::len), Some(500));
+    assert!(
+        page_json["next"].as_str().is_some(),
+        "query limit is clamped"
+    );
+    let page_text = String::from_utf8(page_body.to_vec()).expect("audit JSON text");
+    assert!(!page_text.contains("credential-secret-must-not-leak"));
+    assert!(!page_text.contains("request-acme-"));
+
+    assert_eq!(
+        request(&router, "/audit/events?tenant=other")
+            .await
+            .status(),
+        StatusCode::FORBIDDEN,
+        "same-tenant audit read cannot cross tenants"
+    );
+    harness.set_publisher(Some(oauth_publisher(
+        "acme",
+        &["audit:read", "audit:global"],
+    )));
+    let other = request(&router, "/audit/events?tenant=other&limit=1").await;
+    assert_eq!(other.status(), StatusCode::OK);
+    let other_json: Value = serde_json::from_slice(
+        &to_bytes(other.into_body(), usize::MAX)
+            .await
+            .expect("other tenant body"),
+    )
+    .expect("other tenant JSON");
+    assert_eq!(other_json["events"][0]["tenant"], "other");
+
+    harness.set_publisher(Some(oauth_publisher(
+        "acme",
+        &["audit:read", "audit:export"],
+    )));
+    assert_eq!(
+        request(&router, "/audit/export?tenant=other")
+            .await
+            .status(),
+        StatusCode::FORBIDDEN,
+        "an export credential without audit:global stays tenant-bound"
+    );
+    harness.set_publisher(Some(oauth_publisher(
+        "acme",
+        &["audit:read", "audit:export", "audit:global"],
+    )));
+    assert_eq!(
+        request(&router, "/audit/export?tenant=other&limit=1")
+            .await
+            .status(),
+        StatusCode::OK,
+        "audit:global explicitly permits a cross-tenant export"
+    );
+
+    let first = request(&router, "/audit/events?limit=1").await;
+    let first_json: Value = serde_json::from_slice(
+        &to_bytes(first.into_body(), usize::MAX)
+            .await
+            .expect("first page body"),
+    )
+    .expect("first page JSON");
+    let cursor = first_json["next"].as_str().expect("next cursor");
+    assert_eq!(
+        request(&router, &format!("/audit/events?cursor={cursor}x"))
+            .await
+            .status(),
+        StatusCode::BAD_REQUEST,
+        "tampered cursors fail closed"
+    );
+    assert_eq!(
+        request(
+            &router,
+            &format!("/audit/events?tenant=other&cursor={cursor}"),
+        )
+        .await
+        .status(),
+        StatusCode::BAD_REQUEST,
+        "cursors are tenant-bound even for a global reader"
+    );
+
+    harness.set_publisher(Some(oauth_publisher(
+        "acme",
+        &["audit:read", "audit:export"],
+    )));
+    let export = request(&router, "/audit/export?limit=1").await;
+    assert_eq!(export.status(), StatusCode::OK);
+    assert_eq!(
+        export
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok()),
+        Some("application/x-ndjson; charset=utf-8")
+    );
+    assert_eq!(
+        export
+            .headers()
+            .get(header::CACHE_CONTROL)
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
+    assert!(export.headers().contains_key("x-audit-next"));
+    assert_eq!(
+        export
+            .headers()
+            .get("x-audit-truncated")
+            .and_then(|value| value.to_str().ok()),
+        Some("true")
+    );
+    let exported = to_bytes(export.into_body(), usize::MAX)
+        .await
+        .expect("export body");
+    assert!(
+        String::from_utf8(exported.to_vec())
+            .expect("NDJSON text")
+            .ends_with('\n')
+    );
+    harness.set_publisher(Some(oauth_publisher("acme", &["audit:read"])));
+    assert_eq!(
+        request(&router, "/audit/export").await.status(),
+        StatusCode::FORBIDDEN,
+        "export requires its distinct OAuth capability"
+    );
+
+    let _ = std::fs::remove_dir_all(data_dir);
+}
+
+#[tokio::test]
+async fn scope_denial_is_not_rate_limit_but_single_operation_throttle_is() {
+    let harness = Harness::admin();
+    let mut config = AppConfig::defaults();
+    config.ingress.reads_per_window = 1;
+    let deps = harness.deps_with_config(config);
+    let telemetry = deps.mcp_telemetry.clone();
+    let router = artifact_mcp::build_router(deps);
+
+    let before = telemetry.render_prometheus();
+    let initial_rate = signal_value(&before, "rate_limit");
+
+    harness.set_publisher(Some(oauth_publisher("acme", &[])));
+    assert_eq!(
+        mcp_list_artifacts(&router, 1).await.status(),
+        StatusCode::FORBIDDEN
+    );
+    let after_scope = telemetry.render_prometheus();
+    assert_eq!(signal_value(&after_scope, "rate_limit"), initial_rate);
+
+    harness.set_publisher(Some(oauth_publisher("acme", &["artifacts:read"])));
+    assert_eq!(
+        mcp_list_artifacts(&router, 2).await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        mcp_list_artifacts(&router, 3).await.status(),
+        StatusCode::TOO_MANY_REQUESTS
+    );
+    let after_throttle = telemetry.render_prometheus();
+    assert!(signal_value(&after_throttle, "rate_limit") > initial_rate);
+
+    let batch_harness = Harness::admin();
+    batch_harness.set_publisher(Some(oauth_publisher("acme", &["artifacts:read"])));
+    let mut batch_config = AppConfig::defaults();
+    batch_config.ingress.reads_per_window = 1;
+    let batch_deps = batch_harness.deps_with_config(batch_config);
+    let batch_telemetry = batch_deps.mcp_telemetry.clone();
+    let batch_router = artifact_mcp::build_router(batch_deps);
+    let batch = serde_json::json!([
+        {"jsonrpc":"2.0","id":10,"method":"tools/call","params":{"name":"list_artifacts","arguments":{}}},
+        {"jsonrpc":"2.0","id":11,"method":"tools/call","params":{"name":"list_artifacts","arguments":{}}}
+    ]);
+    let response = batch_router
+        .clone()
+        .oneshot(
+            Request::post("/mcp")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(batch.to_string()))
+                .expect("MCP batch request"),
+        )
+        .await
+        .expect("MCP batch response");
+    assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    let batch_metrics = batch_telemetry.render_prometheus();
+    assert!(signal_value(&batch_metrics, "rate_limit") > initial_rate);
+}
+
+#[tokio::test]
+async fn audit_route_throttle_emits_the_sustained_rate_limit_signal_without_counting_scope_denials()
+{
+    let (mut scope_config, scope_dir) = audit_route_config("scope-denial");
+    scope_config.ingress.reads_per_window = 10;
+    let scope_harness = Harness::admin();
+    scope_harness.set_publisher(Some(oauth_publisher("acme", &[])));
+    let scope_deps = scope_harness.deps_with_config(scope_config);
+    let scope_telemetry = scope_deps.mcp_telemetry.clone();
+    let scope_router = artifact_mcp::build_router(scope_deps);
+    let before_scope = signal_value(&scope_telemetry.render_prometheus(), "rate_limit");
+    assert_eq!(
+        request(&scope_router, "/audit/events").await.status(),
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(
+        signal_value(&scope_telemetry.render_prometheus(), "rate_limit"),
+        before_scope,
+        "a capability denial reaches the audit route but must not look like throttling"
+    );
+
+    let (mut throttle_config, throttle_dir) = audit_route_config("rate-limit");
+    throttle_config.ingress.reads_per_window = 1;
+    let throttle_harness = Harness::admin();
+    throttle_harness.set_publisher(Some(oauth_publisher("acme", &["audit:read"])));
+    let throttle_deps = throttle_harness.deps_with_config(throttle_config);
+    let throttle_telemetry = throttle_deps.mcp_telemetry.clone();
+    let throttle_router = artifact_mcp::build_router(throttle_deps);
+    let before_throttle = signal_value(&throttle_telemetry.render_prometheus(), "rate_limit");
+    assert_eq!(
+        request(&throttle_router, "/audit/events").await.status(),
+        StatusCode::OK
+    );
+    assert_eq!(
+        request(&throttle_router, "/audit/export").await.status(),
+        StatusCode::TOO_MANY_REQUESTS,
+        "ingress throttles this route before audit-route authentication/authorization"
+    );
+    assert_eq!(
+        signal_value(&throttle_telemetry.render_prometheus(), "rate_limit"),
+        before_throttle + 1,
+        "the live audit-route throttle feeds the alert's fixed-cardinality counter"
+    );
+    let alerts = include_str!("../../ops/prometheus/artifact-mcp-alerts.yml");
+    assert!(alerts.contains(
+        "sum(rate(artifact_mcp_security_audit_signals_total{signal=\"rate_limit\"}[5m])) > 0.1"
+    ));
+
+    let _ = std::fs::remove_dir_all(scope_dir);
+    let _ = std::fs::remove_dir_all(throttle_dir);
+}
+
+fn signal_value(metrics: &str, signal: &str) -> u64 {
+    let prefix = format!("artifact_mcp_security_audit_signals_total{{signal=\"{signal}\"}} ");
+    metrics
+        .lines()
+        .find_map(|line| line.strip_prefix(&prefix))
+        .expect("security signal in metrics")
+        .parse()
+        .expect("numeric security signal")
+}
+
+#[tokio::test]
+async fn security_signal_metrics_are_emitted_from_live_auth_rate_admin_integrity_and_reconciliation_paths()
+ {
+    let harness = Harness::admin();
+    let mut config = AppConfig::defaults();
+    config.ingress.auth_failures_per_window = 1;
+    let router = artifact_mcp::build_router(harness.deps_with_config(config));
+
+    for _ in 0..2 {
+        let response = router
+            .clone()
+            .oneshot(
+                Request::post("/mcp")
+                    .header(header::CONTENT_TYPE, "application/json")
+                    .body(Body::from("{}"))
+                    .expect("unauthenticated MCP request"),
+            )
+            .await
+            .expect("unauthenticated MCP response");
+        assert!(matches!(
+            response.status(),
+            StatusCode::UNAUTHORIZED | StatusCode::TOO_MANY_REQUESTS
+        ));
+    }
+    let admin = router
+        .clone()
+        .oneshot(
+            Request::post("/settings/orgs")
+                .header("x-artifact-mutation", "1")
+                .header("sec-fetch-site", "same-origin")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(r#"{"name":"metrics"}"#))
+                .expect("admin mutation request"),
+        )
+        .await
+        .expect("admin mutation response");
+    assert_eq!(admin.status(), StatusCode::OK);
+    let metrics = request(&router, "/metrics").await;
+    let metrics = String::from_utf8(
+        to_bytes(metrics.into_body(), usize::MAX)
+            .await
+            .expect("metrics body")
+            .to_vec(),
+    )
+    .expect("metrics text");
+    assert!(signal_value(&metrics, "auth_failure") >= 2);
+    assert!(signal_value(&metrics, "rate_limit") >= 1);
+    assert!(signal_value(&metrics, "admin_action") >= 1);
+
+    let (integrity_config, integrity_dir) = audit_route_config("integrity");
+    append_audit_events(&integrity_config, 1, 0);
+    let key = artifact_mcp::security::audit::parse_hmac_key(AUDIT_KEY).expect("audit key");
+    let before_integrity = signal_value(
+        &artifact_mcp::observability::McpTelemetry::default().render_prometheus(),
+        "integrity_failure",
+    );
+    {
+        let mut conn = rusqlite::Connection::open(integrity_config.database_path())
+            .expect("open audit database");
+        conn.execute(
+            "UPDATE security_audit_events SET event_hash='tampered' WHERE sequence=1",
+            [],
+        )
+        .expect("tamper ledger for signal test");
+        assert!(
+            artifact_mcp::security::audit::prune_expired(
+                &mut conn,
+                &key,
+                Some("2999-01-01T00:00:00Z"),
+                1,
+            )
+            .is_err()
+        );
+    }
+    assert!(
+        signal_value(
+            &artifact_mcp::observability::McpTelemetry::default().render_prometheus(),
+            "integrity_failure",
+        ) >= before_integrity.saturating_add(1),
+        "the real retention integrity check increments the metric"
+    );
+
+    let (reconciliation_config, reconciliation_dir) = audit_route_config("reconciliation");
+    {
+        let pool = artifact_mcp::persistence::db::Database::open(&reconciliation_config)
+            .expect("reconciliation database");
+        drop(pool);
+        let reconciliation_db = rusqlite::Connection::open(reconciliation_config.database_path())
+            .expect("open reconciliation database");
+        reconciliation_db
+            .execute_batch("PRAGMA foreign_keys=OFF; DROP TABLE artifacts;")
+            .expect("corrupt storage query fixture after migrations");
+    }
+    let before_reconciliation = signal_value(
+        &artifact_mcp::observability::McpTelemetry::default().render_prometheus(),
+        "reconciliation_failure",
+    );
+    let startup = super::u20_runtime::runtime::run_with_bind(
+        reconciliation_config,
+        Arc::new(AuditStartupObserver),
+        |_host, _port, _router| async { Ok(()) },
+    )
+    .await;
+    assert!(
+        startup.is_err(),
+        "blocked artifact storage fails startup reconciliation"
+    );
+    assert!(
+        signal_value(
+            &artifact_mcp::observability::McpTelemetry::default().render_prometheus(),
+            "reconciliation_failure",
+        ) >= before_reconciliation.saturating_add(1),
+        "the runtime reconciliation error path increments the metric"
+    );
+
+    let _ = std::fs::remove_dir_all(integrity_dir);
+    let _ = std::fs::remove_dir_all(reconciliation_dir);
 }

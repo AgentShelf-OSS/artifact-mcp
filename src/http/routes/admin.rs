@@ -1,9 +1,10 @@
 //! Owned by U18 (terra) — administrator settings, keys, orgs, and webhooks.
 
+use std::time::Duration;
+
 use axum::{
     Json, Router,
-    body::to_bytes,
-    extract::{Path, Request, State},
+    extract::{Extension, Path, Request, State},
     http::{HeaderMap, header},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
@@ -15,12 +16,19 @@ use crate::{
     AppDeps,
     config::{Clock, SystemClock},
     error::AppError,
+    http::ingress::{
+        BodyReadError, ViewerCost, complexity_response, read_body_limited, validate_json_complexity,
+    },
+    mcp::protocol::OrderedJson,
     model::{
         ClientId, CreateOrganization, CreatePublisherKey, CreateWebhook, DeliveryResult,
         EmailAddress, OrgId, Viewer, WebhookEvent, WebhookId,
     },
     render::view_models::{SettingsOrganization, SettingsView},
-    security::access::AccessPolicy,
+    security::{
+        access::AccessPolicy,
+        audit::{AuditRequestId, MutationAudit},
+    },
 };
 
 pub(crate) fn router() -> Router<AppDeps> {
@@ -66,6 +74,12 @@ async fn settings(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
         Ok(viewer) => viewer,
         Err(error) => return error.into_response(),
     };
+    if !deps
+        .ingress
+        .allow_verified_viewer(&headers, &viewer, ViewerCost::Admin)
+    {
+        return AppError::RateLimited.into_response();
+    }
     if let Err(error) = AccessPolicy::admin_access(&viewer) {
         return (error.http_status(), error.to_string()).into_response();
     }
@@ -102,7 +116,7 @@ async fn settings(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
 }
 
 async fn create_key(State(deps): State<AppDeps>, request: Request) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -120,19 +134,22 @@ async fn create_key(State(deps): State<AppDeps>, request: Request) -> Response {
 
     let created = match deps
         .admin
-        .create_key(CreatePublisherKey {
-            client_id: ClientId(js_or_empty(body.get("clientId"))),
-            org: OrgId(js_or_empty(body.get("org"))),
-            label: js_or_empty(body.get("label")),
-            role: match js_or_empty(body.get("role")) {
-                value if value.is_empty() => "author".to_owned(),
-                value => value,
+        .create_key(
+            CreatePublisherKey {
+                client_id: ClientId(js_or_empty(body.get("clientId"))),
+                org: OrgId(js_or_empty(body.get("org"))),
+                label: js_or_empty(body.get("label")),
+                role: match js_or_empty(body.get("role")) {
+                    value if value.is_empty() => "author".to_owned(),
+                    value => value,
+                },
+                owner_email: {
+                    let value = js_or_empty(body.get("ownerEmail"));
+                    (!value.is_empty()).then_some(value)
+                },
             },
-            owner_email: {
-                let value = js_or_empty(body.get("ownerEmail"));
-                (!value.is_empty()).then_some(value)
-            },
-        })
+            audit,
+        )
         .await
     {
         Ok(created) => created,
@@ -153,11 +170,18 @@ async fn revoke_key(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,
     headers: HeaderMap,
+    request_id: Option<Extension<AuditRequestId>>,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
-    let revoked = match deps.admin.revoke_key(&ClientId(id.clone())).await {
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0)) {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
+    let revoked = match deps.admin.revoke_key(&ClientId(id.clone()), audit).await {
         Ok(revoked) => revoked,
         Err(error) => return error.into_response(),
     };
@@ -178,14 +202,14 @@ async fn set_key_owner(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
     let value = js_or_empty(body.get("ownerEmail"));
     match deps
         .admin
-        .set_key_owner(ClientId(id), (!value.is_empty()).then_some(value))
+        .set_key_owner(ClientId(id), (!value.is_empty()).then_some(value), audit)
         .await
     {
         Ok(Some(updated)) => Json(KeyOwnerResponse {
@@ -216,7 +240,7 @@ async fn backfill_key_owner(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -227,7 +251,7 @@ async fn backfill_key_owner(
     let confirm = matches!(body.get("confirm"), Some(Value::Bool(true)));
     match deps
         .admin
-        .backfill_key_owner(ClientId(id), owner_email, confirm)
+        .backfill_key_owner(ClientId(id), owner_email, confirm, audit)
         .await
     {
         Ok(Some(result)) => Json(OwnerBackfillResponse {
@@ -245,18 +269,21 @@ async fn backfill_key_owner(
 }
 
 async fn create_org(State(deps): State<AppDeps>, request: Request) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
     let domain = js_or_empty(body.get("domain"));
     let created = match deps
         .admin
-        .create_org(CreateOrganization {
-            name: OrgId(js_or_empty(body.get("name"))),
-            label: js_or_empty(body.get("label")),
-            domain: (!domain.is_empty()).then_some(domain),
-        })
+        .create_org(
+            CreateOrganization {
+                name: OrgId(js_or_empty(body.get("name"))),
+                label: js_or_empty(body.get("label")),
+                domain: (!domain.is_empty()).then_some(domain),
+            },
+            audit,
+        )
         .await
     {
         Ok(created) => created,
@@ -277,11 +304,20 @@ async fn delete_org(
     State(deps): State<AppDeps>,
     Path(name): Path<String>,
     headers: HeaderMap,
+    request_id: Option<Extension<AuditRequestId>>,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
-    let removed = match deps.admin.delete_org(&OrgId(name.clone())).await {
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0))
+            .and_then(|audit| audit.admin_for_tenant(&name))
+        {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
+    let removed = match deps.admin.delete_org(&OrgId(name.clone()), audit).await {
         Ok(removed) => removed,
         Err(error) => return error.into_response(),
     };
@@ -293,12 +329,20 @@ async fn add_domain(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
     let domain = js_or_empty(body.get("domain"));
-    let normalized = match deps.admin.add_domain(&OrgId(name.clone()), &domain).await {
+    let audit = match target_audit(audit, &name) {
+        Ok(audit) => audit,
+        Err(error) => return error.into_response(),
+    };
+    let normalized = match deps
+        .admin
+        .add_domain(&OrgId(name.clone()), &domain, audit)
+        .await
+    {
         Ok(domain) => domain,
         Err(error) => return error.into_response(),
     };
@@ -309,13 +353,22 @@ async fn remove_domain(
     State(deps): State<AppDeps>,
     Path((name, domain)): Path<(String, String)>,
     headers: HeaderMap,
+    request_id: Option<Extension<AuditRequestId>>,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0))
+            .and_then(|audit| audit.admin_for_tenant(&name))
+        {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
     let removed = match deps
         .admin
-        .remove_domain(&OrgId(name.clone()), &domain)
+        .remove_domain(&OrgId(name.clone()), &domain, audit)
         .await
     {
         Ok(removed) => removed,
@@ -329,14 +382,21 @@ async fn add_email_member(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
     let email = EmailAddress(js_or_empty(body.get("email")));
     let normalized = match deps
         .admin
-        .add_email_member(&OrgId(name.clone()), &email)
+        .add_email_member(
+            &OrgId(name.clone()),
+            &email,
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(email) => email,
@@ -349,14 +409,23 @@ async fn remove_email_member(
     State(deps): State<AppDeps>,
     Path((name, email)): Path<(String, String)>,
     headers: HeaderMap,
+    request_id: Option<Extension<AuditRequestId>>,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0))
+            .and_then(|audit| audit.admin_for_tenant(&name))
+        {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
     let email = EmailAddress(js_trim(&email).to_lowercase());
     let removed = match deps
         .admin
-        .remove_email_member(&OrgId(name.clone()), &email)
+        .remove_email_member(&OrgId(name.clone()), &email, audit)
         .await
     {
         Ok(removed) => removed,
@@ -370,14 +439,21 @@ async fn add_category(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
     let category = js_or_empty(body.get("name"));
     let normalized = match deps
         .admin
-        .add_category(&OrgId(name.clone()), &category)
+        .add_category(
+            &OrgId(name.clone()),
+            &category,
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(category) => category,
@@ -391,7 +467,7 @@ async fn remove_category(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -399,7 +475,14 @@ async fn remove_category(
     let category = js_or_empty(requested_name.as_ref());
     let removed = match deps
         .admin
-        .remove_category(&OrgId(name.clone()), &category)
+        .remove_category(
+            &OrgId(name.clone()),
+            &category,
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(removed) => removed,
@@ -419,7 +502,7 @@ async fn set_color(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -427,7 +510,14 @@ async fn set_color(
     let color = js_or_empty(requested);
     let stored = match deps
         .admin
-        .set_color(&OrgId(name.clone()), requested.map(|_| color.as_str()))
+        .set_color(
+            &OrgId(name.clone()),
+            requested.map(|_| color.as_str()),
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(color) => color,
@@ -441,7 +531,7 @@ async fn create_webhook(
     Path(name): Path<String>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -451,12 +541,18 @@ async fn create_webhook(
     };
     let webhook = match deps
         .admin
-        .create_webhook(CreateWebhook {
-            org: OrgId(name),
-            url: js_or_empty(body.get("url")),
-            label: js_or_empty(body.get("label")),
-            events,
-        })
+        .create_webhook(
+            CreateWebhook {
+                org: OrgId(name.clone()),
+                url: js_or_empty(body.get("url")),
+                label: js_or_empty(body.get("label")),
+                events,
+            },
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(webhook) => webhook,
@@ -469,14 +565,23 @@ async fn remove_webhook(
     State(deps): State<AppDeps>,
     Path((name, id)): Path<(String, String)>,
     headers: HeaderMap,
+    request_id: Option<Extension<AuditRequestId>>,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0))
+            .and_then(|audit| audit.admin_for_tenant(&name))
+        {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
     let webhook_id = id.clone().into();
     let removed = match deps
         .admin
-        .remove_webhook(&OrgId(name.clone()), &webhook_id)
+        .remove_webhook(&OrgId(name.clone()), &webhook_id, audit)
         .await
     {
         Ok(removed) => removed,
@@ -490,7 +595,7 @@ async fn update_webhook_events(
     Path((name, id)): Path<(String, String)>,
     request: Request,
 ) -> Response {
-    let (_viewer, body) = match admin_json_request(&deps, request).await {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
         Ok(authorized) => authorized,
         Err(response) => return response,
     };
@@ -500,7 +605,15 @@ async fn update_webhook_events(
     };
     match deps
         .admin
-        .set_webhook_events(&OrgId(name), &id.into(), &events)
+        .set_webhook_events(
+            &OrgId(name.clone()),
+            &id.into(),
+            &events,
+            match target_audit(audit, &name) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(Some(webhook)) => Json(webhook).into_response(),
@@ -512,11 +625,16 @@ async fn update_webhook_events(
 async fn test_webhook(
     State(deps): State<AppDeps>,
     Path((name, id)): Path<(String, String)>,
+    request_id: Option<Extension<AuditRequestId>>,
     headers: HeaderMap,
 ) -> Response {
-    if let Err(response) = require_admin(&deps, &headers).await {
-        return response;
-    }
+    // External delivery cannot share a SQLite transaction. We therefore commit a requested
+    // marker before I/O and a correlated terminal result afterward. A crash in the gap leaves an
+    // actionable requested-only record; neither record contains the decrypted URL.
+    let viewer = match require_admin(&deps, &headers).await {
+        Ok(viewer) => viewer,
+        Err(response) => return response,
+    };
     let delivery = match deps.admin.webhook_delivery(&WebhookId(id)).await {
         Ok(Some(delivery)) if delivery.org.0 == name => delivery,
         Ok(Some(_) | None) => {
@@ -524,10 +642,38 @@ async fn test_webhook(
         }
         Err(error) => return error.into_response(),
     };
+    let audit =
+        match MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref().map(|id| &id.0)) {
+            Ok(audit) => audit,
+            Err(error) => return error.into_response(),
+        };
+    if let Err(error) = deps
+        .admin
+        .audit_webhook_test(&delivery.org, &delivery.id, None, audit.clone())
+        .await
+    {
+        return error.into_response();
+    }
     let result = match deps.notifications.test(&delivery).await {
         Ok(result) => result,
-        Err(error) => return error.into_response(),
+        Err(delivery_error) => {
+            if let Err(audit_error) = deps
+                .admin
+                .audit_webhook_test(&delivery.org, &delivery.id, Some(false), audit)
+                .await
+            {
+                return audit_error.into_response();
+            }
+            return delivery_error.into_response();
+        }
     };
+    if let Err(error) = deps
+        .admin
+        .audit_webhook_test(&delivery.org, &delivery.id, Some(result.ok), audit)
+        .await
+    {
+        return error.into_response();
+    }
     Json(DeliveryResultResponse::from(result)).into_response()
 }
 
@@ -564,41 +710,86 @@ fn parse_webhook_events(value: Option<&Value>) -> Result<Option<Vec<WebhookEvent
     Ok(Some(events))
 }
 
-async fn require_admin(deps: &AppDeps, headers: &HeaderMap) -> Result<Viewer, Response> {
+pub(crate) async fn require_admin(deps: &AppDeps, headers: &HeaderMap) -> Result<Viewer, Response> {
     let viewer = deps
         .viewer_identity
         .resolve(headers)
         .await
         .map_err(IntoResponse::into_response)?;
     AccessPolicy::admin_access(&viewer).map_err(IntoResponse::into_response)?;
+    deps.mcp_telemetry.record_security_signal("admin_action");
+    if !deps
+        .ingress
+        .allow_verified_viewer(headers, &viewer, ViewerCost::Admin)
+    {
+        return Err(AppError::RateLimited.into_response());
+    }
     Ok(viewer)
 }
 
-async fn admin_json_request(deps: &AppDeps, request: Request) -> Result<(Viewer, Value), Response> {
+pub(crate) async fn admin_json_request(
+    deps: &AppDeps,
+    request: Request,
+) -> Result<(Viewer, Value, MutationAudit), Response> {
     let headers = request.headers().clone();
-    let body = parse_json_body(request, deps.config.body.key_json).await?;
+    let request_id = request.extensions().get::<AuditRequestId>().cloned();
     let viewer = require_admin(deps, &headers).await?;
-    Ok((viewer, body))
+    // Authenticate, authorize, and apply the verified-admin quota before admitting parser work.
+    // The body reader remains bounded for authorized callers, but an unauthorized peer cannot
+    // spend a request permit on a slow or structurally expensive JSON payload.
+    let body = parse_json_body(request, deps.config.body.key_json, &deps.config.ingress).await?;
+    let audit = MutationAudit::viewer_with_request_id(&viewer, request_id.as_ref())
+        .map_err(IntoResponse::into_response)?;
+    Ok((viewer, body, audit))
 }
 
-async fn parse_json_body(request: Request, limit: u64) -> Result<Value, Response> {
-    if !request
+fn target_audit(audit: MutationAudit, name: &str) -> Result<MutationAudit, AppError> {
+    audit.admin_for_tenant(name)
+}
+
+async fn parse_json_body(
+    request: Request,
+    limit: u64,
+    ingress: &crate::config::IngressConfig,
+) -> Result<Value, Response> {
+    let is_json = request
         .headers()
         .get(header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
-        .is_some_and(is_json_content_type)
-    {
-        return Ok(Value::Object(Map::new()));
-    }
+        .is_some_and(is_json_content_type);
     let limit = usize::try_from(limit).unwrap_or(usize::MAX);
-    let bytes = to_bytes(request.into_body(), limit)
-        .await
-        .map_err(|_| AppError::PayloadTooLarge.into_response())?;
+    let bytes = read_body_limited(
+        request.into_body(),
+        limit,
+        Duration::from_millis(ingress.read_timeout_ms),
+    )
+    .await
+    .map_err(|error| match error {
+        BodyReadError::Timeout => {
+            (axum::http::StatusCode::REQUEST_TIMEOUT, "request timeout").into_response()
+        }
+        BodyReadError::TooLarge => AppError::PayloadTooLarge.into_response(),
+        BodyReadError::Invalid => AppError::Validation("invalid JSON".to_owned()).into_response(),
+    })?;
+    if !is_json {
+        return if bytes.is_empty() {
+            Ok(Value::Object(Map::new()))
+        } else {
+            Err((
+                axum::http::StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "unsupported media type",
+            )
+                .into_response())
+        };
+    }
     if bytes.is_empty() {
         return Ok(Value::Object(Map::new()));
     }
-    match serde_json::from_slice::<Value>(&bytes) {
-        Ok(value @ (Value::Object(_) | Value::Array(_))) => Ok(value),
+    match serde_json::from_slice::<OrderedJson>(&bytes) {
+        Ok(value @ (OrderedJson::Object(_) | OrderedJson::Array(_))) => {
+            validate_json_complexity(&value, ingress).map_err(complexity_response)?;
+            Ok(value.into_value())
+        }
         Ok(_) | Err(_) => Err(AppError::Validation("invalid JSON".to_owned()).into_response()),
     }
 }

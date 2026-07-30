@@ -34,11 +34,12 @@
 
 use std::collections::BTreeMap;
 
-use rusqlite::{Connection, OptionalExtension as _, Transaction};
+use rusqlite::{Connection, OptionalExtension as _, Transaction, TransactionBehavior};
 
 use crate::error::AppError;
 use crate::model::{CreateOrganization, EmailAddress, OrgId, Organization, Timestamp};
 use crate::persistence::db::{self, DbPool};
+use crate::security::audit::{AuditEvent, MutationAudit, mutate_in_transaction};
 
 // ---------------------------------------------------------------------------
 // Shared JavaScript string semantics
@@ -538,24 +539,36 @@ pub fn create_org(
     }
 
     let transaction = conn
-        .transaction()
+        .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|error| database_failure("begin create org", &error))?;
-    insert_org(&transaction, &name, &label)?;
-    if let Some(domain) = domain.as_deref() {
-        insert_domain(&transaction, domain, &name)?;
-    }
+    let organization = create_org_in_transaction(&transaction, &name, &label, domain.as_deref())?;
     transaction
         .commit()
         .map_err(|error| database_failure("commit create org", &error))?;
+    Ok(organization)
+}
+
+fn create_org_in_transaction(
+    transaction: &Transaction<'_>,
+    name: &str,
+    label: &str,
+    domain: Option<&str>,
+) -> Result<Organization, AppError> {
+    insert_org(transaction, name, label)?;
+    if let Some(domain) = domain {
+        insert_domain(transaction, domain, name)?;
+    }
 
     // Node returns a literal rather than re-reading the row, so `color` and `created_at` are
     // absent. [lib/orgs.js:126]
     Ok(Organization {
-        name: OrgId(name),
-        label,
+        name: OrgId(name.to_owned()),
+        label: label.to_owned(),
         color: None,
         created_at: None,
-        domains: domain.map(|value| vec![value]).unwrap_or_default(),
+        domains: domain
+            .map(|value| vec![value.to_owned()])
+            .unwrap_or_default(),
         emails: Vec::new(),
         categories: Vec::new(),
         key_count: 0,
@@ -575,15 +588,23 @@ pub fn create_org(
 pub fn delete_org(conn: &mut Connection, name: &str) -> Result<bool, AppError> {
     let name = norm_org(name);
     let transaction = conn
-        .transaction()
+        .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|error| database_failure("begin delete org", &error))?;
-    if !org_exists(&transaction, &name)? {
+    let result = delete_org_in_transaction(&transaction, &name)?;
+    transaction
+        .commit()
+        .map_err(|error| database_failure("commit delete org", &error))?;
+    Ok(result)
+}
+
+fn delete_org_in_transaction(transaction: &Transaction<'_>, name: &str) -> Result<bool, AppError> {
+    if !org_exists(transaction, name)? {
         return Ok(false);
     }
     let artifact_count = transaction
         .query_row(
             "SELECT COUNT(*) FROM artifacts WHERE org = ?",
-            [&name],
+            [name],
             |row| row.get::<_, i64>(0),
         )
         .map_err(|error| database_failure("count org artifacts", &error))?;
@@ -596,16 +617,13 @@ pub fn delete_org(conn: &mut Connection, name: &str) -> Result<bool, AppError> {
     transaction
         .execute(
             "UPDATE api_keys SET revoked_at = datetime('now') WHERE org = ? AND revoked_at IS NULL",
-            [&name],
+            [name],
         )
         .map_err(|error| database_failure("revoke org keys", &error))?;
     let removed = transaction
-        .execute("DELETE FROM orgs WHERE name = ?", [&name])
+        .execute("DELETE FROM orgs WHERE name = ?", [name])
         .map_err(|error| database_failure("delete org", &error))?
         > 0;
-    transaction
-        .commit()
-        .map_err(|error| database_failure("commit delete org", &error))?;
     Ok(removed)
 }
 
@@ -887,6 +905,39 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| create_org(conn, &request)).await
     }
 
+    pub async fn create_org_audited(
+        &self,
+        request: CreateOrganization,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Organization, AppError> {
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let created = create_org_in_transaction_from_request(&tx, &request)?;
+            let audit = audit.for_target_tenant(&created.name.0)?;
+            let event = AuditEvent {
+                operation: "org.create".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: created.name.0.clone(),
+                result: "success".to_owned(),
+                classification: "organization_created".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(created)
+        })
+        .await
+    }
+
     /// See [`delete_org`].
     ///
     /// # Errors
@@ -894,6 +945,43 @@ impl OrgStore {
     pub async fn delete_org(&self, org: &OrgId) -> Result<bool, AppError> {
         let org = org.0.clone();
         db::interact(&self.pool, move |conn| delete_org(conn, &org)).await
+    }
+
+    pub async fn delete_org_audited(
+        &self,
+        org: OrgId,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        db::interact(&self.pool, move |conn| {
+            let target = norm_org(&org.0);
+            let audit = audit.for_target_tenant(&target)?;
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            if !delete_org_in_transaction(&tx, &target)? {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(false);
+            }
+            let event = AuditEvent {
+                operation: "org.delete".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: "organization_deleted".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(true)
+        })
+        .await
     }
 
     /// See [`add_domain`].
@@ -905,6 +993,25 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| add_domain(conn, &org, &domain)).await
     }
 
+    pub async fn add_domain_audited(
+        &self,
+        org: OrgId,
+        domain: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<String, AppError> {
+        self.audited_org_value(
+            org,
+            domain,
+            audit,
+            audit_key,
+            "org.domain.add",
+            "domain_added",
+            add_domain,
+        )
+        .await
+    }
+
     /// See [`remove_domain`].
     ///
     /// # Errors
@@ -912,6 +1019,25 @@ impl OrgStore {
     pub async fn remove_domain(&self, org: &OrgId, domain: &str) -> Result<bool, AppError> {
         let (org, domain) = (org.0.clone(), domain.to_owned());
         db::interact(&self.pool, move |conn| remove_domain(conn, &org, &domain)).await
+    }
+
+    pub async fn remove_domain_audited(
+        &self,
+        org: OrgId,
+        domain: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        self.audited_org_bool(
+            org,
+            domain,
+            audit,
+            audit_key,
+            "org.domain.remove",
+            "domain_removed",
+            remove_domain,
+        )
+        .await
     }
 
     /// See [`add_email_member`].
@@ -930,6 +1056,27 @@ impl OrgStore {
         .await
     }
 
+    pub async fn add_email_member_audited(
+        &self,
+        org: OrgId,
+        email: EmailAddress,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<EmailAddress, AppError> {
+        let value = self
+            .audited_org_value(
+                org,
+                email.0,
+                audit,
+                audit_key,
+                "org.member.add",
+                "member_added",
+                add_email_member,
+            )
+            .await?;
+        Ok(EmailAddress(value))
+    }
+
     /// See [`remove_email_member`].
     ///
     /// # Errors
@@ -943,6 +1090,25 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| {
             remove_email_member(conn, &org, &email)
         })
+        .await
+    }
+
+    pub async fn remove_email_member_audited(
+        &self,
+        org: OrgId,
+        email: EmailAddress,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        self.audited_org_bool(
+            org,
+            email.0,
+            audit,
+            audit_key,
+            "org.member.remove",
+            "member_removed",
+            remove_email_member,
+        )
         .await
     }
 
@@ -964,6 +1130,56 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| add_category(conn, &org, &name)).await
     }
 
+    pub async fn add_category_audited(
+        &self,
+        org: OrgId,
+        name: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<String, AppError> {
+        let target = org.0.clone();
+        let audit = audit.for_target_tenant(&target)?;
+        let pool = self.pool.clone();
+        db::interact(&pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let normalized = norm_category(&name);
+            let existed = tx
+                .query_row(
+                    "SELECT 1 FROM org_categories WHERE org=?1 AND name=?2",
+                    (&org.0, &normalized),
+                    |_| Ok(()),
+                )
+                .optional()
+                .map_err(|error| database_failure("read category", &error))?
+                .is_some();
+            let result = add_category(&tx, &org.0, &name)?;
+            if existed {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(result);
+            }
+            let event = AuditEvent {
+                operation: "org.category.add".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: "category_added".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(result)
+        })
+        .await
+    }
+
     /// See [`remove_category`].
     ///
     /// # Errors
@@ -971,6 +1187,25 @@ impl OrgStore {
     pub async fn remove_category(&self, org: &OrgId, name: &str) -> Result<bool, AppError> {
         let (org, name) = (org.0.clone(), name.to_owned());
         db::interact(&self.pool, move |conn| remove_category(conn, &org, &name)).await
+    }
+
+    pub async fn remove_category_audited(
+        &self,
+        org: OrgId,
+        name: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        self.audited_org_bool(
+            org,
+            name,
+            audit,
+            audit_key,
+            "org.category.remove",
+            "category_removed",
+            remove_category,
+        )
+        .await
     }
 
     /// See [`color_map`].
@@ -996,6 +1231,168 @@ impl OrgStore {
         })
         .await
     }
+
+    pub async fn set_color_audited(
+        &self,
+        org: OrgId,
+        color: Option<String>,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Option<String>, AppError> {
+        let target = org.0.clone();
+        let audit = audit.for_target_tenant(&target)?;
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let current = tx
+                .query_row("SELECT color FROM orgs WHERE name=?1", [&org.0], |row| {
+                    row.get::<_, Option<String>>(0)
+                })
+                .optional()
+                .map_err(|error| database_failure("read org color", &error))?;
+            let stored = set_color(&tx, &org.0, color.as_deref())?;
+            if current.as_ref() == Some(&stored) {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(stored);
+            }
+            let event = AuditEvent {
+                operation: "org.color.set".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: "color_updated".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(stored)
+        })
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn audited_org_value(
+        &self,
+        org: OrgId,
+        value: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+        operation: &'static str,
+        classification: &'static str,
+        mutation: fn(&Connection, &str, &str) -> Result<String, AppError>,
+    ) -> Result<String, AppError> {
+        let target = org.0.clone();
+        let audit = audit.for_target_tenant(&target)?;
+        db::interact(&self.pool, move |conn| {
+            mutate_in_transaction(conn, &audit_key, &audit, |tx| {
+                let result = mutation(tx, &org.0, &value)?;
+                Ok((
+                    result,
+                    AuditEvent {
+                        operation: operation.to_owned(),
+                        target_type: "organization".to_owned(),
+                        target_id: target,
+                        result: "success".to_owned(),
+                        classification: classification.to_owned(),
+                        revision: None,
+                    },
+                ))
+            })
+        })
+        .await
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    async fn audited_org_bool(
+        &self,
+        org: OrgId,
+        value: String,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+        operation: &'static str,
+        classification: &'static str,
+        mutation: fn(&Connection, &str, &str) -> Result<bool, AppError>,
+    ) -> Result<bool, AppError> {
+        let target = org.0.clone();
+        let audit = audit.for_target_tenant(&target)?;
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            if !mutation(&tx, &org.0, &value)? {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(false);
+            }
+            let event = AuditEvent {
+                operation: operation.to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: classification.to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(true)
+        })
+        .await
+    }
+}
+
+fn create_org_in_transaction_from_request(
+    tx: &Transaction<'_>,
+    request: &CreateOrganization,
+) -> Result<Organization, AppError> {
+    let name = js_trim(&request.name.0).to_lowercase();
+    let label = truncate_utf16(js_trim(&request.label), ORG_LABEL_MAX_LENGTH);
+    if !is_valid_org_name(&name) {
+        return Err(AppError::Validation(
+            "Org name must be letters, numbers, dot, dash, or underscore (max 41).".to_owned(),
+        ));
+    }
+    if is_valid_domain(&name) {
+        return Err(AppError::Validation("Org name must not be an email domain. Use a tenant id such as \"acme\" and add the domain separately.".to_owned()));
+    }
+    if name == RESERVED_ORG_NAME {
+        return Err(AppError::Validation(
+            "\"admin\" is a reserved org name.".to_owned(),
+        ));
+    }
+    if org_exists(tx, &name)? {
+        return Err(AppError::Validation(format!(
+            "Organization \"{name}\" already exists."
+        )));
+    }
+    let domain = request
+        .domain
+        .as_deref()
+        .filter(|value| !value.is_empty())
+        .map(norm_domain)
+        .filter(|value| !value.is_empty());
+    if let Some(domain) = domain.as_deref() {
+        if !is_valid_domain(domain) {
+            return Err(invalid_domain(domain));
+        }
+        if let Some(owner) = domain_owner(tx, domain)? {
+            return Err(AppError::Validation(format!(
+                "Domain \"{domain}\" is already mapped to \"{owner}\"."
+            )));
+        }
+    }
+    create_org_in_transaction(tx, &name, &label, domain.as_deref())
 }
 
 #[cfg(test)]

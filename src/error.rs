@@ -27,6 +27,8 @@ pub enum AppError {
     Gone(String),
     #[error("payload too large")]
     PayloadTooLarge,
+    #[error("too many requests")]
+    RateLimited,
     #[error("{0}")]
     Unavailable(String),
     #[error("internal error")]
@@ -45,6 +47,7 @@ impl AppError {
             Self::Conflict(_) => StatusCode::CONFLICT,
             Self::Gone(_) => StatusCode::GONE,
             Self::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            Self::RateLimited => StatusCode::TOO_MANY_REQUESTS,
             Self::Unavailable(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         }

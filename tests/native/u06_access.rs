@@ -186,6 +186,7 @@ impl ArtifactService for SpyArtifacts {
     fn publish(
         &self,
         _request: PublishArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
         refuse(self, "publish")
     }
@@ -263,6 +264,7 @@ impl ArtifactService for SpyArtifacts {
         &self,
         _artifact: AuthorizedArtifact,
         _update: ArtifactUpdate,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
         refuse(self, "update")
     }
@@ -272,11 +274,16 @@ impl ArtifactService for SpyArtifacts {
         _artifact: AuthorizedArtifact,
         _revision: u64,
         _acting_client_id: Option<ClientId>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
         refuse(self, "restore")
     }
 
-    fn delete(&self, _artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
+    fn delete(
+        &self,
+        _artifact: AuthorizedArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
         refuse(self, "delete")
     }
 
@@ -284,6 +291,7 @@ impl ArtifactService for SpyArtifacts {
         &self,
         _artifact: AuthorizedArtifact,
         _category: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         refuse(self, "set_category")
     }
@@ -292,6 +300,7 @@ impl ArtifactService for SpyArtifacts {
         &self,
         _artifact: AuthorizedArtifact,
         _hidden: bool,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         refuse(self, "set_hidden")
     }
@@ -301,6 +310,7 @@ impl ArtifactService for SpyArtifacts {
         _artifact: AuthorizedArtifact,
         _target_org: OrgId,
         _category: Option<String>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         refuse(self, "move_to_org")
     }

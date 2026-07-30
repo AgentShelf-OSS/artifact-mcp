@@ -5,9 +5,13 @@
 //! what they will use after the key is set. Both are exercised end to end here.
 
 use artifact_mcp::error::AppError;
+use artifact_mcp::integrations::delivery_worker::{WebhookResolutionFailure, WorkerWebhooks};
 use artifact_mcp::model::{CreateWebhook, OrgId, WebhookEvent, WebhookId};
+use artifact_mcp::persistence::db;
 use artifact_mcp::persistence::migrations::mask_webhook_url;
-use artifact_mcp::persistence::webhooks::{INVALID_URL_MESSAGE, mask_url};
+use artifact_mcp::persistence::webhooks::{
+    INVALID_URL_MESSAGE, WebhookDeliveryResolutionFailure, mask_url,
+};
 
 use crate::u12_support::{fixture, raw_url_columns, seed_org, store_with, test_key};
 
@@ -147,6 +151,73 @@ async fn an_encrypted_row_read_without_the_key_fails_closed() {
     assert_eq!(listed.len(), 1);
     assert_eq!(listed[0].url, "https://discord.com…wxyz");
     assert!(!listed[0].url.contains(TOKEN));
+}
+
+#[tokio::test]
+async fn durable_resolution_is_typed_tenant_bound_and_redacted() {
+    let (_dir, pool, encrypted) = fixture("durable-resolution", "acme", Some(&test_key())).await;
+    let url = discord_url();
+    let created = encrypted
+        .create(request("acme", &url))
+        .await
+        .expect("create encrypted webhook");
+
+    let resolved = encrypted
+        .resolve_delivery(&created.id, &OrgId("acme".to_owned()))
+        .await
+        .expect("same-tenant reference resolves");
+    assert_eq!(resolved.id, created.id);
+    assert_eq!(resolved.url, url);
+
+    for (id, org) in [
+        (WebhookId("missing".to_owned()), OrgId("acme".to_owned())),
+        (created.id.clone(), OrgId("other".to_owned())),
+        (WebhookId("   ".to_owned()), OrgId("acme".to_owned())),
+    ] {
+        let failure = encrypted
+            .resolve_delivery(&id, &org)
+            .await
+            .expect_err("invalid durable target is terminal");
+        assert_eq!(failure, WebhookDeliveryResolutionFailure::InvalidReference);
+        let diagnostic = format!("{failure:?}");
+        assert!(!diagnostic.contains(TOKEN));
+        assert!(!diagnostic.contains(&url));
+    }
+
+    // A lost key/authentication failure is terminal and its diagnostics never materialise the URL.
+    let keyless = store_with(pool.clone(), None);
+    let failure = keyless
+        .resolve_delivery(&created.id, &OrgId("acme".to_owned()))
+        .await
+        .expect_err("encrypted target without key fails closed");
+    assert_eq!(failure, WebhookDeliveryResolutionFailure::DecryptFailed);
+    assert!(!format!("{failure:?}").contains(TOKEN));
+    assert_eq!(
+        WorkerWebhooks::delivery(keyless.as_ref(), &created.id, &OrgId("acme".to_owned()))
+            .await
+            .expect_err("worker adapter preserves decrypt classification"),
+        WebhookResolutionFailure::DecryptFailed
+    );
+
+    // A database fault remains retryable instead of being misclassified as a decrypt failure.
+    db::interact(&pool, |conn| {
+        conn.execute_batch("DROP TABLE org_webhooks")
+            .map_err(|_| AppError::Internal)
+    })
+    .await
+    .expect("drop webhook table to force lookup fault");
+    let failure = encrypted
+        .resolve_delivery(&created.id, &OrgId("acme".to_owned()))
+        .await
+        .expect_err("database fault");
+    assert_eq!(failure, WebhookDeliveryResolutionFailure::Retryable);
+    assert!(!format!("{failure:?}").contains(TOKEN));
+    assert_eq!(
+        WorkerWebhooks::delivery(encrypted.as_ref(), &created.id, &OrgId("acme".to_owned()))
+            .await
+            .expect_err("worker adapter preserves database retry classification"),
+        WebhookResolutionFailure::Retryable
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -389,6 +460,51 @@ async fn remove_is_scoped_to_the_org() {
             .await
             .expect("second delete")
     );
+}
+
+#[tokio::test]
+async fn notification_thread_anchor_prevents_webhook_deletion_or_published_unsubscribe() {
+    let (_dir, pool, store) = fixture("notification-thread-anchor", "acme", None).await;
+    let created = store
+        .create(request("acme", &discord_url()))
+        .await
+        .expect("create");
+    let webhook_id = created.id.0.clone();
+    db::interact(&pool, move |conn| {
+        conn.execute(
+            "INSERT INTO org_discord_discussion_connections \
+             (id, org, url, label, strategy, notification_webhook_id, channel_id, guild_id) \
+             VALUES ('connection-a', 'acme', '', 'Artifact threads', 'notification_thread', \
+                     ?1, '123456789012345678', '323456789012345678')",
+            [webhook_id],
+        )
+        .expect("notification thread connection");
+        Ok(())
+    })
+    .await
+    .expect("seed connection");
+
+    assert!(matches!(
+        store
+            .set_events(
+                &OrgId("acme".to_owned()),
+                &created.id,
+                &[WebhookEvent::Feedback],
+            )
+            .await,
+        Err(AppError::Conflict(_))
+    ));
+    assert!(matches!(
+        store.remove(&OrgId("acme".to_owned()), &created.id).await,
+        Err(AppError::Conflict(_))
+    ));
+
+    let retained = store
+        .list_for_org(&OrgId("acme".to_owned()))
+        .await
+        .expect("retained webhook");
+    assert_eq!(retained.len(), 1);
+    assert!(retained[0].events.contains(&WebhookEvent::Published));
 }
 
 #[tokio::test]

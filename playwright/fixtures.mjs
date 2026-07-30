@@ -8,7 +8,11 @@ import { test as base } from "@playwright/test";
 
 const ADMIN = process.env.PW_ADMIN_EMAIL || "admin@example.test";
 
-export const adminHeaders = { "Cf-Access-Authenticated-User-Email": ADMIN };
+export const adminHeaders = {
+  "Cf-Access-Authenticated-User-Email": ADMIN,
+  "X-Artifact-Mutation": "1",
+  "Sec-Fetch-Site": "same-origin"
+};
 
 /** Unique per run so parallel/repeat runs never collide, and leftovers are identifiable. */
 export function runId() {

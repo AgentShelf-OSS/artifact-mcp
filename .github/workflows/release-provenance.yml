@@ -1,0 +1,304 @@
+name: Release provenance
+
+on:
+  push:
+    # GitHub filters are globs, not regular expressions; `prepare` enforces the exact shape.
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing signed tag to release (for example v1.7.0)
+        required: true
+        type: string
+      backup_identity:
+        description: Immutable, pre-migration backup identity
+        required: false
+        type: string
+      rollback_image:
+        description: Previously verified image in repository@sha256:digest form
+        required: false
+        type: string
+
+# A candidate can be published for scanning, but promotion of the stable tag and GitHub Release is
+# serialized and protected. The workflow never rebuilds after obtaining its candidate digest.
+concurrency:
+  group: ${{ github.repository }}-production-release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  prepare:
+    name: Verify signed release input
+    runs-on: ubuntu-latest
+    outputs:
+      commit: ${{ steps.release.outputs.commit }}
+      created: ${{ steps.release.outputs.created }}
+      image: ${{ steps.release.outputs.image }}
+      schema_current: ${{ steps.release.outputs.schema_current }}
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref }}
+      - id: release
+        name: Verify tag, version, and trusted signature
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          tag="${INPUT_TAG:-${GITHUB_REF_NAME:-}}"
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] || {
+            echo "A vMAJOR.MINOR.PATCH tag is required" >&2; exit 1;
+          }
+          git rev-parse --verify "refs/tags/$tag" >/dev/null
+          [[ "$(git cat-file -t "refs/tags/$tag")" == tag ]] || {
+            echo "Release tags must be annotated and signed" >&2; exit 1;
+          }
+          [[ -s ops/release/trusted-release-signers.asc ]] || {
+            echo "Missing ops/release/trusted-release-signers.asc; see docs/release-provenance.md" >&2; exit 1;
+          }
+          export GNUPGHOME="$(mktemp -d)"
+          trap 'rm -rf "$GNUPGHOME"' EXIT
+          gpg --batch --import ops/release/trusted-release-signers.asc
+          git verify-tag "$tag"
+          commit="$(git rev-parse "$tag^{commit}")"
+          version="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n1)"
+          [[ "$tag" == "v$version" ]] || {
+            echo "Tag $tag does not match Cargo.toml version $version" >&2; exit 1;
+          }
+          schema_current="$(sed -nE 's/^pub const LATEST_SCHEMA_VERSION: i64 = ([0-9]+);/\1/p' src/persistence/migrations.rs)"
+          [[ -n "$schema_current" ]] || { echo "Could not determine schema version" >&2; exit 1; }
+          created="$(git for-each-ref --format='%(taggerdate:iso-strict)' "refs/tags/$tag")"
+          created="$(date -u -d "$created" +%Y-%m-%dT%H:%M:%SZ)"
+          image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          {
+            echo "commit=$commit"
+            echo "created=$created"
+            echo "image=$image"
+            echo "schema_current=$schema_current"
+            echo "tag=$tag"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+  candidate:
+    name: Build, test, scan, and attest candidate
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      binary_attestation: ${{ steps.attest_binary.outputs.attestation-url }}
+      image_attestation: ${{ steps.attest_image.outputs.attestation-url }}
+      image_digest: ${{ steps.build.outputs.digest }}
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Generate deterministic source SBOM
+        run: |
+          mkdir release
+          node scripts/release/generate-source-sbom.mjs \
+            --out release/source.spdx.json \
+            --commit '${{ needs.prepare.outputs.commit }}' \
+            --version '${{ needs.prepare.outputs.version }}' \
+            --created '${{ needs.prepare.outputs.created }}' \
+            --repository '${{ github.repository }}'
+      - id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile.rust
+          push: true
+          tags: ${{ env.IMAGE }}:candidate-${{ needs.prepare.outputs.commit }}
+          build-args: |
+            VERSION=${{ needs.prepare.outputs.version }}
+            REVISION=${{ needs.prepare.outputs.commit }}
+            CREATED=${{ needs.prepare.outputs.created }}
+            SOURCE=${{ github.server_url }}/${{ github.repository }}
+          provenance: mode=max
+          sbom: true
+      - name: Pull and exercise the exact candidate digest against frozen fixtures
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE@$DIGEST"
+          docker run --detach --rm --name artifact-mcp-release-candidate \
+            --tmpfs /data-rust:rw,nosuid,nodev,noexec,size=64m \
+            --publish 127.0.0.1:3480:3480 "$IMAGE@$DIGEST"
+          cleanup() { docker stop artifact-mcp-release-candidate >/dev/null 2>&1 || true; }
+          trap cleanup EXIT
+          for _ in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:3480/health >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --show-error http://127.0.0.1:3480/health >/dev/null
+          node scripts/release/verify-historical-fixtures-in-image.mjs \
+            "$IMAGE@$DIGEST" release/historical-fixture-preflight.json
+          container="$(docker create "$IMAGE@$DIGEST")"
+          docker cp "$container:/artifact-mcp" release/artifact-mcp
+          docker rm "$container" >/dev/null
+      - name: Generate SPDX image SBOM for exact candidate digest
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: release/image.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Enforce the high/critical vulnerability policy
+        uses: anchore/scan-action@1638637db639e0ade3258b51db49a9a137574c3e # v6
+        with:
+          image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          fail-build: true
+          severity-cutoff: high
+      - name: Write candidate checksums
+        run: |
+          cd release
+          sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - id: attest_binary
+        name: Attest the released native binary
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: release/artifact-mcp
+      - id: attest_image
+        name: Attest the released OCI image digest
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ env.IMAGE }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-candidate-${{ needs.prepare.outputs.tag }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+  promote:
+    name: Promote verified digest and publish release evidence
+    needs: [prepare, candidate]
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+      packages: write
+    env:
+      BACKUP_IDENTITY: ${{ inputs.backup_identity || vars.RELEASE_BACKUP_IDENTITY }}
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      ROLLBACK_IMAGE: ${{ inputs.rollback_image || vars.RELEASE_ROLLBACK_IMAGE }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-candidate-${{ needs.prepare.outputs.tag }}
+          path: release
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Verify inputs and candidate artifacts
+        env:
+          DIGEST: ${{ needs.candidate.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          [[ -n "$BACKUP_IDENTITY" ]] || { echo "Missing immutable backup identity" >&2; exit 1; }
+          [[ "$ROLLBACK_IMAGE" =~ ^[a-z0-9./:_-]+@sha256:[a-f0-9]{64}$ ]] || {
+            echo "ROLLBACK_IMAGE must be an immutable image reference" >&2; exit 1;
+          }
+          [[ -f "docs/releases/$TAG.md" ]] || {
+            echo "Missing docs/releases/$TAG.md migration notes" >&2; exit 1;
+          }
+          (cd release && sha256sum --check SHA256SUMS)
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" >/dev/null
+          candidate_digest="$(docker buildx imagetools inspect "$IMAGE:candidate-${{ needs.prepare.outputs.commit }}" | awk '/^Digest:/ {print $2}')"
+          [[ "$candidate_digest" == "$DIGEST" ]] || {
+            echo "Candidate tag does not resolve to the attested digest" >&2; exit 1;
+          }
+          gh attestation verify release/artifact-mcp --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "oci://$IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
+          if docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+            echo "Refusing to replace an existing release image tag" >&2; exit 1;
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Refusing to replace an existing GitHub Release" >&2; exit 1;
+          fi
+      - name: Promote without rebuilding
+        env:
+          DIGEST: ${{ needs.candidate.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          docker buildx imagetools create --tag "$IMAGE:$TAG" "$IMAGE@$DIGEST"
+          published="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
+          [[ "$published" == "$DIGEST" ]] || {
+            echo "Published digest $published did not match verified candidate $DIGEST" >&2; exit 1;
+          }
+      - name: Generate and verify release manifest
+        env:
+          DIGEST: ${{ needs.candidate.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          cd release
+          cp "../docs/releases/$TAG.md" migration-notes.md
+          node ../scripts/release/generate-manifest.mjs \
+            --out release-manifest.json \
+            --tag "$TAG" \
+            --version '${{ needs.prepare.outputs.version }}' \
+            --commit '${{ needs.prepare.outputs.commit }}' \
+            --created '${{ needs.prepare.outputs.created }}' \
+            --binary artifact-mcp \
+            --image-ref "$IMAGE:$TAG" \
+            --image-digest "$DIGEST" \
+            --schema-min 0 \
+            --schema-current '${{ needs.prepare.outputs.schema_current }}' \
+            --schema-max '${{ needs.prepare.outputs.schema_current }}' \
+            --source-sbom source.spdx.json \
+            --image-sbom image.spdx.json \
+            --backup-identity "$BACKUP_IDENTITY" \
+            --migration-notes migration-notes.md \
+            --fixture-preflight historical-fixture-preflight.json \
+            --rollback-image "$ROLLBACK_IMAGE" \
+            --repository '${{ github.repository }}' \
+            --binary-attestation '${{ needs.candidate.outputs.binary_attestation }}' \
+            --image-attestation '${{ needs.candidate.outputs.image_attestation }}'
+          node ../scripts/release/verify-manifest.mjs release-manifest.json
+          sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
+          sha256sum --check SHA256SUMS
+      - name: Publish immutable release evidence
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release/artifact-mcp
+            release/SHA256SUMS
+            release/release-manifest.json
+            release/source.spdx.json
+            release/image.spdx.json
+            release/historical-fixture-preflight.json
+            release/migration-notes.md

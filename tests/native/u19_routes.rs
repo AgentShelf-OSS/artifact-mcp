@@ -9,6 +9,10 @@ use artifact_mcp::{
     AppDeps, build_router,
     config::AppConfig,
     error::AppError,
+    mcp::{
+        dispatch::{ProtocolEra, dispatch, dispatch_for_era},
+        protocol::OrderedJson,
+    },
     model::*,
     ports::{
         AdminService, ArtifactService, BoxFuture, EngagementService, HealthProbe, NotificationSink,
@@ -155,7 +159,9 @@ fn unavailable<'a, T>() -> BoxFuture<'a, Result<T, AppError>> {
 struct RouteHarness {
     viewer: Viewer,
     meta: Option<ArtifactMeta>,
+    publisher: Option<PublisherIdentity>,
     calls: Arc<Mutex<Vec<String>>>,
+    fail_category_registration: Arc<Mutex<bool>>,
     reaction_update: Arc<Mutex<Option<ReactionUpdate>>>,
     feedback_submission: Arc<Mutex<Option<SubmitFeedback>>>,
     notifications: Arc<Mutex<Vec<(WebhookEvent, OrgId, NotificationPayload)>>>,
@@ -166,7 +172,9 @@ impl RouteHarness {
         Self {
             viewer,
             meta,
+            publisher: None,
             calls: Arc::new(Mutex::new(Vec::new())),
+            fail_category_registration: Arc::new(Mutex::new(false)),
             reaction_update: Arc::new(Mutex::new(None)),
             feedback_submission: Arc::new(Mutex::new(None)),
             notifications: Arc::new(Mutex::new(Vec::new())),
@@ -179,6 +187,18 @@ impl RouteHarness {
 
     fn calls(&self) -> Vec<String> {
         self.calls.lock().expect("calls lock").clone()
+    }
+
+    fn fail_category_registration(&self) {
+        *self
+            .fail_category_registration
+            .lock()
+            .expect("category registration lock") = true;
+    }
+
+    fn with_publisher(mut self, publisher: PublisherIdentity) -> Self {
+        self.publisher = Some(publisher);
+        self
     }
 
     fn reaction_update(&self) -> Option<ReactionUpdate> {
@@ -205,7 +225,12 @@ impl PublisherAuthenticator for RouteHarness {
         &'a self,
         _headers: &'a HeaderMap,
     ) -> BoxFuture<'a, Result<PublisherIdentity, AppError>> {
-        unavailable()
+        let publisher = self.publisher.clone();
+        Box::pin(async move {
+            publisher.ok_or_else(|| {
+                AppError::Unauthorized("publisher authentication required".to_owned())
+            })
+        })
     }
 }
 
@@ -230,6 +255,7 @@ impl ArtifactService for RouteHarness {
     fn publish(
         &self,
         _request: PublishArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
         unavailable()
     }
@@ -331,6 +357,7 @@ impl ArtifactService for RouteHarness {
         &self,
         _artifact: AuthorizedArtifact,
         _update: ArtifactUpdate,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
         unavailable()
     }
@@ -340,6 +367,7 @@ impl ArtifactService for RouteHarness {
         artifact: AuthorizedArtifact,
         revision: u64,
         _acting_client_id: Option<ClientId>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
         self.record("restore");
         let mut meta = artifact.into_meta();
@@ -352,7 +380,11 @@ impl ArtifactService for RouteHarness {
         })
     }
 
-    fn delete(&self, _artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
+    fn delete(
+        &self,
+        _artifact: AuthorizedArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
         self.record("delete");
         Box::pin(async { Ok(true) })
     }
@@ -361,6 +393,7 @@ impl ArtifactService for RouteHarness {
         &self,
         _artifact: AuthorizedArtifact,
         category: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         self.record("set_category");
         let mut meta = self.meta.clone().expect("configured meta");
@@ -372,6 +405,7 @@ impl ArtifactService for RouteHarness {
         &self,
         _artifact: AuthorizedArtifact,
         hidden: bool,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         self.record("set_hidden");
         let mut meta = self.meta.clone().expect("configured meta");
@@ -384,6 +418,7 @@ impl ArtifactService for RouteHarness {
         artifact: AuthorizedArtifact,
         target_org: OrgId,
         category: Option<String>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         self.record("move_to_org");
         let mut meta = artifact.into_meta();
@@ -413,10 +448,15 @@ impl AdminService for RouteHarness {
     fn create_key(
         &self,
         _request: CreatePublisherKey,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<CreatedPublisherKey, AppError>> {
         unavailable()
     }
-    fn revoke_key<'a>(&'a self, _client_id: &'a ClientId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn revoke_key<'a>(
+        &'a self,
+        _client_id: &'a ClientId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
     fn org_exists<'a>(&'a self, _org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
@@ -443,16 +483,22 @@ impl AdminService for RouteHarness {
     fn create_org(
         &self,
         _request: CreateOrganization,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<Organization, AppError>> {
         unavailable()
     }
-    fn delete_org<'a>(&'a self, _org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn delete_org<'a>(
+        &'a self,
+        _org: &'a OrgId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
     fn add_domain<'a>(
         &'a self,
         _org: &'a OrgId,
         _domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         unavailable()
     }
@@ -460,6 +506,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
@@ -467,6 +514,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
         unavailable()
     }
@@ -474,6 +522,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
@@ -484,10 +533,18 @@ impl AdminService for RouteHarness {
         &'a self,
         org: &'a OrgId,
         name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         // Records org and name so a test can prove the category route registers the category on
         // the org (the fix for the Settings-picker bug).
         self.record(&format!("add_category({},{name})", org.0));
+        if *self
+            .fail_category_registration
+            .lock()
+            .expect("category registration lock")
+        {
+            return Box::pin(async { Err(AppError::Internal) });
+        }
         let name = name.to_owned();
         Box::pin(async move { Ok(name) })
     }
@@ -495,6 +552,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
@@ -505,6 +563,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _color: Option<&'a str>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
         unavailable()
     }
@@ -517,6 +576,7 @@ impl AdminService for RouteHarness {
     fn create_webhook(
         &self,
         _request: CreateWebhook,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<WebhookSummary, AppError>> {
         unavailable()
     }
@@ -524,6 +584,7 @@ impl AdminService for RouteHarness {
         &'a self,
         _org: &'a OrgId,
         _id: &'a WebhookId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unavailable()
     }
@@ -532,6 +593,7 @@ impl AdminService for RouteHarness {
         _org: &'a OrgId,
         _id: &'a WebhookId,
         _events: &'a [WebhookEvent],
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<WebhookSummary>, AppError>> {
         unavailable()
     }
@@ -609,10 +671,15 @@ impl EngagementService for RouteHarness {
     }
     fn feedback_ref<'a>(
         &'a self,
-        _id: &'a FeedbackId,
+        id: &'a FeedbackId,
     ) -> BoxFuture<'a, Result<Option<FeedbackRef>, AppError>> {
         self.record("feedback_ref");
-        unavailable()
+        let reference = self.meta.as_ref().map(|meta| FeedbackRef {
+            id: id.clone(),
+            artifact_id: meta.id.clone(),
+            org: meta.org.clone(),
+        });
+        Box::pin(async move { Ok(reference) })
     }
     fn list_feedback<'a>(
         &'a self,
@@ -663,7 +730,8 @@ impl EngagementService for RouteHarness {
         _id: FeedbackId,
         _resolved_by: String,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
-        unavailable()
+        self.record("resolve_feedback_as_publisher");
+        Box::pin(async { Ok(true) })
     }
     fn reopen_feedback_as_publisher(
         &self,
@@ -704,6 +772,7 @@ impl ShareService for RouteHarness {
         &self,
         _artifact: AuthorizedArtifact,
         _request: CreateShare,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublicShare, AppError>> {
         self.record("create_share");
         Box::pin(async {
@@ -733,6 +802,7 @@ impl ShareService for RouteHarness {
         &self,
         _artifact: AuthorizedArtifact,
         _token: ShareToken,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
         self.record("revoke_share");
         Box::pin(async { Ok(true) })
@@ -851,7 +921,10 @@ fn feedback_row(meta: &ArtifactMeta) -> Feedback {
         artifact_id: meta.id.clone(),
         org: meta.org.clone(),
         parent_id: None,
-        viewer_email: EmailAddress::from("viewer@example.test"),
+        viewer_email: Some(EmailAddress::from("viewer@example.test")),
+        author: FeedbackAuthor::Artifact {
+            viewer_email: EmailAddress::from("viewer@example.test"),
+        },
         body: "Note".to_owned(),
         artifact_revision: meta.revision,
         anchor_path: None,
@@ -864,6 +937,9 @@ fn feedback_row(meta: &ArtifactMeta) -> Feedback {
         created_at: Timestamp("2026-07-21 00:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,
+        external_created_at: None,
+        external_edited_at: None,
+        external_deleted_at: None,
     }
 }
 
@@ -873,16 +949,24 @@ fn deps(harness: Arc<RouteHarness>) -> AppDeps {
         viewer_identity: harness.clone(),
         artifacts: harness.clone(),
         admin: harness.clone(),
+        discussions: Arc::new(artifact_mcp::ports::InertDiscussionService),
         engagement: harness.clone(),
         shares: harness.clone(),
         pages: harness.clone(),
         previews: harness.clone(),
         notifications: harness.clone(),
         health: harness,
+        ingress: Arc::new(artifact_mcp::http::ingress::IngressState::from_config(
+            &AppConfig::default(),
+        )),
         preview_tasks: artifact_mcp::mcp::tasks::PreviewTaskStore::new(
             std::env::temp_dir().join(format!("artifact-mcp-u19-tasks-{}", std::process::id())),
         ),
         mcp_telemetry: artifact_mcp::observability::McpTelemetry::default(),
+        delivery_telemetry:
+            artifact_mcp::integrations::delivery_runtime::DeliveryTelemetry::default(),
+        delivery_wake: artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
+        audit_access: None,
         config: Arc::new(AppConfig::default()),
     }
 }
@@ -937,7 +1021,7 @@ async fn same_org_non_owners_and_legacy_members_cannot_delete() {
 }
 
 #[tokio::test]
-async fn delete_uses_lifecycle_cleanup_and_notification_services() {
+async fn delete_uses_lifecycle_cleanup_without_detached_notification() {
     let mut owned = meta("acme");
     owned.owner_email = Some("VIEWER@EXAMPLE.TEST".to_owned());
     let harness = Arc::new(RouteHarness::new(viewer("acme", false), Some(owned)));
@@ -961,15 +1045,8 @@ async fn delete_uses_lifecycle_cleanup_and_notification_services() {
     let calls = harness.calls();
     assert_eq!(&calls[..3], ["resolve_viewer", "find_meta", "delete"]);
     assert!(calls[3..].contains(&"remove_preview".to_owned()));
-    assert!(calls[3..].contains(&"notify".to_owned()));
-    let notifications = harness.notifications();
-    assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0].0, WebhookEvent::Deleted);
-    assert_eq!(notifications[0].1, OrgId::from("acme"));
-    assert_eq!(
-        notifications[0].2.artifact_id,
-        ArtifactId::from("abc123def456")
-    );
+    assert!(!calls[3..].contains(&"notify".to_owned()));
+    assert!(harness.notifications().is_empty());
 }
 
 #[tokio::test]
@@ -1048,15 +1125,15 @@ async fn move_conceals_before_applying_the_admin_policy() {
         body(response).await,
         br#"{"id":"abc123def456","org":"beta","category":"Moved"}"#
     );
-    // The move registers the resulting category on the (new) org too, so it appears in the
-    // Settings picker — same fix as the plain category route.
+    // The audited registry write is a precondition for the move, so a registry failure cannot
+    // report a move whose category remains invisible in Settings.
     assert_eq!(
         admin.calls(),
         [
             "resolve_viewer",
             "find_meta",
-            "move_to_org",
-            "add_category(beta,Moved)"
+            "add_category(beta,Moved)",
+            "move_to_org"
         ]
     );
 }
@@ -1146,16 +1223,15 @@ async fn category_and_visibility_routes_return_the_persisted_values() {
         body(response).await,
         br#"{"id":"abc123def456","category":"Dashboards"}"#
     );
-    // The category route must register the category on the org (via add_category) so it reaches
-    // org_categories and appears in the Settings picker — the bug this covers is that assigning a
-    // category through the web UI left it invisible in Settings.
+    // The category's audited registry write is a precondition, so it reaches org_categories
+    // before the artifact is retagged and cannot be silently skipped.
     assert_eq!(
         category.calls(),
         [
             "resolve_viewer",
             "find_meta",
-            "set_category",
-            "add_category(acme,Dashboards)"
+            "add_category(acme,Dashboards)",
+            "set_category"
         ]
     );
 
@@ -1181,6 +1257,97 @@ async fn category_and_visibility_routes_return_the_persisted_values() {
     assert_eq!(
         visibility.calls(),
         ["resolve_viewer", "find_meta", "set_hidden"]
+    );
+}
+
+#[tokio::test]
+async fn category_registration_audit_failure_prevents_browser_category_and_move_success() {
+    let category = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
+    category.fail_category_registration();
+    let category_response = build_router(deps(category.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/abc123def456/category")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"category":"Dashboards"}"#))
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+    assert_eq!(
+        category_response.status(),
+        StatusCode::INTERNAL_SERVER_ERROR
+    );
+    assert_eq!(
+        category.calls(),
+        [
+            "resolve_viewer",
+            "find_meta",
+            "add_category(acme,Dashboards)"
+        ],
+        "a failed audited registry write must not retag the artifact"
+    );
+
+    let mover = Arc::new(RouteHarness::new(viewer("acme", true), Some(meta("acme"))));
+    mover.fail_category_registration();
+    let move_response = build_router(deps(mover.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/abc123def456/move")
+                .header("content-type", "application/json")
+                .body(Body::from(r#"{"org":"beta","category":"Moved"}"#))
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+    assert_eq!(move_response.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    assert_eq!(
+        mover.calls(),
+        ["resolve_viewer", "find_meta", "add_category(beta,Moved)"],
+        "a failed audited registry write must not move the artifact"
+    );
+}
+
+#[tokio::test]
+async fn category_registration_audit_failure_is_an_explicit_mcp_error_before_retagging() {
+    let harness = Arc::new(
+        RouteHarness::new(viewer("acme", false), Some(meta("acme"))).with_publisher(
+            PublisherIdentity {
+                client_id: ClientId::from("publisher"),
+                org: OrgId::from("acme"),
+                label: "Publisher".to_owned(),
+                role: "author".to_owned(),
+                scopes: Some(["artifacts:publish".to_owned()].into_iter().collect()),
+            },
+        ),
+    );
+    harness.fail_category_registration();
+    let response = build_router(deps(harness.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/mcp")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"set_category","arguments":{"id":"abc123def456","category":"Dashboards"}}}"#,
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+    assert_eq!(response.status(), StatusCode::OK);
+    let response_body = body(response).await;
+    assert!(
+        String::from_utf8_lossy(&response_body).contains("internal error"),
+        "the audit/registry failure must reach the MCP client: {}",
+        String::from_utf8_lossy(&response_body)
+    );
+    assert_eq!(
+        harness.calls(),
+        ["find_meta", "add_category(acme,Dashboards)"],
+        "MCP must not retag when its audited registry precondition fails"
     );
 }
 
@@ -1287,15 +1454,8 @@ async fn history_and_restore_routes_preserve_node_numbers_and_notifications() {
         body(response).await,
         br#"{"id":"abc123def456","revision":3,"restoredFrom":1}"#
     );
-    assert_eq!(
-        restore.calls(),
-        ["resolve_viewer", "find_meta", "restore", "notify"]
-    );
-    let notifications = restore.notifications();
-    assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0].0, WebhookEvent::Restored);
-    assert_eq!(notifications[0].1, OrgId::from("acme"));
-    assert_eq!(notifications[0].2.revision, 3);
+    assert_eq!(restore.calls(), ["resolve_viewer", "find_meta", "restore"]);
+    assert!(restore.notifications().is_empty());
 }
 
 #[tokio::test]
@@ -1318,7 +1478,7 @@ async fn cross_org_feedback_listing_is_concealed_before_the_feedback_service() {
 }
 
 #[tokio::test]
-async fn feedback_submission_uses_u11_and_returns_the_node_creation_projection() {
+async fn feedback_submission_uses_u11_without_invoking_the_legacy_notifier() {
     let harness = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
     let response = build_router(deps(harness.clone()))
         .oneshot(
@@ -1354,21 +1514,13 @@ async fn feedback_submission_uses_u11_and_returns_the_node_creation_projection()
     );
     assert_eq!(
         harness.calls(),
-        ["resolve_viewer", "find_meta", "submit_feedback", "notify"]
+        ["resolve_viewer", "find_meta", "submit_feedback"]
     );
-    let notifications = harness.notifications();
-    assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0].0, WebhookEvent::Feedback);
-    assert_eq!(notifications[0].1, OrgId::from("acme"));
-    assert_eq!(
-        notifications[0].2.viewer_email,
-        Some(EmailAddress::from("viewer@example.test"))
-    );
-    assert_eq!(notifications[0].2.body.as_deref(), Some("Note"));
+    assert!(harness.notifications().is_empty());
 }
 
 #[tokio::test]
-async fn feedback_mutations_delegate_ownership_to_u11_and_notify_only_resolves() {
+async fn feedback_mutations_delegate_ownership_without_legacy_resolve_notification() {
     let delete = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
     let response = build_router(deps(delete.clone()))
         .oneshot(
@@ -1410,21 +1562,76 @@ async fn feedback_mutations_delegate_ownership_to_u11_and_notify_only_resolves()
     );
     assert_eq!(
         resolve.calls(),
-        [
-            "resolve_viewer",
-            "find_meta",
-            "resolve_feedback_as_viewer",
-            "notify"
-        ]
+        ["resolve_viewer", "find_meta", "resolve_feedback_as_viewer"]
     );
-    let notifications = resolve.notifications();
-    assert_eq!(notifications.len(), 1);
-    assert_eq!(notifications[0].0, WebhookEvent::Resolved);
-    assert_eq!(notifications[0].1, OrgId::from("acme"));
+    assert!(resolve.notifications().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_feedback_submit_and_resolve_do_not_invoke_the_legacy_notifier() {
+    let harness = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
+    let dependencies = deps(harness.clone());
+    let publisher = PublisherIdentity {
+        client_id: ClientId::from("publisher"),
+        org: OrgId::from("acme"),
+        label: "Publisher".to_owned(),
+        role: "author".to_owned(),
+        scopes: None,
+    };
+    let submitted: OrderedJson = serde_json::from_str(
+        r#"{
+          "jsonrpc":"2.0",
+          "id":"submit",
+          "method":"tools/call",
+          "params":{
+            "name":"submit_feedback",
+            "arguments":{"id":"abc123def456","body":"MCP note"},
+            "_meta":{
+              "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+              "io.modelcontextprotocol/clientInfo":{"name":"u19","version":"1"},
+              "io.modelcontextprotocol/clientCapabilities":{
+                "extensions":{
+                  "io.modelcontextprotocol/ui":{"mimeTypes":["text/html;profile=mcp-app"]}
+                }
+              }
+            }
+          }
+        }"#,
+    )
+    .expect("submit request");
+    let result = dispatch_for_era(&submitted, &publisher, &dependencies, ProtocolEra::Modern)
+        .await
+        .expect("submit feedback");
+    assert_eq!(result["structuredContent"]["submitted"], true);
     assert_eq!(
-        notifications[0].2.resolver.as_deref(),
-        Some("admin:viewer@example.test")
+        harness.calls(),
+        ["find_meta", "submit_feedback"],
+        "the MCP submit path must stop at the transactional engagement boundary"
     );
+    assert!(harness.notifications().is_empty());
+
+    harness.calls.lock().expect("calls lock").clear();
+    let resolved: OrderedJson = serde_json::from_str(
+        r#"{
+          "jsonrpc":"2.0",
+          "id":"resolve",
+          "method":"tools/call",
+          "params":{
+            "name":"resolve_feedback",
+            "arguments":{"feedback_id":"feedback-id"}
+          }
+        }"#,
+    )
+    .expect("resolve request");
+    let result = dispatch(&resolved, &publisher, &dependencies)
+        .await
+        .expect("resolve feedback");
+    assert_eq!(result["structuredContent"]["resolved"], true);
+    assert_eq!(
+        harness.calls(),
+        ["feedback_ref", "find_meta", "resolve_feedback_as_publisher"]
+    );
+    assert!(harness.notifications().is_empty());
 }
 
 #[tokio::test]
@@ -1695,4 +1902,43 @@ async fn rust_action_responses_match_the_real_node_app_routes() {
         serde_json::Value::Object(rust),
         run_node_route_reference(&root)
     );
+}
+
+#[tokio::test]
+async fn bodyless_category_and_move_requests_cannot_clear_an_artifact_category() {
+    let category = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
+    let category_response = build_router(deps(category.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/abc123def456/category")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+    assert_eq!(category_response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body(category_response).await,
+        br#"{"error":"category is required"}"#
+    );
+    assert_eq!(category.calls(), ["resolve_viewer", "find_meta"]);
+
+    let move_artifact = Arc::new(RouteHarness::new(viewer("acme", true), Some(meta("acme"))));
+    let move_response = build_router(deps(move_artifact.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/abc123def456/move")
+                .body(Body::empty())
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+    assert_eq!(move_response.status(), StatusCode::BAD_REQUEST);
+    assert_eq!(
+        body(move_response).await,
+        br#"{"error":"org or category is required"}"#
+    );
+    assert_eq!(move_artifact.calls(), ["resolve_viewer", "find_meta"]);
 }

@@ -236,7 +236,9 @@
           "body": "probe"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -257,7 +259,9 @@
           "body": "probe"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -279,7 +283,9 @@
           "favorite": true
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -300,7 +306,9 @@
           "favorite": true
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -322,7 +330,9 @@
           "hidden": true
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -343,7 +353,9 @@
           "hidden": true
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -365,7 +377,9 @@
           "category": "probe"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -386,7 +400,9 @@
           "category": "probe"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -408,7 +424,9 @@
           "org": "beta"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -429,7 +447,9 @@
           "org": "beta"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -451,7 +471,9 @@
           "expires": "never"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -472,7 +494,9 @@
           "expires": "never"
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -494,7 +518,9 @@
           "revision": 1
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -515,7 +541,9 @@
           "revision": 1
         },
         "headers": {
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -532,7 +560,11 @@
       "name": "[unsigned] DELETE delete \u2014 existing-foreign",
       "request": {
         "method": "DELETE",
-        "path": "/${artifact_id_1}"
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
       },
       "expect": {
         "headers": {
@@ -547,7 +579,11 @@
       "name": "[unsigned] DELETE delete \u2014 nonexistent",
       "request": {
         "method": "DELETE",
-        "path": "/zzzzzzzzzzzz"
+        "path": "/zzzzzzzzzzzz",
+        "headers": {
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
       },
       "expect": {
         "headers": {
@@ -791,7 +827,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -813,7 +851,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -836,7 +876,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -858,7 +900,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -881,7 +925,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -903,7 +949,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -926,7 +974,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -948,7 +998,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -971,7 +1023,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -993,7 +1047,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1016,7 +1072,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1038,7 +1096,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1061,7 +1121,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1083,7 +1145,9 @@
         },
         "headers": {
           "cf-access-authenticated-user-email": "${viewer_beta}",
-          "content-type": "application/json"
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1102,7 +1166,9 @@
         "method": "DELETE",
         "path": "/${artifact_id_1}",
         "headers": {
-          "cf-access-authenticated-user-email": "${viewer_beta}"
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {
@@ -1120,7 +1186,9 @@
         "method": "DELETE",
         "path": "/zzzzzzzzzzzz",
         "headers": {
-          "cf-access-authenticated-user-email": "${viewer_beta}"
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
         }
       },
       "expect": {

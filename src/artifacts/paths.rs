@@ -181,6 +181,20 @@ pub fn history_body_path(
     }
 }
 
+/// Temporary copy owned by a metadata-only update while publishing immutable history.
+///
+/// Keep this derivation in one place: Rust intentionally replaces the history body's extension,
+/// so `1.html` becomes `1.snapshot-tmp` while a bundle directory `1` does the same.
+#[must_use]
+pub fn history_snapshot_temp_path(
+    artifact_dir: &Path,
+    id: &SafeArtifactId,
+    revision: u64,
+    is_bundle: bool,
+) -> PathBuf {
+    history_body_path(artifact_dir, id, revision, is_bundle).with_extension("snapshot-tmp")
+}
+
 // ---------------------------------------------------------------------------
 // Previews
 // ---------------------------------------------------------------------------

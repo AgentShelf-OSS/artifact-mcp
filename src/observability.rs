@@ -14,6 +14,16 @@ use std::{
 use nanoid::nanoid;
 
 const DURATION_BUCKETS_SECONDS: [f64; 7] = [0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 5.0];
+static GLOBAL_SECURITY_SIGNALS: std::sync::LazyLock<Mutex<BTreeMap<&'static str, u64>>> =
+    std::sync::LazyLock::new(|| Mutex::new(BTreeMap::new()));
+
+pub fn record_global_security_signal(signal: &'static str) {
+    let mut signals = GLOBAL_SECURITY_SIGNALS
+        .lock()
+        .unwrap_or_else(|error| error.into_inner());
+    let value = signals.get(signal).copied().unwrap_or(0).saturating_add(1);
+    signals.insert(signal, value);
+}
 
 #[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd)]
 struct MetricKey {
@@ -82,6 +92,7 @@ struct Series {
 #[derive(Clone, Default)]
 pub struct McpTelemetry {
     series: Arc<Mutex<BTreeMap<MetricKey, Series>>>,
+    security_signals: Arc<Mutex<BTreeMap<&'static str, u64>>>,
 }
 
 impl McpTelemetry {
@@ -93,6 +104,26 @@ impl McpTelemetry {
             labels: McpMetricLabels::default(),
             completed: false,
         }
+    }
+
+    /// Fixed-name operational signals only; callers cannot attach identities or request data.
+    pub fn record_security_signal(&self, signal: &'static str) {
+        if !matches!(
+            signal,
+            "auth_failure"
+                | "admin_action"
+                | "integrity_failure"
+                | "reconciliation_failure"
+                | "rate_limit"
+        ) {
+            return;
+        }
+        let mut signals = self
+            .security_signals
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let value = signals.get(signal).copied().unwrap_or(0).saturating_add(1);
+        signals.insert(signal, value);
     }
 
     fn record(
@@ -202,6 +233,45 @@ impl McpTelemetry {
                     "artifact_mcp_result_size_bucket_total{{{labels},size=\"{bucket}\"}} {count}\n"
                 ));
             }
+        }
+        let signals = self
+            .security_signals
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        let global = GLOBAL_SECURITY_SIGNALS
+            .lock()
+            .unwrap_or_else(|error| error.into_inner());
+        output.push_str("# HELP artifact_mcp_security_audit_signals_total Low-cardinality security audit operational signals.\n# TYPE artifact_mcp_security_audit_signals_total counter\n");
+        for (signal, value) in [
+            (
+                "auth_failure",
+                signals.get("auth_failure").copied().unwrap_or(0)
+                    + global.get("auth_failure").copied().unwrap_or(0),
+            ),
+            (
+                "admin_action",
+                signals.get("admin_action").copied().unwrap_or(0)
+                    + global.get("admin_action").copied().unwrap_or(0),
+            ),
+            (
+                "integrity_failure",
+                signals.get("integrity_failure").copied().unwrap_or(0)
+                    + global.get("integrity_failure").copied().unwrap_or(0),
+            ),
+            (
+                "reconciliation_failure",
+                signals.get("reconciliation_failure").copied().unwrap_or(0)
+                    + global.get("reconciliation_failure").copied().unwrap_or(0),
+            ),
+            (
+                "rate_limit",
+                signals.get("rate_limit").copied().unwrap_or(0)
+                    + global.get("rate_limit").copied().unwrap_or(0),
+            ),
+        ] {
+            output.push_str(&format!(
+                "artifact_mcp_security_audit_signals_total{{signal=\"{signal}\"}} {value}\n"
+            ));
         }
         output
     }

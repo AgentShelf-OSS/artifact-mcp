@@ -34,8 +34,8 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use crate::config::IdSource;
 use crate::error::AppError;
 use crate::model::{
-    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackId, FeedbackMutation,
-    FeedbackRef, OrgId, SubmitFeedback, Timestamp,
+    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAuthor, FeedbackId,
+    FeedbackMutation, FeedbackRef, OrgId, SubmitFeedback, Timestamp,
 };
 
 // ---------------------------------------------------------------------------
@@ -101,12 +101,15 @@ pub fn too_long_message(max_body: u64) -> String {
 /// columns keeps the mapping independent of the `ALTER TABLE` order migrations 12-19 produced.
 const COLUMNS: &str = "id, artifact_id, org, viewer_email, body, artifact_revision, parent_id, \
      anchor_path, anchor_x, anchor_y, anchor_w, anchor_h, anchor_approx, anchor_page, created_at, \
-     resolved_at, resolved_by";
+     resolved_at, resolved_by, author_source, external_author_id, external_author_display, \
+     external_created_at, external_edited_at, external_deleted_at";
 
 /// The same list qualified for the `feedback f JOIN artifacts a` listings.
 const JOINED_COLUMNS: &str = "f.id, f.artifact_id, f.org, f.viewer_email, f.body, \
      f.artifact_revision, f.parent_id, f.anchor_path, f.anchor_x, f.anchor_y, f.anchor_w, \
-     f.anchor_h, f.anchor_approx, f.anchor_page, f.created_at, f.resolved_at, f.resolved_by";
+     f.anchor_h, f.anchor_approx, f.anchor_page, f.created_at, f.resolved_at, f.resolved_by, \
+     f.author_source, f.external_author_id, f.external_author_display, f.external_created_at, \
+     f.external_edited_at, f.external_deleted_at";
 
 /// `insertStmt` — [lib/feedback.js:45-48]
 const INSERT_SQL: &str = "INSERT INTO feedback (id, artifact_id, org, viewer_email, body, \
@@ -543,7 +546,7 @@ fn scoped_row(
     let row = get(conn, &scope.id)?
         .filter(|row| row.artifact_id == scope.artifact_id && row.org == scope.org)
         .ok_or_else(|| AppError::NotFound(NOT_FOUND_MESSAGE.to_owned()))?;
-    if &row.viewer_email != viewer_email && !is_admin {
+    if row.viewer_email.as_ref() != Some(viewer_email) && !is_admin {
         return Err(AppError::Forbidden(FORBIDDEN_MESSAGE.to_owned()));
     }
     Ok(row)
@@ -695,11 +698,28 @@ fn query(conn: &Connection, sql: &str, binds: &[&String]) -> Result<Vec<Feedback
 
 /// Maps one row of [`COLUMNS`] / [`JOINED_COLUMNS`].
 fn read_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Feedback> {
+    let viewer_email = row.get::<_, Option<String>>(3)?.map(EmailAddress);
+    let author = match row.get::<_, String>(17)?.as_str() {
+        "discord" => FeedbackAuthor::Discord {
+            external_author_id: row.get(18)?,
+            external_author_display: row.get(19)?,
+        },
+        _ => FeedbackAuthor::Artifact {
+            viewer_email: viewer_email.clone().ok_or_else(|| {
+                rusqlite::Error::InvalidColumnType(
+                    3,
+                    "viewer_email".to_owned(),
+                    rusqlite::types::Type::Null,
+                )
+            })?,
+        },
+    };
     Ok(Feedback {
         id: FeedbackId(row.get(0)?),
         artifact_id: ArtifactId(row.get(1)?),
         org: OrgId(row.get(2)?),
-        viewer_email: EmailAddress(row.get(3)?),
+        viewer_email,
+        author,
         body: row.get(4)?,
         artifact_revision: row.get::<_, i64>(5)?.unsigned_abs(),
         parent_id: row.get::<_, Option<String>>(6)?.map(FeedbackId),
@@ -713,6 +733,9 @@ fn read_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Feedback> {
         created_at: Timestamp(row.get(14)?),
         resolved_at: row.get::<_, Option<String>>(15)?.map(Timestamp),
         resolved_by: row.get(16)?,
+        external_created_at: row.get::<_, Option<String>>(20)?.map(Timestamp),
+        external_edited_at: row.get::<_, Option<String>>(21)?.map(Timestamp),
+        external_deleted_at: row.get::<_, Option<String>>(22)?.map(Timestamp),
     })
 }
 

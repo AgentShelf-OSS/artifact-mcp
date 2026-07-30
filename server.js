@@ -19,6 +19,7 @@ import * as views from "./lib/views.js";
 import * as shares from "./lib/shares.js";
 import { addFeedback, listForArtifact as feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer } from "./lib/feedback.js";
 import * as webhooks from "./lib/webhooks.js";
+import * as discussions from "./lib/discussions.js";
 import * as notify from "./lib/notify.js";
 import * as notifications from "./lib/notifications.js";
 import { createArtifactPreviewNotifier, createPreviewRenderer } from "./lib/preview.js";
@@ -28,6 +29,7 @@ import {
   oauthConfigFromEnv
 } from "./lib/oauth.js";
 import { createPreviewTaskStore } from "./lib/tasks.js";
+import { assertAuditReady, createAuditLedger, createAuditMetrics, systemAuditContext } from "./lib/audit.js";
 
 const PORT = Number(process.env.PORT || 3480);
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:3480";
@@ -74,6 +76,15 @@ function preventResponseTransforms(res) {
 }
 
 assertReady();
+// Security mutations must never run without the durable, tamper-evident ledger key. The value is
+// deliberately neither logged nor threaded through request diagnostics.
+assertAuditReady();
+const securityAudit = createAuditLedger({ db });
+const auditIntegrity = securityAudit.verify();
+if (!auditIntegrity.ok) {
+  throw new Error("security audit ledger integrity verification failed; refusing to serve mutations");
+}
+const securityMetrics = createAuditMetrics();
 const seededKeys = seedKeysFromEnv(sha256Hex);
 console.log(`[artifact-mcp] seeded ${seededKeys} key(s) from env`);
 if (seededKeys === 0 && listKeys().filter((k) => !k.revoked_at).length === 0) {
@@ -105,6 +116,20 @@ if (storageReport.missingBodies.length || storageReport.orphanBodies.length) {
     `[artifact-mcp] storage divergence: ${storageReport.missingBodies.length} missing body/bodies, ` +
     `${storageReport.orphanBodies.length} orphan body/bodies`
   );
+}
+// Reconciliation is an independently durable operational event. It has no body/path/token data;
+// the count is intentionally classified only into fixed low-cardinality signal names.
+if (storageReport.recoveredPaths.length) {
+  securityAudit.append(systemAuditContext({ source: "reconciliation" }), {
+    operation: "storage.reconcile", targetType: "storage", result: "recovered", classification: "durability_recovered"
+  });
+  securityMetrics.record("reconciliation_failure");
+}
+if (storageReport.missingBodies.length || storageReport.orphanBodies.length || storageReport.divergentBodies.length) {
+  securityAudit.append(systemAuditContext({ source: "reconciliation" }), {
+    operation: "storage.reconcile", targetType: "storage", result: "failure", classification: "integrity_mismatch"
+  });
+  securityMetrics.record("integrity_failure");
 }
 
 // Older artifacts predate the body_sha256 column and carry a blank digest. Backfill their
@@ -189,6 +214,7 @@ const app = createApp({
     colorMap: orgs.colorMap
   },
   webhooks,
+  discussions,
   notify: artifactNotifier,
   notifications,
   reactions: { get: getReaction, set: setReaction, forViewer: reactionsFor, sentiment: sentimentMap },
@@ -197,6 +223,8 @@ const app = createApp({
   pages: { gallery: renderGallery, shell: renderArtifactShell, notFound: notFoundPage, notSignedIn: notSignedInPage, settings: renderSettings },
   publicBase: PUBLIC_BASE,
   oauth: oauthConfig,
+  audit: securityAudit,
+  securityMetrics,
   healthCheck() {
     db.prepare("SELECT 1").get();
     accessSync(ARTIFACT_DIR, constants.R_OK | constants.W_OK);

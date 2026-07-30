@@ -127,6 +127,67 @@ async function invokeRoute(app, method, path, { headers = {}, params = {}, query
   return result;
 }
 
+test("cookie-authenticated portal mutations require the first-party header and same-origin metadata", async () => {
+  const seen = [];
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "viewer@acme.test", org: "acme", isAdmin: false }),
+    notifications: { recentForViewer: () => [], unreadCount: () => 0, markSeen: (email) => seen.push(email) }
+  }));
+  await serve(app, async (baseUrl) => {
+    const denied = await fetch(`${baseUrl}/notifications/seen`, {
+      method: "POST",
+      headers: { cookie: "CF_Authorization=viewer", "sec-fetch-site": "cross-site" }
+    });
+    assert.equal(denied.status, 403);
+    assert.deepEqual(seen, []);
+
+    const allowed = await fetch(`${baseUrl}/notifications/seen`, {
+      method: "POST",
+      headers: {
+        cookie: "CF_Authorization=viewer",
+        "x-artifact-mutation": "1",
+        "sec-fetch-site": "same-origin"
+      }
+    });
+    assert.equal(allowed.status, 200);
+    assert.deepEqual(seen, ["viewer@acme.test"]);
+
+    const trustedHeaderDenied = await fetch(`${baseUrl}/notifications/seen`, {
+      method: "POST",
+      headers: {
+        "cf-access-authenticated-user-email": "viewer@acme.test",
+        "sec-fetch-site": "same-origin"
+      }
+    });
+    assert.equal(trustedHeaderDenied.status, 403);
+
+    const trustedHeaderAllowed = await fetch(`${baseUrl}/notifications/seen`, {
+      method: "POST",
+      headers: {
+        "cf-access-authenticated-user-email": "viewer@acme.test",
+        "x-artifact-mutation": "1",
+        "sec-fetch-site": "same-origin"
+      }
+    });
+    assert.equal(trustedHeaderAllowed.status, 200);
+    assert.deepEqual(seen, ["viewer@acme.test", "viewer@acme.test"]);
+
+    const bodylessCategory = await fetch(`${baseUrl}/abc123/category`, {
+      method: "POST",
+      headers: {
+        cookie: "CF_Authorization=viewer",
+        "x-artifact-mutation": "1",
+        "sec-fetch-site": "same-origin"
+      }
+    });
+    assert.equal(bodylessCategory.status, 400);
+    assert.deepEqual(await bodylessCategory.json(), { error: "category is required" });
+
+    const mcp = await fetch(`${baseUrl}/mcp`, { method: "POST" });
+    assert.equal(mcp.status, 401, "MCP remains outside the portal CSRF gate");
+  });
+});
+
 test("Access identity fails closed when JWT and explicit header trust are both off", async () => {
   await withIdentityEnv({ ADMIN_EMAILS: "admin@example.test" }, async (identity) => {
     assert.equal(identity.ACCESS_IDENTITY_MODE, "disabled");
@@ -827,6 +888,12 @@ test("Settings renders escaped explicit email chips and explains Access policy",
   assert.match(html, /data-ui="nav-artifacts"/);
   assert.match(html, /data-ui="nav-administration"/);
   assert.match(html, /aria-current="page"/);
+  assert.match(html, /data-discussion-org="legacy\.example"/);
+  assert.match(html, /Discord notification threads/);
+  assert.match(html, /type="password"/);
+  assert.match(html, /name="botToken"/);
+  assert.match(html, /Enable Discord threads for this organization/);
+  assert.match(html, /exact canonical artifact URL/);
   assert.doesNotMatch(html, /<span>Gallery<\/span>/);
 });
 
@@ -1269,7 +1336,10 @@ test("OAuth MCP routes publish resource metadata and return a scoped 403 challen
         "artifacts:publish",
         "artifacts:review",
         "artifacts:visibility",
-        "artifacts:delete"
+        "artifacts:delete",
+        "audit:read",
+        "audit:export",
+        "audit:global"
       ]
     });
 
@@ -1352,6 +1422,171 @@ test("preview notifier preserves the admin webhook test action", async () => {
   });
   assert.equal(response.status, 200);
   assert.deepEqual(response.body, { ok: true });
+});
+
+test("discussion parity routes keep strict bodies, safe projections, and owner/admin mutations", async () => {
+  const calls = [];
+  const safeConnection = { configured: true, label: "Forum", destination: "https://discord.com/…test", lastError: null };
+  const safeDiscussion = { mode: "artifact_only", state: "local", enabled: false, connectionConfigured: true, lastError: null };
+  const discussions = {
+    connection(org) { calls.push(["connection", org]); return safeConnection; },
+    configure(input) { calls.push(["configure", input]); return safeConnection; },
+    remove(input) { calls.push(["remove", input]); return true; },
+    async testConnection(input) { calls.push(["test", input]); return true; },
+    status(input) { calls.push(["status", input]); return safeDiscussion; },
+    setMode(input) { calls.push(["mode", input]); return { ...safeDiscussion, mode: input.mode, enabled: input.mode === "discord_mirror" }; },
+    retry(input) { calls.push(["retry", input]); return safeDiscussion; }
+  };
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher" };
+  const app = createApp(dependencies({
+    audit: {}, discussions,
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+
+  const connection = await invokeRoute(app, "get", "/settings/orgs/:org/discord-discussion", { params: { org: "acme" } });
+  assert.deepEqual(connection.body, safeConnection);
+  const malformed = await invokeRoute(app, "put", "/settings/orgs/:org/discord-discussion", {
+    params: { org: "acme" }, body: { url: "https://discord.com/api/webhooks/x/y" }
+  });
+  assert.equal(malformed.status, 400);
+  const configured = await invokeRoute(app, "put", "/settings/orgs/:org/discord-discussion", {
+    params: { org: "acme" }, body: { url: "https://discord.com/api/webhooks/x/y", label: "Forum" }
+  });
+  assert.deepEqual(configured.body, safeConnection);
+  const status = await invokeRoute(app, "get", "/:id/discussion", { params: { id: artifact.id } });
+  assert.deepEqual(status.body, safeDiscussion);
+  const mode = await invokeRoute(app, "put", "/:id/discussion", { params: { id: artifact.id }, body: { mode: "discord_mirror" } });
+  assert.equal(mode.body.mode, "discord_mirror");
+  const retry = await invokeRoute(app, "post", "/:id/discussion/retry", { params: { id: artifact.id }, body: {} });
+  assert.deepEqual(retry.body, safeDiscussion);
+  assert.ok(calls.some(([name]) => name === "configure"));
+  assert.ok(calls.some(([name]) => name === "mode"));
+  assert.ok(calls.some(([name]) => name === "retry"));
+  const configureCall = calls.find(([name]) => name === "configure")[1];
+  assert.match(configureCall.context.requestId, /^[0-9a-f-]{36}$/i, "browser audit correlation is server-generated");
+});
+
+test("discussion mutations authorize before malformed JSON is parsed", async () => {
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher", owner_email: "owner@acme.test" };
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+  await serve(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/abc123/discussion`, {
+      method: "PUT", headers: { "content-type": "application/json" }, body: "{ not json"
+    });
+    assert.equal(response.status, 403, "a non-owner is denied before the malformed body can win");
+    assert.deepEqual(await response.json(), { error: "Forbidden" });
+  });
+});
+
+test("discussion mutation routes reject duplicate JSON members before schema normalization", async () => {
+  const calls = [];
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher" };
+  const discussions = {
+    configure() { calls.push("configure"); return {}; },
+    async testConnection() { calls.push("test"); return true; },
+    setMode() { calls.push("mode"); return {}; },
+    retry() { calls.push("retry"); return {}; }
+  };
+  const app = createApp(dependencies({
+    audit: {},
+    discussions,
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+  const requests = [
+    [
+      "/settings/orgs/acme/discord-discussion",
+      "PUT",
+      "{\"url\":\"https://discord.com/api/webhooks/x/first\",\"url\":\"https://discord.com/api/webhooks/x/second\",\"label\":\"Forum\"}"
+    ],
+    ["/settings/orgs/acme/discord-discussion/test", "POST", "{\"probe\":1,\"probe\":2}"],
+    ["/abc123/discussion", "PUT", "{\"mode\":\"artifact_only\",\"mo\\u0064e\":\"discord_mirror\"}"],
+    ["/abc123/discussion/retry", "POST", "{\"probe\":1,\"probe\":2}"]
+  ];
+
+  await serve(app, async (baseUrl) => {
+    for (const [path, method, body] of requests) {
+      const response = await fetch(`${baseUrl}${path}`, {
+        method,
+        headers: { "content-type": "application/json" },
+        body
+      });
+      assert.equal(response.status, 400, `${method} ${path} rejects duplicate members`);
+    }
+  });
+  assert.deepEqual(calls, [], "no privileged discussion operation runs after duplicate JSON");
+});
+
+test("organization threading routes keep credentials write-only and artifact overrides owner/admin-only", async () => {
+  const calls = [];
+  const secret = "synthetic-bot-token-never-returned";
+  const threading = {
+    status(org) {
+      calls.push(["status", org]);
+      return { configured: true, credential: "configured", fallback: false, enabled: true, recovery: { state: "idle", pending: 0 } };
+    },
+    save(input) { calls.push(["save", input]); return this.status(input.org); },
+    test(input) { calls.push(["test", input]); return { tested: true }; },
+    remove(input) { calls.push(["remove", input]); return { removed: true }; },
+    queueRecovery(input) { calls.push(["recover", input]); return { queued: true }; },
+    artifactStatus(input) { calls.push(["artifactStatus", input]); return { override: "inherit", effectiveMode: "discord_mirror", state: "recovering", actionableError: null }; },
+    setArtifactOverride(input) { calls.push(["override", input]); return { override: input.override, effectiveMode: input.override === "artifact_only" ? "artifact_only" : "discord_mirror", state: "local", actionableError: null }; }
+  };
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher", owner_email: "owner@acme.test" };
+  const app = createApp(dependencies({
+    audit: {}, organizationThreading: threading,
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+
+  const saved = await invokeRoute(app, "put", "/settings/orgs/:org/discord-threading", {
+    params: { org: "acme" }, body: { botToken: secret, enabled: true }
+  });
+  assert.equal(saved.status, 200);
+  assert.doesNotMatch(JSON.stringify(saved.body), new RegExp(secret));
+  assert.equal(calls.find(([name]) => name === "save")[1].botToken, secret);
+  const override = await invokeRoute(app, "put", "/:id/discussion/override", {
+    params: { id: artifact.id }, body: { override: "artifact_only" }
+  });
+  assert.deepEqual(override.body, { override: "artifact_only", effectiveMode: "artifact_only", state: "local", actionableError: null });
+  assert.ok(calls.some(([name]) => name === "override"));
+});
+
+test("threading mutations authorize before body parsing and reject duplicate/unknown fields", async () => {
+  const artifact = { id: "abc123", org: "acme", title: "Artifact", client_id: "publisher", owner_email: "owner@acme.test" };
+  const calls = [];
+  const threading = { save() { calls.push("save"); }, setArtifactOverride() { calls.push("override"); } };
+  const app = createApp(dependencies({
+    organizationThreading: threading,
+    resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+  await serve(app, async (baseUrl) => {
+    const unauthorized = await fetch(`${baseUrl}/settings/orgs/acme/discord-threading`, {
+      method: "PUT", headers: { "content-type": "application/json" }, body: "{ bad json"
+    });
+    assert.equal(unauthorized.status, 403);
+  });
+  const admin = createApp(dependencies({
+    organizationThreading: threading,
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => artifact }
+  }));
+  await serve(admin, async (baseUrl) => {
+    for (const [path, body] of [
+      ["/settings/orgs/acme/discord-threading", '{"botToken":"one","botToken":"two","enabled":true}'],
+      ["/settings/orgs/acme/discord-threading", '{"botToken":"one","enabled":true,"extra":true}'],
+      ["/abc123/discussion/override", '{"override":"inherit","override":"artifact_only"}']
+    ]) {
+      const response = await fetch(`${baseUrl}${path}`, { method: "PUT", headers: { "content-type": "application/json" }, body });
+      assert.equal(response.status, 400);
+    }
+  });
+  assert.deepEqual(calls, []);
 });
 
 test("thumbnail delivery is digest-bound, authenticated, and uses no-store placeholders", async () => {

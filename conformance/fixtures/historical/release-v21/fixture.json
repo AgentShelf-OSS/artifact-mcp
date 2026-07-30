@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "origin": {
+    "releaseTag": "v1.5.0",
+    "schemaVersion": 21,
+    "kind": "public-release",
+    "sourceRef": {
+      "commit": "819f4d6a7d88a4088c561b44cfb0018558c63259",
+      "migrationSourceSha256": "1404b07314fb68097d6cebde9eab6cc413dde97d07efa1123395b7d112e897ed"
+    }
+  },
+  "expectedTargetSchema": 24,
+  "generation": "node scripts/generate-historical-fixtures.mjs",
+  "webhookEncryption": {
+    "keyId": "fixture-zero-key-v1",
+    "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "authentication": {
+    "clientId": "fixture-key",
+    "token": "fixture-public-token-v1",
+    "classification": "public synthetic test material"
+  },
+  "expectedRecovery": {
+    "recoveredPaths": [],
+    "divergentBodies": [],
+    "orphanBodies": [],
+    "missingBodies": [],
+    "preservedTransientPaths": []
+  },
+  "database": {
+    "path": "artifacts.db",
+    "sha256": "1a2e6b1815625ef6b9c8cdc0903e88ff98bafa713d3a30ace9d57f6def1e0d64"
+  },
+  "bodies": [
+    {
+      "path": ".history/single16/1.html",
+      "bytes": 32,
+      "sha256": "fe0377bdde83fd1cd271bb4271823cd9afff409290db308803fe8a8ad3aff00a"
+    },
+    {
+      "path": "bundle16/assets/site.css",
+      "bytes": 25,
+      "sha256": "c39e3c1f5479800e4ab6ff5e655b01a20bd8d024945a9b00d0425b75fbf3c6e1"
+    },
+    {
+      "path": "bundle16/index.html",
+      "bytes": 30,
+      "sha256": "4a6ac1fd9d9e440ab4c2a0e94bb338383ae3f953f1668b5dea94db9dde8bf336"
+    },
+    {
+      "path": "single16.html",
+      "bytes": 30,
+      "sha256": "fb9e88ad26f491c2d10a52f98b491684c1493dafdeb5aafa6f5ae76284d71645"
+    }
+  ]
+}

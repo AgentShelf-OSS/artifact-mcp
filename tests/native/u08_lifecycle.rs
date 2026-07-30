@@ -12,7 +12,8 @@ use artifact_mcp::model::{ArtifactContent, ArtifactId, ArtifactUpdate};
 use artifact_mcp::ports::ArtifactService as _;
 
 use crate::u08_support::{
-    Fixture, TEST_CLIENT, TEST_ORG, bundle_content, bundle_update, html_update, sha256_hex,
+    Fixture, TEST_CLIENT, TEST_ORG, bundle_content, bundle_update, html_update, mutation_audit,
+    sha256_hex,
 };
 
 // ---------------------------------------------------------------------------
@@ -158,6 +159,7 @@ async fn an_exact_no_op_update_creates_no_revision() {
                 content: Some(ArtifactContent::SingleHtml("<p>same</p>".to_owned())),
                 acting_client_id: None,
             },
+            mutation_audit(),
         )
         .await
         .expect("a no-op update succeeds");
@@ -191,7 +193,7 @@ async fn update_bumps_the_revision_and_snapshots_the_outgoing_body() {
 
     let result = fixture
         .store
-        .update_for(&meta, html_update(1, "NEW"))
+        .update_for(&meta, html_update(1, "NEW"), mutation_audit())
         .await
         .expect("update succeeds");
 
@@ -218,14 +220,14 @@ async fn update_rejects_a_stale_expected_revision() {
     let meta = fixture.publish_single("OLD").await;
     fixture
         .store
-        .update_for(&meta, html_update(1, "NEW"))
+        .update_for(&meta, html_update(1, "NEW"), mutation_audit())
         .await
         .expect("first update succeeds");
 
     // `meta` still carries revision 1, which is now stale.
     let conflict = fixture
         .store
-        .update_for(&meta, html_update(1, "NEWER"))
+        .update_for(&meta, html_update(1, "NEWER"), mutation_audit())
         .await
         .expect_err("a stale revision conflicts");
     assert_eq!(conflict, AppError::Conflict("conflict".to_owned()));
@@ -238,7 +240,7 @@ async fn update_rejects_a_stale_expected_revision() {
     // A zero expected revision is Node's `< 1` rejection. [lib/store.js:319-321]
     let invalid = fixture
         .store
-        .update_for(&meta, html_update(0, "NEWER"))
+        .update_for(&meta, html_update(0, "NEWER"), mutation_audit())
         .await
         .expect_err("revision 0 conflicts");
     assert_eq!(invalid, AppError::Conflict("conflict".to_owned()));
@@ -258,6 +260,7 @@ async fn a_metadata_only_update_copies_the_body_and_keeps_it_live() {
                 title: Some("Renamed".to_owned()),
                 ..ArtifactUpdate::default()
             },
+            mutation_audit(),
         )
         .await
         .expect("metadata update succeeds");
@@ -295,6 +298,7 @@ async fn an_entry_only_bundle_update_revisions_without_replacing_files() {
                 content: Some(bundle_content(&[], Some("other.html"))),
                 ..ArtifactUpdate::default()
             },
+            mutation_audit(),
         )
         .await
         .expect("entry-only update succeeds");
@@ -320,6 +324,7 @@ async fn an_entry_only_bundle_update_revisions_without_replacing_files() {
                 content: Some(bundle_content(&[], Some("nope.html"))),
                 ..ArtifactUpdate::default()
             },
+            mutation_audit(),
         )
         .await
         .expect_err("an entry that is not a file is rejected");
@@ -341,7 +346,11 @@ async fn update_refuses_to_change_the_artifact_shape() {
     assert_eq!(
         fixture
             .store
-            .update_for(&single, bundle_update(1, &[("index.html", "I")], None))
+            .update_for(
+                &single,
+                bundle_update(1, &[("index.html", "I")], None),
+                mutation_audit()
+            )
             .await
             .expect_err("a bundle payload on a single-file artifact is rejected"),
         AppError::Validation("artifact is single-file; pass html, not files".to_owned())
@@ -349,7 +358,7 @@ async fn update_refuses_to_change_the_artifact_shape() {
     assert_eq!(
         fixture
             .store
-            .update_for(&bundle, html_update(1, "S"))
+            .update_for(&bundle, html_update(1, "S"), mutation_audit())
             .await
             .expect_err("an html payload on a bundle is rejected"),
         AppError::Validation("artifact is a bundle; pass files, not html".to_owned())
@@ -363,7 +372,8 @@ async fn update_refuses_to_change_the_artifact_shape() {
                     expected_revision: 1,
                     content: Some(bundle_content(&[], Some("index.html"))),
                     ..ArtifactUpdate::default()
-                }
+                },
+                mutation_audit()
             )
             .await
             .expect_err("an entry on a single-file artifact is rejected"),
@@ -391,6 +401,7 @@ async fn history_retention_keeps_only_the_newest_snapshots() {
             .update_for(
                 &current,
                 html_update(current.revision, &format!("v{version}")),
+                mutation_audit(),
             )
             .await
             .expect("update succeeds")
@@ -422,7 +433,7 @@ async fn restore_replays_a_past_revision_as_a_new_revision() {
     let meta = fixture.publish_single("v1").await;
     let v2 = fixture
         .store
-        .update_for(&meta, html_update(1, "v2"))
+        .update_for(&meta, html_update(1, "v2"), mutation_audit())
         .await
         .expect("update succeeds")
         .meta;
@@ -430,7 +441,7 @@ async fn restore_replays_a_past_revision_as_a_new_revision() {
 
     let restored = fixture
         .store
-        .restore_for(&v2, 1, None)
+        .restore_for(&v2, 1, None, mutation_audit())
         .await
         .expect("restore succeeds");
 
@@ -465,7 +476,7 @@ async fn restore_reports_nodes_failure_reasons() {
     assert_eq!(
         fixture
             .store
-            .restore_for(&meta, 9, None)
+            .restore_for(&meta, 9, None, mutation_audit())
             .await
             .expect_err("an unknown revision"),
         AppError::NotFound("revision_not_found".to_owned())
@@ -473,7 +484,7 @@ async fn restore_reports_nodes_failure_reasons() {
 
     let v2 = fixture
         .store
-        .update_for(&meta, html_update(1, "v2"))
+        .update_for(&meta, html_update(1, "v2"), mutation_audit())
         .await
         .expect("update")
         .meta;
@@ -489,7 +500,7 @@ async fn restore_reports_nodes_failure_reasons() {
     assert_eq!(
         fixture
             .store
-            .restore_for(&v2, 1, None)
+            .restore_for(&v2, 1, None, mutation_audit())
             .await
             .expect_err("a dropped body"),
         AppError::Gone("body_missing".to_owned())
@@ -511,7 +522,7 @@ async fn restore_reports_nodes_failure_reasons() {
     assert_eq!(
         fixture
             .store
-            .restore_for(&v2, 1, None)
+            .restore_for(&v2, 1, None, mutation_audit())
             .await
             .expect_err("a type mismatch"),
         AppError::Conflict("type_mismatch".to_owned())
@@ -529,6 +540,7 @@ async fn restore_round_trips_a_bundle_snapshot() {
         .update_for(
             &published.meta,
             bundle_update(1, &[("index.html", "two"), ("app.js", "2")], None),
+            mutation_audit(),
         )
         .await
         .expect("update")
@@ -536,7 +548,7 @@ async fn restore_round_trips_a_bundle_snapshot() {
 
     let restored = fixture
         .store
-        .restore_for(&v2, 1, None)
+        .restore_for(&v2, 1, None, mutation_audit())
         .await
         .expect("restore succeeds");
     assert_eq!(restored.restored_from, 1);
@@ -566,7 +578,7 @@ async fn delete_cascades_every_subordinate_table_and_removes_the_bodies() {
     let meta = fixture.publish_single("v1").await;
     let v2 = fixture
         .store
-        .update_for(&meta, html_update(1, "v2"))
+        .update_for(&meta, html_update(1, "v2"), mutation_audit())
         .await
         .expect("update")
         .meta;
@@ -581,7 +593,7 @@ async fn delete_cascades_every_subordinate_table_and_removes_the_bodies() {
     assert!(
         fixture
             .store
-            .delete_for(&v2)
+            .delete_for(&v2, mutation_audit())
             .await
             .expect("delete succeeds")
     );
@@ -593,6 +605,18 @@ async fn delete_cascades_every_subordinate_table_and_removes_the_bodies() {
     assert_eq!(fixture.count("SELECT COUNT(*) FROM artifact_shares"), 0);
     assert_eq!(fixture.count("SELECT COUNT(*) FROM artifact_revisions"), 0);
     assert!(fixture.body_on_disk(&meta).is_none());
+    assert_eq!(
+        fixture.scalar::<String>(
+            "SELECT operation || ':' || result FROM security_audit_events ORDER BY sequence DESC LIMIT 1",
+        ),
+        "artifact.delete:success",
+        "a durable delete has exactly one terminal audited outcome"
+    );
+    assert_eq!(
+        fixture.count("SELECT COUNT(*) FROM security_audit_receipts WHERE state = 'pending'"),
+        0,
+        "the finalized delete cannot leave an orphan pending receipt"
+    );
     assert!(
         fixture.history_entries(&meta).is_empty(),
         "history bodies are removed with the record"
@@ -608,11 +632,17 @@ async fn delete_cascades_every_subordinate_table_and_removes_the_bodies() {
 async fn deleting_an_unknown_artifact_reports_false() {
     let fixture = Fixture::new("delete-missing");
     let meta = fixture.publish_single("v1").await;
-    assert!(fixture.store.delete_for(&meta).await.expect("first delete"));
+    assert!(
+        fixture
+            .store
+            .delete_for(&meta, mutation_audit())
+            .await
+            .expect("first delete")
+    );
     assert!(
         !fixture
             .store
-            .delete_for(&meta)
+            .delete_for(&meta, mutation_audit())
             .await
             .expect("second delete is a no-op")
     );
@@ -629,7 +659,7 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
     let meta = fixture.publish_single("v1").await;
     let v2 = fixture
         .store
-        .update_for(&meta, html_update(1, "v2"))
+        .update_for(&meta, html_update(1, "v2"), mutation_audit())
         .await
         .expect("update")
         .meta;
@@ -637,7 +667,7 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
 
     let moved = fixture
         .store
-        .move_to_org_for(&v2, "other", Some("moved"))
+        .move_to_org_for(&v2, "other", Some("moved"), mutation_audit())
         .await
         .expect("move succeeds");
 
@@ -669,6 +699,14 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
         0,
         "the deferred composite FKs hold at commit"
     );
+    assert_eq!(
+        fixture.scalar::<String>(
+            "SELECT tenant || ':' || operation || ':' || classification \
+             FROM security_audit_events ORDER BY sequence DESC LIMIT 1",
+        ),
+        "acme:artifact.org.move:shares_revoked_1",
+        "an admin-initiated cross-org move is filed under the affected source tenant without a share token"
+    );
 }
 
 #[tokio::test]
@@ -678,7 +716,7 @@ async fn move_to_org_rejects_an_unknown_organization() {
     assert_eq!(
         fixture
             .store
-            .move_to_org_for(&meta, " nope ", None)
+            .move_to_org_for(&meta, " nope ", None, mutation_audit())
             .await
             .expect_err("unknown org"),
         AppError::Validation("Unknown organization \"nope\".".to_owned())
@@ -696,7 +734,7 @@ async fn category_and_visibility_are_normalized_and_bump_updated_at() {
 
     let categorized = fixture
         .store
-        .set_category_for(&meta, "  Design   Docs  ")
+        .set_category_for(&meta, "  Design   Docs  ", mutation_audit())
         .await
         .expect("set category");
     assert_eq!(categorized.category, "Design Docs");
@@ -704,7 +742,7 @@ async fn category_and_visibility_are_normalized_and_bump_updated_at() {
 
     let hidden = fixture
         .store
-        .set_hidden_for(&categorized, true)
+        .set_hidden_for(&categorized, true, mutation_audit())
         .await
         .expect("set hidden");
     assert!(hidden.hidden);
@@ -722,6 +760,24 @@ async fn category_and_visibility_are_normalized_and_bump_updated_at() {
         .await
         .expect("list including hidden");
     assert_eq!(listed_all.len(), 1);
+    let conn = fixture.pool.get().expect("checkout audit assertions");
+    let mut statement = conn
+        .prepare("SELECT operation,classification FROM security_audit_events ORDER BY sequence DESC LIMIT 2")
+        .expect("prepare audit assertions");
+    let rows = statement
+        .query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })
+        .expect("query audit assertions")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("read audit assertions");
+    assert_eq!(
+        rows,
+        vec![
+            ("artifact.visibility.set".to_owned(), "hidden".to_owned()),
+            ("artifact.category.set".to_owned(), String::new()),
+        ]
+    );
 }
 
 // ---------------------------------------------------------------------------
@@ -762,7 +818,7 @@ async fn publisher_listings_are_org_scoped_unless_the_key_is_admin() {
     let meta = fixture.publish_single("v1").await;
     fixture
         .store
-        .move_to_org_for(&meta, "other", None)
+        .move_to_org_for(&meta, "other", None, mutation_audit())
         .await
         .expect("move");
 
@@ -797,7 +853,7 @@ async fn revision_bodies_are_readable_for_both_shapes() {
     let single = fixture.publish_single("v1").await;
     let single_v2 = fixture
         .store
-        .update_for(&single, html_update(1, "v2"))
+        .update_for(&single, html_update(1, "v2"), mutation_audit())
         .await
         .expect("update")
         .meta;
@@ -825,7 +881,11 @@ async fn revision_bodies_are_readable_for_both_shapes() {
         .meta;
     let bundle_v2 = fixture
         .store
-        .update_for(&bundle, bundle_update(1, &[("index.html", "two")], None))
+        .update_for(
+            &bundle,
+            bundle_update(1, &[("index.html", "two")], None),
+            mutation_audit(),
+        )
         .await
         .expect("update")
         .meta;

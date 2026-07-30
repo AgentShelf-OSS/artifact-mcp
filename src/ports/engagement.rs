@@ -11,7 +11,10 @@ use crate::{
         ShareToken, SubmitFeedback, TopViewedArtifact, ViewCounts, Viewer, ViewerNotification,
         ViewerView,
     },
-    security::access::{AuthorizedArtifact, OwnedArtifact},
+    security::{
+        access::{AuthorizedArtifact, OwnedArtifact},
+        audit::MutationAudit,
+    },
 };
 
 pub trait EngagementService: Send + Sync {
@@ -122,6 +125,7 @@ pub trait ShareService: Send + Sync {
         &self,
         artifact: AuthorizedArtifact,
         request: CreateShare,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<PublicShare, AppError>>;
     fn list<'a>(
         &'a self,
@@ -131,5 +135,6 @@ pub trait ShareService: Send + Sync {
         &self,
         artifact: AuthorizedArtifact,
         token: ShareToken,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>>;
 }

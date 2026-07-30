@@ -6,6 +6,29 @@ on:
   pull_request:
 
 jobs:
+  mcp-surface:
+    # Derived from the frozen definitions, schemas, dispatch, OAuth scopes, documentation, and
+    # registered contract tests. No hand-maintained second tool catalog is involved.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check derived MCP surface against the change base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+          base="$BASE_SHA"
+          if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+          fi
+          node scripts/check-mcp-surface.mjs --base "$base"
+
   test:
     runs-on: ubuntu-latest
     steps:
@@ -62,7 +85,7 @@ jobs:
     # Real Chromium journeys run against both complete server packages. Each instance has an
     # isolated database, and global teardown removes the synthetic organization and artifacts.
     runs-on: ubuntu-latest
-    needs: [test, conformance, rust]
+    needs: [mcp-surface, test, conformance, rust]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -88,16 +111,23 @@ jobs:
           rust_data="$(mktemp -d)"
           node_log="$RUNNER_TEMP/artifact-mcp-node.log"
           rust_log="$RUNNER_TEMP/artifact-mcp-rust.log"
+          test_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
 
           env DATA_DIR="$node_data" PORT=3485 LISTEN_HOST=127.0.0.1 \
             TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS="$PW_ADMIN_EMAIL" NODE_ENV=test \
             PUBLIC_BASE_URL="$PW_NODE_URL" PREVIEW_RENDERER_URL= \
+            AUDIT_LEDGER_HMAC_KEY="$test_key" WEBHOOK_ENC_KEY="$test_key" \
             node server.js >"$node_log" 2>&1 &
           node_pid=$!
 
           env DATA_DIR="$rust_data" PORT=3483 LISTEN_HOST=127.0.0.1 \
             TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS="$PW_ADMIN_EMAIL" NODE_ENV=test \
             PUBLIC_BASE_URL="$PW_RUST_URL" PREVIEW_RENDERER_URL= \
+            AUDIT_LEDGER_HMAC_KEY="$test_key" WEBHOOK_ENC_KEY="$test_key" \
+            INGRESS_READS_PER_WINDOW=1000 INGRESS_MUTATIONS_PER_WINDOW=1000 \
+            INGRESS_MCP_PER_WINDOW=1000 INGRESS_UPLOADS_PER_WINDOW=1000 \
+            INGRESS_FEEDBACK_PER_WINDOW=1000 INGRESS_ADMIN_PER_WINDOW=1000 \
+            INGRESS_VERIFIED_VIEWERS_PER_WINDOW=1000 INGRESS_SHARES_PER_WINDOW=1000 \
             target/release/artifact-mcp >"$rust_log" 2>&1 &
           rust_pid=$!
 

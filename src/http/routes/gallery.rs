@@ -13,6 +13,7 @@ use serde::Serialize;
 use crate::{
     AppDeps,
     error::AppError,
+    http::ingress::ViewerCost,
     model::{OrgArtifacts, OrgId, Reaction, ViewCounts, Viewer},
     render::view_models::{ArtifactNavigation, GalleryView, ShellView},
     security::access::{AccessPolicy, AuthorizedArtifact, resolve_for_viewer},
@@ -36,6 +37,12 @@ pub(crate) async fn resolve_page_artifact(
     id: &str,
 ) -> Result<(Viewer, AuthorizedArtifact), AppError> {
     let viewer = deps.viewer_identity.resolve(headers).await?;
+    if !deps
+        .ingress
+        .allow_verified_viewer(headers, &viewer, ViewerCost::Read)
+    {
+        return Err(AppError::RateLimited);
+    }
     let artifact = resolve_for_viewer(deps.artifacts.as_ref(), &viewer, id).await?;
     Ok((viewer, artifact))
 }
@@ -94,6 +101,12 @@ async fn gallery(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
         Ok(viewer) => viewer,
         Err(error) => return error.into_response(),
     };
+    if !deps
+        .ingress
+        .allow_verified_viewer(&headers, &viewer, ViewerCost::Read)
+    {
+        return AppError::RateLimited.into_response();
+    }
     match gallery_result(&deps, viewer).await {
         Ok(response) => response,
         Err(error) => {
@@ -246,6 +259,12 @@ async fn mark_notifications_seen_result(
     headers: &HeaderMap,
 ) -> Result<Response, AppError> {
     let viewer = deps.viewer_identity.resolve(headers).await?;
+    if !deps
+        .ingress
+        .allow_verified_viewer(headers, &viewer, ViewerCost::Mutation)
+    {
+        return Err(AppError::RateLimited);
+    }
     let Some(email) = viewer.email.as_ref().filter(|email| !email.0.is_empty()) else {
         return Ok((
             StatusCode::FORBIDDEN,

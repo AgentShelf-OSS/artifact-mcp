@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use artifact_mcp::config::{AppConfig, SeedKeys};
+use artifact_mcp::config::{AppConfig, Secret, SeedKeys};
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -53,6 +53,7 @@ impl runtime::StartupObserver for Observer {
 fn config_for(data_dir: &Path) -> AppConfig {
     let mut config = AppConfig {
         data_dir: data_dir.to_path_buf(),
+        audit_ledger_hmac_key: Some(Secret::new("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")),
         public_base_url: "http://conformance.test".to_owned(),
         seed_keys: SeedKeys::parse("administrator:admin:admin-secret"),
         ..AppConfig::defaults()
@@ -92,6 +93,8 @@ async fn create_org_with_domain(router: &Router, name: &str, domain: Option<&str
         .oneshot(
             Request::post("/settings/orgs")
                 .header("cf-access-authenticated-user-email", "admin@example.test")
+                .header("x-artifact-mutation", "1")
+                .header("sec-fetch-site", "same-origin")
                 .header("content-type", "application/json")
                 .body(Body::from(payload.to_string()))
                 .expect("create-org request"),
@@ -172,6 +175,8 @@ async fn publisher_share_and_feedback_mutations_conceal_foreign_references() {
                 .oneshot(
                     Request::post(format!("/{id}/feedback"))
                         .header("cf-access-authenticated-user-email", "reader@acme.test")
+                        .header("x-artifact-mutation", "1")
+                        .header("sec-fetch-site", "same-origin")
                         .header("content-type", "application/json")
                         .body(Body::from(json!({ "body": "Conceal me" }).to_string()))
                         .expect("feedback request"),

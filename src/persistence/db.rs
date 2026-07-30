@@ -58,7 +58,7 @@ pub const POOL_CHECKOUT_TIMEOUT: Duration = Duration::from_secs(5);
 /// file, the other four are per-connection state applied by the pool initializer.
 pub const PINNED_PRAGMAS: &[(&str, PragmaValue)] = &[
     ("journal_mode", PragmaValue::Text("wal")),
-    ("synchronous", PragmaValue::Int(1)), // NORMAL
+    ("synchronous", PragmaValue::Int(2)), // FULL
     ("busy_timeout", PragmaValue::Int(5000)),
     ("wal_autocheckpoint", PragmaValue::Int(1000)),
     ("foreign_keys", PragmaValue::Int(1)), // ON
@@ -198,7 +198,7 @@ fn apply_file_pragmas(conn: &Connection) -> rusqlite::Result<()> {
 /// Per-connection pragmas. These do not survive a connection, so the pool initializer applies
 /// them to every checkout target — not just to the bootstrap connection.
 fn apply_connection_pragmas(conn: &Connection) -> rusqlite::Result<()> {
-    run_pragma(conn, "PRAGMA synchronous = NORMAL")?;
+    run_pragma(conn, "PRAGMA synchronous = FULL")?;
     run_pragma(conn, "PRAGMA busy_timeout = 5000")?;
     run_pragma(conn, "PRAGMA wal_autocheckpoint = 1000")?;
     run_pragma(conn, "PRAGMA foreign_keys = ON")?;

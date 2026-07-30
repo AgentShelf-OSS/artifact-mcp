@@ -26,7 +26,7 @@ fn expected_ledger() -> Vec<(i64, String)> {
 }
 
 #[test]
-fn fresh_database_applies_the_extended_ledger_to_v23() {
+fn fresh_database_applies_the_extended_ledger_to_v24() {
     let dir = TempDataDir::new("fresh");
     let pool = open(&dir);
     let conn = db::checkout(&pool).expect("checkout");
@@ -207,7 +207,7 @@ fn observed_pragmas(conn: &Connection) -> Vec<(&'static str, String)> {
 fn expected_pragmas() -> Vec<(&'static str, String)> {
     vec![
         ("journal_mode", "wal".to_owned()),
-        ("synchronous", "1".to_owned()),
+        ("synchronous", "2".to_owned()),
         ("busy_timeout", "5000".to_owned()),
         ("wal_autocheckpoint", "1000".to_owned()),
         ("foreign_keys", "1".to_owned()),

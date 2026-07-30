@@ -535,13 +535,28 @@ fn feedback_template(
     } else {
         "Pinned comment".to_owned()
     };
+    let (author_label, manageable) = match &feedback.author {
+        crate::model::FeedbackAuthor::Artifact {
+            viewer_email: author,
+        } => (
+            author.0.clone(),
+            viewer_is_admin || author.0 == viewer_email,
+        ),
+        crate::model::FeedbackAuthor::Discord {
+            external_author_display,
+            ..
+        } => (
+            format!("{external_author_display} · Discord"),
+            viewer_is_admin,
+        ),
+    };
     FeedbackTemplate {
         id: feedback.id.0.clone(),
-        viewer_email: feedback.viewer_email.0.clone(),
+        viewer_email: author_label,
         body: feedback.body.clone(),
         created_at: format_date(&feedback.created_at.0),
         resolved: feedback.resolved_at.is_some(),
-        manageable: viewer_is_admin || feedback.viewer_email.0 == viewer_email,
+        manageable,
         has_anchor_state: !anchor_state.is_empty(),
         anchor_state,
     }
@@ -635,17 +650,26 @@ fn gallery_template<'a>(
     let notifications = view
         .notifications
         .iter()
-        .map(|notification| NotificationTemplate {
-            href: format!(
-                "/{}?feedback={}",
-                encode_uri_component(&notification.artifact_id.0),
-                encode_uri_component(&notification.id.0)
-            ),
-            unread: notification.unread,
-            viewer_email: notification.viewer_email.0.clone(),
-            relative_time: relative_time(&notification.created_at.0, now),
-            artifact_title: notification.artifact_title.clone(),
-            snippet: notification_snippet(&notification.body),
+        .map(|notification| {
+            let author = match &notification.author {
+                crate::model::FeedbackAuthor::Artifact { viewer_email } => viewer_email.0.clone(),
+                crate::model::FeedbackAuthor::Discord {
+                    external_author_display,
+                    ..
+                } => format!("{external_author_display} · Discord"),
+            };
+            NotificationTemplate {
+                href: format!(
+                    "/{}?feedback={}",
+                    encode_uri_component(&notification.artifact_id.0),
+                    encode_uri_component(&notification.id.0)
+                ),
+                unread: notification.unread,
+                viewer_email: author,
+                relative_time: relative_time(&notification.created_at.0, now),
+                artifact_title: notification.artifact_title.clone(),
+                snippet: notification_snippet(&notification.body),
+            }
         })
         .collect();
     let viewer_org = view

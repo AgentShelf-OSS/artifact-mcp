@@ -117,12 +117,22 @@ light and dark themes ship; light shown here.*
   six events (`published`, `updated`, `restored`, `deleted`, `feedback`, `resolved`). Route
   publishes to `#artifacts` and feedback to `#feedback`, etc. URLs are validated to the Discord
   host, masked in every UI/API response, and encrypted at rest with `WEBHOOK_ENC_KEY`. The
-  documented no-key mode preserves zero-config with a loud plaintext-storage warning. Delivery is
-  fire-and-forget (never blocks a request). Test button.
+  documented no-key mode preserves zero-config with a loud plaintext-storage warning. Committed
+  events enter a durable, bounded at-least-once queue: delivery never blocks the mutation, retries
+  are bounded, and a process stop during an ambiguous provider attempt can produce a duplicate.
+  Dead-letter rows and privacy-safe worker/queue metrics make failures actionable. See the
+  [durable-delivery runbook](docs/ops/discord-durable-delivery.md). Test button.
 - **Optional persistent thumbnails** — gallery cards use authenticated static images, never live
   preview iframes. A single-file `published`, `updated`, or `restored` event renders one PNG that is
   persisted by content digest and reused by Discord. This is off by default and uses a separate
   Playwright sidecar, so the core image has no browser dependency. Bundles use a static placeholder.
+- **Optional Discord notification threads** — an organization can select one existing
+  `published` artifact webhook, then use a narrowly scoped bot credential to start a public thread
+  on that artifact's notification when its first mirrored comment arrives. The webhook authors
+  the notification and comments; the bot manages the thread. Organization enablement is the
+  outbound default, while artifacts may stay local or explicitly enable two-way human Discord
+  replies. Discord identity never grants Artifact MCP access. See the
+  [Discord runbook](docs/ops/discord-durable-delivery.md#organization-discord-threading).
 
 ### Operate
 - **Settings (admin)** — manage orgs / domains / categories / webhooks, and generate/revoke
@@ -135,6 +145,10 @@ light and dark themes ship; light shown here.*
   result-size signals, and deployable alert rules. See
   [`docs/ops/mcp-observability.md`](docs/ops/mcp-observability.md) and the repeatable
   [`connector-readiness checklist`](docs/ops/connector-readiness.md).
+- **Discord delivery operations** — two bounded workers drain the durable queue; queue age,
+  dead-letter, rate-limit, and worker-health metrics have deployable alerts. See the
+  [durable-delivery runbook](docs/ops/discord-durable-delivery.md) before rotating a webhook or
+  its encryption key.
 - **Optional private MCP ingress** — an isolated, digest-pinned Compose profile for Anthropic's
   MCP Tunnels research preview, with file-backed secrets, independent health signals,
   Anthropic-side validation, and a one-command local rollback. See the
@@ -171,7 +185,7 @@ their current docs.</sub>
 
 Artifact MCP serves the existing stateful `2025-06-18` contract and the stateless `2026-07-28`
 contract side by side. Modern clients can use `server/discover`, private-cache-aware artifact
-resources (`resources/list`, `resources/read`, and templates), typed/validated tool outputs,
+resources (`resources/list`, `resources/read`, and `resources/templates/list`), typed/validated tool outputs,
 negotiated MCP Apps, and durable preview tasks. Clients that do not advertise those capabilities
 retain the ordinary text/structured fallback.
 
@@ -214,6 +228,18 @@ operation as a bounded synchronous tool result. No other artifact operation is t
 
 The legacy catalog contains 21 tools. MCP 2026 adds `regenerate_artifact_preview` for 22; an
 MCP-App-capable client additionally receives the app-only `submit_feedback` action.
+
+### MCP surface synchronization
+
+`node scripts/check-mcp-surface.mjs` is a release gate derived from the frozen tool definitions,
+typed output schemas, Rust dispatch and OAuth scope mapping, README, conformance cases, and native
+test registration. It reports the current names, protocol versions, required test coverage, and
+fails when those surfaces disagree. It deliberately is not another tool registry.
+
+When an intentional compatibility change spans a branch, run
+`node scripts/check-mcp-surface.mjs --base origin/master` to include affected MCP paths in the
+machine-readable report. Update the existing definition/schema/dispatch/docs/tests together; do
+not add a handwritten manifest. Then run the reported conformance and Rust test commands.
 
 ## Architecture
 
@@ -279,7 +305,10 @@ For domain language, invariants, module seams, and workflows, see [`CONTEXT.md`]
 | `MCP_OAUTH_ALLOWED_ALGS` | Asymmetric JWT algorithm allowlist; defaults to `RS256` |
 | `MCP_OAUTH_MAX_TOKEN_LIFETIME_S` / `MCP_OAUTH_CLOCK_TOLERANCE_S` | Access-token maximum lifetime (default `3600`) and clock tolerance (default `30`) |
 | `MCP_API_KEYS_ENABLED` | API-key compatibility switch; defaults to `1`, and may be `0` only with complete OAuth configuration |
-| `WEBHOOK_ENC_KEY` | Optional 32-byte base64 AES-256-GCM key for Discord webhook URLs; unset preserves plaintext fallback with a startup warning |
+| `WEBHOOK_ENC_KEY` | 32-byte base64 AES-256-GCM integration-secret key. Discord webhook URLs retain their legacy plaintext fallback when unset, but organization bot credentials cannot be saved without it |
+| `DISCORD_BOT_TOKEN` | Migration fallback only for an organization with an existing PBI-079 discussion connection; save a write-only organization credential in Settings to retire it |
+| `DISCORD_INBOUND_ENABLED` | Operator kill switch for explicitly authorized two-way Discord Gateway consumption; defaults to `0` and does not affect local feedback or outbound delivery |
+| `AUDIT_LEDGER_HMAC_KEY` | Required 32-byte base64 HMAC key for the tamper-evident security audit ledger; startup fails closed when absent |
 | `PREVIEW_RENDERER_URL` | Optional internal renderer base URL; unset keeps gallery placeholders and Discord text-only |
 | `PREVIEW_RENDER_TIMEOUT_MS` / `PREVIEW_VIEWPORT` | Optional renderer timeout (default `8000`) and social-card crop (default `1200x630`) |
 | `PREVIEW_MAX_PNG_BYTES` | Maximum accepted renderer response and persisted PNG size (default `7500000`) |
@@ -296,6 +325,8 @@ For domain language, invariants, module seams, and workflows, see [`CONTEXT.md`]
 | `MAX_HISTORY` (20) | Retained revisions per artifact |
 | `FEEDBACK_MAX_BODY` (4000) | Max feedback length |
 | `MCP_JSON_LIMIT` | Optional JSON-envelope override; defaults above the configured bundle cap |
+| `INGRESS_*` | Origin admission limits for HTTP headers/URI/body reads, JSON complexity, connection/request/mutation concurrency, render queue depth, and token-bucket read/mutation/MCP/upload/feedback/admin/share source budgets; verified MCP publishers and Access viewers receive separate post-resolution budgets. Conservative defaults are shown in `.env.example`. |
+| `TRUSTED_PROXY_CIDRS` | Optional comma-separated Cloudflare/proxy CIDRs. Only these peers may supply `CF-Connecting-IP`; `X-Forwarded-For` is ignored |
 
 See `.env.example`.
 
@@ -317,12 +348,19 @@ Encrypted rows cannot be opened with a replacement key, so do not simply overwri
 
 1. While the old key is active, inventory each webhook's events/label and copy its full URL from
    Discord's integration settings (artifact-mcp deliberately shows only a mask).
-2. Delete those webhook registrations in artifact-mcp Settings, stop the app, and back up the data
-   volume plus the old key.
-3. Generate and install the new key, restart, then recreate the webhooks. New rows are encrypted
-   with the new key. Keep the old key as long as any backup containing old encrypted rows is kept.
+2. Temporarily remove every event subscription from those registrations so no new delivery rows
+   target them. Keep the registrations and old key in place while the durable-delivery queue
+   drains; follow the
+   [runbook](docs/ops/discord-durable-delivery.md#replacing-a-discord-webhook-safely) and do not
+   continue while any old-target row is non-terminal.
+3. Delete the drained registrations in Settings, stop the app, and back up the data volume plus the
+   old key.
+4. Generate and install the new key, restart, recreate the webhooks, use the awaited Test action,
+   and restore their subscriptions. New rows are encrypted with the new key. Keep the old key as
+   long as any backup containing old encrypted rows is retained.
 
-This procedure has a brief notification outage but never writes decrypted URLs back to SQLite.
+This procedure has a notification outage but neither strands queued work nor writes decrypted URLs
+back to SQLite. A no-outage, dual-key rotation requires a future encryption-lifecycle migration.
 
 ### Optional: persistent gallery and Discord thumbnails
 
@@ -443,8 +481,18 @@ Let an org **publish**: generate a key for it in Settings.
 - **Webhooks** — URLs are validated to the Discord webhook host (no SSRF to arbitrary hosts),
   masked in all responses, and encrypted at rest with AES-256-GCM when `WEBHOOK_ENC_KEY` is set.
   Without it, the service remains zero-config and stores URLs in plaintext after a prominent
-  one-time startup warning. URLs are decrypted only for delivery, which is fire-and-forget with a
-  timeout and no redirect following.
+  one-time startup warning. URLs are decrypted only by bounded durable delivery or the awaited
+  administrator test; provider delivery is at-least-once rather than exactly-once, with explicit
+  duplicate-risk and dead-letter state for operators.
+- **Discord bot credentials** — Settings accepts a write-only token per organization, validates
+  the bot and exact selected destination, and encrypts it with `WEBHOOK_ENC_KEY`. Token material is
+  never returned, masked with token fragments, logged, audited, queued, or sent to an incoming
+  webhook URL. `DISCORD_BOT_TOKEN` is process-only migration fallback for an organization with an
+  existing pilot connection; unrelated organizations cannot implicitly consume it. Outbound
+  threading needs View Channel, Create Public Threads, and Send Messages in Threads. Exact
+  historical recovery additionally needs Read Message History. Explicit per-artifact two-way
+  mode also requires `GUILDS`, `GUILD_MESSAGES`, privileged `MESSAGE_CONTENT`, View Channel, and
+  Read Message History. Outbound policy alone never starts Gateway consumption.
 - **Preview renderer** — optional and off by default. It receives HTML bodies rather than gated
   artifact URLs, runs without host/data/secret mounts on an internal network with no egress, blocks
   browser network requests/navigation, uses an ephemeral Chromium context, and has hard time and
@@ -455,14 +503,16 @@ Let an org **publish**: generate a key for it in Settings.
   controls; invalid, expired, and revoked tokens all return the same 404.
 - Bundle paths are sanitized (no `..`, no absolute); size/file caps enforced; the Docker build
   context excludes deployment secrets, persistent data, and local planning files.
-- Not included: content scanning, rate limiting, or a physically separate raw-content origin.
+- Not included: content scanning or a physically separate raw-content origin. Origin-side ingress
+  rate limits and concurrency bounds complement Cloudflare/proxy controls; they intentionally use
+  opaque source/principal fingerprints and never distinguish valid from invalid keys or shares.
 
 ## Roadmap
 
 - Admin sentiment dashboard (votes + views already collected)
 - Full-text search across the library
 - Cooperative (`data-anchor`) precise anchoring; text-range highlights
-- Per-key rate limits and quotas; artifact TTL/expiry; deleted-artifact tombstone
+- Per-key quota policy recalibration for a larger declared envelope; artifact TTL/expiry; deleted-artifact tombstone
 - Optional separate artifact-delivery origin and content scanning
 
 External no-login sharing is intentionally limited to explicit per-artifact links under `/s/*`;

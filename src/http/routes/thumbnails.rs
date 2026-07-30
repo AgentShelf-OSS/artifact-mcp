@@ -42,11 +42,12 @@ async fn thumbnail_result(
 ) -> Result<Response, AppError> {
     let (_viewer, artifact) = resolve_page_artifact(deps, headers, id).await?;
     let digest = QueryValues::parse(query).single("v").unwrap_or_default();
-    let png = if digest == artifact.meta().body_sha256 {
-        deps.previews.read_thumbnail(&artifact, &digest).await?
-    } else {
-        None
-    };
+    // The store holds its lifecycle read guard across the readiness/digest recheck and the PNG
+    // file read. An update/delete therefore cannot sneak between those two steps.
+    let png = deps
+        .artifacts
+        .read_current_thumbnail(&artifact, &digest, std::sync::Arc::clone(&deps.previews))
+        .await?;
     if let Some(png) = png {
         return Ok(binary_response(
             png,

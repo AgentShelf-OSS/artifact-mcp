@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { SignJWT, generateKeyPair } from "jose";
 
 import {
+  OAUTH_SCOPES,
   createOAuthAuthenticator,
   createPublisherAuthenticator,
   hasRequiredScope,
@@ -144,4 +145,11 @@ test("OAuth scope mapping separates read, publish, review, visibility, and delet
     "artifacts:read"
   );
   assert.equal(requiredScopeForMcpRequest({ method: "server/discover" }), null);
+});
+
+test("OAuth metadata advertises the explicit audit scopes", () => {
+  assert.deepEqual(
+    OAUTH_SCOPES.filter((scope) => scope.startsWith("audit:")),
+    ["audit:read", "audit:export", "audit:global"]
+  );
 });

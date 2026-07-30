@@ -1,6 +1,6 @@
 {
   "name": "artifact-mcp",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "type": "module",
   "description": "Self-hostable MCP server for publishing agent-made HTML artifacts to your own domain, with multi-org tenancy",
   "license": "Apache-2.0",
@@ -22,6 +22,9 @@
     "tunnel:status": "node scripts/anthropic-tunnel.mjs status",
     "tunnel:validate": "node scripts/anthropic-tunnel.mjs validate",
     "tunnel:rollback": "node scripts/anthropic-tunnel.mjs rollback",
+    "release:manifest": "node scripts/release/generate-manifest.mjs",
+    "release:verify-manifest": "node scripts/release/verify-manifest.mjs",
+    "release:source-sbom": "node scripts/release/generate-source-sbom.mjs",
     "test": "node --test --test-concurrency=1"
   },
   "dependencies": {

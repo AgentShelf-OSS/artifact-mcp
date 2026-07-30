@@ -15,13 +15,179 @@ use crate::{
     config::{AccessIdentityMode, AppConfig},
     ports::PageRenderer,
     security::access_retry::{ACCESS_RETRY_PARAM, access_retry_target},
+    security::audit::AuditRequestId,
 };
+
+/// Attach a server-only correlation id for browser mutation audit records. This must not reuse
+/// tower-http's `RequestId`: that layer intentionally preserves a client-provided header.
+pub async fn attach_audit_request_id(mut request: Request, next: Next) -> Response {
+    let id = match AuditRequestId::generate() {
+        Ok(id) => id,
+        Err(error) => return error.into_response(),
+    };
+    request.extensions_mut().insert(id);
+    next.run(request).await
+}
 
 /// Dependencies for the listener-level Cloudflare Access session retry response.
 #[derive(Clone)]
 pub struct AccessRetryState {
     mode: AccessIdentityMode,
     pages: Arc<dyn PageRenderer>,
+}
+
+/// Header added by the first-party portal before every unsafe request.
+///
+/// A browser script on another origin cannot attach this header to a credentialed request without
+/// a CORS preflight. The application does not grant CORS permission to portal mutation routes, so
+/// it is an independent CSRF signal rather than a secret.
+pub const PORTAL_MUTATION_HEADER: &str = "x-artifact-mutation";
+const PORTAL_MUTATION_VALUE: &str = "1";
+// Keep this byte sequence, including key order, aligned with Express's `res.json` output.
+// This response returns before the ordinary `express_etag` layer, so the gate installs the
+// same representation headers itself.
+const CSRF_FORBIDDEN_BODY: &[u8] = br#"{"error":"forbidden","code":"same_origin_required"}"#;
+
+/// Request-authenticity configuration derived once as the application router is built.
+///
+/// It intentionally never trusts the request `Host` header: the configured public URL is the
+/// only canonical origin accepted as a fallback when browsers omit Fetch Metadata.
+#[derive(Clone, Debug)]
+pub struct RequestAuthenticityState {
+    public_origin: String,
+}
+
+impl RequestAuthenticityState {
+    /// Build state from the startup-validated public URL.
+    #[must_use]
+    pub fn from_config(config: &AppConfig) -> Self {
+        let public_origin = url::Url::parse(&config.public_base_url)
+            .expect("PUBLIC_BASE_URL is validated during configuration")
+            .origin()
+            .ascii_serialization();
+        Self { public_origin }
+    }
+}
+
+/// Reject cross-site, cookie-authenticated portal mutations.
+///
+/// `/mcp` is intentionally excluded: its authentication is an explicit API key or OAuth bearer
+/// token, not an ambient viewer session. The policy applies before all human route handlers so a
+/// newly-added mutation cannot accidentally omit the boundary.
+pub async fn same_origin_gate(
+    State(state): State<Arc<RequestAuthenticityState>>,
+    request: Request,
+    next: Next,
+) -> Response {
+    if request.uri().path() == "/mcp" || !is_unsafe_method(request.method()) {
+        return next.run(request).await;
+    }
+
+    // A viewer request only reaches a protected handler when Access credentials are present.
+    // Retaining this distinction means the router's deterministic, credential-free tests remain
+    // useful while production browser sessions always receive the full gate. In a configured
+    // Access deployment the edge supplies either the Access cookie or an identity assertion.
+    if !has_viewer_session(request.headers()) {
+        let mut response = next.run(request).await;
+        append_csrf_vary(response.headers_mut());
+        return response;
+    }
+
+    let accepted = portal_header_present(request.headers())
+        && same_origin_metadata_or_origin(request.headers(), &state);
+    if !accepted {
+        return csrf_forbidden_response();
+    }
+
+    let mut response = next.run(request).await;
+    append_csrf_vary(response.headers_mut());
+    response
+}
+
+fn is_unsafe_method(method: &Method) -> bool {
+    matches!(
+        *method,
+        Method::POST | Method::PUT | Method::PATCH | Method::DELETE
+    )
+}
+
+fn has_viewer_session(headers: &HeaderMap) -> bool {
+    // `CF_Authorization` arrives in Cookie on direct origin deployments. Cloudflare Access can
+    // instead forward its signed assertion, while loopback-only header-trust development uses the
+    // authenticated email header. All three authenticate a human browser request in a supported
+    // mode, so none may bypass the mutation gate.
+    headers.contains_key(header::COOKIE)
+        || headers.contains_key("cf-access-jwt-assertion")
+        || headers.contains_key("cf-access-authenticated-user-email")
+}
+
+fn portal_header_present(headers: &HeaderMap) -> bool {
+    headers
+        .get(PORTAL_MUTATION_HEADER)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| value == PORTAL_MUTATION_VALUE)
+}
+
+fn same_origin_metadata_or_origin(headers: &HeaderMap, state: &RequestAuthenticityState) -> bool {
+    match headers
+        .get("sec-fetch-site")
+        .and_then(|value| value.to_str().ok())
+    {
+        // `none` is deliberately unsafe here. There is no supported address-bar or form POST
+        // flow, so accepting it would create an unnecessary exception to the invariant.
+        Some(value) => value.eq_ignore_ascii_case("same-origin"),
+        None => headers
+            .get(header::ORIGIN)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|origin| origin_matches_public_base(origin, state)),
+    }
+}
+
+fn origin_matches_public_base(origin: &str, state: &RequestAuthenticityState) -> bool {
+    let Ok(parsed) = url::Url::parse(origin) else {
+        return false;
+    };
+    parsed.origin().ascii_serialization() == state.public_origin
+}
+
+fn csrf_forbidden_response() -> Response {
+    let mut response = Response::new(Body::from(CSRF_FORBIDDEN_BODY));
+    *response.status_mut() = StatusCode::FORBIDDEN;
+    response.headers_mut().insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static("application/json; charset=utf-8"),
+    );
+    let etag = weak_etag(CSRF_FORBIDDEN_BODY);
+    response.headers_mut().insert(
+        header::ETAG,
+        HeaderValue::from_str(&etag).expect("weak ETag is a valid header value"),
+    );
+    append_csrf_vary(response.headers_mut());
+    response
+}
+
+fn append_csrf_vary(headers: &mut HeaderMap) {
+    let existing = headers
+        .get(header::VARY)
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    let mut values = existing
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_owned)
+        .collect::<Vec<_>>();
+    for required in ["Sec-Fetch-Site", "Origin"] {
+        if !values
+            .iter()
+            .any(|value| value.eq_ignore_ascii_case(required))
+        {
+            values.push(required.to_owned());
+        }
+    }
+    if let Ok(value) = HeaderValue::from_str(&values.join(", ")) {
+        headers.insert(header::VARY, value);
+    }
 }
 
 impl AccessRetryState {

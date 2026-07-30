@@ -1,0 +1,56 @@
+{
+  "steps": [
+    {
+      "status": 200
+    },
+    {
+      "status": 403,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"33-NKcbRXS6iAK9YutI5oOaWAHZ/LQ\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"forbidden\",\"code\":\"same_origin_required\"}"
+      }
+    },
+    {
+      "status": 403,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"33-NKcbRXS6iAK9YutI5oOaWAHZ/LQ\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"forbidden\",\"code\":\"same_origin_required\"}"
+      }
+    },
+    {
+      "status": 200
+    }
+  ],
+  "postState": {
+    "sql": {
+      "authenticity_boundary_effects": [
+        {
+          "client_id": "conf-csrf-fetch-site"
+        },
+        {
+          "client_id": "conf-csrf-origin"
+        }
+      ]
+    }
+  }
+}

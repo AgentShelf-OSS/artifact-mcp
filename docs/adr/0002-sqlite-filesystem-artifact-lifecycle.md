@@ -19,7 +19,13 @@ Retain SQLite for artifact records, keys, reactions, and migration history, and 
 - Delete by moving the body to hidden trash, deleting metadata, then removing trash. Restore the body if database deletion fails.
 - Reconcile transient paths at startup. If a live artifact record has no final body, recover its staging/trash path. Before replacing an installed body from staging, verify that staging matches the committed digest; preserve and report both paths on mismatch.
 - When recovery installs verified staging over an outgoing body, move that outgoing body to its revision-history path before the swap. This keeps the committed outgoing revision readable and restorable across the commit-then-snapshot crash window.
-- PBI-038 does not change the durability mode: SQLite remains `synchronous=NORMAL`, and staging/history writes and directory renames retain their existing non-fsync behavior. The ordering and verification fixes are independently sufficient to close A2 and A3 without silently changing write-latency semantics.
+- PBI-051 sets SQLite `synchronous=FULL` on the bootstrap and every pooled writer connection.
+  Bodies are written in a staging path on the same filesystem, each file and bundle directory is
+  synced, and every staging/final/history/trash rename is followed by parent-directory syncs.
+- A prepared durability intent conceals an artifact from normal read and list paths while its
+  metadata and body transition. Startup resolves digest-proven completed or aborted intents before
+  the ordinary transient sweep. Ambiguous states retain every viable copy and remain concealed for
+  operator investigation rather than deleting content to make a row appear ready.
 
 ## Durability recommendation (2026-07-22)
 
@@ -36,6 +42,13 @@ The cost is extra storage flush latency on publish, body update, and restore, wi
 ## Consequences
 
 - Normal and caught failure paths keep metadata, bodies, and reactions consistent.
-- A process or host crash can still interrupt the cross-resource sequence, but the next startup repairs only digest-verified states, preserves the outgoing revision before replacement, and reports unresolved divergence without destroying either path.
+- An acknowledged mutation has a best-effort local power-loss guarantee only when the SQLite DB,
+  artifact tree, and their parents are on one local filesystem with working file and directory
+  flush semantics. Network filesystems (NFS/SMB) and cross-device artifact paths are unsupported;
+  a rename or directory-sync failure fails the mutation and preserves recovery evidence.
+- SQLite and filesystems are still not a distributed transaction. Recovery repairs only
+  digest-verified states, preserves the outgoing revision before replacement, and reports
+  unresolved divergence without destroying either path. The durability cost is extra write latency
+  for file, tree, and directory flushes; the operational benchmark records it before release.
 - Orphan artifact bodies are not deleted automatically; destructive reconciliation requires an explicit future decision.
 - SQLite plus local storage remains intentionally single-writer and tied to a persistent volume. Horizontal multi-writer deployment would require revisiting this decision.
