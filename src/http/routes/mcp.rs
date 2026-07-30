@@ -321,11 +321,11 @@ fn validate_transport(
     headers: &HeaderMap,
 ) -> Result<ProtocolEra, TransportValidationError> {
     let header_version = optional_header(headers, "mcp-protocol-version")?;
-    let has_modern_metadata = contains_request_meta(payload);
+    let has_modern_metadata = contains_modern_request_metadata(payload);
     let method = payload.get("method").and_then(OrderedJson::as_str);
     let modern_intent = header_version
         .as_deref()
-        .is_some_and(|version| version != PROTOCOL_VERSION)
+        .is_some_and(|version| version == MODERN_PROTOCOL_VERSION)
         || has_modern_metadata
         || method == Some("server/discover");
 
@@ -439,12 +439,13 @@ fn optional_header(
         .transpose()
 }
 
-fn contains_request_meta(payload: &OrderedJson) -> bool {
+fn contains_modern_request_metadata(payload: &OrderedJson) -> bool {
     match payload {
-        OrderedJson::Array(messages) => messages.iter().any(contains_request_meta),
-        _ => payload
-            .get("params")
-            .is_some_and(|params| params.contains_key("_meta")),
+        OrderedJson::Array(messages) => messages.iter().any(contains_modern_request_metadata),
+        _ => request_meta(payload).is_some_and(|meta| {
+            meta.get("io.modelcontextprotocol/protocolVersion")
+                .is_some()
+        }),
     }
 }
 
