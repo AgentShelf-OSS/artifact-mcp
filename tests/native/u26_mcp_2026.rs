@@ -870,6 +870,53 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
                 })
             );
 
+            let (status, initialized) = post(
+                &router,
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "legacy-initialize",
+                    "method": "initialize",
+                    "params": {
+                        "protocolVersion": "2025-11-25",
+                        "capabilities": {},
+                        "clientInfo": {
+                            "name": "legacy-client",
+                            "version": "1.0.0"
+                        }
+                    }
+                }),
+                &[("mcp-protocol-version", "2025-11-25")],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(initialized["result"]["protocolVersion"], "2025-11-25");
+            assert!(initialized["result"].get("resultType").is_none());
+
+            let (status, legacy_with_version_header) = post(
+                &router,
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "legacy-version-header",
+                    "method": "tools/list",
+                    "params": {
+                        "_meta": { "progressToken": "legacy-progress" }
+                    }
+                }),
+                &[("mcp-protocol-version", "2025-11-25")],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(
+                legacy_with_version_header["result"]
+                    .get("resultType")
+                    .is_none()
+            );
+            assert!(
+                legacy_with_version_header["result"]["tools"]
+                    .as_array()
+                    .is_some_and(|tools| tools.len() == 21)
+            );
+
             let (status, legacy) = post(
                 &router,
                 json!({ "jsonrpc": "2.0", "id": "legacy", "method": "tools/list" }),

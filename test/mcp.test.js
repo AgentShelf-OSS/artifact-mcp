@@ -567,7 +567,7 @@ test("MCP App review actions enforce admin-or-uploader management", async () => 
   );
 });
 
-test("MCP 2026 HTTP metadata rejects mismatches before dispatch", () => {
+test("MCP 2026 HTTP metadata rejects mismatches before dispatch", async () => {
   const payload = {
     jsonrpc: "2.0",
     id: "call",
@@ -615,6 +615,62 @@ test("MCP 2026 HTTP metadata rejects mismatches before dispatch", () => {
     {}
   );
   assert.deepEqual(legacy, { ok: true, protocolVersion: PROTOCOL_VERSION, modern: false });
+
+  const legacyInitialize = validateMcpHttpRequest(
+    {
+      jsonrpc: "2.0",
+      id: "legacy-initialize",
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-11-25",
+        capabilities: {},
+        clientInfo: { name: "legacy-client", version: "1.0.0" }
+      }
+    },
+    { "mcp-protocol-version": "2025-11-25" }
+  );
+  assert.deepEqual(legacyInitialize, {
+    ok: true,
+    protocolVersion: PROTOCOL_VERSION,
+    modern: false
+  });
+
+  const legacyList = validateMcpHttpRequest(
+    {
+      jsonrpc: "2.0",
+      id: "legacy-list",
+      method: "tools/list",
+      params: { _meta: { progressToken: "legacy-progress" } }
+    },
+    { "mcp-protocol-version": "2025-11-25" }
+  );
+  assert.deepEqual(legacyList, {
+    ok: true,
+    protocolVersion: PROTOCOL_VERSION,
+    modern: false
+  });
+  const listedAsLegacy = await handleMcp(
+    {
+      jsonrpc: "2.0",
+      id: "legacy-list",
+      method: "tools/list",
+      params: { _meta: { progressToken: "legacy-progress" } }
+    },
+    auth,
+    { protocolVersion: legacyList.protocolVersion }
+  );
+  assert.equal(listedAsLegacy.result.tools.length, 21);
+  assert.equal(listedAsLegacy.result.resultType, undefined);
+
+  const missingModernMetadata = validateMcpHttpRequest(
+    { jsonrpc: "2.0", id: "modern-missing-meta", method: "tools/list" },
+    {
+      "mcp-protocol-version": MODERN_PROTOCOL_VERSION,
+      "mcp-method": "tools/list"
+    }
+  );
+  assert.equal(missingModernMetadata.status, 400);
+  assert.equal(missingModernMetadata.response.error.code, -32602);
 });
 
 test("MCP artifact events expose revision metadata through the notifier seam", async () => {
