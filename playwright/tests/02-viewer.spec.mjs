@@ -38,25 +38,28 @@ test.describe("artifact viewer", () => {
     expect(hist.status()).toBe(200);
   });
 
-  test("discussion details are safe, actionable for an admin, and never offer an untrusted thread link", async ({ page, request, publisherKey, org }) => {
+  test("discussion details fail safely on Node and expose guarded Rust policy controls without an untrusted thread link", async ({ page, request, publisherKey, org }, testInfo) => {
     const artifact = await publish(request, publisherKey, { title: `PW Discussion ${org}`, html: "<!doctype html><h1>discussion</h1>" });
-    const configured = await request.put(`/settings/orgs/${encodeURIComponent(org)}/discord-discussion`, {
-      headers: { "X-Artifact-Mutation": "1", "Sec-Fetch-Site": "same-origin", "content-type": "application/json" },
-      data: { label: "review", url: "https://discord.com/api/webhooks/123456789012345678/pw-discussion-token" },
-    });
-    expect(configured.status(), await configured.text()).toBe(200);
-
     await page.goto(`/${artifact.id}`);
     await page.locator("#vmore-toggle").click();
     await page.getByRole("button", { name: "Details" }).click();
-    await expect(page.locator("#vdiscussion-state")).toHaveText("Local only");
-    await expect(page.getByRole("button", { name: "Enable mirroring" })).toBeVisible();
-    await expect(page.getByText(/Discord replies do not sync back/i)).toBeVisible();
     await expect(page.getByRole("link", { name: /Open Thread/i })).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Enable mirroring" }).click();
-    await expect(page.locator("#vdiscussion-state")).toHaveText("Connecting");
-    await expect(page.locator("#vdiscussion-state")).toBeFocused();
+    if (testInfo.project.name === "node") {
+      await expect(page.locator("#vdiscussion-state")).toHaveText("Status unavailable");
+      await expect(page.locator("#vdiscussion-actions button")).toHaveCount(0);
+      await expect(page.getByText(/Artifact content and feedback remain available/i)).toBeVisible();
+      return;
+    }
+
+    await expect(page.locator("#vdiscussion-state")).toHaveText("Artifact MCP only");
+    await expect(page.getByRole("button", { name: "Keep discussion in Artifact MCP" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enable two-way Discord sync" })).toBeVisible();
+    await expect(page.getByText(/Artifact MCP remains canonical/i)).toBeVisible();
+
+    await page.getByRole("button", { name: "Keep discussion in Artifact MCP" }).click();
+    await expect(page.locator("#vdiscussion-state")).toHaveText("Artifact MCP only");
+    await expect(page.getByRole("button", { name: "Use organization default" })).toBeFocused();
   });
 
   test("an artifact owner can manage discussion status while a same-org non-owner cannot", async ({ browser, baseURL, request, org }) => {
