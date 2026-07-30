@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import Database from "better-sqlite3";
-import { LATEST_SCHEMA_VERSION } from "../lib/migrations.js";
+import { LATEST_SCHEMA_VERSION, migrateDatabaseThrough } from "../lib/migrations.js";
 import { decrypt } from "../lib/crypto.js";
 
 const ALL_VERSIONS = Array.from({ length: LATEST_SCHEMA_VERSION }, (_, i) => i + 1);
@@ -68,6 +68,38 @@ test("fresh databases apply ordered migrations with foreign keys enabled", () =>
     );
   } finally {
     runtime.db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("historical migration boundary seam executes real ledger steps without manufacturing rows", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-db-boundary-"));
+  const boundary = new Database(path.join(dataDir, "artifacts.db"));
+  try {
+    migrateDatabaseThrough(boundary, 8);
+    assert.deepEqual(boundary.prepare("SELECT version FROM schema_migrations ORDER BY version").pluck().all(),
+      [1, 2, 3, 4, 5, 6, 7, 8]);
+    assert.equal(boundary.prepare("SELECT COUNT(*) FROM sqlite_master WHERE name = 'artifact_revisions'").pluck().get(), 1);
+    assert.equal(boundary.prepare("SELECT COUNT(*) FROM sqlite_master WHERE name = 'artifact_shares'").pluck().get(), 0);
+    assert.throws(() => migrateDatabaseThrough(boundary, LATEST_SCHEMA_VERSION + 1), /Unsupported schema version/);
+  } finally {
+    boundary.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("a frozen v25 audit database upgrades through v26 without rewriting its history", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-db-v25-audit-"));
+  const db = new Database(path.join(dataDir, "artifacts.db"));
+  try {
+    migrateDatabaseThrough(db, 25);
+    assert.equal(db.prepare("PRAGMA table_info(security_audit_chain_head)").all().some((column) => column.name === "head_mac"), false);
+    migrateDatabaseThrough(db);
+    assert.equal(db.prepare("PRAGMA table_info(security_audit_chain_head)").all().some((column) => column.name === "head_mac"), true);
+    assert.equal(db.prepare("PRAGMA table_info(security_audit_chain_head)").all().some((column) => column.name === "pending_receipts_root"), true);
+    assert.deepEqual(db.prepare("PRAGMA table_info(security_audit_receipts)").all().filter((column) => ["actor_id", "result", "canonical_version", "receipt_mac"].includes(column.name)).map((column) => column.name), ["result", "actor_id", "canonical_version", "receipt_mac"]);
+  } finally {
+    db.close();
     rmSync(dataDir, { recursive: true, force: true });
   }
 });

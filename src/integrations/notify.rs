@@ -85,7 +85,8 @@ pub const fn event_color(event: &WebhookEvent) -> u32 {
 }
 
 /// The top-level POST body: `{ embeds: [embed] }` — [lib/notify.js:56].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DiscordPayload {
     /// Exactly one embed, as the reference always builds.
     pub embeds: Vec<Embed>,
@@ -97,7 +98,8 @@ pub struct DiscordPayload {
 /// `{color, author, title, url?, fields}` and then assigns `description` (and, for the preview
 /// path, `image`) afterwards, so both land *after* `fields` in `JSON.stringify` output. Reordering
 /// these declarations changes the bytes Discord receives.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Embed {
     /// `COLORS[event]`.
     pub color: u32,
@@ -118,14 +120,16 @@ pub struct Embed {
 }
 
 /// `author: { name }` — [lib/notify.js:33].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EmbedAuthor {
     /// Organization label, or `Artifact Index`.
     pub name: String,
 }
 
 /// One `{ name, value, inline }` field, in the reference's literal order.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EmbedField {
     /// Field label.
     pub name: String,
@@ -136,7 +140,8 @@ pub struct EmbedField {
 }
 
 /// `image: { url: "attachment://preview.png" }` — [lib/notify.js:68].
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EmbedImage {
     /// Always the `attachment://` form.
     pub url: String,

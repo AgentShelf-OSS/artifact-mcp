@@ -6,7 +6,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use artifact_mcp::config::{AppConfig, SeedKeys};
+use artifact_mcp::config::{AppConfig, Secret, SeedKeys};
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -52,6 +52,7 @@ impl runtime::StartupObserver for Observer {
 fn config_for(data_dir: &Path) -> AppConfig {
     AppConfig {
         data_dir: data_dir.to_path_buf(),
+        audit_ledger_hmac_key: Some(Secret::new("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")),
         public_base_url: "http://conformance.test".to_owned(),
         seed_keys: SeedKeys::parse("publisher:acme:owner-secret,foreign:other:foreign-secret"),
         ..AppConfig::defaults()

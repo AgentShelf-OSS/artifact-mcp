@@ -71,6 +71,7 @@ struct WebhookTemplate {
     url: String,
     label: String,
     has_label: bool,
+    discussion_eligible: bool,
     artifact_events: Vec<WebhookEventTemplate>,
     feedback_events: Vec<WebhookEventTemplate>,
 }
@@ -163,6 +164,7 @@ pub(super) fn render_settings(
                     .webhooks
                     .iter()
                     .map(|webhook| {
+                        let discussion_eligible = webhook.events.contains(&WebhookEvent::Published);
                         let mut events = webhook_events(&webhook.events);
                         let feedback_events = events.split_off(4);
                         WebhookTemplate {
@@ -170,6 +172,7 @@ pub(super) fn render_settings(
                             url: webhook.url.clone(),
                             label: webhook.label.clone(),
                             has_label: !webhook.label.is_empty(),
+                            discussion_eligible,
                             artifact_events: events,
                             feedback_events,
                         }

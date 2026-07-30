@@ -2,6 +2,7 @@
 
 pub mod access;
 pub mod access_retry;
+pub mod audit;
 pub mod auth;
 pub mod crypto;
 pub mod identity;

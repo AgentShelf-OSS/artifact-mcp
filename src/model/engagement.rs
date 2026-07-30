@@ -62,7 +62,8 @@ pub struct Feedback {
     pub artifact_id: ArtifactId,
     pub org: OrgId,
     pub parent_id: Option<FeedbackId>,
-    pub viewer_email: EmailAddress,
+    pub viewer_email: Option<EmailAddress>,
+    pub author: FeedbackAuthor,
     pub body: String,
     pub artifact_revision: u64,
     pub anchor_path: Option<String>,
@@ -75,6 +76,38 @@ pub struct Feedback {
     pub created_at: Timestamp,
     pub resolved_at: Option<Timestamp>,
     pub resolved_by: Option<String>,
+    pub external_created_at: Option<Timestamp>,
+    pub external_edited_at: Option<Timestamp>,
+    pub external_deleted_at: Option<Timestamp>,
+}
+
+/// The author identity carried by new feedback projections.
+///
+/// `Artifact` deliberately retains the historical verified Access email.  `Discord` has no
+/// email field: a Discord snowflake or display name must never become an Artifact MCP viewer,
+/// owner, or unread-notification identity.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "source", rename_all = "snake_case")]
+pub enum FeedbackAuthor {
+    Artifact {
+        viewer_email: EmailAddress,
+    },
+    Discord {
+        external_author_id: String,
+        external_author_display: String,
+    },
+}
+
+impl FeedbackAuthor {
+    /// Backward-compatible projection for legacy callers.  Only verified Artifact identities
+    /// produce a viewer email.
+    #[must_use]
+    pub fn verified_viewer_email(&self) -> Option<&EmailAddress> {
+        match self {
+            Self::Artifact { viewer_email } => Some(viewer_email),
+            Self::Discord { .. } => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -128,7 +161,7 @@ pub struct ViewerNotification {
     pub artifact_title: String,
     pub org: OrgId,
     pub body: String,
-    pub viewer_email: EmailAddress,
+    pub author: FeedbackAuthor,
     pub created_at: Timestamp,
     pub parent_id: Option<FeedbackId>,
     pub resolved: bool,

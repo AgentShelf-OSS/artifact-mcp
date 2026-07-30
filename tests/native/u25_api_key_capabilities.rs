@@ -7,7 +7,7 @@ use std::{
 };
 
 use artifact_mcp::{
-    config::{AppConfig, SeedKeys},
+    config::{AppConfig, Secret, SeedKeys},
     persistence::db,
     security::access::{
         DELETE_PERMISSION_ERROR, PUBLISH_PERMISSION_ERROR, READ_PERMISSION_ERROR,
@@ -60,6 +60,7 @@ impl runtime::StartupObserver for Observer {
 fn config_for(data_dir: &Path) -> AppConfig {
     AppConfig {
         data_dir: data_dir.to_path_buf(),
+        audit_ledger_hmac_key: Some(Secret::new("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")),
         public_base_url: "http://conformance.test".to_owned(),
         seed_keys: SeedKeys::parse(
             "role-reader:acme:reader-secret,\

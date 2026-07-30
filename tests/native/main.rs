@@ -68,6 +68,21 @@ mod u24_security_wave2;
 mod u25_api_key_capabilities;
 mod u26_mcp_2026;
 mod u27_oauth;
+mod u28_csrf;
+mod u29_preview_notifier;
+mod u50_historical_fixtures;
+mod u56_discord_delivery;
+mod u56_envelope_fanout;
+mod u56_feedback_cutover;
+mod u56_lifecycle_crash_recovery;
+mod u56_lifecycle_cutover;
+mod u56_outbox;
+mod u58_admin_audit;
+mod u79_discussion_app;
+mod u79_discussion_persistence;
+mod u79_outbox_bridge;
+mod u80_discord_inbound;
+mod u81_organization_discord;
 
 /// Fails loudly if a file in `tests/native/` is not declared above.
 ///

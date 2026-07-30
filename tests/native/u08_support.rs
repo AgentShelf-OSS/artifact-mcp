@@ -18,6 +18,7 @@ use artifact_mcp::model::{
     PublisherIdentity,
 };
 use artifact_mcp::persistence::db::{self, Database, DbPool};
+use artifact_mcp::security::audit::MutationAudit;
 use rusqlite::params;
 
 use crate::u03_support::TempDataDir;
@@ -26,6 +27,13 @@ use crate::u03_support::TempDataDir;
 pub const TEST_ORG: &str = "acme";
 /// The publisher key every fixture publishes with.
 pub const TEST_CLIENT: &str = "client-1";
+/// Explicit deterministic audit material for the direct lifecycle adapter tests.
+pub const TEST_AUDIT_KEY: [u8; 32] = [0xA5; 32];
+
+/// Explicit verified actor carrier for every direct-store mutation in the lifecycle corpus.
+pub fn mutation_audit() -> MutationAudit {
+    MutationAudit::publisher(&publisher()).expect("deterministic test audit context")
+}
 
 /// A throwaway store over a real database and a real artifact directory.
 pub struct Fixture {
@@ -47,6 +55,12 @@ impl Fixture {
         Self::with_injector(label, faults, StorageLimits::default())
     }
 
+    /// A store with a caller-controlled lifecycle injector. Concurrency proofs use this to
+    /// hold one production mutation at an exact boundary while a second request races it.
+    pub fn with_custom_injector(label: &str, faults: Arc<dyn FaultInjector>) -> Self {
+        Self::with_injector(label, faults, StorageLimits::default())
+    }
+
     /// A store with custom limits (used by the history-retention test).
     pub fn with_limits(label: &str, limits: StorageLimits) -> Self {
         Self::with_injector(label, Arc::new(NoFaults), limits)
@@ -56,12 +70,13 @@ impl Fixture {
         let dir = TempDataDir::new(label);
         let pool = Database::open_at(dir.path()).expect("bootstrap database");
         let artifact_dir = dir.path().join("artifacts");
-        let store = ArtifactStore::with_faults(
+        let store = ArtifactStore::with_faults_for_test(
             pool.clone(),
             artifact_dir.clone(),
             limits,
             Arc::new(SequentialIdSource::default()),
             faults,
+            TEST_AUDIT_KEY,
         );
         let fixture = Self {
             dir,
@@ -236,7 +251,8 @@ impl Fixture {
         request: PublishArtifact,
     ) -> Result<PublishedArtifact, AppError> {
         use artifact_mcp::ports::ArtifactService as _;
-        self.store.publish(request).await
+        let audit = artifact_mcp::security::audit::MutationAudit::publisher(&request.publisher)?;
+        self.store.publish(request, audit).await
     }
 
     /// The current body digest recorded in the row, for divergence assertions.

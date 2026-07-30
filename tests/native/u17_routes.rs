@@ -14,7 +14,8 @@ use artifact_mcp::{
     http::artifact_response::{ANCHOR_BRIDGE_MARKER, DOCUMENT_SANDBOX},
     model::*,
     ports::{
-        AdminService, ArtifactService, BoxFuture, EngagementService, HealthProbe, NotificationSink,
+        AdminService, ArtifactDiscussionView, ArtifactService, BoxFuture, DiscussionConnectionView,
+        DiscussionModeRequest, DiscussionService, EngagementService, HealthProbe, NotificationSink,
         PageRenderer, PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
         integrations::{HealthReport, PreviewPriority},
     },
@@ -171,6 +172,126 @@ impl ViewerIdentity for Fake {
     }
 }
 
+impl DiscussionService for Fake {
+    fn connection<'a>(
+        &'a self,
+        _org: &'a OrgId,
+    ) -> BoxFuture<'a, Result<DiscussionConnectionView, AppError>> {
+        Box::pin(async move {
+            self.operation(
+                "discussions.connection",
+                DiscussionConnectionView {
+                    configured: true,
+                    label: "Forum".to_owned(),
+                    destination: "discord.com/…/masked".to_owned(),
+                    strategy: "notification_thread".to_owned(),
+                    webhook_id: Some("webhook-a".to_owned()),
+                    bot_configured: true,
+                    last_error: None,
+                },
+            )
+        })
+    }
+
+    fn configure_connection(
+        &self,
+        _org: OrgId,
+        _webhook_id: String,
+        _label: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<DiscussionConnectionView, AppError>> {
+        Box::pin(async move {
+            self.operation(
+                "discussions.configure",
+                DiscussionConnectionView {
+                    configured: true,
+                    label: "Forum".to_owned(),
+                    destination: "discord.com/…/masked".to_owned(),
+                    strategy: "notification_thread".to_owned(),
+                    webhook_id: Some("webhook-a".to_owned()),
+                    bot_configured: true,
+                    last_error: None,
+                },
+            )
+        })
+    }
+
+    fn remove_connection(
+        &self,
+        _org: OrgId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move { self.operation("discussions.remove", true) })
+    }
+
+    fn test_connection(
+        &self,
+        _org: OrgId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move { self.operation("discussions.test", true) })
+    }
+
+    fn status<'a>(
+        &'a self,
+        _artifact: &'a ArtifactMeta,
+    ) -> BoxFuture<'a, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            self.operation(
+                "discussions.status",
+                ArtifactDiscussionView {
+                    mode: "artifact_only".to_owned(),
+                    state: "local".to_owned(),
+                    enabled: false,
+                    connection_configured: true,
+                    last_error: None,
+                },
+            )
+        })
+    }
+
+    fn set_mode(
+        &self,
+        _artifact: ArtifactMeta,
+        _mode: DiscussionModeRequest,
+        _actor: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            self.operation(
+                "discussions.set_mode",
+                ArtifactDiscussionView {
+                    mode: "discord_mirror".to_owned(),
+                    state: "pending".to_owned(),
+                    enabled: true,
+                    connection_configured: true,
+                    last_error: None,
+                },
+            )
+        })
+    }
+
+    fn retry(
+        &self,
+        _artifact: ArtifactMeta,
+        _actor: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<ArtifactDiscussionView, AppError>> {
+        Box::pin(async move {
+            self.operation(
+                "discussions.retry",
+                ArtifactDiscussionView {
+                    mode: "discord_mirror".to_owned(),
+                    state: "pending".to_owned(),
+                    enabled: true,
+                    connection_configured: true,
+                    last_error: None,
+                },
+            )
+        })
+    }
+}
+
 impl PublisherAuthenticator for Fake {
     fn authenticate<'a>(
         &'a self,
@@ -194,6 +315,7 @@ impl ArtifactService for Fake {
     fn publish(
         &self,
         _request: PublishArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
         unused()
     }
@@ -293,6 +415,7 @@ impl ArtifactService for Fake {
         &self,
         _artifact: AuthorizedArtifact,
         _update: ArtifactUpdate,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
         unused()
     }
@@ -302,11 +425,16 @@ impl ArtifactService for Fake {
         _artifact: AuthorizedArtifact,
         _revision: u64,
         _acting_client_id: Option<ClientId>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
         unused()
     }
 
-    fn delete(&self, _artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
+    fn delete(
+        &self,
+        _artifact: AuthorizedArtifact,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
         unused()
     }
 
@@ -314,6 +442,7 @@ impl ArtifactService for Fake {
         &self,
         _artifact: AuthorizedArtifact,
         _category: String,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unused()
     }
@@ -322,6 +451,7 @@ impl ArtifactService for Fake {
         &self,
         _artifact: AuthorizedArtifact,
         _hidden: bool,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unused()
     }
@@ -331,6 +461,7 @@ impl ArtifactService for Fake {
         _artifact: AuthorizedArtifact,
         _target_org: OrgId,
         _category: Option<String>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         unused()
     }
@@ -355,11 +486,16 @@ impl AdminService for Fake {
     fn create_key(
         &self,
         _request: CreatePublisherKey,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<CreatedPublisherKey, AppError>> {
         unused()
     }
 
-    fn revoke_key<'a>(&'a self, _client_id: &'a ClientId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn revoke_key<'a>(
+        &'a self,
+        _client_id: &'a ClientId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
 
@@ -395,11 +531,16 @@ impl AdminService for Fake {
     fn create_org(
         &self,
         _request: CreateOrganization,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<Organization, AppError>> {
         unused()
     }
 
-    fn delete_org<'a>(&'a self, _org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
+    fn delete_org<'a>(
+        &'a self,
+        _org: &'a OrgId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
 
@@ -407,6 +548,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         unused()
     }
@@ -415,6 +557,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _domain: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
@@ -423,6 +566,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
         unused()
     }
@@ -431,6 +575,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _email: &'a EmailAddress,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
@@ -443,6 +588,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<String, AppError>> {
         unused()
     }
@@ -451,6 +597,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _name: &'a str,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
@@ -466,6 +613,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _color: Option<&'a str>,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
         unused()
     }
@@ -480,6 +628,7 @@ impl AdminService for Fake {
     fn create_webhook(
         &self,
         _request: CreateWebhook,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<WebhookSummary, AppError>> {
         unused()
     }
@@ -488,6 +637,7 @@ impl AdminService for Fake {
         &'a self,
         _org: &'a OrgId,
         _id: &'a WebhookId,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
         unused()
     }
@@ -497,6 +647,7 @@ impl AdminService for Fake {
         _org: &'a OrgId,
         _id: &'a WebhookId,
         _events: &'a [WebhookEvent],
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'a, Result<Option<WebhookSummary>, AppError>> {
         unused()
     }
@@ -708,6 +859,7 @@ impl ShareService for Fake {
         &self,
         _artifact: AuthorizedArtifact,
         _request: CreateShare,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<PublicShare, AppError>> {
         unused()
     }
@@ -723,6 +875,7 @@ impl ShareService for Fake {
         &self,
         _artifact: AuthorizedArtifact,
         _token: ShareToken,
+        _audit: artifact_mcp::security::audit::MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
         unused()
     }
@@ -778,6 +931,15 @@ impl PreviewService for Fake {
         })
     }
 
+    fn read_thumbnail_sync(
+        &self,
+        _meta: &ArtifactMeta,
+        _digest: &str,
+    ) -> Result<Option<Vec<u8>>, AppError> {
+        let png = self.lock().thumbnail.clone();
+        self.operation("previews.read_thumbnail", png)
+    }
+
     fn placeholder(&self, _meta: &ArtifactMeta, _accent: Option<&str>) -> Vec<u8> {
         let mut state = self.lock();
         state.calls.push("previews.placeholder".to_owned());
@@ -823,24 +985,112 @@ impl HealthProbe for Fake {
 }
 
 fn deps(fake: &Fake) -> AppDeps {
+    deps_with_config(fake, AppConfig::default())
+}
+
+fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
     let fake = Arc::new(fake.clone());
     AppDeps {
         publisher_auth: fake.clone(),
         viewer_identity: fake.clone(),
         artifacts: fake.clone(),
         admin: fake.clone(),
+        discussions: fake.clone(),
         engagement: fake.clone(),
         shares: fake.clone(),
         pages: fake.clone(),
         previews: fake.clone(),
         notifications: fake.clone(),
         health: fake,
+        ingress: Arc::new(artifact_mcp::http::ingress::IngressState::from_config(
+            &config,
+        )),
         preview_tasks: artifact_mcp::mcp::tasks::PreviewTaskStore::new(
             std::env::temp_dir().join(format!("artifact-mcp-u17-tasks-{}", std::process::id())),
         ),
         mcp_telemetry: artifact_mcp::observability::McpTelemetry::default(),
-        config: Arc::new(AppConfig::default()),
+        delivery_telemetry:
+            artifact_mcp::integrations::delivery_runtime::DeliveryTelemetry::default(),
+        delivery_wake: artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
+        audit_access: None,
+        config: Arc::new(config),
     }
+}
+
+#[tokio::test]
+async fn resolved_share_variants_share_the_canonical_verified_budget_while_invalid_tokens_stay_404()
+{
+    let fake = Fake::standard();
+    let mut config = AppConfig::default();
+    config.ingress.shares_per_window = 1;
+    config.ingress.reads_per_window = 20;
+    let app = build_router(deps_with_config(&fake, config));
+    let first = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/s/share%2Dtoken")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+    let canonical = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/s/share-token")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(canonical.status(), StatusCode::TOO_MANY_REQUESTS);
+    let mut invalid_config = AppConfig::default();
+    invalid_config.ingress.shares_per_window = 20;
+    fake.lock().share = None;
+    let missing = build_router(deps_with_config(&fake, invalid_config))
+        .oneshot(
+            Request::builder()
+                .uri("/s/not-a-share")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(missing.status(), StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn resolved_viewers_are_scoped_by_verified_identity_not_cookie_variants_on_one_nat() {
+    let fake = Fake::standard();
+    let mut config = AppConfig::default();
+    config.ingress.reads_per_window = 20;
+    config.ingress.verified_viewers_per_window = 1;
+    let app = build_router(deps_with_config(&fake, config));
+    let request = |cookie: &'static str| {
+        Request::builder()
+            .uri(format!("/raw/{ID}"))
+            .header(header::COOKIE, cookie)
+            .body(Body::empty())
+            .unwrap()
+    };
+    let first = app.clone().oneshot(request("session=one")).await.unwrap();
+    assert_eq!(first.status(), StatusCode::OK);
+    let alternate_cookie = app
+        .clone()
+        .oneshot(request("session=rotated"))
+        .await
+        .unwrap();
+    assert_eq!(alternate_cookie.status(), StatusCode::TOO_MANY_REQUESTS);
+    fake.lock().viewer = Viewer {
+        email: Some(EmailAddress::from("other@acme.test")),
+        org: Some(OrgId::from("acme")),
+        is_admin: false,
+    };
+    let second_viewer = app.oneshot(request("session=other")).await.unwrap();
+    assert_eq!(second_viewer.status(), StatusCode::OK);
 }
 
 async fn invoke(fake: &Fake, method: Method, uri: &str) -> Response {
@@ -869,6 +1119,261 @@ async fn snapshot(fake: &Fake, method: Method, uri: &str) -> (StatusCode, Header
     let headers = response.headers().clone();
     let body = response_body(response).await;
     (status, headers, body)
+}
+
+async fn discussion_request(
+    fake: &Fake,
+    method: Method,
+    uri: &str,
+    body: &'static str,
+) -> Response {
+    build_router(deps(fake))
+        .oneshot(
+            Request::builder()
+                .method(method)
+                .uri(uri)
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(body))
+                .expect("discussion request"),
+        )
+        .await
+        .expect("discussion response")
+}
+
+#[tokio::test]
+async fn discussion_connection_routes_are_admin_only_and_never_echo_a_webhook_secret() {
+    let non_admin = Fake::standard();
+    let denied = invoke(
+        &non_admin,
+        Method::GET,
+        "/settings/orgs/acme/discord-discussion",
+    )
+    .await;
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert!(
+        !non_admin
+            .calls()
+            .iter()
+            .any(|call| call.starts_with("discussions."))
+    );
+    for (method, path, body) in [
+        (
+            Method::PUT,
+            "/settings/orgs/acme/discord-discussion",
+            r#"{"webhookId":"webhook-a","label":"Artifact thread"}"#,
+        ),
+        (Method::DELETE, "/settings/orgs/acme/discord-discussion", ""),
+        (
+            Method::POST,
+            "/settings/orgs/acme/discord-discussion/test",
+            "{}",
+        ),
+    ] {
+        let response = discussion_request(&non_admin, method, path, body).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{path}");
+    }
+
+    let admin = Fake::standard();
+    admin.lock().viewer.is_admin = true;
+    let get = invoke(
+        &admin,
+        Method::GET,
+        "/settings/orgs/acme/discord-discussion",
+    )
+    .await;
+    assert_eq!(get.status(), StatusCode::OK);
+    let body = response_body(get).await;
+    assert!(
+        body.windows(b"masked".len())
+            .any(|window| window == b"masked")
+    );
+    assert!(
+        !body
+            .windows(b"secret".len())
+            .any(|window| window == b"secret")
+    );
+
+    for (method, path, body, call) in [
+        (
+            Method::PUT,
+            "/settings/orgs/acme/discord-discussion",
+            r#"{"webhookId":"webhook-a","label":"Artifact thread"}"#,
+            "discussions.configure",
+        ),
+        (
+            Method::DELETE,
+            "/settings/orgs/acme/discord-discussion",
+            "",
+            "discussions.remove",
+        ),
+        (
+            Method::POST,
+            "/settings/orgs/acme/discord-discussion/test",
+            "{}",
+            "discussions.test",
+        ),
+    ] {
+        let response = discussion_request(&admin, method, path, body).await;
+        assert_eq!(response.status(), StatusCode::OK, "{path}");
+        assert!(admin.calls().iter().any(|seen| seen == call));
+    }
+    let invalid_configure = discussion_request(
+        &admin,
+        Method::PUT,
+        "/settings/orgs/acme/discord-discussion",
+        r#"{"webhookId":"webhook-a","label":"Artifact thread","extra":true}"#,
+    )
+    .await;
+    assert_eq!(invalid_configure.status(), StatusCode::BAD_REQUEST);
+    let invalid_test = discussion_request(
+        &admin,
+        Method::POST,
+        "/settings/orgs/acme/discord-discussion/test",
+        r#"{"unexpected":true}"#,
+    )
+    .await;
+    assert_eq!(invalid_test.status(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn discussion_artifact_routes_conceal_before_body_work_and_enforce_owner_or_admin() {
+    let owner = Fake::standard();
+    {
+        let mut state = owner.lock();
+        state.meta.as_mut().expect("meta").owner_email = Some("member@acme.test".to_owned());
+    }
+    let exact = discussion_request(
+        &owner,
+        Method::PUT,
+        &format!("/{ID}/discussion"),
+        r#"{"mode":"discord_mirror"}"#,
+    )
+    .await;
+    assert_eq!(exact.status(), StatusCode::OK);
+    assert!(
+        owner
+            .calls()
+            .iter()
+            .any(|call| call == "discussions.set_mode")
+    );
+    let safe_status = invoke(&owner, Method::GET, &format!("/{ID}/discussion")).await;
+    let safe_status_body = response_body(safe_status).await;
+    assert!(
+        safe_status_body
+            .windows(b"artifact_only".len())
+            .any(|part| part == b"artifact_only")
+    );
+    assert!(
+        !safe_status_body
+            .windows(b"webhooks".len())
+            .any(|part| part == b"webhooks")
+    );
+
+    let invalid = discussion_request(
+        &owner,
+        Method::PUT,
+        &format!("/{ID}/discussion"),
+        r#"{"mode":"discord_mirror","extra":true}"#,
+    )
+    .await;
+    assert_eq!(invalid.status(), StatusCode::BAD_REQUEST);
+
+    let retry = discussion_request(
+        &owner,
+        Method::POST,
+        &format!("/{ID}/discussion/retry"),
+        "{}",
+    )
+    .await;
+    assert_eq!(retry.status(), StatusCode::OK);
+    let retry_invalid = discussion_request(
+        &owner,
+        Method::POST,
+        &format!("/{ID}/discussion/retry"),
+        r#"{"unexpected":true}"#,
+    )
+    .await;
+    assert_eq!(retry_invalid.status(), StatusCode::BAD_REQUEST);
+
+    let admin = Fake::standard();
+    admin.lock().viewer.is_admin = true;
+    let admin_set = discussion_request(
+        &admin,
+        Method::PUT,
+        &format!("/{ID}/discussion"),
+        r#"{"mode":"artifact_only"}"#,
+    )
+    .await;
+    assert_eq!(admin_set.status(), StatusCode::OK);
+
+    let non_owner = Fake::standard();
+    non_owner.lock().meta.as_mut().expect("meta").owner_email = Some("owner@acme.test".to_owned());
+    let denied = discussion_request(
+        &non_owner,
+        Method::POST,
+        &format!("/{ID}/discussion/retry"),
+        "not json",
+    )
+    .await;
+    assert_eq!(denied.status(), StatusCode::FORBIDDEN);
+    assert!(
+        !non_owner
+            .calls()
+            .iter()
+            .any(|call| call == "discussions.retry")
+    );
+    let oversized = build_router(deps(&non_owner))
+        .oneshot(
+            Request::builder()
+                .method(Method::PUT)
+                .uri(format!("/{ID}/discussion"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from("x".repeat(128 * 1024)))
+                .expect("oversized request"),
+        )
+        .await
+        .expect("oversized response");
+    assert_eq!(oversized.status(), StatusCode::FORBIDDEN);
+
+    let csrf = build_router(deps(&owner))
+        .oneshot(
+            Request::builder()
+                .method(Method::PUT)
+                .uri(format!("/{ID}/discussion"))
+                .header(header::CONTENT_TYPE, "application/json")
+                .header(header::COOKIE, "CF_Authorization=session")
+                .body(Body::from(r#"{"mode":"artifact_only"}"#))
+                .expect("csrf request"),
+        )
+        .await
+        .expect("csrf response");
+    assert_eq!(csrf.status(), StatusCode::FORBIDDEN);
+
+    let foreign = Fake::standard();
+    foreign.lock().viewer.org = Some(OrgId::from("other"));
+    let missing = Fake::standard();
+    missing.lock().viewer.org = Some(OrgId::from("other"));
+    missing.lock().meta = None;
+    let foreign_response = discussion_request(
+        &foreign,
+        Method::PUT,
+        &format!("/{ID}/discussion"),
+        "not json",
+    )
+    .await;
+    let missing_response = discussion_request(
+        &missing,
+        Method::PUT,
+        &format!("/{ID}/discussion"),
+        "not json",
+    )
+    .await;
+    assert_eq!(foreign_response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(missing_response.status(), StatusCode::NOT_FOUND);
+    assert_eq!(
+        response_body(foreign_response).await,
+        response_body(missing_response).await
+    );
 }
 
 #[tokio::test]

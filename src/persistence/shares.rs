@@ -38,13 +38,20 @@
 //! Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent and
 //! matches unconditionally. Recorded as a contract-delta request.
 
-use rusqlite::{Connection, OptionalExtension, params};
+use std::sync::Arc;
+
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use time::{Date, Month};
 
 use crate::config::{Clock, IdSource};
 use crate::error::AppError;
 use crate::model::{
     ArtifactId, CreateShare, OrgId, PublicShare, ShareGrant, ShareToken, Timestamp,
+};
+use crate::persistence::db::{self, DbPool};
+use crate::security::{
+    access::AuthorizedArtifact,
+    audit::{AuditEvent, MutationAudit, append_in_transaction, mutate_in_transaction},
 };
 
 /// `expires` is neither keyword nor an ISO-shaped string — [lib/shares.js:29]
@@ -236,6 +243,82 @@ pub fn revoke(
         .execute(REVOKE_SQL, params![artifact_id.0, token.0])
         .map_err(|error| failed("revoke public share", &error))?;
     Ok(changed > 0)
+}
+
+/// Production public-share creation with the security event appended in the same SQLite
+/// transaction. The tenant comes from the already-authorized persisted artifact metadata.
+pub async fn create_audited_pooled(
+    pool: &DbPool,
+    ids: Arc<dyn IdSource>,
+    clock: Arc<dyn Clock>,
+    artifact: AuthorizedArtifact,
+    request: CreateShare,
+    audit: MutationAudit,
+    audit_key: [u8; 32],
+) -> Result<PublicShare, AppError> {
+    let pool = pool.clone();
+    let meta = artifact.into_meta();
+    db::interact(&pool, move |conn| {
+        let audit = audit.for_target_tenant(&meta.org.0)?;
+        let target = meta.id.0.clone();
+        mutate_in_transaction(conn, &audit_key, &audit, |tx| {
+            let share = create(
+                tx,
+                ids.as_ref(),
+                clock.as_ref(),
+                &meta.id,
+                &meta.org,
+                &request,
+            )?;
+            Ok((
+                share,
+                AuditEvent {
+                    operation: "share.create".to_owned(),
+                    target_type: "artifact".to_owned(),
+                    target_id: target,
+                    result: "success".to_owned(),
+                    classification: "public_share_created".to_owned(),
+                    revision: None,
+                },
+            ))
+        })
+    })
+    .await
+}
+
+/// Production public-share revocation. A missing/already-revoked token is a concealed no-op and
+/// deliberately produces no event, preventing the ledger from becoming a token oracle.
+pub async fn revoke_audited_pooled(
+    pool: &DbPool,
+    artifact: AuthorizedArtifact,
+    token: ShareToken,
+    audit: MutationAudit,
+    audit_key: [u8; 32],
+) -> Result<bool, AppError> {
+    let pool = pool.clone();
+    let meta = artifact.into_meta();
+    db::interact(&pool, move |conn| {
+        let audit = audit.for_target_tenant(&meta.org.0)?;
+        let tx = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|_| AppError::Internal)?;
+        if !revoke(&tx, &meta.id, &token)? {
+            tx.commit().map_err(|_| AppError::Internal)?;
+            return Ok(false);
+        }
+        let event = AuditEvent {
+            operation: "share.revoke".to_owned(),
+            target_type: "artifact".to_owned(),
+            target_id: meta.id.0,
+            result: "success".to_owned(),
+            classification: "public_share_revoked".to_owned(),
+            revision: None,
+        };
+        append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
+        tx.commit().map_err(|_| AppError::Internal)?;
+        Ok(true)
+    })
+    .await
 }
 
 /// `dropSharesOnMoveStmt.run(id)` — [lib/store.js:144,476].

@@ -7,9 +7,9 @@ use std::{
 use artifact_mcp::{
     config::AppConfig,
     model::{
-        ArtifactId, ArtifactMeta, ClientId, EmailAddress, Feedback, FeedbackId, OrgArtifacts,
-        OrgId, Organization, PublisherKeySummary, Reaction, Timestamp, ViewCounts, Viewer,
-        ViewerNotification, WebhookEvent, WebhookId, WebhookSummary,
+        ArtifactId, ArtifactMeta, ClientId, EmailAddress, Feedback, FeedbackAuthor, FeedbackId,
+        OrgArtifacts, OrgId, Organization, PublisherKeySummary, Reaction, Timestamp, ViewCounts,
+        Viewer, ViewerNotification, WebhookEvent, WebhookId, WebhookSummary,
     },
     ports::PageRenderer,
     render::{
@@ -124,7 +124,9 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
         artifact_title: attack.to_owned(),
         org: artifact.org.clone(),
         body: format!("note {attack}"),
-        viewer_email: EmailAddress::from("author@example.test"),
+        author: FeedbackAuthor::Artifact {
+            viewer_email: EmailAddress::from("author@example.test"),
+        },
         created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         parent_id: None,
         resolved: false,
@@ -250,7 +252,10 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         artifact_id: ArtifactId::from("artifact1234"),
         org: OrgId::from("acme"),
         parent_id: None,
-        viewer_email: EmailAddress::from(attack),
+        viewer_email: Some(EmailAddress::from(attack)),
+        author: FeedbackAuthor::Artifact {
+            viewer_email: EmailAddress::from(attack),
+        },
         body: attack.to_owned(),
         artifact_revision: 3,
         anchor_path: Some(attack.to_owned()),
@@ -263,6 +268,9 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         created_at: Timestamp("2026-07-21 12:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,
+        external_created_at: None,
+        external_edited_at: None,
+        external_deleted_at: None,
     };
     let view = ShellView {
         artifact: authorized,
@@ -504,7 +512,9 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
                 artifact_title: attack.to_owned(),
                 org: OrgId::from("acme🎉"),
                 body: attack.to_owned(),
-                viewer_email: EmailAddress::from(attack),
+                author: FeedbackAuthor::Artifact {
+                    viewer_email: EmailAddress::from(attack),
+                },
                 created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
                 parent_id: None,
                 resolved: false,
@@ -563,7 +573,10 @@ fn parity_feedback(attack: &str) -> Feedback {
         artifact_id: ArtifactId::from("artifact1234"),
         org: OrgId::from("acme🎉"),
         parent_id: None,
-        viewer_email: EmailAddress::from(attack),
+        viewer_email: Some(EmailAddress::from(attack)),
+        author: FeedbackAuthor::Artifact {
+            viewer_email: EmailAddress::from(attack),
+        },
         body: attack.to_owned(),
         artifact_revision: 3,
         anchor_path: Some(attack.to_owned()),
@@ -576,6 +589,9 @@ fn parity_feedback(attack: &str) -> Feedback {
         created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,
+        external_created_at: None,
+        external_edited_at: None,
+        external_deleted_at: None,
     }
 }
 

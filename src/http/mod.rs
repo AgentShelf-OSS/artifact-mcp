@@ -5,6 +5,7 @@ use axum::{Router, middleware as axum_middleware};
 use crate::AppDeps;
 
 pub mod artifact_response;
+pub mod ingress;
 pub mod middleware;
 pub mod routes;
 
@@ -13,6 +14,7 @@ pub(crate) fn router() -> Router<AppDeps> {
         .merge(routes::health::router())
         .merge(routes::mcp::router())
         .merge(routes::admin::router())
+        .merge(routes::discussions::router())
         .merge(routes::public_share::router())
         .merge(routes::thumbnails::router())
         .merge(routes::raw::router())

@@ -75,6 +75,7 @@ mod tests {
         fn publish(
             &self,
             _request: PublishArtifact,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
             unavailable()
         }
@@ -152,6 +153,7 @@ mod tests {
             &self,
             _artifact: AuthorizedArtifact,
             _update: ArtifactUpdate,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
             unavailable()
         }
@@ -161,11 +163,16 @@ mod tests {
             _artifact: AuthorizedArtifact,
             _revision: u64,
             _acting_client_id: Option<ClientId>,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
             unavailable()
         }
 
-        fn delete(&self, _artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
+        fn delete(
+            &self,
+            _artifact: AuthorizedArtifact,
+            _audit: crate::security::audit::MutationAudit,
+        ) -> BoxFuture<'_, Result<bool, AppError>> {
             unavailable()
         }
 
@@ -173,6 +180,7 @@ mod tests {
             &self,
             _artifact: AuthorizedArtifact,
             _category: String,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
             unavailable()
         }
@@ -181,6 +189,7 @@ mod tests {
             &self,
             _artifact: AuthorizedArtifact,
             _hidden: bool,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
             unavailable()
         }
@@ -190,6 +199,7 @@ mod tests {
             _artifact: AuthorizedArtifact,
             _target_org: OrgId,
             _category: Option<String>,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
             unavailable()
         }
@@ -214,6 +224,7 @@ mod tests {
         fn create_key(
             &self,
             _request: CreatePublisherKey,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<CreatedPublisherKey, AppError>> {
             unavailable()
         }
@@ -221,6 +232,7 @@ mod tests {
         fn revoke_key<'a>(
             &'a self,
             _client_id: &'a ClientId,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
@@ -254,11 +266,16 @@ mod tests {
         fn create_org(
             &self,
             _request: CreateOrganization,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<Organization, AppError>> {
             unavailable()
         }
 
-        fn delete_org<'a>(&'a self, _org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
+        fn delete_org<'a>(
+            &'a self,
+            _org: &'a OrgId,
+            _audit: crate::security::audit::MutationAudit,
+        ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
 
@@ -266,6 +283,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _domain: &'a str,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<String, AppError>> {
             unavailable()
         }
@@ -274,6 +292,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _domain: &'a str,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
@@ -282,6 +301,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _email: &'a EmailAddress,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
             unavailable()
         }
@@ -290,6 +310,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _email: &'a EmailAddress,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
@@ -305,6 +326,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _name: &'a str,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<String, AppError>> {
             unavailable()
         }
@@ -313,6 +335,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _name: &'a str,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
@@ -325,6 +348,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _color: Option<&'a str>,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
             unavailable()
         }
@@ -339,6 +363,7 @@ mod tests {
         fn create_webhook(
             &self,
             _request: CreateWebhook,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<WebhookSummary, AppError>> {
             unavailable()
         }
@@ -347,6 +372,7 @@ mod tests {
             &'a self,
             _org: &'a OrgId,
             _id: &'a WebhookId,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             unavailable()
         }
@@ -356,6 +382,7 @@ mod tests {
             _org: &'a OrgId,
             _id: &'a WebhookId,
             _events: &'a [WebhookEvent],
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'a, Result<Option<WebhookSummary>, AppError>> {
             unavailable()
         }
@@ -534,6 +561,7 @@ mod tests {
             &self,
             _artifact: AuthorizedArtifact,
             _request: CreateShare,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<PublicShare, AppError>> {
             unavailable()
         }
@@ -549,6 +577,7 @@ mod tests {
             &self,
             _artifact: AuthorizedArtifact,
             _token: ShareToken,
+            _audit: crate::security::audit::MutationAudit,
         ) -> BoxFuture<'_, Result<bool, AppError>> {
             unavailable()
         }
@@ -645,16 +674,23 @@ mod tests {
             viewer_identity: fake.clone(),
             artifacts: fake.clone(),
             admin: fake.clone(),
+            discussions: Arc::new(crate::ports::InertDiscussionService),
             engagement: fake.clone(),
             shares: fake.clone(),
             pages: fake.clone(),
             previews: fake.clone(),
             notifications: fake.clone(),
             health: fake,
+            ingress: Arc::new(crate::http::ingress::IngressState::from_config(
+                &AppConfig::default(),
+            )),
             preview_tasks: crate::mcp::tasks::PreviewTaskStore::new(
                 std::env::temp_dir().join("artifact-mcp-health-test-tasks"),
             ),
             mcp_telemetry: crate::observability::McpTelemetry::default(),
+            delivery_telemetry: crate::integrations::delivery_runtime::DeliveryTelemetry::default(),
+            delivery_wake: crate::integrations::delivery_runtime::DeliveryWakeSignal::default(),
+            audit_access: None,
             config: Arc::new(AppConfig::default()),
         }
     }

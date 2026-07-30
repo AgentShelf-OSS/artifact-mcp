@@ -25,6 +25,15 @@ pub trait PreviewService: Send + Sync {
         artifact: &'a AuthorizedArtifact,
         digest: &'a str,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, AppError>>;
+    /// Synchronous file read used only inside ArtifactStore's lifecycle-read critical section.
+    /// The default keeps deterministic non-filesystem test doubles inert; production overrides it.
+    fn read_thumbnail_sync(
+        &self,
+        _meta: &ArtifactMeta,
+        _digest: &str,
+    ) -> Result<Option<Vec<u8>>, AppError> {
+        Ok(None)
+    }
     fn placeholder(&self, meta: &ArtifactMeta, accent: Option<&str>) -> Vec<u8>;
     fn ensure_thumbnail<'a>(
         &'a self,

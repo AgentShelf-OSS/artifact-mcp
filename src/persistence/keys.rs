@@ -28,7 +28,7 @@
 use std::fmt::Write as _;
 use std::sync::Arc;
 
-use rusqlite::{Connection, OptionalExtension as _};
+use rusqlite::{Connection, OptionalExtension as _, Transaction, TransactionBehavior};
 
 use crate::artifacts::digest::sha256_hex;
 use crate::config::{OsRandom, RandomSource, Secret};
@@ -39,6 +39,7 @@ use crate::model::{
 };
 use crate::persistence::db::{self, DbPool};
 use crate::persistence::orgs::{js_trim, truncate_utf16};
+use crate::security::audit::{AuditEvent, MutationAudit};
 
 /// `crypto.randomBytes(24)` — [lib/keys.js:38]. Rendered as 48 lowercase hex characters.
 pub const SECRET_BYTES: usize = 24;
@@ -325,8 +326,21 @@ pub fn backfill_key_owner(
     confirm: bool,
 ) -> Result<Option<OwnerBackfillResult>, AppError> {
     let transaction = conn
-        .transaction()
+        .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|error| database_failure("start owner backfill", &error))?;
+    let result = backfill_key_owner_in_transaction(&transaction, client_id, owner_email, confirm)?;
+    transaction
+        .commit()
+        .map_err(|error| database_failure("commit owner backfill", &error))?;
+    Ok(result)
+}
+
+fn backfill_key_owner_in_transaction(
+    transaction: &Transaction<'_>,
+    client_id: &str,
+    owner_email: &str,
+    confirm: bool,
+) -> Result<Option<OwnerBackfillResult>, AppError> {
     let Some(org) = transaction
         .query_row(
             "SELECT org FROM api_keys WHERE client_id = ?1",
@@ -338,7 +352,7 @@ pub fn backfill_key_owner(
     else {
         return Ok(None);
     };
-    let Some(owner_email) = normalize_verified_owner(&transaction, Some(owner_email), &org)? else {
+    let Some(owner_email) = normalize_verified_owner(transaction, Some(owner_email), &org)? else {
         return Err(AppError::Validation(
             "Owner is required for backfill.".to_owned(),
         ));
@@ -361,9 +375,6 @@ pub fn backfill_key_owner(
     } else {
         0
     };
-    transaction
-        .commit()
-        .map_err(|error| database_failure("commit owner backfill", &error))?;
     Ok(Some(OwnerBackfillResult {
         client_id: ClientId(client_id.to_owned()),
         org: OrgId(org),
@@ -504,6 +515,40 @@ impl KeyStore {
         .await
     }
 
+    pub async fn create_key_audited(
+        &self,
+        request: CreatePublisherKey,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<CreatedPublisherKey, AppError> {
+        let random = Arc::clone(&self.random);
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let created = create_key(&tx, &request, random.as_ref())?;
+            let audit = audit.for_target_tenant(&created.org.0)?;
+            let event = AuditEvent {
+                operation: "key.create".to_owned(),
+                target_type: "publisher_key".to_owned(),
+                target_id: created.client_id.0.clone(),
+                result: "success".to_owned(),
+                classification: "credential_created".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(created)
+        })
+        .await
+    }
+
     /// See [`revoke_key`].
     ///
     /// # Errors
@@ -511,6 +556,55 @@ impl KeyStore {
     pub async fn revoke_key(&self, client_id: &ClientId) -> Result<bool, AppError> {
         let client_id = client_id.0.clone();
         db::interact(&self.pool, move |conn| revoke_key(conn, &client_id)).await
+    }
+
+    pub async fn revoke_key_audited(
+        &self,
+        client_id: ClientId,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let Some(org) = tx
+                .query_row(
+                    "SELECT org FROM api_keys WHERE client_id=?1 AND revoked_at IS NULL",
+                    [&client_id.0],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|error| database_failure("load key", &error))?
+            else {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(false);
+            };
+            let changed = revoke_key(&tx, &client_id.0)?;
+            if !changed {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(false);
+            }
+            let event = AuditEvent {
+                operation: "key.revoke".to_owned(),
+                target_type: "publisher_key".to_owned(),
+                target_id: client_id.0.clone(),
+                result: "success".to_owned(),
+                classification: "credential_revoked".to_owned(),
+                revision: None,
+            };
+            let audit = audit.for_target_tenant(&org)?;
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(true)
+        })
+        .await
     }
 
     pub async fn set_key_owner(
@@ -524,6 +618,73 @@ impl KeyStore {
         .await
     }
 
+    pub async fn set_key_owner_audited(
+        &self,
+        client_id: ClientId,
+        owner_email: Option<String>,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Option<KeyOwnerUpdate>, AppError> {
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let Some(org) = tx
+                .query_row(
+                    "SELECT org FROM api_keys WHERE client_id=?1",
+                    [&client_id.0],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()
+                .map_err(|error| database_failure("load key owner", &error))?
+            else {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(None);
+            };
+            let next = normalize_verified_owner(&tx, owner_email.as_deref(), &org)?;
+            let current = tx
+                .query_row(
+                    "SELECT owner_email FROM api_keys WHERE client_id=?1",
+                    [&client_id.0],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .map_err(|error| database_failure("load key owner", &error))?;
+            let updated = KeyOwnerUpdate {
+                client_id: client_id.clone(),
+                org: OrgId(org),
+                owner_email: next.clone(),
+            };
+            if current == next {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(Some(updated));
+            }
+            tx.execute(
+                "UPDATE api_keys SET owner_email=?1 WHERE client_id=?2",
+                rusqlite::params![next, client_id.0],
+            )
+            .map_err(|error| database_failure("set key owner", &error))?;
+            let event = AuditEvent {
+                operation: "key.owner.set".to_owned(),
+                target_type: "publisher_key".to_owned(),
+                target_id: client_id.0.clone(),
+                result: "success".to_owned(),
+                classification: "owner_assignment".to_owned(),
+                revision: None,
+            };
+            let audit = audit.for_target_tenant(&updated.org.0)?;
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(Some(updated))
+        })
+        .await
+    }
+
     pub async fn backfill_key_owner(
         &self,
         client_id: ClientId,
@@ -532,6 +693,52 @@ impl KeyStore {
     ) -> Result<Option<OwnerBackfillResult>, AppError> {
         db::interact(&self.pool, move |conn| {
             backfill_key_owner(conn, &client_id.0, &owner_email, confirm)
+        })
+        .await
+    }
+
+    pub async fn backfill_key_owner_audited(
+        &self,
+        client_id: ClientId,
+        owner_email: String,
+        confirm: bool,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Option<OwnerBackfillResult>, AppError> {
+        if !confirm {
+            return self.backfill_key_owner(client_id, owner_email, false).await;
+        }
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let result = backfill_key_owner_in_transaction(&tx, &client_id.0, &owner_email, true)?;
+            let Some(result) = result else {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(None);
+            };
+            if result.updated == 0 {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(Some(result));
+            }
+            let audit = audit.for_target_tenant(&result.org.0)?;
+            let event = AuditEvent {
+                operation: "key.owner.backfill".to_owned(),
+                target_type: "publisher_key".to_owned(),
+                target_id: client_id.0.clone(),
+                result: "success".to_owned(),
+                classification: "owner_backfill_confirmed".to_owned(),
+                revision: None,
+            };
+            crate::security::audit::append_in_transaction(
+                &tx,
+                &audit_key,
+                &audit.event_id()?,
+                audit.context(),
+                &event,
+            )?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(Some(result))
         })
         .await
     }

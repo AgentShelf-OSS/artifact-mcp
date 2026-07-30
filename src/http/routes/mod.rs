@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod artifact;
+pub mod discussions;
 pub mod feedback;
 pub mod gallery;
 pub mod health;

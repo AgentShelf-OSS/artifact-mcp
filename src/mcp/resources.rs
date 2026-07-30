@@ -160,14 +160,17 @@ async fn read_resource(
     let artifact = authorized.into_authorized();
 
     if target.thumbnail {
-        let thumbnail = if current.is_bundle || current.body_sha256.is_empty() {
-            None
-        } else {
-            deps.previews
-                .read_thumbnail(&artifact, &current.body_sha256)
-                .await
-                .map_err(resource_app_error)?
-        };
+        // Hold ArtifactStore's lifecycle read guard from readiness/digest recheck through the
+        // preview read, so a concurrent update/delete cannot return a stale PNG after auth.
+        let thumbnail = deps
+            .artifacts
+            .read_current_thumbnail(
+                &artifact,
+                &current.body_sha256,
+                std::sync::Arc::clone(&deps.previews),
+            )
+            .await
+            .map_err(resource_app_error)?;
         let (mime_type, bytes) = thumbnail.map_or_else(
             || ("image/svg+xml", deps.previews.placeholder(&current, None)),
             |png| ("image/png", png),

@@ -89,7 +89,11 @@
       "request": {
         "method": "DELETE",
         "path": "/${publisher_write_id}",
-        "headers": { "cf-access-authenticated-user-email": "${viewer_acme}" }
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
       },
       "expect": { "status": 200, "body": { "mode": "canonical-json" } }
     },

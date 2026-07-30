@@ -19,8 +19,8 @@ use crate::{
     http::artifact_response::is_html_content_type,
     mcp::protocol::OrderedJson,
     model::{
-        ArtifactId, Feedback, FeedbackAnchor, FeedbackId, NotificationPayload, OrgId,
-        SubmitFeedback, Timestamp, WebhookEvent,
+        ArtifactId, Feedback, FeedbackAnchor, FeedbackAuthor, FeedbackId, OrgId, SubmitFeedback,
+        Timestamp,
     },
     persistence::feedback::{
         ANCHOR_NOT_OBJECT_MESSAGE, ANCHOR_PAGE_MISSING_MESSAGE, ANCHOR_PAGE_NOT_BUNDLE_MESSAGE,
@@ -41,7 +41,8 @@ struct FeedbackResponse {
     id: FeedbackId,
     artifact_id: ArtifactId,
     org: OrgId,
-    viewer_email: crate::model::EmailAddress,
+    viewer_email: Option<crate::model::EmailAddress>,
+    author: FeedbackAuthor,
     body: String,
     artifact_revision: u64,
     created_at: Timestamp,
@@ -64,6 +65,7 @@ impl From<Feedback> for FeedbackResponse {
             artifact_id: feedback.artifact_id,
             org: feedback.org,
             viewer_email: feedback.viewer_email,
+            author: feedback.author,
             body: feedback.body,
             artifact_revision: feedback.artifact_revision,
             created_at: feedback.created_at,
@@ -108,7 +110,8 @@ async fn list_feedback(
 struct CreatedFeedbackResponse {
     id: FeedbackId,
     artifact_id: ArtifactId,
-    viewer_email: crate::model::EmailAddress,
+    viewer_email: Option<crate::model::EmailAddress>,
+    author: FeedbackAuthor,
     body: String,
     parent_id: Option<FeedbackId>,
     anchor_path: Option<String>,
@@ -128,6 +131,7 @@ impl From<Feedback> for CreatedFeedbackResponse {
             id: feedback.id,
             artifact_id: feedback.artifact_id,
             viewer_email: feedback.viewer_email,
+            author: feedback.author,
             body: feedback.body,
             parent_id: feedback.parent_id,
             anchor_path: feedback.anchor_path,
@@ -148,7 +152,13 @@ async fn submit_feedback(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.feedback_json).await {
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.feedback_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
@@ -210,23 +220,7 @@ async fn submit_feedback(
         }
         Err(error) => return no_store(error.into_response()),
     };
-    let payload = NotificationPayload {
-        artifact_id: meta.id.clone(),
-        title: meta.title,
-        url: format!("{}/{}", deps.config.public_base_url, meta.id),
-        description: meta.description,
-        uploader_label: meta.uploader_label,
-        category: meta.category,
-        revision: meta.revision,
-        bytes: meta.bytes,
-        viewer_email: Some(viewer_email),
-        body: Some(created.body.clone()),
-        resolver: None,
-    };
-    let _ignored = deps
-        .notifications
-        .emit(WebhookEvent::Feedback, meta.org, payload)
-        .await;
+    deps.delivery_wake.wake();
     no_store(
         (
             StatusCode::CREATED,
@@ -388,13 +382,6 @@ async fn resolve_feedback(
         Ok(allowed) => allowed,
         Err(error) => return no_store(error.into_response()),
     };
-    let meta = artifact.meta().clone();
-    let resolver_email = viewer.email.clone().unwrap_or_default();
-    let resolver = if viewer.is_admin {
-        format!("admin:{resolver_email}")
-    } else {
-        resolver_email.0
-    };
     let mutation = match deps
         .engagement
         .resolve_feedback_as_viewer(artifact, viewer, FeedbackId(fid.clone()))
@@ -404,23 +391,7 @@ async fn resolve_feedback(
         Err(error) => return no_store(error.into_response()),
     };
     if mutation.changed {
-        let payload = NotificationPayload {
-            artifact_id: meta.id.clone(),
-            title: meta.title,
-            url: format!("{}/{}", deps.config.public_base_url, meta.id),
-            description: meta.description,
-            uploader_label: meta.uploader_label,
-            category: meta.category,
-            revision: meta.revision,
-            bytes: meta.bytes,
-            viewer_email: None,
-            body: None,
-            resolver: Some(resolver),
-        };
-        let _ignored = deps
-            .notifications
-            .emit(WebhookEvent::Resolved, meta.org, payload)
-            .await;
+        deps.delivery_wake.wake();
     }
     no_store(
         Json(ResolveFeedbackResponse {

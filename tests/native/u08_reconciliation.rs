@@ -9,7 +9,7 @@
 use artifact_mcp::model::ArtifactMeta;
 use artifact_mcp::ports::ArtifactService as _;
 
-use crate::u08_support::{Fixture, html_update, read_names, sha256_hex};
+use crate::u08_support::{Fixture, html_update, mutation_audit, read_names, sha256_hex};
 
 const OLD: &str = "<p>OLD</p>";
 const NEW: &str = "<p>NEW</p>";
@@ -357,7 +357,7 @@ async fn orphan_history_is_reclaimed_only_when_cleaning() {
     let meta = fixture.publish_single(OLD).await;
     fixture
         .store
-        .update_for(&meta, html_update(1, NEW))
+        .update_for(&meta, html_update(1, NEW), mutation_audit())
         .await
         .expect("update creates a history snapshot");
     assert_eq!(fixture.history_entries(&meta), vec!["1.html"]);
@@ -389,7 +389,7 @@ async fn the_history_directory_is_never_an_orphan_body() {
     let meta = fixture.publish_single(OLD).await;
     fixture
         .store
-        .update_for(&meta, html_update(1, NEW))
+        .update_for(&meta, html_update(1, NEW), mutation_audit())
         .await
         .expect("update creates a history snapshot");
 

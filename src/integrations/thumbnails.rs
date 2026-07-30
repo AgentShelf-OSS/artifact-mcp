@@ -70,18 +70,23 @@
 use std::collections::{HashMap, VecDeque};
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicU64, Ordering},
+};
 
 use tokio::sync::{OnceCell, oneshot};
 
-use crate::artifacts::paths::{
-    BodyDigest, SafeArtifactId, preview_artifact_dir, preview_dir, thumbnail_path,
+use crate::artifacts::{
+    lifecycle::{ArtifactStore, PostCommitPreviewScheduler},
+    paths::{BodyDigest, SafeArtifactId, preview_artifact_dir, preview_dir, thumbnail_path},
 };
 use crate::config::{AppConfig, OsRandom, RandomSource};
 use crate::error::AppError;
+use crate::http::ingress::RenderQueuePressure;
 use crate::model::{ArtifactId, ArtifactMeta};
-use crate::ports::BoxFuture;
 use crate::ports::integrations::{PreviewPriority, PreviewService};
+use crate::ports::{ArtifactService, BoxFuture};
 use crate::security::access::AuthorizedArtifact;
 
 use super::preview::PreviewRenderer;
@@ -312,16 +317,51 @@ impl ThumbnailStore {
         }
         let target = self.thumbnail_path(meta)?;
         let max_bytes = self.max_png_bytes;
-        blocking(move || {
-            let png = std::fs::read(&target).ok()?;
-            if valid_png(&png, max_bytes) {
-                return Some(png);
-            }
-            remove_file_quietly(&target);
-            None
-        })
-        .await
-        .flatten()
+        blocking(move || Self::read_thumbnail_path(&target, max_bytes))
+            .await
+            .flatten()
+    }
+
+    /// Reads a digest-addressed thumbnail for a durable delivery reference.
+    ///
+    /// Unlike [`Self::read_thumbnail`], this intentionally permits a prior digest for an
+    /// artifact that has since advanced to a newer revision. The delivery worker has already
+    /// bound the reference to a same-tenant, non-bundle artifact; this method validates only the
+    /// path components and the PNG, never exposes a path, and never renders.
+    pub async fn read_delivery_thumbnail(
+        &self,
+        artifact_id: &ArtifactId,
+        digest: &str,
+    ) -> Option<Vec<u8>> {
+        let id = SafeArtifactId::addressable(&artifact_id.0)?;
+        let digest = BodyDigest::parse(digest)?;
+        let target = thumbnail_path(&self.data_dir, &id, &digest);
+        let max_bytes = self.max_png_bytes;
+        blocking(move || Self::read_thumbnail_path(&target, max_bytes))
+            .await
+            .flatten()
+    }
+
+    /// Same bytes-only operation as [`Self::read_thumbnail`], for the artifact lifecycle's
+    /// synchronous read gate. It intentionally performs no rendering or queue work.
+    pub fn read_thumbnail_sync(
+        &self,
+        meta: &ArtifactMeta,
+        requested_digest: &str,
+    ) -> Option<Vec<u8>> {
+        if meta.is_bundle || requested_digest != meta.body_sha256 {
+            return None;
+        }
+        Self::read_thumbnail_path(&self.thumbnail_path(meta)?, self.max_png_bytes)
+    }
+
+    fn read_thumbnail_path(target: &Path, max_bytes: u64) -> Option<Vec<u8>> {
+        let png = std::fs::read(target).ok()?;
+        if valid_png(&png, max_bytes) {
+            return Some(png);
+        }
+        remove_file_quietly(target);
+        None
     }
 
     /// `ensureThumbnail(meta, html)` — [lib/thumbnails.js:142-151]
@@ -698,6 +738,7 @@ struct QueuedJob {
     meta: ArtifactMeta,
     html: PreviewHtml,
     respond: oneshot::Sender<Option<Vec<u8>>>,
+    reserved_bytes: u64,
 }
 
 #[derive(Default)]
@@ -705,6 +746,7 @@ struct QueueState {
     high: VecDeque<QueuedJob>,
     low: VecDeque<QueuedJob>,
     running: bool,
+    reserved_bytes: u64,
 }
 
 /// Pending job counts — `pending()` [lib/thumbnails.js:235]
@@ -713,6 +755,7 @@ pub struct QueueDepth {
     pub high: usize,
     pub low: usize,
     pub running: bool,
+    pub reserved_bytes: u64,
 }
 
 /// `createThumbnailQueue({ thumbnails })` — [lib/thumbnails.js:207-236]
@@ -725,6 +768,10 @@ pub struct QueueDepth {
 pub struct ThumbnailQueue {
     store: Arc<ThumbnailStore>,
     state: Mutex<QueueState>,
+    max_pending: usize,
+    max_pending_bytes: u64,
+    rejections: Option<Arc<AtomicU64>>,
+    pressure: Arc<Mutex<Option<RenderQueuePressure>>>,
 }
 
 impl std::fmt::Debug for QueueState {
@@ -741,10 +788,54 @@ impl std::fmt::Debug for QueueState {
 impl ThumbnailQueue {
     #[must_use]
     pub fn new(store: Arc<ThumbnailStore>) -> Arc<Self> {
+        Self::new_with_limits_and_counter(store, usize::MAX, u64::MAX, None)
+    }
+
+    /// Construct a queue with a bounded number of waiting jobs. The running job is not counted;
+    /// this keeps renderer backpressure independent from request admission permits.
+    #[must_use]
+    pub fn new_with_limit(store: Arc<ThumbnailStore>, max_pending: usize) -> Arc<Self> {
+        Self::new_with_limits_and_counter(store, max_pending, u64::MAX, None)
+    }
+
+    /// Same bounded queue with a low-cardinality rejection counter owned by the ingress metrics.
+    #[must_use]
+    pub fn new_with_limit_and_counter(
+        store: Arc<ThumbnailStore>,
+        max_pending: usize,
+        rejections: Option<Arc<AtomicU64>>,
+    ) -> Arc<Self> {
+        Self::new_with_limits_and_counter(store, max_pending, u64::MAX, rejections)
+    }
+
+    /// Bounded job-count and declared-byte reservation used by the production notifier. Bytes
+    /// remain reserved until the active render releases them, so queued work cannot race an
+    /// in-flight body load and exceed the configured memory envelope.
+    #[must_use]
+    pub fn new_with_limits_and_counter(
+        store: Arc<ThumbnailStore>,
+        max_pending: usize,
+        max_pending_bytes: u64,
+        rejections: Option<Arc<AtomicU64>>,
+    ) -> Arc<Self> {
         Arc::new(Self {
             store,
             state: Mutex::new(QueueState::default()),
+            max_pending: max_pending.max(1),
+            max_pending_bytes: max_pending_bytes.max(1),
+            rejections,
+            pressure: Arc::new(Mutex::new(None)),
         })
+    }
+
+    #[must_use]
+    pub fn with_pressure(self: Arc<Self>, pressure: RenderQueuePressure) -> Arc<Self> {
+        *self
+            .pressure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(pressure);
+        self.update_pressure();
+        self
     }
 
     /// `pending()` — [lib/thumbnails.js:235]
@@ -755,6 +846,7 @@ impl ThumbnailQueue {
             high: state.high.len(),
             low: state.low.len(),
             running: state.running,
+            reserved_bytes: state.reserved_bytes,
         }
     }
 
@@ -769,14 +861,40 @@ impl ThumbnailQueue {
         html: PreviewHtml,
         priority: PreviewPriority,
     ) -> BoxFuture<'static, Option<Vec<u8>>> {
+        self.try_enqueue(meta, html, priority)
+            .unwrap_or_else(|| Box::pin(async { None }))
+    }
+
+    /// Reserve count and byte capacity before scheduling work. `None` means no task may be
+    /// spawned by the caller: the job was never accepted and no artifact body should be loaded.
+    pub fn try_enqueue(
+        self: &Arc<Self>,
+        meta: ArtifactMeta,
+        html: PreviewHtml,
+        priority: PreviewPriority,
+    ) -> Option<BoxFuture<'static, Option<Vec<u8>>>> {
         let (respond, receive) = oneshot::channel();
         let job = QueuedJob {
+            reserved_bytes: meta.bytes,
             meta,
             html,
             respond,
         };
         let start = {
             let mut state = self.lock_state();
+            if state.high.len().saturating_add(state.low.len()) >= self.max_pending
+                || meta_bytes_would_exceed(
+                    state.reserved_bytes,
+                    job.reserved_bytes,
+                    self.max_pending_bytes,
+                )
+            {
+                if let Some(rejections) = &self.rejections {
+                    rejections.fetch_add(1, Ordering::Relaxed);
+                }
+                return None;
+            }
+            state.reserved_bytes = state.reserved_bytes.saturating_add(job.reserved_bytes);
             match priority {
                 PreviewPriority::High => state.high.push_back(job),
                 PreviewPriority::Low => state.low.push_back(job),
@@ -790,8 +908,59 @@ impl ThumbnailQueue {
             let lane = Arc::clone(self);
             tokio::spawn(lane.drain());
         }
+        self.update_pressure();
         // A sender dropped without a value (worker panic) resolves to "no thumbnail", never an
         // error: an unfinished preview must not fail the mutation that requested it.
+        Some(Box::pin(async move { receive.await.unwrap_or(None) }))
+    }
+
+    /// Reserve queue capacity before cloning an HTML body from an HTTP mutation. The generic
+    /// [`Self::enqueue`] API also supports deferred startup work, but the request path must not
+    /// create an additional multi-megabyte `String` merely to discover that the renderer lane is
+    /// full. A rejected preview is intentionally optional and resolves to `None`.
+    pub fn enqueue_ready(
+        self: &Arc<Self>,
+        meta: ArtifactMeta,
+        html: &str,
+        priority: PreviewPriority,
+    ) -> BoxFuture<'static, Option<Vec<u8>>> {
+        let (respond, receive) = oneshot::channel();
+        let reserved_bytes = meta.bytes;
+        let start = {
+            let mut state = self.lock_state();
+            if state.high.len().saturating_add(state.low.len()) >= self.max_pending
+                || meta_bytes_would_exceed(
+                    state.reserved_bytes,
+                    reserved_bytes,
+                    self.max_pending_bytes,
+                )
+            {
+                if let Some(rejections) = &self.rejections {
+                    rejections.fetch_add(1, Ordering::Relaxed);
+                }
+                let _ = respond.send(None);
+                return Box::pin(async { None });
+            }
+            state.reserved_bytes = state.reserved_bytes.saturating_add(reserved_bytes);
+            let job = QueuedJob {
+                meta,
+                html: PreviewHtml::Ready(html.to_owned()),
+                respond,
+                reserved_bytes,
+            };
+            match priority {
+                PreviewPriority::High => state.high.push_back(job),
+                PreviewPriority::Low => state.low.push_back(job),
+            }
+            let idle = !state.running;
+            state.running = true;
+            idle
+        };
+        if start {
+            let lane = Arc::clone(self);
+            tokio::spawn(lane.drain());
+        }
+        self.update_pressure();
         Box::pin(async move { receive.await.unwrap_or(None) })
     }
 
@@ -804,10 +973,16 @@ impl ThumbnailQueue {
                     Some(job) => job,
                     None => {
                         state.running = false;
+                        // The previous job reported its completion while the lane was still
+                        // marked running. Publish the final idle transition as well so the
+                        // ingress gauge cannot remain stuck at one after a drained queue.
+                        drop(state);
+                        self.update_pressure();
                         return;
                     }
                 }
             };
+            self.update_pressure();
             let html = match job.html {
                 PreviewHtml::Ready(html) => Some(html),
                 PreviewHtml::Deferred(load) => load().await,
@@ -816,6 +991,11 @@ impl ThumbnailQueue {
                 .store
                 .ensure_thumbnail(&job.meta, html.as_deref())
                 .await;
+            {
+                let mut state = self.lock_state();
+                state.reserved_bytes = state.reserved_bytes.saturating_sub(job.reserved_bytes);
+            }
+            self.update_pressure();
             let _ = job.respond.send(png);
         }
     }
@@ -825,6 +1005,26 @@ impl ThumbnailQueue {
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
+
+    fn update_pressure(&self) {
+        let pressure = self
+            .pressure
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
+        if let Some(pressure) = pressure {
+            let state = self.lock_state();
+            pressure.update(
+                state.high.len().saturating_add(state.low.len()),
+                state.running,
+                state.reserved_bytes,
+            );
+        }
+    }
+}
+
+fn meta_bytes_would_exceed(current: u64, requested: u64, limit: u64) -> bool {
+    requested > limit || current.saturating_add(requested) > limit
 }
 
 // ---------------------------------------------------------------------------
@@ -848,12 +1048,39 @@ impl PreviewIntegration {
         Self { store, queue }
     }
 
+    /// Compose the production preview adapter around a caller-managed serial queue.
+    ///
+    /// This is useful when composition needs a bounded queue with explicit admission limits.
+    #[must_use]
+    pub const fn from_parts(store: Arc<ThumbnailStore>, queue: Arc<ThumbnailQueue>) -> Self {
+        Self { store, queue }
+    }
+
     /// Build the whole preview stack from configuration. A missing `PREVIEW_RENDERER_URL` yields
     /// a fully inert but perfectly usable service.
     #[must_use]
     pub fn from_config(config: &AppConfig) -> Self {
+        Self::from_config_with_queue_counter(config, None, None)
+    }
+
+    /// Production constructor that connects bounded renderer pressure to origin metrics.
+    #[must_use]
+    pub fn from_config_with_queue_counter(
+        config: &AppConfig,
+        queue_rejections: Option<Arc<AtomicU64>>,
+        queue_pressure: Option<RenderQueuePressure>,
+    ) -> Self {
         let renderer = Arc::new(PreviewRenderer::new(&config.preview));
-        Self::new(Arc::new(ThumbnailStore::from_config(config, renderer)))
+        let max_pending = usize::try_from(config.ingress.render_queue_jobs).unwrap_or(usize::MAX);
+        let store = Arc::new(ThumbnailStore::from_config(config, renderer));
+        let queue = ThumbnailQueue::new_with_limits_and_counter(
+            Arc::clone(&store),
+            max_pending,
+            config.ingress.render_queue_bytes,
+            queue_rejections,
+        );
+        let queue = queue_pressure.map_or(queue.clone(), |pressure| queue.with_pressure(pressure));
+        Self { store, queue }
     }
 
     #[must_use]
@@ -864,6 +1091,50 @@ impl PreviewIntegration {
     #[must_use]
     pub fn queue(&self) -> &Arc<ThumbnailQueue> {
         &self.queue
+    }
+}
+
+/// Production-only scheduler for persistent artifact gallery thumbnails.
+///
+/// Queue admission occurs after the artifact mutation and its durable delivery fanout have
+/// committed. It never emits a notification and its deferred body loader re-checks the current
+/// digest before touching disk, so a fast update cannot render an obsolete body as current.
+#[derive(Debug)]
+pub struct PersistentThumbnailScheduler {
+    previews: Arc<PreviewIntegration>,
+}
+
+impl PersistentThumbnailScheduler {
+    #[must_use]
+    pub const fn new(previews: Arc<PreviewIntegration>) -> Self {
+        Self { previews }
+    }
+}
+
+impl PostCommitPreviewScheduler for PersistentThumbnailScheduler {
+    fn schedule(&self, artifacts: ArtifactStore, meta: ArtifactMeta) {
+        if meta.is_bundle || BodyDigest::parse(&meta.body_sha256).is_none() {
+            return;
+        }
+        let id = meta.id.clone();
+        let expected_digest = meta.body_sha256.clone();
+        let deferred = PreviewHtml::Deferred(Box::new(move || {
+            Box::pin(async move {
+                let current = artifacts.find_meta(&id).await.ok().flatten()?;
+                if current.is_bundle || current.body_sha256 != expected_digest {
+                    return None;
+                }
+                let file = artifacts.read_body_for(&current).await.ok().flatten()?;
+                String::from_utf8(file.content).ok()
+            })
+        }));
+        // Full queue pressure makes gallery preview preparation optional, never a successful
+        // mutation failure. `try_enqueue` starts the lane itself and returns without awaiting
+        // rendering; one post-commit call creates exactly one queued job.
+        let _ = self
+            .previews
+            .queue()
+            .try_enqueue(meta, deferred, PreviewPriority::High);
     }
 }
 
@@ -878,6 +1149,14 @@ impl PreviewService for PreviewIntegration {
         digest: &'a str,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, AppError>> {
         Box::pin(async move { Ok(self.store.read_thumbnail(artifact.meta(), digest).await) })
+    }
+
+    fn read_thumbnail_sync(
+        &self,
+        meta: &ArtifactMeta,
+        digest: &str,
+    ) -> Result<Option<Vec<u8>>, AppError> {
+        Ok(self.store.read_thumbnail_sync(meta, digest))
     }
 
     fn placeholder(&self, meta: &ArtifactMeta, accent: Option<&str>) -> Vec<u8> {
@@ -898,9 +1177,7 @@ impl PreviewService for PreviewIntegration {
             if !self.store.enabled() {
                 return Ok(self.store.ensure_thumbnail(meta, Some(html)).await);
             }
-            let job =
-                self.queue
-                    .enqueue(meta.clone(), PreviewHtml::Ready(html.to_owned()), priority);
+            let job = self.queue.enqueue_ready(meta.clone(), html, priority);
             Ok(job.await)
         })
     }

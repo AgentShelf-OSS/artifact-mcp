@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use artifact_mcp::config::{AppConfig, OAuthConfig, SeedKeys};
+use artifact_mcp::config::{AppConfig, OAuthConfig, Secret, SeedKeys};
 use artifact_mcp::model::{ArtifactId, ClientId, OrgId, PublisherIdentity};
 use axum::{
     Router,
@@ -55,6 +55,7 @@ impl runtime::StartupObserver for Observer {
 fn config_for(data_dir: &Path) -> AppConfig {
     AppConfig {
         data_dir: data_dir.to_path_buf(),
+        audit_ledger_hmac_key: Some(Secret::new("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")),
         public_base_url: "http://conformance.test".to_owned(),
         seed_keys: SeedKeys::parse("publisher:acme:owner-secret,foreign:other:foreign-secret"),
         oauth: OAuthConfig {
@@ -220,7 +221,10 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
                     "artifacts:publish",
                     "artifacts:review",
                     "artifacts:visibility",
-                    "artifacts:delete"
+                    "artifacts:delete",
+                    "audit:read",
+                    "audit:export",
+                    "audit:global"
                 ])
             );
 
@@ -468,6 +472,29 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert_eq!(
                 submitted_feedback["result"]["structuredContent"]["submitted"],
                 true
+            );
+
+            let (status, templates) = post(
+                &router,
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "resource-templates",
+                    "method": "resources/templates/list",
+                    "params": { "_meta": apps_meta(MODERN_VERSION) }
+                }),
+                &[
+                    ("mcp-protocol-version", MODERN_VERSION),
+                    ("mcp-method", "resources/templates/list"),
+                ],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(
+                templates["result"]["resourceTemplates"]
+                    .as_array()
+                    .expect("resource templates")
+                    .iter()
+                    .any(|template| template["uriTemplate"] == "artifact://{id}")
             );
 
             let (status, resources) = post(
@@ -1059,6 +1086,89 @@ async fn mcp_preflight_advertises_modern_request_headers() {
     )
     .await
     .expect("run production MCP preflight");
+}
+
+#[tokio::test]
+async fn mcp_rejects_non_json_media_types_with_a_json_rpc_415_envelope() {
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            let response = router
+                .oneshot(
+                    Request::post("/mcp")
+                        .header("authorization", "Bearer owner-secret")
+                        .header("content-type", "text/plain")
+                        .body(Body::from(
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": "wrong-media",
+                                "method": "tools/list"
+                            })
+                            .to_string(),
+                        ))
+                        .expect("MCP request"),
+                )
+                .await
+                .expect("MCP response");
+            assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+            let body = serde_json::from_slice::<Value>(
+                &to_bytes(response.into_body(), usize::MAX)
+                    .await
+                    .expect("MCP media rejection body"),
+            )
+            .expect("JSON-RPC media rejection");
+            assert_eq!(body["jsonrpc"], "2.0");
+            assert!(body["id"].is_null());
+            assert_eq!(body["error"]["data"]["reason"], "unsupported_media_type");
+            Ok(())
+        },
+    )
+    .await
+    .expect("run production MCP media-type rejection");
+}
+
+#[tokio::test]
+async fn legacy_mcp_batches_are_read_only_and_reject_mixed_work_before_dispatch() {
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            let (status, read_only) = post(
+                &router,
+                json!([
+                    { "jsonrpc": "2.0", "id": "list", "method": "tools/list" },
+                    { "jsonrpc": "2.0", "id": "ping", "method": "ping" }
+                ]),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert!(read_only.is_array());
+
+            let (status, mixed) = post(
+                &router,
+                json!([
+                    { "jsonrpc": "2.0", "id": "list", "method": "tools/list" },
+                    {
+                        "jsonrpc": "2.0",
+                        "id": "write",
+                        "method": "tools/call",
+                        "params": { "name": "submit_feedback", "arguments": {} }
+                    }
+                ]),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert_eq!(mixed["error"]["code"], -32_600);
+            Ok(())
+        },
+    )
+    .await
+    .expect("run legacy batch admission");
 }
 
 #[tokio::test]

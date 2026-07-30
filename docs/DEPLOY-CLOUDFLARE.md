@@ -48,6 +48,29 @@ application exists, while artifact-mcp reads `CF_ACCESS_AUD` when `lib/identity.
 5. Start artifact-mcp, or fully restart it if it was already running. Editing an env file or doing
    a hot reload is insufficient because identity configuration is captured at module initialization.
 
+## Browser mutation protection
+
+Set the Cloudflare Access authorization cookie to **`Lax` or `Strict`**. Do not use `None` for the
+artifact-mcp catch-all application: `None` permits cross-site credentialed requests and makes a
+misconfigured edge more dangerous. The application is still the authoritative protection: every
+cookie-authenticated portal `POST`, `PUT`, `PATCH`, and `DELETE` requires the first-party
+`X-Artifact-Mutation: 1` header plus either `Sec-Fetch-Site: same-origin` or an `Origin` matching
+the canonical `PUBLIC_BASE_URL` origin. It rejects `Sec-Fetch-Site: none`, `same-site`, and
+`cross-site` for mutations. `/mcp` is intentionally excluded because it uses an explicit API key
+or OAuth bearer token rather than an ambient browser session.
+
+The portal JavaScript adds this header automatically. A script served from an uploaded artifact or
+another site cannot add it to a credentialed request without CORS preflight, and artifact-mcp does
+not authorize such cross-origin portal mutations. Verify the configured Access cookie setting in
+[Cloudflare's authorization-cookie settings](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/)
+after changing an Access application.
+
+The single boundary covers every current human mutation: artifact deletion, reactions, category,
+share, visibility, move, and restore; feedback create/delete/resolve; the notification watermark;
+all publisher-key, organization, category, membership, color, and webhook settings operations.
+New human `POST`, `PUT`, `PATCH`, or `DELETE` routes inherit it automatically. Public share/raw
+routes are read-only, and `/mcp` is the explicit bearer-authenticated exception.
+
 ## Setup inputs
 
 | Variable | Required | Purpose |
@@ -94,6 +117,7 @@ rule, the script warns and continues because the origin `no-transform` header is
 | Strict startup says `CF_ACCESS_*` is missing | Run setup before strict startup, copy the emitted AUD/team domain, set both runtime vars, and fully restart. |
 | First request after login briefly says it is completing sign-in | This is the one-shot JWT-assertion propagation retry. If the guarded retry still fails, artifact-mcp renders the normal signed-out page and remains fail closed. |
 | `/mcp` returns an Access login page or public shares prompt for login | Create/repair the two explicit **Bypass → Everyone** applications. The setup command never changes policies. |
+| Portal mutation returns `403` with `same_origin_required` | Confirm the request originated in the first-party portal, `PUBLIC_BASE_URL` is the public canonical URL, and the proxy forwards `Origin` and `Sec-Fetch-Site` unchanged. Do not remove the portal mutation header. |
 | Login logo has a CSP/load error | Use a separately hosted public HTTPS image in `CF_ACCESS_LOGIN_LOGO_URL`; do not point it at a route behind the same Access gate. |
 
 Cloudflare documents that `Cache-Control: no-transform` disables Email Address Obfuscation and that

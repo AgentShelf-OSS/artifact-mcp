@@ -43,6 +43,10 @@ The harness can drive two running, isolated servers rather than booting its own:
     npx playwright test -c playwright.config.mjs
 
 Use separate data directories for the Node reference runtime and the Rust release candidate.
+Both need a disposable `AUDIT_LEDGER_HMAC_KEY`; use a separate disposable
+`WEBHOOK_ENC_KEY` when exercising encrypted delivery configuration. Raise the Rust `INGRESS_*`
+per-window budgets only for this isolated browser run so the complete deterministic suite does
+not exhaust production-oriented defaults.
 
 ## Safety
 

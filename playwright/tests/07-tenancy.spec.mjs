@@ -86,12 +86,20 @@ test.describe("visibility & tenancy", () => {
     await owner.card.locator('[data-action="more"]').click();
     await expect(owner.card.getByRole("button", { name: "Delete artifact" })).toBeVisible();
     const hidden = await owner.context.request.post(`${baseURL}/${artifact.id}/visibility`, {
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "X-Artifact-Mutation": "1",
+        "Sec-Fetch-Site": "same-origin",
+      },
       data: { hidden: true },
     });
     expect(hidden.status(), await hidden.text()).toBe(200);
     const shown = await owner.context.request.post(`${baseURL}/${artifact.id}/visibility`, {
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "X-Artifact-Mutation": "1",
+        "Sec-Fetch-Site": "same-origin",
+      },
       data: { hidden: false },
     });
     expect(shown.status(), await shown.text()).toBe(200);
@@ -103,7 +111,11 @@ test.describe("visibility & tenancy", () => {
     await nonOwner.card.locator('[data-action="more"]').click();
     await expect(nonOwner.card.getByRole("button", { name: "Delete artifact" })).toHaveCount(0);
     const denied = await nonOwner.context.request.post(`${baseURL}/${artifact.id}/visibility`, {
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        "X-Artifact-Mutation": "1",
+        "Sec-Fetch-Site": "same-origin",
+      },
       data: { hidden: true },
     });
     expect(denied.status()).toBe(403);

@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "origin": {
+    "releaseTag": null,
+    "schemaVersion": 24,
+    "kind": "current-ledger-recovery",
+    "sourceRef": {
+      "ref": "current append-only migration ledger",
+      "migrationLedgerSha256": "18cb06884469ed933871ad390415fd8c1bd40170c88cfdbb56e58d4481d622b3"
+    }
+  },
+  "expectedTargetSchema": 24,
+  "generation": "node scripts/generate-historical-fixtures.mjs",
+  "webhookEncryption": {
+    "keyId": "fixture-zero-key-v1",
+    "key": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+  },
+  "authentication": {
+    "clientId": "fixture-key",
+    "token": "fixture-public-token-v1",
+    "classification": "public synthetic test material"
+  },
+  "expectedRecovery": {
+    "recoveredPaths": [
+      ".intentpub24.staging-fixture",
+      ".intentup24.staging-fixture",
+      ".recover23.staging-fixture",
+      ".intentdel24.trash-fixture",
+      ".trash23.trash-fixture"
+    ],
+    "divergentBodies": [
+      "diverge23",
+      "ambigup24"
+    ],
+    "orphanBodies": [
+      "orphan23.html"
+    ],
+    "missingBodies": [
+      "missing23"
+    ],
+    "preservedTransientPaths": [
+      ".ambigup24.staging-fixture",
+      ".diverge23.staging-fixture"
+    ],
+    "remainingIntentIds": [
+      "update:ambigup24:2"
+    ],
+    "preparedMetadataOnly": {
+      "id": "prepared24",
+      "revision": 2,
+      "historyRevision": 1,
+      "html": "<main>legacy prepared metadata body</main>"
+    }
+  },
+  "database": {
+    "path": "artifacts.db",
+    "sha256": "7fa06b4ced34c8874a59431bfbdf6c9023df616b6a87c02c78ef70adef0f6214"
+  },
+  "bodies": [
+    {
+      "path": ".ambigup24.staging-fixture",
+      "bytes": 15,
+      "sha256": "853280459617a3c22588a54fec4b4065d56c9f0f9ea9b5adf57913d0bbb5fe21"
+    },
+    {
+      "path": ".diverge23.staging-fixture",
+      "bytes": 34,
+      "sha256": "9b462867142b768e27a956c215a11047196a27d9fe053139978cfd35202580f5"
+    },
+    {
+      "path": ".gone24.trash-fixture",
+      "bytes": 34,
+      "sha256": "78d34330abc2e4900e5f5e51b9a426484fdcc1829c67685c05d7514cb5c717ca"
+    },
+    {
+      "path": ".history/single16/1.html",
+      "bytes": 32,
+      "sha256": "fe0377bdde83fd1cd271bb4271823cd9afff409290db308803fe8a8ad3aff00a"
+    },
+    {
+      "path": ".intentdel24.trash-fixture",
+      "bytes": 42,
+      "sha256": "d49b085a338a8ee0dfcbde6c85fc4eebf55e8f83aab80f8c7771865141498361"
+    },
+    {
+      "path": ".intentpub24.staging-fixture",
+      "bytes": 43,
+      "sha256": "22c599bf98c7479873b8b333a9f69dd2463ab2428166d51605a38c4d992edbd2"
+    },
+    {
+      "path": ".intentup24.staging-fixture",
+      "bytes": 40,
+      "sha256": "a55aa37cacf5f3e7c87319e26ee45ab80e0a0dfa734cc90648e86668577aca89"
+    },
+    {
+      "path": ".norow24.staging-fixture",
+      "bytes": 32,
+      "sha256": "e6d59164e7f82d72ef22381d8354fb769b566bbde05e32fe4916ba040aa23541"
+    },
+    {
+      "path": ".recover23.staging-fixture",
+      "bytes": 38,
+      "sha256": "3aa5291cf8501cd3827ab8bc4fae1ae11d7c572794e9d6451bb781551efb5d60"
+    },
+    {
+      "path": ".trash23.trash-fixture",
+      "bytes": 36,
+      "sha256": "5347270a647170d9afb8a9ed22daeaa589337b80efd6821fc932d76584db9cd6"
+    },
+    {
+      "path": "ambigup24.html",
+      "bytes": 39,
+      "sha256": "968e0d1b725662c1dad2f6d77e737ff54e2243fdc8cd27557472f6a9f430d34c"
+    },
+    {
+      "path": "bundle16/assets/site.css",
+      "bytes": 25,
+      "sha256": "c39e3c1f5479800e4ab6ff5e655b01a20bd8d024945a9b00d0425b75fbf3c6e1"
+    },
+    {
+      "path": "bundle16/index.html",
+      "bytes": 30,
+      "sha256": "4a6ac1fd9d9e440ab4c2a0e94bb338383ae3f953f1668b5dea94db9dde8bf336"
+    },
+    {
+      "path": "diverge23.html",
+      "bytes": 38,
+      "sha256": "a081037cbddefe5c09bfec03803f50439f7818db406aba3fd3ef07ba2db07320"
+    },
+    {
+      "path": "intentup24.html",
+      "bytes": 39,
+      "sha256": "41f5a9c015315fd15d34eed56ec457928c1a94b96fb9e06740b4dd735127442c"
+    },
+    {
+      "path": "orphan23.html",
+      "bytes": 36,
+      "sha256": "aef3a3c9e3159ab3f00ed296d160feffaa8f15188feafefe599f6833a5015a74"
+    },
+    {
+      "path": "prepared24.html",
+      "bytes": 42,
+      "sha256": "07bdaeb905020e9cc8449af430d32e75a49b3d2728dc1bf8f97bd214ffe242ee"
+    },
+    {
+      "path": "recover23.html",
+      "bytes": 30,
+      "sha256": "5ed2333470df5fffdcdb87c98b9aa276e87bfb2cfc6c70835edc08a09e7f9f60"
+    },
+    {
+      "path": "single16.html",
+      "bytes": 30,
+      "sha256": "fb9e88ad26f491c2d10a52f98b491684c1493dafdeb5aafa6f5ae76284d71645"
+    }
+  ]
+}

@@ -53,6 +53,8 @@ export function baseEnv() {
     ADMIN_EMAILS: VIEWERS.admin_email,
     ORG_EMAIL_DOMAINS: "acme.test:acme,beta.test:beta",
     PUBLIC_BASE_URL: PUBLIC_BASE,
+    // Fixed non-secret test key so both runtimes exercise the mandatory tamper-evident ledger.
+    AUDIT_LEDGER_HMAC_KEY: Buffer.alloc(32, 7).toString("base64"),
     // Keep preview/thumbnail rendering off so no headless browser is required.
     PREVIEW_RENDERER_URL: "",
     NODE_ENV: "test"

@@ -9,7 +9,11 @@ export default async function globalTeardown() {
   for (const base of [process.env.PW_NODE_URL, process.env.PW_RUST_URL].filter(Boolean)) {
     const ctx = await pwRequest.newContext({
       baseURL: base,
-      extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": ADMIN },
+      extraHTTPHeaders: {
+        "Cf-Access-Authenticated-User-Email": ADMIN,
+        "X-Artifact-Mutation": "1",
+        "Sec-Fetch-Site": "same-origin"
+      },
     });
     try {
       // Delete artifacts belonging to the throwaway org, then the org itself.

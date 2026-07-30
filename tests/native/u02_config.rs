@@ -90,6 +90,7 @@ fn empty_environment_reproduces_every_node_default() {
 
     // lib/crypto.js:9, lib/db.js:30
     assert!(config.webhook_enc_key.is_none());
+    assert!(config.discord_bot_token.is_none());
     assert!(config.seed_keys.entries.is_empty());
     assert!(config.seed_keys.ignored_placeholders.is_empty());
 
@@ -146,6 +147,31 @@ fn typed_overrides_are_parsed_as_numbers_and_paths() {
     assert_eq!(config.storage.max_artifact_bytes, 1024);
     assert_eq!(config.storage.max_bundle_bytes, 4096);
     assert_eq!(config.storage.max_bundle_files, 7);
+}
+
+#[test]
+fn ingress_controls_parse_as_positive_bounded_origin_limits() {
+    let config = parse_ok(&[
+        ("INGRESS_MAX_HEADERS", "48"),
+        ("INGRESS_MAX_HEADER_BYTES", "16384"),
+        ("INGRESS_MAX_CONNECTIONS", "12"),
+        ("INGRESS_MCP_PER_WINDOW", "45"),
+        ("INGRESS_UPLOADS_PER_WINDOW", "6"),
+        ("INGRESS_FEEDBACK_PER_WINDOW", "7"),
+        ("INGRESS_ADMIN_PER_WINDOW", "8"),
+        ("TRUSTED_PROXY_CIDRS", " 127.0.0.1/32, 2001:db8::/32 "),
+    ]);
+    assert_eq!(config.ingress.max_headers, 48);
+    assert_eq!(config.ingress.max_header_bytes, 16_384);
+    assert_eq!(config.ingress.max_connections, 12);
+    assert_eq!(config.ingress.mcp_per_window, 45);
+    assert_eq!(config.ingress.uploads_per_window, 6);
+    assert_eq!(config.ingress.feedback_per_window, 7);
+    assert_eq!(config.ingress.admin_per_window, 8);
+    assert_eq!(config.ingress.trusted_proxy_cidrs.len(), 2);
+
+    assert!(parse(&[("INGRESS_MAX_HEADER_BYTES", "8191")]).is_err());
+    assert!(parse(&[("TRUSTED_PROXY_CIDRS", "not-a-cidr")]).is_err());
 }
 
 #[test]
@@ -348,13 +374,51 @@ fn webhook_encryption_key_requires_canonical_32_byte_base64() {
 }
 
 #[test]
+fn discord_bot_token_is_optional_bounded_and_redacted() {
+    let config = parse_ok(&[("DISCORD_BOT_TOKEN", "bot.token_value-123")]);
+    assert_eq!(
+        config
+            .discord_bot_token
+            .as_ref()
+            .expect("bot token parsed")
+            .expose(),
+        "bot.token_value-123"
+    );
+    for bad in ["\"", "contains space", "x\\y"] {
+        assert!(matches!(
+            parse(&[("DISCORD_BOT_TOKEN", bad)]),
+            Err(AppError::Validation(_))
+        ));
+    }
+    assert!(matches!(
+        parse(&[("DISCORD_BOT_TOKEN", &"x".repeat(513))]),
+        Err(AppError::Validation(_))
+    ));
+}
+
+#[test]
+fn discord_inbound_gateway_is_an_explicit_strict_kill_switch() {
+    assert!(!parse_ok(&[]).discord_inbound_enabled);
+    assert!(!parse_ok(&[("DISCORD_INBOUND_ENABLED", "0")]).discord_inbound_enabled);
+    assert!(parse_ok(&[("DISCORD_INBOUND_ENABLED", "1")]).discord_inbound_enabled);
+    for bad in ["true", "yes", "2"] {
+        assert!(matches!(
+            parse(&[("DISCORD_INBOUND_ENABLED", bad)]),
+            Err(AppError::Validation(_))
+        ));
+    }
+}
+
+#[test]
 fn secrets_are_redacted_in_debug_output() {
     let config = parse_ok(&[
         ("WEBHOOK_ENC_KEY", VALID_WEBHOOK_KEY),
+        ("DISCORD_BOT_TOKEN", "navi.local.secret"),
         ("ARTIFACT_API_KEYS", "agent:acme:hunter2-super-secret"),
     ]);
     let rendered = format!("{config:?}");
     assert!(!rendered.contains(VALID_WEBHOOK_KEY), "{rendered}");
+    assert!(!rendered.contains("navi.local.secret"), "{rendered}");
     assert!(!rendered.contains("hunter2-super-secret"), "{rendered}");
     assert!(rendered.contains("Secret(<redacted>)"), "{rendered}");
 }

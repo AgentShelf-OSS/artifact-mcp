@@ -7,7 +7,7 @@ use std::{
     sync::atomic::{AtomicU64, Ordering},
 };
 
-use artifact_mcp::config::{AppConfig, SeedKeys};
+use artifact_mcp::config::{AppConfig, Secret, SeedKeys};
 use axum::{
     Router,
     body::{Body, to_bytes},
@@ -55,6 +55,7 @@ impl runtime::StartupObserver for Observer {
 fn config_for(data_dir: &Path) -> AppConfig {
     let mut config = AppConfig {
         data_dir: data_dir.to_path_buf(),
+        audit_ledger_hmac_key: Some(Secret::new("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")),
         public_base_url: "http://conformance.test".to_owned(),
         seed_keys: SeedKeys::parse(
             "administrator:admin:admin-secret,owner:offboard:offboard-secret",
@@ -108,6 +109,8 @@ async fn delete_org(router: &Router) -> Response {
         .oneshot(
             Request::delete("/settings/orgs/offboard")
                 .header("cf-access-authenticated-user-email", "admin@example.test")
+                .header("x-artifact-mutation", "1")
+                .header("sec-fetch-site", "same-origin")
                 .body(Body::empty())
                 .expect("delete-org request"),
         )
@@ -127,6 +130,8 @@ async fn deleted_org_key_cannot_authenticate_or_publish_against_the_real_databas
                 .oneshot(
                     Request::post("/settings/orgs")
                         .header("cf-access-authenticated-user-email", "admin@example.test")
+                        .header("x-artifact-mutation", "1")
+                        .header("sec-fetch-site", "same-origin")
                         .header("content-type", "application/json")
                         .body(Body::from(json!({ "name": "offboard" }).to_string()))
                         .expect("create-org request"),

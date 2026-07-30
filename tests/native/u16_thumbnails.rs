@@ -13,6 +13,7 @@ use std::sync::Arc;
 
 use artifact_mcp::artifacts::paths::{BodyDigest, SafeArtifactId, thumbnail_path};
 use artifact_mcp::config::{AppConfig, PreviewConfig, SeededRandom};
+use artifact_mcp::http::ingress::IngressState;
 use artifact_mcp::integrations::preview::PreviewRenderer;
 use artifact_mcp::integrations::thumbnails::{
     DEFAULT_MAX_PNG_BYTES, PreviewArtifactIndex, PreviewArtifactRef, PreviewHtml,
@@ -145,6 +146,29 @@ async fn an_existing_thumbnail_is_served_without_rendering_again() {
         stub.request_count(),
         1,
         "an on-disk thumbnail was re-rendered"
+    );
+}
+
+#[tokio::test]
+async fn durable_delivery_can_read_a_prior_digest_after_a_same_tenant_rapid_update() {
+    let data = TempDataDir::new("u16-durable-prior-digest");
+    let png = sample_png();
+    let stub = StubRenderer::rendering(png.clone());
+    let store = thumbnail_store(data.path(), stub.config());
+    let prior = single(ID, DIGEST);
+    assert_eq!(
+        store.ensure_thumbnail(&prior, Some("<p>prior</p>")).await,
+        Some(png.clone())
+    );
+
+    // The live metadata has already advanced. Browser thumbnail reads correctly reject the
+    // stale digest, while a claimed durable event may still attach the cache entry that its
+    // immutable envelope referenced.
+    let current = single(ID, OTHER_DIGEST);
+    assert_eq!(store.read_thumbnail(&current, DIGEST).await, None);
+    assert_eq!(
+        store.read_delivery_thumbnail(&current.id, DIGEST).await,
+        Some(png)
     );
 }
 
@@ -535,6 +559,102 @@ async fn the_queue_is_serial_and_runs_high_priority_work_first() {
 
     assert_eq!(stub.received_html(), vec!["first", "high", "low"]);
     assert_eq!(queue.depth().high, 0);
+}
+
+#[tokio::test]
+async fn the_queue_rejects_renderer_floods_without_growing_unboundedly() {
+    let data = TempDataDir::new("u16-queue-capacity");
+    let stub = StubRenderer::rendering(sample_png());
+    stub.gate();
+    let queue = ThumbnailQueue::new_with_limit(thumbnail_store(data.path(), stub.config()), 1);
+    let first = queue.enqueue(
+        single("aaa111aaa111", DIGEST),
+        PreviewHtml::Ready("first".to_owned()),
+        PreviewPriority::High,
+    );
+    stub.wait_for_requests(1).await;
+    let queued = queue.enqueue(
+        single("bbb222bbb222", DIGEST),
+        PreviewHtml::Ready("queued".to_owned()),
+        PreviewPriority::Low,
+    );
+    let rejected = queue.enqueue(
+        single("ccc333ccc333", DIGEST),
+        PreviewHtml::Ready("rejected".to_owned()),
+        PreviewPriority::Low,
+    );
+    assert_eq!(queue.depth().low, 1);
+    assert_eq!(rejected.await, None);
+    stub.release(2);
+    assert!(first.await.is_some());
+    assert!(queued.await.is_some());
+    assert_eq!(stub.received_html(), vec!["first", "queued"]);
+}
+
+#[tokio::test]
+async fn queue_pressure_reports_idle_after_the_last_render_finishes() {
+    let data = TempDataDir::new("u16-queue-pressure-idle");
+    let stub = StubRenderer::rendering(sample_png());
+    let ingress_config = AppConfig::default();
+    let ingress = IngressState::from_config(&ingress_config);
+    let queue = ThumbnailQueue::new(thumbnail_store(data.path(), stub.config()))
+        .with_pressure(ingress.preview_queue_pressure());
+
+    assert!(
+        queue
+            .enqueue(
+                single("aaa111aaa111", DIGEST),
+                PreviewHtml::Ready("finished".to_owned()),
+                PreviewPriority::High,
+            )
+            .await
+            .is_some()
+    );
+    tokio::time::timeout(std::time::Duration::from_secs(1), async {
+        loop {
+            if !queue.depth().running {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("queue reaches idle");
+    assert!(
+        ingress
+            .render_prometheus()
+            .contains("artifact_mcp_render_queue_running 0\n"),
+        "idle transition must reach the exported ingress gauge"
+    );
+}
+
+#[tokio::test]
+async fn the_queue_reserves_declared_bytes_until_the_active_render_finishes() {
+    let data = TempDataDir::new("u16-queue-byte-capacity");
+    let stub = StubRenderer::rendering(sample_png());
+    stub.gate();
+    let queue = ThumbnailQueue::new_with_limits_and_counter(
+        thumbnail_store(data.path(), stub.config()),
+        4,
+        64,
+        None,
+    );
+    let first = queue.enqueue(
+        single("aaa111aaa111", DIGEST),
+        PreviewHtml::Ready("first".to_owned()),
+        PreviewPriority::High,
+    );
+    stub.wait_for_requests(1).await;
+    let rejected = queue.enqueue(
+        single("bbb222bbb222", DIGEST),
+        PreviewHtml::Ready("second".to_owned()),
+        PreviewPriority::High,
+    );
+    assert_eq!(queue.depth().reserved_bytes, 42);
+    assert_eq!(rejected.await, None);
+    stub.release(1);
+    assert!(first.await.is_some());
+    assert_eq!(queue.depth().reserved_bytes, 0);
 }
 
 #[tokio::test]

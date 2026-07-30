@@ -63,23 +63,33 @@
 
 use std::fmt;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 
-use rusqlite::{Connection, OptionalExtension, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 
-use crate::config::{AppConfig, IdSource, StorageLimits};
+use crate::config::{AppConfig, Clock, IdSource, StorageLimits, SystemClock};
 use crate::error::AppError;
+use crate::integrations::delivery_envelope::{
+    DeliveryEnvelopeV1, DeliveryPreviewReferenceV1, stable_delivery_event_id,
+};
 use crate::model::{
     ArtifactContent, ArtifactFile, ArtifactId, ArtifactMeta, ArtifactRevision, ArtifactUpdate,
-    ClientId, DigestBackfillReport, OrgArtifacts, OrgId, PublishArtifact, PublishedArtifact,
-    PublisherIdentity, RestoreArtifactResult, RevisionHistory, StorageAuditReport, Timestamp,
-    UpdateArtifactResult,
+    ClientId, DigestBackfillReport, NotificationPayload, OrgArtifacts, OrgId, PublishArtifact,
+    PublishedArtifact, PublisherIdentity, RestoreArtifactResult, RevisionHistory,
+    StorageAuditReport, Timestamp, UpdateArtifactResult, WebhookEvent,
 };
 use crate::persistence::db::{self, DbPool};
+use crate::persistence::{outbox, outbox_fanout};
 use crate::ports::{ArtifactService, BoxFuture};
 use crate::security::access::AuthorizedArtifact;
+use crate::security::audit::{
+    AuditEvent, MutationAudit, append_in_transaction, delete_pending_receipt_in_transaction,
+    finalize_receipt_in_transaction, initialize_head, parse_hmac_key,
+    reserve_receipt_in_transaction, verify, verify_pending_receipt_in_transaction,
+};
 
-use super::digest::bundle_manifest_digest;
+use super::digest::{body_digest_at_path, bundle_manifest_digest};
+use super::durable;
 use super::paths::{self, SafeArtifactId, TransientKind};
 use super::read;
 use super::reconciliation;
@@ -100,17 +110,27 @@ use super::validation::{
 pub enum FaultPoint {
     /// Before the staging body is written. [lib/store.js:217], [lib/store.js:263-267]
     PublishStageWrite,
+    /// After a publish staging body is written, before its file durability barrier.
+    PublishStageFileSync,
+    /// After a publish staging body is file-durable, before its parent-directory barrier.
+    PublishStageDirectorySync,
     /// After staging, before `INSERT INTO artifacts`. [lib/store.js:218]
     PublishInsert,
     /// After the insert, before `rename(staging → final)`. [lib/store.js:220]
     PublishRename,
     /// After the rename, before the metadata read-back.
     PublishComplete,
+    /// Kernel publish rename completed; fail before parent directory sync.
+    PublishRenameBarrier,
     /// Compensation: before the inserted artifact row is deleted. [lib/store.js:223],
     /// [lib/store.js:276]
     PublishDeleteRow,
     /// Before the replacement body is staged. [lib/store.js:374-384]
     UpdateStageWrite,
+    /// After an update staging body is written, before its file durability barrier.
+    UpdateStageFileSync,
+    /// After an update staging body is file-durable, before its parent-directory barrier.
+    UpdateStageDirectorySync,
     /// After staging, before the metadata transaction opens. [lib/store.js:406]
     UpdateCommit,
     /// Inside the metadata transaction, after the guarded UPDATE and the revision row, before
@@ -118,8 +138,16 @@ pub enum FaultPoint {
     UpdateCommitTransaction,
     /// After the metadata commit, before the outgoing body is snapshotted. [lib/store.js:424]
     UpdateSnapshot,
+    /// After a metadata-only history copy is written, before its file durability barrier.
+    UpdateSnapshotFileSync,
     /// After the snapshot, before the staged body is swapped in. [lib/store.js:426]
     UpdateSwap,
+    /// Kernel update install rename completed; fail before parent directory sync.
+    UpdateSwapBarrier,
+    /// Kernel history snapshot rename completed; fail before parent directory sync.
+    UpdateSnapshotBarrier,
+    /// While creating the `.history/<artifact>` chain, before its first directory barrier.
+    UpdateHistoryDirectorySync,
     /// After the swap, before history pruning. [lib/store.js:438]
     UpdatePrune,
     /// Compensation: before the snapshotted body is moved back. [lib/store.js:430]
@@ -127,8 +155,14 @@ pub enum FaultPoint {
     /// Compensation: before the revision row is dropped and metadata reverted.
     /// [lib/store.js:432-435]
     UpdateRevertMetadata,
+    /// Compensation: before an owned metadata-only snapshot temporary is durably removed.
+    UpdateSnapshotTempRemove,
+    /// Kernel snapshot temporary removal completed; fail before its parent-directory barrier.
+    UpdateSnapshotTempRemoveBarrier,
     /// Before the live body is renamed into trash. [lib/store.js:503-509]
     DeleteTrashRename,
+    /// Kernel delete-to-trash rename completed; fail before parent directory sync.
+    DeleteTrashRenameBarrier,
     /// After the body reached trash, before `DELETE FROM artifacts`. [lib/store.js:632]
     DeleteRow,
     /// After the row is gone, before the trashed body is removed. [lib/store.js:637]
@@ -312,31 +346,17 @@ pub(crate) fn path_exists(target: &Path) -> bool {
 /// `safeRemove(files, target)` = `rmSync(target, { recursive: true, force: true })` inside a
 /// swallowing `try`. [lib/store.js:71-75]
 pub(crate) fn safe_remove(target: &Path) {
-    let Ok(metadata) = std::fs::symlink_metadata(target) else {
-        return;
-    };
-    let _ = if metadata.is_dir() {
-        std::fs::remove_dir_all(target)
-    } else {
-        std::fs::remove_file(target)
-    };
+    // Cleanup remains best-effort, but a successful cleanup gets a durable parent barrier.
+    let _ = durable::remove(target);
 }
 
 /// `files.renameSync(from, to)` — a hard failure, never swallowed.
 pub(crate) fn rename(from: &Path, to: &Path) -> Result<(), AppError> {
-    std::fs::rename(from, to).map_err(|error| {
-        tracing::error!(
-            from = %from.display(),
-            to = %to.display(),
-            error = %error,
-            "artifact rename failed"
-        );
-        AppError::Internal
-    })
+    durable::rename(from, to)
 }
 
 /// `files.cpSync(src, dest, { recursive: true })` — [lib/store.js:559]
-fn copy_recursive(source: &Path, destination: &Path) -> std::io::Result<()> {
+pub(crate) fn copy_recursive(source: &Path, destination: &Path) -> std::io::Result<()> {
     if std::fs::metadata(source)?.is_dir() {
         std::fs::create_dir_all(destination)?;
         for entry in std::fs::read_dir(source)? {
@@ -521,6 +541,13 @@ fn as_i64(value: u64) -> Result<i64, AppError> {
 
 /// `getMetaStmt.get(id)` — [lib/store.js:111]
 fn load_meta(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppError> {
+    if durability_pending(conn, id)? {
+        return Ok(None);
+    }
+    load_meta_unchecked(conn, id)
+}
+
+fn load_meta_unchecked(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppError> {
     conn.query_row(
         &format!("SELECT {META_COLUMNS} FROM artifacts WHERE id = ?1"),
         params![id],
@@ -528,6 +555,72 @@ fn load_meta(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppErr
     )
     .optional()
     .map_err(|error| sql_error("load artifact metadata", &error))
+}
+
+/// A row with a prepared durability intent is deliberately invisible to normal read paths.  This
+/// prevents a concurrent request from observing metadata while its body is being staged, moved,
+/// or removed. Startup reconciliation clears only intents whose postcondition is verified.
+fn start_durability_intent(
+    conn: &Connection,
+    intent_id: &str,
+    artifact_id: &str,
+    operation: &str,
+    expected_sha256: &str,
+    prior_sha256: &str,
+    staging_path: &Path,
+) -> Result<(), AppError> {
+    // SQLite is not an authority for filesystem paths. Persist only the generated transient
+    // basename after proving it belongs to this artifact; reconciliation reconstructs it beneath
+    // the configured artifact directory.
+    let staging_name = staging_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| {
+            paths::is_transient_name(name)
+                && paths::transient_name_artifact_id(name)
+                    .is_some_and(|owner| owner.as_str() == artifact_id)
+        })
+        .ok_or(AppError::Internal)?;
+    conn.execute(
+        "INSERT INTO artifact_durability_intents \
+         (id, artifact_id, operation, state, expected_sha256, prior_sha256, staging_path) \
+         VALUES (?1, ?2, ?3, 'prepared', ?4, ?5, ?6)",
+        params![
+            intent_id,
+            artifact_id,
+            operation,
+            expected_sha256,
+            prior_sha256,
+            staging_name
+        ],
+    )
+    .map_err(|error| sql_error("record durability intent", &error))?;
+    Ok(())
+}
+
+fn advance_durability_intent(
+    conn: &Connection,
+    intent_id: &str,
+    state: &str,
+) -> Result<(), AppError> {
+    let changes = conn.execute(
+        "UPDATE artifact_durability_intents SET state = ?1, updated_at = datetime('now') WHERE id = ?2",
+        params![state, intent_id],
+    )
+    .map_err(|error| sql_error("advance durability intent", &error))?;
+    if changes != 1 {
+        return Err(AppError::Internal);
+    }
+    Ok(())
+}
+
+fn finish_durability_intent(conn: &Connection, intent_id: &str) -> Result<(), AppError> {
+    conn.execute(
+        "DELETE FROM artifact_durability_intents WHERE id = ?1",
+        params![intent_id],
+    )
+    .map_err(|error| sql_error("complete durability intent", &error))?;
+    Ok(())
 }
 
 fn list_metas(
@@ -541,8 +634,36 @@ fn list_metas(
     let rows = statement
         .query_map(parameters, meta_from_row)
         .map_err(|error| sql_error("query artifact list", &error))?;
-    rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|error| sql_error("read artifact list", &error))
+    let rows = rows
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(|error| sql_error("read artifact list", &error))?;
+    rows.into_iter()
+        .filter_map(|meta| match durability_pending(conn, &meta.id.0) {
+            Ok(false) => Some(Ok(meta)),
+            Ok(true) => None,
+            Err(error) => Some(Err(error)),
+        })
+        .collect()
+}
+
+fn durability_pending(conn: &Connection, id: &str) -> Result<bool, AppError> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM artifact_durability_intents WHERE artifact_id = ?1)",
+        params![id],
+        |row| row.get::<_, i64>(0),
+    )
+    .map(|value| value != 0)
+    .map_err(|error| sql_error("check durability intent", &error))
+}
+
+fn durability_intent_state(conn: &Connection, intent_id: &str) -> Result<Option<String>, AppError> {
+    conn.query_row(
+        "SELECT state FROM artifact_durability_intents WHERE id = ?1",
+        [intent_id],
+        |row| row.get(0),
+    )
+    .optional()
+    .map_err(|error| sql_error("read durability intent state", &error))
 }
 
 /// Persist attribution and metadata for one produced revision.
@@ -637,9 +758,16 @@ fn org_exists(conn: &Connection, name: &str) -> Result<bool, AppError> {
 #[derive(Debug)]
 pub struct StoreContext {
     artifact_dir: PathBuf,
+    delivery_base_url: String,
     limits: StorageLimits,
     ids: Arc<dyn IdSource>,
     faults: Arc<dyn FaultInjector>,
+    // Non-optional: a configured writer must never silently become an unaudited writer.
+    audit_key: [u8; 32],
+    /// Linearizes body/history reads against lifecycle mutations. Authorization remains at the
+    /// route boundary; this lock only ensures an already-authorized read cannot interleave a
+    /// ready-to-pending transition and then touch a different body generation.
+    lifecycle_gate: RwLock<()>,
 }
 
 /// The SQLite + filesystem [`ArtifactService`], mirroring `createArtifactStore`.
@@ -648,22 +776,75 @@ pub struct StoreContext {
 pub struct ArtifactStore {
     pool: DbPool,
     context: Arc<StoreContext>,
+    preview_scheduler: Option<Arc<dyn PostCommitPreviewScheduler>>,
+}
+
+/// Schedules persistent gallery-thumbnail preparation after a successful lifecycle commit.
+///
+/// This is deliberately separate from provider delivery: no subscriber lookup, webhook secret,
+/// or network send can determine whether an uploaded artifact receives its gallery preview.
+pub trait PostCommitPreviewScheduler: Send + Sync + fmt::Debug {
+    /// Must return immediately after bounded queue admission; it must not read a body or render
+    /// while the mutation is completing.
+    fn schedule(&self, store: ArtifactStore, meta: ArtifactMeta);
 }
 
 impl ArtifactStore {
-    /// `files.mkdirSync(artifactDir, { recursive: true })` runs here, as Node does at store
-    /// construction. [lib/store.js:103]
+    /// Compatibility constructor for direct adapters. Production construction receives the
+    /// configured public base URL through the configuration constructor.
     #[must_use]
     pub fn new(
         pool: DbPool,
         artifact_dir: PathBuf,
         limits: StorageLimits,
         ids: Arc<dyn IdSource>,
+        audit_key: [u8; 32],
     ) -> Self {
-        Self::with_faults(pool, artifact_dir, limits, ids, Arc::new(NoFaults))
+        Self::new_for_test(pool, artifact_dir, limits, ids, audit_key)
+    }
+
+    /// `files.mkdirSync(artifactDir, { recursive: true })` runs here, as Node does at store
+    /// construction. [lib/store.js:103]
+    #[must_use]
+    pub fn new_for_test(
+        pool: DbPool,
+        artifact_dir: PathBuf,
+        limits: StorageLimits,
+        ids: Arc<dyn IdSource>,
+        audit_key: [u8; 32],
+    ) -> Self {
+        Self::with_faults_for_test(
+            pool,
+            artifact_dir,
+            limits,
+            ids,
+            Arc::new(NoFaults),
+            audit_key,
+        )
     }
 
     /// The failpoint-aware constructor used by the crash matrix.
+    #[must_use]
+    pub fn with_faults_for_test(
+        pool: DbPool,
+        artifact_dir: PathBuf,
+        limits: StorageLimits,
+        ids: Arc<dyn IdSource>,
+        faults: Arc<dyn FaultInjector>,
+        audit_key: [u8; 32],
+    ) -> Self {
+        Self::with_delivery_base_url(
+            pool,
+            artifact_dir,
+            limits,
+            ids,
+            faults,
+            audit_key,
+            "https://artifact.test".to_owned(),
+        )
+    }
+
+    /// Compatibility failpoint constructor. It remains an explicit test seam.
     #[must_use]
     pub fn with_faults(
         pool: DbPool,
@@ -671,6 +852,19 @@ impl ArtifactStore {
         limits: StorageLimits,
         ids: Arc<dyn IdSource>,
         faults: Arc<dyn FaultInjector>,
+        audit_key: [u8; 32],
+    ) -> Self {
+        Self::with_faults_for_test(pool, artifact_dir, limits, ids, faults, audit_key)
+    }
+
+    fn with_delivery_base_url(
+        pool: DbPool,
+        artifact_dir: PathBuf,
+        limits: StorageLimits,
+        ids: Arc<dyn IdSource>,
+        faults: Arc<dyn FaultInjector>,
+        audit_key: [u8; 32],
+        delivery_base_url: String,
     ) -> Self {
         // Best effort, exactly like Node: a store over an unwritable directory fails per
         // operation rather than at construction.
@@ -679,17 +873,50 @@ impl ArtifactStore {
             pool,
             context: Arc::new(StoreContext {
                 artifact_dir,
+                delivery_base_url,
                 limits,
                 ids,
                 faults,
+                audit_key,
+                lifecycle_gate: RwLock::new(()),
             }),
+            preview_scheduler: None,
         }
     }
 
     /// Compose the store from the validated application configuration.
-    #[must_use]
-    pub fn from_config(pool: DbPool, config: &AppConfig, ids: Arc<dyn IdSource>) -> Self {
-        Self::new(pool, config.artifact_dir(), config.storage, ids)
+    pub fn from_config(
+        pool: DbPool,
+        config: &AppConfig,
+        ids: Arc<dyn IdSource>,
+    ) -> Result<Self, AppError> {
+        let encoded = config.audit_ledger_hmac_key.as_ref().ok_or_else(|| {
+            AppError::Validation(
+                "AUDIT_LEDGER_HMAC_KEY is required; refusing to start without a tamper-evident audit ledger"
+                    .to_owned(),
+            )
+        })?;
+        let store = Self::with_delivery_base_url(
+            pool,
+            config.artifact_dir(),
+            config.storage,
+            ids,
+            Arc::new(NoFaults),
+            parse_hmac_key(encoded.expose())?,
+            config.public_base_url.clone(),
+        );
+        // Validate the anchor before startup reconciliation can perform any recovery mutation.
+        // `initialize_head` seals a pristine migration head exactly once; any pre-existing
+        // wrong key, rollback, or altered event fails closed.
+        let conn = db::checkout(&store.pool)?;
+        initialize_head(&conn, &store.context.audit_key)?;
+        if !verify(&conn, &store.context.audit_key)? {
+            crate::observability::record_global_security_signal("integrity_failure");
+            return Err(AppError::Validation(
+                "security audit ledger integrity verification failed; refusing to start".to_owned(),
+            ));
+        }
+        Ok(store)
     }
 
     /// The directory every body path is derived from.
@@ -698,8 +925,25 @@ impl ArtifactStore {
         &self.context.artifact_dir
     }
 
+    /// Adds a production-only post-commit thumbnail scheduler. Test constructors deliberately
+    /// leave this unset, so lifecycle tests remain inert unless they opt in explicitly.
+    #[must_use]
+    pub fn with_post_commit_preview_scheduler(
+        mut self,
+        preview_scheduler: Arc<dyn PostCommitPreviewScheduler>,
+    ) -> Self {
+        self.preview_scheduler = Some(preview_scheduler);
+        self
+    }
+
     fn context(&self) -> Arc<StoreContext> {
         Arc::clone(&self.context)
+    }
+
+    fn schedule_preview(&self, meta: ArtifactMeta) {
+        if let Some(scheduler) = &self.preview_scheduler {
+            scheduler.schedule(self.clone(), meta);
+        }
     }
 }
 
@@ -707,6 +951,7 @@ impl ArtifactStore {
 #[derive(Debug)]
 struct PublishState {
     inserted: bool,
+    final_durable: bool,
 }
 
 /// The body relocation `delete` may have to undo. [lib/store.js:503-514]
@@ -773,6 +1018,185 @@ struct UpdatePlan {
 }
 
 impl StoreContext {
+    fn delivery_envelope(
+        &self,
+        meta: &ArtifactMeta,
+        event: WebhookEvent,
+    ) -> Result<DeliveryEnvelopeV1, AppError> {
+        let subject = format!("artifact:{}:{}", meta.id, meta.revision);
+        let event_id = stable_delivery_event_id(&meta.org, &event, &subject);
+        let preview = (!meta.is_bundle
+            && matches!(
+                &event,
+                WebhookEvent::Published | WebhookEvent::Updated | WebhookEvent::Restored
+            ))
+        .then(|| DeliveryPreviewReferenceV1::new(&meta.id.0, meta.revision, &meta.body_sha256))
+        .transpose()?;
+        DeliveryEnvelopeV1::build_with_preview(
+            event_id,
+            &meta.org,
+            &event,
+            &NotificationPayload {
+                artifact_id: meta.id.clone(),
+                title: meta.title.clone(),
+                url: format!(
+                    "{}/{}",
+                    self.delivery_base_url.trim_end_matches('/'),
+                    meta.id
+                ),
+                description: meta.description.clone(),
+                uploader_label: meta.uploader_label.clone(),
+                category: meta.category.clone(),
+                revision: meta.revision,
+                bytes: meta.bytes,
+                viewer_email: None,
+                body: None,
+                resolver: None,
+            },
+            preview,
+        )
+    }
+
+    fn fanout_delivery(
+        &self,
+        transaction: &Transaction<'_>,
+        meta: &ArtifactMeta,
+        event: WebhookEvent,
+        intent_id: &str,
+    ) -> Result<(), AppError> {
+        let envelope = self.delivery_envelope(meta, event.clone())?;
+        outbox_fanout::fanout_in_transaction(
+            transaction,
+            &envelope,
+            &meta.org,
+            &event,
+            Some(intent_id.to_owned()),
+            SystemClock.now_unix_millis(),
+            || self.ids.webhook_id().map(|id| id.0),
+        )
+        .map(|_| ())
+    }
+
+    fn audit_event(operation: &str, target_id: &str, revision: Option<u64>) -> AuditEvent {
+        AuditEvent {
+            operation: operation.to_owned(),
+            target_type: "artifact".to_owned(),
+            target_id: target_id.to_owned(),
+            result: "success".to_owned(),
+            classification: String::new(),
+            revision,
+        }
+    }
+
+    fn reserve_audit(
+        &self,
+        transaction: &rusqlite::Transaction<'_>,
+        audit: &MutationAudit,
+        intent_id: &str,
+        operation: &str,
+        target_id: &str,
+        revision: Option<u64>,
+    ) -> Result<(), AppError> {
+        let event = Self::audit_event(operation, target_id, revision);
+        let correlation = audit.correlation(operation, target_id, revision);
+        if !reserve_receipt_in_transaction(
+            transaction,
+            &self.audit_key,
+            &correlation,
+            intent_id,
+            audit.context(),
+            &event,
+        )? {
+            return Err(AppError::Internal);
+        }
+        Ok(())
+    }
+
+    fn finalize_audit_and_intent(
+        &self,
+        conn: &mut Connection,
+        audit: &MutationAudit,
+        intent_id: &str,
+        operation: &str,
+        target_id: &str,
+        revision: Option<u64>,
+    ) -> Result<(), AppError> {
+        let key = &self.audit_key;
+        let event = Self::audit_event(operation, target_id, revision);
+        let correlation = audit.correlation(operation, target_id, revision);
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| sql_error("open audit finalization transaction", &error))?;
+        let event_id = audit.event_id()?;
+        let _ = finalize_receipt_in_transaction(
+            &transaction,
+            key,
+            &correlation,
+            &event_id,
+            audit.context(),
+            &event,
+        )?;
+        outbox::finalize_durability_success_in_transaction(
+            &transaction,
+            intent_id,
+            SystemClock.now_unix_millis(),
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| sql_error("commit audit finalization transaction", &error))
+    }
+
+    /// Finish a *proven* in-process compensation.  A pending receipt and its durability intent
+    /// must both exist; otherwise this is an ambiguous/finalized state and must be left for
+    /// reconciliation.  The safe failure event, receipt release, and intent release commit as
+    /// one transaction, so no retry can relabel a partially released mutation.
+    fn cancel_compensated_audit_intent(
+        &self,
+        conn: &mut Connection,
+        audit: &MutationAudit,
+        intent_id: &str,
+        operation: &str,
+        target_id: &str,
+        revision: Option<u64>,
+    ) -> Result<(), AppError> {
+        let event_id = audit.event_id()?;
+        let event = AuditEvent {
+            operation: operation.to_owned(),
+            target_type: "artifact".to_owned(),
+            target_id: target_id.to_owned(),
+            result: "failure".to_owned(),
+            classification: "compensated".to_owned(),
+            revision,
+        };
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| sql_error("open compensated audit cancellation", &error))?;
+        verify_pending_receipt_in_transaction(&transaction, &self.audit_key, intent_id)?;
+        append_in_transaction(
+            &transaction,
+            &self.audit_key,
+            &event_id,
+            audit.context(),
+            &event,
+        )?;
+        delete_pending_receipt_in_transaction(&transaction, &self.audit_key, intent_id)?;
+        outbox::compensate_durability_in_transaction(&transaction, intent_id)?;
+        transaction
+            .commit()
+            .map_err(|error| sql_error("commit compensated audit cancellation", &error))
+    }
+
+    fn rename_with_barrier(
+        &self,
+        from: &Path,
+        to: &Path,
+        point: FaultPoint,
+    ) -> Result<(), AppError> {
+        durable::rename_after_move(from, to, || {
+            self.faults.check(point).map_err(InjectedFault::into_error)
+        })
+    }
+
     fn fault(&self, point: FaultPoint) -> Result<(), Interrupt> {
         self.faults.check(point).map_err(Interrupt::from)
     }
@@ -832,13 +1256,24 @@ impl StoreContext {
     }
 
     /// `files.writeFileSync(staging, html, "utf8")` — [lib/store.js:217], [lib/store.js:376]
-    fn stage_single_body(&self, staging: &Path, html: &str) -> Result<(), AppError> {
+    fn stage_single_body(
+        &self,
+        staging: &Path,
+        html: &str,
+        file_sync: FaultPoint,
+        directory_sync: FaultPoint,
+    ) -> Result<(), AppError> {
         if let Some(parent) = staging.parent() {
             std::fs::create_dir_all(parent)
                 .map_err(|error| io_failure("create staging parent", staging, &error))?;
         }
         std::fs::write(staging, html.as_bytes())
-            .map_err(|error| io_failure("write staged body", staging, &error))
+            .map_err(|error| io_failure("write staged body", staging, &error))?;
+        durable::sync_file_with_barrier(staging, || self.bare_fault(file_sync))?;
+        if let Some(parent) = staging.parent() {
+            durable::sync_dir_with_barrier(parent, || self.bare_fault(directory_sync))?;
+        }
+        Ok(())
     }
 
     /// ```text
@@ -859,6 +1294,8 @@ impl StoreContext {
         &self,
         staging: &Path,
         files: &[(String, String)],
+        file_sync: FaultPoint,
+        directory_sync: FaultPoint,
     ) -> Result<(), AppError> {
         std::fs::create_dir_all(staging)
             .map_err(|error| io_failure("create staging directory", staging, &error))?;
@@ -880,6 +1317,10 @@ impl StoreContext {
             std::fs::write(&full, content.as_bytes())
                 .map_err(|error| io_failure("write bundle file", &full, &error))?;
         }
+        durable::sync_tree_with_barrier(staging, || self.bare_fault(file_sync))?;
+        if let Some(parent) = staging.parent() {
+            durable::sync_dir_with_barrier(parent, || self.bare_fault(directory_sync))?;
+        }
         Ok(())
     }
 
@@ -890,19 +1331,46 @@ impl StoreContext {
     /// `publish` / `publishBundle` — [lib/store.js:206-281]
     fn publish_sync(
         &self,
-        conn: &Connection,
+        conn: &mut Connection,
         request: PublishArtifact,
+        audit: MutationAudit,
     ) -> Result<PublishedArtifact, AppError> {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
         let prepared = self.prepare_publish(&request.content)?;
+        // A publisher administrator may select a tenant other than its own.  Audit under the
+        // artifact's persisted/target tenant while preserving the verified actor identity.
+        let audit_tenant = if request.target_org.0.is_empty() {
+            OrgId(DEFAULT_ORG.to_owned())
+        } else {
+            request.target_org.clone()
+        };
+        let audit = audit.for_affected_tenant(&audit_tenant);
 
         let id = self.next_id(conn)?;
         let staging = self.transient_path(&id, TransientKind::Staging)?;
         let final_path = self.body_path(&id, prepared.is_bundle);
 
-        let mut state = PublishState { inserted: false };
+        let intent_id = format!("publish:{}", id.as_str());
+        start_durability_intent(
+            conn,
+            &intent_id,
+            id.as_str(),
+            "publish",
+            &prepared.body_sha256,
+            "",
+            &staging,
+        )?;
+        let mut state = PublishState {
+            inserted: false,
+            final_durable: false,
+        };
         let attempt = self.publish_attempt(
             conn,
             &request,
+            &audit,
             PublishPlan {
                 id: &id,
                 staging: &staging,
@@ -932,7 +1400,24 @@ impl StoreContext {
                             .map_err(|error| sql_error("delete published artifact", &error))?;
                     }
                     safe_remove(&staging);
-                    safe_remove(&final_path);
+                    if state.final_durable {
+                        safe_remove(&final_path);
+                    }
+                    if state.inserted {
+                        // Once the inserted row/body have been proven removed, record the safe
+                        // terminal failure while releasing the reservation and intent atomically.
+                        self.cancel_compensated_audit_intent(
+                            conn,
+                            &audit,
+                            &intent_id,
+                            "artifact.publish",
+                            id.as_str(),
+                            Some(1),
+                        )?;
+                    } else {
+                        // Staging failed before a receipt was admitted.
+                        finish_durability_intent(conn, &intent_id)?;
+                    }
                 }
                 Err(interrupt.error)
             }
@@ -976,16 +1461,27 @@ impl StoreContext {
 
     fn publish_attempt(
         &self,
-        conn: &Connection,
+        conn: &mut Connection,
         request: &PublishArtifact,
+        audit: &MutationAudit,
         plan: PublishPlan<'_>,
         state: &mut PublishState,
     ) -> Result<ArtifactMeta, Interrupt> {
         self.fault(FaultPoint::PublishStageWrite)?;
         if let Some(html) = plan.single {
-            self.stage_single_body(plan.staging, html)?;
+            self.stage_single_body(
+                plan.staging,
+                html,
+                FaultPoint::PublishStageFileSync,
+                FaultPoint::PublishStageDirectorySync,
+            )?;
         } else if let Some(bundle) = plan.bundle {
-            self.stage_bundle_files(plan.staging, &bundle.files)?;
+            self.stage_bundle_files(
+                plan.staging,
+                &bundle.files,
+                FaultPoint::PublishStageFileSync,
+                FaultPoint::PublishStageDirectorySync,
+            )?;
         }
 
         self.fault(FaultPoint::PublishInsert)?;
@@ -1006,7 +1502,10 @@ impl StoreContext {
             .optional()
             .map_err(|error| Interrupt::from(sql_error("read publisher key owner", &error)))?
             .flatten();
-        conn.execute(
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| Interrupt::from(sql_error("open publish transaction", &error)))?;
+        transaction.execute(
             "INSERT INTO artifacts \
              (id, client_id, org, owner_email, uploader_label, title, description, bytes, is_bundle, entry, \
               category, body_sha256) \
@@ -1027,16 +1526,65 @@ impl StoreContext {
             ],
         )
         .map_err(|error| Interrupt::from(sql_error("insert artifact", &error)))?;
-        state.inserted = true;
-
-        let meta = load_meta(conn, plan.id.as_str())?
+        let meta = load_meta_unchecked(&transaction, plan.id.as_str())?
             .ok_or_else(|| Interrupt::from(AppError::Internal))?;
-        record_revision_row(conn, &meta, Some(&request.publisher.client_id))?;
+        record_revision_row(&transaction, &meta, Some(&request.publisher.client_id))?;
+        self.reserve_audit(
+            &transaction,
+            audit,
+            &format!("publish:{}", plan.id.as_str()),
+            "artifact.publish",
+            plan.id.as_str(),
+            Some(1),
+        )?;
+        self.fanout_delivery(
+            &transaction,
+            &meta,
+            WebhookEvent::Published,
+            &format!("publish:{}", plan.id.as_str()),
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| Interrupt::from(sql_error("commit publish transaction", &error)))?;
+        state.inserted = true;
+        advance_durability_intent(
+            conn,
+            &format!("publish:{}", plan.id.as_str()),
+            "metadata_committed",
+        )?;
 
         self.fault(FaultPoint::PublishRename)?;
-        rename(plan.staging, plan.final_path)?;
-
+        if let Err(error) = self.rename_with_barrier(
+            plan.staging,
+            plan.final_path,
+            FaultPoint::PublishRenameBarrier,
+        ) {
+            if path_exists(plan.final_path) && !path_exists(plan.staging) {
+                state.final_durable = true;
+                return Err(Interrupt {
+                    error,
+                    compensate: false,
+                });
+            }
+            return Err(Interrupt::from(error));
+        }
+        state.final_durable = true;
+        advance_durability_intent(
+            conn,
+            &format!("publish:{}", plan.id.as_str()),
+            "body_durable",
+        )?;
+        // Keep the terminal receipt after the final lifecycle fault boundary so an in-process
+        // failure can still prove compensation and append a single terminal failure record.
         self.fault(FaultPoint::PublishComplete)?;
+        self.finalize_audit_and_intent(
+            conn,
+            audit,
+            &format!("publish:{}", plan.id.as_str()),
+            "artifact.publish",
+            plan.id.as_str(),
+            Some(1),
+        )?;
         Ok(meta)
     }
 
@@ -1055,10 +1603,32 @@ impl StoreContext {
         id: &str,
         expected_revision: u64,
         update: &ArtifactUpdate,
+        audit: &MutationAudit,
+        operation: &str,
+    ) -> Result<UpdateArtifactResult, AppError> {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
+        self.update_locked(conn, id, expected_revision, update, audit, operation)
+    }
+
+    /// Update while the caller already owns the lifecycle write gate. Restore uses this to keep
+    /// the source revision's metadata/body read and its replay as one linearized operation.
+    fn update_locked(
+        &self,
+        conn: &mut Connection,
+        id: &str,
+        expected_revision: u64,
+        update: &ArtifactUpdate,
+        audit: &MutationAudit,
+        operation: &str,
     ) -> Result<UpdateArtifactResult, AppError> {
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
+        let scoped_audit = audit.for_affected_tenant(&meta.org);
+        let audit = &scoped_audit;
         let safe_id = SafeArtifactId::parse(id).ok_or(AppError::ConcealedNotFound)?;
 
         // `if (!Number.isInteger(g) || g < 1 || g !== meta.revision) return conflict;`
@@ -1077,18 +1647,49 @@ impl StoreContext {
             });
         }
 
+        // Every new revision must retain a durable, immutable predecessor. Validate the live
+        // body before metadata can advance: otherwise a metadata-only update could finish with
+        // no restore point, and a content update could overwrite the last good body.
+        self.require_current_body(&safe_id, &meta)?;
+
         // Stage the replacement before touching the database. [lib/store.js:374-384]
         let mut staged: Option<PathBuf> = None;
+        let intent_id = format!("update:{id}:{}", meta.revision.saturating_add(1));
+        // Even a metadata-only revision snapshots the current body into immutable history. It is
+        // therefore a cross-resource mutation too: conceal it until that snapshot is durable.
+        let intent_path = self.transient_path(&safe_id, TransientKind::Staging)?;
         if plan.content_changed {
             self.bare_fault(FaultPoint::UpdateStageWrite)?;
-            let path = self.transient_path(&safe_id, TransientKind::Staging)?;
+        }
+        start_durability_intent(
+            conn,
+            &intent_id,
+            id,
+            "update",
+            &plan.body_sha256,
+            &meta.body_sha256,
+            &intent_path,
+        )?;
+        if plan.content_changed {
+            let path = intent_path;
             let staging_result = match &plan.body {
-                StagedBody::Single(html) => self.stage_single_body(&path, html),
-                StagedBody::Bundle(files) => self.stage_bundle_files(&path, files),
+                StagedBody::Single(html) => self.stage_single_body(
+                    &path,
+                    html,
+                    FaultPoint::UpdateStageFileSync,
+                    FaultPoint::UpdateStageDirectorySync,
+                ),
+                StagedBody::Bundle(files) => self.stage_bundle_files(
+                    &path,
+                    files,
+                    FaultPoint::UpdateStageFileSync,
+                    FaultPoint::UpdateStageDirectorySync,
+                ),
                 StagedBody::None => Ok(()),
             };
             if let Err(error) = staging_result {
                 safe_remove(&path);
+                let _ = finish_durability_intent(conn, &intent_id);
                 return Err(error);
             }
             staged = Some(path);
@@ -1107,31 +1708,56 @@ impl StoreContext {
 
         if let Err(fault) = self.faults.check(FaultPoint::UpdateCommit) {
             let interrupt = Interrupt::from(fault);
-            if interrupt.compensate
-                && let Some(path) = &staged
-            {
-                safe_remove(path);
+            if interrupt.compensate {
+                if let Some(path) = &staged {
+                    safe_remove(path);
+                }
+                let _ = finish_durability_intent(conn, &intent_id);
             }
             return Err(interrupt.error);
         }
 
         // Commit metadata FIRST, then swap the body. [lib/store.js:386-393]
-        let committed = self.commit_update(
+        let committed = match self.commit_update(
             conn,
             &meta,
             expected_revision,
             &plan,
             update.acting_client_id.as_ref(),
-        )?;
+            &intent_id,
+            audit,
+            operation,
+        ) {
+            Ok(committed) => committed,
+            Err(error) => {
+                // Fanout/capacity errors occur before the metadata transaction commits and can
+                // be proven by the still-prepared intent.  A commit error is ambiguous: retain
+                // the intent, metadata, staging and blocked rows for reconciliation instead.
+                if matches!(
+                    &error,
+                    AppError::RateLimited
+                        | AppError::PayloadTooLarge
+                        | AppError::Validation(_)
+                        | AppError::Conflict(_)
+                ) && durability_intent_state(conn, &intent_id)?.as_deref() == Some("prepared")
+                {
+                    if let Some(path) = &staged {
+                        safe_remove(path);
+                    }
+                    finish_durability_intent(conn, &intent_id)?;
+                }
+                return Err(error);
+            }
+        };
         if !committed {
             // `if (!committed) { if (staged) safeRemove(staged); return conflict; }`
             // — [lib/store.js:416-419]
             if let Some(path) = &staged {
                 safe_remove(path);
             }
+            let _ = finish_durability_intent(conn, &intent_id);
             return Err(AppError::Conflict("conflict".to_owned()));
         }
-
         let mut snapshot: Option<BodySnapshot> = None;
         if let Err(interrupt) = self.swap_body(&safe_id, &meta, staged.as_deref(), &mut snapshot) {
             if interrupt.compensate {
@@ -1142,13 +1768,33 @@ impl StoreContext {
                     safe_remove(path);
                 }
                 self.revert_update(conn, &meta, &before)?;
+                self.remove_snapshot_temporary(&safe_id, meta.revision, meta.is_bundle)?;
+                self.cancel_compensated_audit_intent(
+                    conn,
+                    audit,
+                    &intent_id,
+                    operation,
+                    id,
+                    Some(meta.revision.saturating_add(1)),
+                )?;
             }
             return Err(interrupt.error);
         }
 
+        advance_durability_intent(conn, &intent_id, "body_durable")?;
+
         // Pruning is best-effort in Node too; a fault here leaves a fully committed update.
         self.bare_fault(FaultPoint::UpdatePrune)?;
         self.prune_history(conn, &safe_id);
+
+        self.finalize_audit_and_intent(
+            conn,
+            audit,
+            &intent_id,
+            operation,
+            id,
+            Some(meta.revision.saturating_add(1)),
+        )?;
 
         let meta = load_meta(conn, id)?.ok_or(AppError::Internal)?;
         Ok(UpdateArtifactResult {
@@ -1281,6 +1927,7 @@ impl StoreContext {
     ///
     /// The guard pins `client_id` and `org` to the values read at the start of the operation, so
     /// a concurrent re-tenant or delete turns into a conflict instead of a lost update.
+    #[allow(clippy::too_many_arguments)] // Transactional lifecycle inputs mirror the durability record exactly.
     fn commit_update(
         &self,
         conn: &mut Connection,
@@ -1288,9 +1935,12 @@ impl StoreContext {
         expected_revision: u64,
         plan: &UpdatePlan,
         acting_client_id: Option<&ClientId>,
+        intent_id: &str,
+        audit: &MutationAudit,
+        operation: &str,
     ) -> Result<bool, AppError> {
         let transaction = conn
-            .transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| sql_error("open update transaction", &error))?;
         let changes = transaction
             .execute(
@@ -1316,6 +1966,14 @@ impl StoreContext {
             // `if (info.changes !== 1) return false;` — dropping the transaction rolls it back.
             return Ok(false);
         }
+        self.reserve_audit(
+            &transaction,
+            audit,
+            intent_id,
+            operation,
+            &meta.id.0,
+            Some(meta.revision.saturating_add(1)),
+        )?;
         record_legacy_revision_row(&transaction, meta)?;
         let mut produced = meta.clone();
         produced.title.clone_from(&plan.title);
@@ -1326,6 +1984,26 @@ impl StoreContext {
         produced.body_sha256.clone_from(&plan.body_sha256);
         produced.revision = meta.revision.saturating_add(1);
         record_revision_row(&transaction, &produced, acting_client_id)?;
+        self.fanout_delivery(
+            &transaction,
+            &produced,
+            if operation == "artifact.restore" {
+                WebhookEvent::Restored
+            } else {
+                WebhookEvent::Updated
+            },
+            intent_id,
+        )?;
+        let changes = transaction
+            .execute(
+                "UPDATE artifact_durability_intents \
+                 SET state = 'metadata_committed', updated_at = datetime('now') WHERE id = ?1",
+                params![intent_id],
+            )
+            .map_err(|error| sql_error("advance update durability intent", &error))?;
+        if changes != 1 {
+            return Err(AppError::Internal);
+        }
         // A fault here drops the transaction unread, which is exactly what a crash before COMMIT
         // leaves behind.
         self.bare_fault(FaultPoint::UpdateCommitTransaction)?;
@@ -1344,11 +2022,55 @@ impl StoreContext {
         snapshot: &mut Option<BodySnapshot>,
     ) -> Result<(), Interrupt> {
         self.fault(FaultPoint::UpdateSnapshot)?;
-        *snapshot = self.snapshot_body(id, meta, staged.is_some())?;
+        match self.snapshot_body(id, meta, staged.is_some()) {
+            Ok(value) => *snapshot = value,
+            Err(error) => {
+                let source = self.body_path(id, meta.is_bundle);
+                let history =
+                    paths::history_body_path(&self.artifact_dir, id, meta.revision, meta.is_bundle);
+                // The move completed but its directory barrier failed. Metadata already names the
+                // staged replacement; retaining the intent lets recovery install it while the
+                // immutable outgoing body remains in history. Never compensate into a missing
+                // live body here.
+                if staged.is_some() && !path_exists(&source) && path_exists(&history) {
+                    return Err(Interrupt {
+                        error,
+                        compensate: false,
+                    });
+                }
+                // A metadata-only snapshot copies the live body. If the copy's final rename
+                // completed but its directory barrier failed, the source remains live and the
+                // digest-valid immutable history is already the recoverable half of the new
+                // revision. Keep its intent/metadata concealed for reconciliation instead of
+                // reverting and stranding an immutable destination that blocks every retry.
+                if staged.is_none()
+                    && path_exists(&source)
+                    && body_digest_at_path(&history, meta.is_bundle).as_deref()
+                        == Some(meta.body_sha256.as_str())
+                {
+                    return Err(Interrupt {
+                        error,
+                        compensate: false,
+                    });
+                }
+                return Err(Interrupt::from(error));
+            }
+        }
 
         self.fault(FaultPoint::UpdateSwap)?;
         if let Some(path) = staged {
-            rename(path, &self.body_path(id, meta.is_bundle))?;
+            let final_path = self.body_path(id, meta.is_bundle);
+            if let Err(error) =
+                self.rename_with_barrier(path, &final_path, FaultPoint::UpdateSwapBarrier)
+            {
+                if path_exists(&final_path) && !path_exists(path) {
+                    return Err(Interrupt {
+                        error,
+                        compensate: false,
+                    });
+                }
+                return Err(Interrupt::from(error));
+            }
         }
         Ok(())
     }
@@ -1365,30 +2087,85 @@ impl StoreContext {
     ) -> Result<Option<BodySnapshot>, AppError> {
         let source = self.body_path(id, meta.is_bundle);
         if !path_exists(&source) {
-            return Ok(None);
+            return Err(AppError::Gone("body_missing".to_owned()));
         }
         let destination =
             paths::history_body_path(&self.artifact_dir, id, meta.revision, meta.is_bundle);
         if let Some(parent) = destination.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|error| io_failure("create history directory", parent, &error))?;
+            durable::create_dir_all_with_barrier(&self.artifact_dir, parent, || {
+                self.bare_fault(FaultPoint::UpdateHistoryDirectorySync)
+            })?;
         }
-        safe_remove(&destination);
+        // A history destination is immutable for a revision. Replacing it would first destroy
+        // the only known good snapshot if a previous crash left an unexpected entry there.
+        if path_exists(&destination) {
+            return Err(AppError::Conflict(
+                "history destination already exists".to_owned(),
+            ));
+        }
         if move_body {
-            rename(&source, &destination)?;
+            self.rename_with_barrier(&source, &destination, FaultPoint::UpdateSnapshotBarrier)?;
             return Ok(Some(BodySnapshot {
                 source,
                 destination,
                 moved: true,
             }));
         }
-        copy_recursive(&source, &destination)
-            .map_err(|error| io_failure("copy history snapshot", &destination, &error))?;
+        let temporary = paths::history_snapshot_temp_path(
+            &self.artifact_dir,
+            id,
+            meta.revision,
+            meta.is_bundle,
+        );
+        if path_exists(&temporary) {
+            return Err(AppError::Conflict(
+                "history snapshot temporary already exists".to_owned(),
+            ));
+        }
+        copy_recursive(&source, &temporary)
+            .map_err(|error| io_failure("copy history snapshot", &temporary, &error))?;
+        durable::sync_tree_with_barrier(&temporary, || {
+            self.bare_fault(FaultPoint::UpdateSnapshotFileSync)
+        })?;
+        self.rename_with_barrier(&temporary, &destination, FaultPoint::UpdateSnapshotBarrier)?;
         Ok(Some(BodySnapshot {
             source,
             destination,
             moved: false,
         }))
+    }
+
+    fn remove_snapshot_temporary(
+        &self,
+        id: &SafeArtifactId,
+        revision: u64,
+        is_bundle: bool,
+    ) -> Result<(), AppError> {
+        let temporary =
+            paths::history_snapshot_temp_path(&self.artifact_dir, id, revision, is_bundle);
+        if path_exists(&temporary) {
+            self.bare_fault(FaultPoint::UpdateSnapshotTempRemove)?;
+            durable::remove_with_barrier(&temporary, || {
+                self.bare_fault(FaultPoint::UpdateSnapshotTempRemoveBarrier)
+            })?;
+        }
+        Ok(())
+    }
+
+    /// Prove the outgoing body still matches its committed metadata before admitting a revision.
+    fn require_current_body(
+        &self,
+        id: &SafeArtifactId,
+        meta: &ArtifactMeta,
+    ) -> Result<(), AppError> {
+        let path = self.body_path(id, meta.is_bundle);
+        let Some(digest) = body_digest_at_path(&path, meta.is_bundle) else {
+            return Err(AppError::Gone("body_missing".to_owned()));
+        };
+        if digest != meta.body_sha256 {
+            return Err(AppError::Conflict("body_digest_mismatch".to_owned()));
+        }
+        Ok(())
     }
 
     /// `restoreSnapshotBody(snap)` — only a *moved* snapshot is undone. [lib/store.js:562-565]
@@ -1413,7 +2190,7 @@ impl StoreContext {
     ) -> Result<(), AppError> {
         self.bare_fault(FaultPoint::UpdateRevertMetadata)?;
         let transaction = conn
-            .transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| sql_error("open revert transaction", &error))?;
         transaction
             .execute(
@@ -1498,7 +2275,12 @@ impl StoreContext {
         id: &str,
         revision: u64,
         acting_client_id: Option<ClientId>,
+        audit: MutationAudit,
     ) -> Result<RestoreArtifactResult, AppError> {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -1537,7 +2319,8 @@ impl StoreContext {
             category: Some(row.category.clone()),
             content: Some(content),
         };
-        let result = self.update_sync(conn, id, meta.revision, &update)?;
+        let result =
+            self.update_locked(conn, id, meta.revision, &update, &audit, "artifact.restore")?;
         Ok(RestoreArtifactResult {
             meta: result.meta,
             restored_from: row.revision,
@@ -1549,21 +2332,100 @@ impl StoreContext {
     // -----------------------------------------------------------------------
 
     /// `removeById(id, …)` — [lib/store.js:626-644]
-    fn delete_sync(&self, conn: &Connection, id: &str) -> Result<bool, AppError> {
+    fn delete_sync(
+        &self,
+        conn: &mut Connection,
+        id: &str,
+        audit: MutationAudit,
+    ) -> Result<bool, AppError> {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
         let Some(meta) = load_meta(conn, id)? else {
             return Ok(false);
         };
+        let audit = audit.for_affected_tenant(&meta.org);
         let safe_id = SafeArtifactId::parse(id).ok_or(AppError::ConcealedNotFound)?;
+        let trash = self.transient_path(&safe_id, TransientKind::Trash)?;
+        let intent_id = format!("delete:{id}:{}", meta.revision);
+        // Reserve the immutable audit snapshot before the first filesystem side effect.  This
+        // transaction is the linearization point for a delete intent: failures roll both rows
+        // back, while a later ambiguous crash leaves both for reconciliation.
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| sql_error("open delete audit reservation", &error))?;
+        start_durability_intent(
+            &transaction,
+            &intent_id,
+            id,
+            "delete",
+            "",
+            &meta.body_sha256,
+            &trash,
+        )?;
+        self.reserve_audit(
+            &transaction,
+            &audit,
+            &intent_id,
+            "artifact.delete",
+            id,
+            Some(meta.revision),
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| sql_error("commit delete audit reservation", &error))?;
 
         // `moveBodyToTrash` runs OUTSIDE the try: a failure here has nothing to compensate.
         // [lib/store.js:503-509], [lib/store.js:630]
-        let moved = self.move_body_to_trash(&safe_id, &meta)?;
+        let move_handle = MovedBody {
+            source: self.body_path(&safe_id, meta.is_bundle),
+            trash: trash.clone(),
+        };
+        let moved = match self.move_body_to_trash(&safe_id, &meta, trash) {
+            Ok(moved) => moved,
+            Err(error) => {
+                // A directory fsync can fail after the kernel completed rename.  Do not clear
+                // the marker in that physical-partial state: normal reads stay concealed and
+                // startup reconciliation can prove whether trash must be restored/cleaned.
+                if path_exists(&move_handle.trash) && !path_exists(&move_handle.source) {
+                    return Err(error);
+                }
+                self.cancel_compensated_audit_intent(
+                    conn,
+                    &audit,
+                    &intent_id,
+                    "artifact.delete",
+                    id,
+                    Some(meta.revision),
+                )?;
+                return Err(error);
+            }
+        };
 
-        match self.delete_attempt(conn, &safe_id, moved.as_ref()) {
-            Ok(deleted) => Ok(deleted),
+        match self.delete_attempt(conn, &safe_id, &meta, moved.as_ref(), &intent_id) {
+            Ok(deleted) => {
+                self.finalize_audit_and_intent(
+                    conn,
+                    &audit,
+                    &intent_id,
+                    "artifact.delete",
+                    id,
+                    Some(meta.revision),
+                )?;
+                Ok(deleted)
+            }
             Err(interrupt) => {
                 if interrupt.compensate {
                     self.restore_body(moved.as_ref())?;
+                    self.cancel_compensated_audit_intent(
+                        conn,
+                        &audit,
+                        &intent_id,
+                        "artifact.delete",
+                        id,
+                        Some(meta.revision),
+                    )?;
                 }
                 Err(interrupt.error)
             }
@@ -1572,31 +2434,84 @@ impl StoreContext {
 
     fn delete_attempt(
         &self,
-        conn: &Connection,
+        conn: &mut Connection,
         id: &SafeArtifactId,
+        pre_delete_meta: &ArtifactMeta,
         moved: Option<&MovedBody>,
+        intent_id: &str,
     ) -> Result<bool, Interrupt> {
         self.fault(FaultPoint::DeleteRow)?;
         // Reactions cascade on `artifacts(id)`; feedback, revisions, views, and shares cascade on
         // the composite `artifacts(id, org)`. [lib/migrations.js:124,167,261,299,357]
-        let changes = conn
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| {
+                Interrupt::from(sql_error("open delete metadata transaction", &error))
+            })?;
+        let changes = transaction
             .execute("DELETE FROM artifacts WHERE id = ?1", params![id.as_str()])
             .map_err(|error| Interrupt::from(sql_error("delete artifact", &error)))?;
         if changes == 0 {
-            // `restoreBody(moved); return false;` — [lib/store.js:633-636]
+            // The row vanished after the audited reservation (for example a competing trusted
+            // maintenance action).  This is a proven compensated failure, never a successful
+            // delete: restore the body and let the caller release the receipt atomically.
+            drop(transaction);
             self.restore_body(moved)?;
-            return Ok(false);
+            return Err(Interrupt {
+                error: AppError::Conflict("conflict".to_owned()),
+                compensate: true,
+            });
         }
 
-        self.fault(FaultPoint::DeleteTrashRemove)?;
+        self.fanout_delivery(
+            &transaction,
+            pre_delete_meta,
+            WebhookEvent::Deleted,
+            intent_id,
+        )
+        .map_err(Interrupt::from)?;
+
+        let changes = transaction
+            .execute(
+                "UPDATE artifact_durability_intents SET state = 'metadata_committed', updated_at = datetime('now') WHERE id = ?1",
+                params![intent_id],
+            )
+            .map_err(|error| Interrupt::from(sql_error("advance delete durability intent", &error)))?;
+        if changes != 1 {
+            return Err(Interrupt::from(AppError::Internal));
+        }
+        transaction.commit().map_err(|error| {
+            Interrupt::from(sql_error("commit delete metadata transaction", &error))
+        })?;
+
+        if let Err(fault) = self.faults.check(FaultPoint::DeleteTrashRemove) {
+            return Err(Interrupt {
+                error: fault.into_error(),
+                compensate: false,
+            });
+        }
         if let Some(moved) = moved {
-            safe_remove(&moved.trash);
+            durable::remove(&moved.trash).map_err(|error| Interrupt {
+                error,
+                compensate: false,
+            })?;
         }
 
-        self.fault(FaultPoint::DeleteHistoryRemove)?;
+        if let Err(fault) = self.faults.check(FaultPoint::DeleteHistoryRemove) {
+            return Err(Interrupt {
+                error: fault.into_error(),
+                compensate: false,
+            });
+        }
         // Revision rows cascade through the composite FK; this removes their bodies.
         // [lib/store.js:638]
-        safe_remove(&paths::history_dir(&self.artifact_dir, id));
+        durable::remove(&paths::history_dir(&self.artifact_dir, id)).map_err(|error| {
+            Interrupt {
+                error,
+                compensate: false,
+            }
+        })?;
+        advance_durability_intent(conn, intent_id, "body_durable").map_err(Interrupt::from)?;
         Ok(true)
     }
 
@@ -1605,14 +2520,14 @@ impl StoreContext {
         &self,
         id: &SafeArtifactId,
         meta: &ArtifactMeta,
+        trash: PathBuf,
     ) -> Result<Option<MovedBody>, AppError> {
         let source = self.body_path(id, meta.is_bundle);
         if !path_exists(&source) {
             return Ok(None);
         }
         self.bare_fault(FaultPoint::DeleteTrashRename)?;
-        let trash = self.transient_path(id, TransientKind::Trash)?;
-        rename(&source, &trash)?;
+        self.rename_with_barrier(&source, &trash, FaultPoint::DeleteTrashRenameBarrier)?;
         Ok(Some(MovedBody { source, trash }))
     }
 
@@ -1635,19 +2550,41 @@ impl StoreContext {
     /// `setCategory(id, category)` — [lib/store.js:446-452]
     fn set_category_sync(
         &self,
-        conn: &Connection,
+        conn: &mut Connection,
         id: &str,
         category: &str,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        if load_meta(conn, id)?.is_none() {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
+        let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
-        }
+        };
         self.bare_fault(FaultPoint::MetadataWrite)?;
-        conn.execute(
-            "UPDATE artifacts SET category = ?1, updated_at = datetime('now') WHERE id = ?2",
-            params![normalize_category(category), id],
-        )
-        .map_err(|error| sql_error("set artifact category", &error))?;
+        let event_id = audit.event_id()?;
+        let event = Self::audit_event("artifact.category.set", id, Some(meta.revision));
+        let scoped_audit = audit.for_affected_tenant(&meta.org);
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| sql_error("open category audit transaction", &error))?;
+        transaction
+            .execute(
+                "UPDATE artifacts SET category = ?1, updated_at = datetime('now') WHERE id = ?2",
+                params![normalize_category(category), id],
+            )
+            .map_err(|error| sql_error("set artifact category", &error))?;
+        append_in_transaction(
+            &transaction,
+            &self.audit_key,
+            &event_id,
+            scoped_audit.context(),
+            &event,
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| sql_error("commit category audit transaction", &error))?;
         load_meta(conn, id)?.ok_or(AppError::Internal)
     }
 
@@ -1655,19 +2592,48 @@ impl StoreContext {
     /// [lib/store.js:455-461]
     fn set_hidden_sync(
         &self,
-        conn: &Connection,
+        conn: &mut Connection,
         id: &str,
         hidden: bool,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        if load_meta(conn, id)?.is_none() {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
+        let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
-        }
+        };
         self.bare_fault(FaultPoint::MetadataWrite)?;
-        conn.execute(
-            "UPDATE artifacts SET hidden = ?1, updated_at = datetime('now') WHERE id = ?2",
-            params![i64::from(hidden), id],
-        )
-        .map_err(|error| sql_error("set artifact visibility", &error))?;
+        let event_id = audit.event_id()?;
+        let event = AuditEvent {
+            operation: "artifact.visibility.set".to_owned(),
+            target_type: "artifact".to_owned(),
+            target_id: id.to_owned(),
+            result: "success".to_owned(),
+            classification: if hidden { "hidden" } else { "shared" }.to_owned(),
+            revision: Some(meta.revision),
+        };
+        let scoped_audit = audit.for_affected_tenant(&meta.org);
+        let transaction = conn
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .map_err(|error| sql_error("open visibility audit transaction", &error))?;
+        transaction
+            .execute(
+                "UPDATE artifacts SET hidden = ?1, updated_at = datetime('now') WHERE id = ?2",
+                params![i64::from(hidden), id],
+            )
+            .map_err(|error| sql_error("set artifact visibility", &error))?;
+        append_in_transaction(
+            &transaction,
+            &self.audit_key,
+            &event_id,
+            scoped_audit.context(),
+            &event,
+        )?;
+        transaction
+            .commit()
+            .map_err(|error| sql_error("commit visibility audit transaction", &error))?;
         load_meta(conn, id)?.ok_or(AppError::Internal)
     }
 
@@ -1682,7 +2648,12 @@ impl StoreContext {
         id: &str,
         target_org: &str,
         category: Option<&str>,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
+        let _gate = self
+            .lifecycle_gate
+            .write()
+            .map_err(|_| AppError::Internal)?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -1696,8 +2667,13 @@ impl StoreContext {
 
         self.bare_fault(FaultPoint::MoveTransaction)?;
         let transaction = conn
-            .transaction()
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| sql_error("open move transaction", &error))?;
+        let event_id = audit.event_id()?;
+        // Audit a cross-org move under the source/affected tenant.  The target organization is
+        // intentionally absent: tenant scope and the count-only revocation classification are
+        // enough for an authorized investigation without retaining share identifiers.
+        let scoped_audit = audit.for_affected_tenant(&meta.org);
         // Composite FKs are checked at COMMIT, after the parent and all children have moved.
         transaction
             .execute_batch("PRAGMA defer_foreign_keys = ON")
@@ -1727,12 +2703,27 @@ impl StoreContext {
                 .execute(sql, params![org, id])
                 .map_err(|error| sql_error(operation, &error))?;
         }
-        transaction
+        let revoked_shares = transaction
             .execute(
                 "DELETE FROM artifact_shares WHERE artifact_id = ?1",
                 params![id],
             )
             .map_err(|error| sql_error("revoke shares on move", &error))?;
+        let event = AuditEvent {
+            operation: "artifact.org.move".to_owned(),
+            target_type: "artifact".to_owned(),
+            target_id: id.to_owned(),
+            result: "success".to_owned(),
+            classification: format!("shares_revoked_{revoked_shares}"),
+            revision: Some(meta.revision),
+        };
+        append_in_transaction(
+            &transaction,
+            &self.audit_key,
+            &event_id,
+            scoped_audit.context(),
+            &event,
+        )?;
         transaction
             .commit()
             .map_err(|error| sql_error("commit move transaction", &error))?;
@@ -1797,7 +2788,16 @@ impl ArtifactStore {
     ) -> Result<Option<ArtifactFile>, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        blocking(move || {
+        db::interact(&self.pool, move |conn| {
+            let _gate = context
+                .lifecycle_gate
+                .read()
+                .map_err(|_| AppError::Internal)?;
+            // Authorization may have resolved just before a lifecycle marker was created. Recheck
+            // in the same blocking closure immediately before filesystem access.
+            if load_meta(conn, &id)?.is_none() {
+                return Ok(None);
+            }
             // `readArtifact` refuses a reserved id before touching the filesystem.
             // [lib/store.js:495]
             let Some(id) = SafeArtifactId::addressable(&id) else {
@@ -1820,7 +2820,14 @@ impl ArtifactStore {
         let context = self.context();
         let meta = meta.clone();
         let relative_path = relative_path.to_owned();
-        blocking(move || {
+        db::interact(&self.pool, move |conn| {
+            let _gate = context
+                .lifecycle_gate
+                .read()
+                .map_err(|_| AppError::Internal)?;
+            if load_meta(conn, &meta.id.0)?.is_none() {
+                return Ok(None);
+            }
             // `readBundleFile` returns null for a single-file artifact. [lib/store.js:484]
             if !meta.is_bundle {
                 return Ok(None);
@@ -1854,6 +2861,13 @@ impl ArtifactStore {
         let id = meta.id.0.clone();
         let relative_path = relative_path.map(ToOwned::to_owned);
         db::interact(&self.pool, move |conn| {
+            let _gate = context
+                .lifecycle_gate
+                .read()
+                .map_err(|_| AppError::Internal)?;
+            if load_meta(conn, &id)?.is_none() {
+                return Ok(None);
+            }
             let Some(safe_id) = SafeArtifactId::parse(&id) else {
                 return Ok(None);
             };
@@ -1885,6 +2899,13 @@ impl ArtifactStore {
         let id = meta.id.0.clone();
         let is_bundle = meta.is_bundle;
         db::interact(&self.pool, move |conn| {
+            let _gate = context
+                .lifecycle_gate
+                .read()
+                .map_err(|_| AppError::Internal)?;
+            if load_meta(conn, &id)?.is_none() {
+                return Ok(None);
+            }
             let Some(safe_id) = SafeArtifactId::parse(&id) else {
                 return Ok(None);
             };
@@ -1918,6 +2939,13 @@ impl ArtifactStore {
         let context = self.context();
         let meta = meta.clone();
         db::interact(&self.pool, move |conn| {
+            let _gate = context
+                .lifecycle_gate
+                .read()
+                .map_err(|_| AppError::Internal)?;
+            if load_meta(conn, &meta.id.0)?.is_none() {
+                return Err(AppError::ConcealedNotFound);
+            }
             context.list_revisions_sync(conn, &meta)
         })
         .await
@@ -1932,13 +2960,25 @@ impl ArtifactStore {
         &self,
         meta: &ArtifactMeta,
         update: ArtifactUpdate,
+        audit: MutationAudit,
     ) -> Result<UpdateArtifactResult, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| {
-            context.update_sync(conn, &id, update.expected_revision, &update)
+        let updated = db::interact(&self.pool, move |conn| {
+            context.update_sync(
+                conn,
+                &id,
+                update.expected_revision,
+                &update,
+                &audit,
+                "artifact.update",
+            )
         })
-        .await
+        .await?;
+        if updated.changed {
+            self.schedule_preview(updated.meta.clone());
+        }
+        Ok(updated)
     }
 
     /// `restoreById(id, revision, …)` — [lib/store.js:605-624]
@@ -1951,23 +2991,33 @@ impl ArtifactStore {
         meta: &ArtifactMeta,
         revision: u64,
         acting_client_id: Option<ClientId>,
+        audit: MutationAudit,
     ) -> Result<RestoreArtifactResult, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| {
-            context.restore_sync(conn, &id, revision, acting_client_id)
+        let restored = db::interact(&self.pool, move |conn| {
+            context.restore_sync(conn, &id, revision, acting_client_id, audit)
         })
-        .await
+        .await?;
+        self.schedule_preview(restored.meta.clone());
+        Ok(restored)
     }
 
     /// `removeById(id, …)` — [lib/store.js:626-644]
     ///
     /// # Errors
     /// Propagates a database or filesystem failure after compensating.
-    pub async fn delete_for(&self, meta: &ArtifactMeta) -> Result<bool, AppError> {
+    pub async fn delete_for(
+        &self,
+        meta: &ArtifactMeta,
+        audit: MutationAudit,
+    ) -> Result<bool, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| context.delete_sync(conn, &id)).await
+        db::interact(&self.pool, move |conn| {
+            context.delete_sync(conn, &id, audit)
+        })
+        .await
     }
 
     /// `setCategory(id, category)` — [lib/store.js:446-452]
@@ -1978,12 +3028,13 @@ impl ArtifactStore {
         &self,
         meta: &ArtifactMeta,
         category: &str,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
         let category = category.to_owned();
         db::interact(&self.pool, move |conn| {
-            context.set_category_sync(conn, &id, &category)
+            context.set_category_sync(conn, &id, &category, audit)
         })
         .await
     }
@@ -1996,11 +3047,12 @@ impl ArtifactStore {
         &self,
         meta: &ArtifactMeta,
         hidden: bool,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
         db::interact(&self.pool, move |conn| {
-            context.set_hidden_sync(conn, &id, hidden)
+            context.set_hidden_sync(conn, &id, hidden, audit)
         })
         .await
     }
@@ -2015,13 +3067,14 @@ impl ArtifactStore {
         meta: &ArtifactMeta,
         target_org: &str,
         category: Option<&str>,
+        audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
         let target_org = target_org.to_owned();
         let category = category.map(ToOwned::to_owned);
         db::interact(&self.pool, move |conn| {
-            context.move_to_org_sync(conn, &id, &target_org, category.as_deref())
+            context.move_to_org_sync(conn, &id, &target_org, category.as_deref(), audit)
         })
         .await
     }
@@ -2050,10 +3103,17 @@ impl ArtifactService for ArtifactStore {
     fn publish(
         &self,
         request: PublishArtifact,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
         let context = self.context();
+        let store = self.clone();
         Box::pin(async move {
-            db::interact(&self.pool, move |conn| context.publish_sync(conn, request)).await
+            let published = db::interact(&self.pool, move |conn| {
+                context.publish_sync(conn, request, audit)
+            })
+            .await?;
+            store.schedule_preview(published.meta.clone());
+            Ok(published)
         })
     }
 
@@ -2170,6 +3230,8 @@ impl ArtifactService for ArtifactStore {
                 let mut statement = conn
                     .prepare(&format!(
                         "SELECT id FROM artifacts WHERE org = ?1{filter} \
+                         AND NOT EXISTS (SELECT 1 FROM artifact_durability_intents i \
+                                         WHERE i.artifact_id = artifacts.id) \
                          ORDER BY created_at DESC, id DESC"
                     ))
                     .map_err(|error| sql_error("prepare org id list", &error))?;
@@ -2188,6 +3250,42 @@ impl ArtifactService for ArtifactStore {
         artifact: &'a AuthorizedArtifact,
     ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
         Box::pin(self.read_body_for(artifact.meta()))
+    }
+
+    fn read_current_thumbnail<'a>(
+        &'a self,
+        artifact: &'a AuthorizedArtifact,
+        digest: &'a str,
+        previews: Arc<dyn crate::ports::PreviewService>,
+    ) -> BoxFuture<'a, Result<Option<Vec<u8>>, AppError>> {
+        let context = self.context();
+        let id = artifact.meta().id.0.clone();
+        let digest = digest.to_owned();
+        let authorized_org = artifact.meta().org.clone();
+        let authorized_client_id = artifact.meta().client_id.clone();
+        Box::pin(async move {
+            db::interact(&self.pool, move |conn| {
+                let _gate = context
+                    .lifecycle_gate
+                    .read()
+                    .map_err(|_| AppError::Internal)?;
+                let Some(current) = load_meta(conn, &id)? else {
+                    return Ok(None);
+                };
+                // The original grant is tied to its tenant and (for publisher authors) client
+                // identity. A re-tenant between authorization and this guarded recheck must
+                // not let an old grant read an unchanged-digest thumbnail.
+                if current.id.0 != id
+                    || current.body_sha256 != digest
+                    || current.org != authorized_org
+                    || current.client_id != authorized_client_id
+                {
+                    return Ok(None);
+                }
+                previews.read_thumbnail_sync(&current, &digest)
+            })
+            .await
+        })
     }
 
     fn read_bundle_file<'a>(
@@ -2226,8 +3324,9 @@ impl ArtifactService for ArtifactStore {
         &self,
         artifact: AuthorizedArtifact,
         update: ArtifactUpdate,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
-        Box::pin(async move { self.update_for(artifact.meta(), update).await })
+        Box::pin(async move { self.update_for(artifact.meta(), update, audit).await })
     }
 
     fn restore(
@@ -2235,31 +3334,41 @@ impl ArtifactService for ArtifactStore {
         artifact: AuthorizedArtifact,
         revision: u64,
         acting_client_id: Option<ClientId>,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
         Box::pin(async move {
-            self.restore_for(artifact.meta(), revision, acting_client_id)
+            self.restore_for(artifact.meta(), revision, acting_client_id, audit)
                 .await
         })
     }
 
-    fn delete(&self, artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<bool, AppError>> {
-        Box::pin(async move { self.delete_for(artifact.meta()).await })
+    fn delete(
+        &self,
+        artifact: AuthorizedArtifact,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<bool, AppError>> {
+        Box::pin(async move { self.delete_for(artifact.meta(), audit).await })
     }
 
     fn set_category(
         &self,
         artifact: AuthorizedArtifact,
         category: String,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        Box::pin(async move { self.set_category_for(artifact.meta(), &category).await })
+        Box::pin(async move {
+            self.set_category_for(artifact.meta(), &category, audit)
+                .await
+        })
     }
 
     fn set_hidden(
         &self,
         artifact: AuthorizedArtifact,
         hidden: bool,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        Box::pin(async move { self.set_hidden_for(artifact.meta(), hidden).await })
+        Box::pin(async move { self.set_hidden_for(artifact.meta(), hidden, audit).await })
     }
 
     fn move_to_org(
@@ -2267,9 +3376,10 @@ impl ArtifactService for ArtifactStore {
         artifact: AuthorizedArtifact,
         target_org: OrgId,
         category: Option<String>,
+        audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
         Box::pin(async move {
-            self.move_to_org_for(artifact.meta(), &target_org.0, category.as_deref())
+            self.move_to_org_for(artifact.meta(), &target_org.0, category.as_deref(), audit)
                 .await
         })
     }
@@ -2281,11 +3391,16 @@ impl ArtifactService for ArtifactStore {
         let context = self.context();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
+                let _gate = context
+                    .lifecycle_gate
+                    .write()
+                    .map_err(|_| AppError::Internal)?;
                 reconciliation::audit_storage(
                     conn,
                     &context.artifact_dir,
                     clean_transient,
                     context.faults.as_ref(),
+                    &context.audit_key,
                 )
             })
             .await
@@ -2296,6 +3411,10 @@ impl ArtifactService for ArtifactStore {
         let context = self.context();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
+                let _gate = context
+                    .lifecycle_gate
+                    .write()
+                    .map_err(|_| AppError::Internal)?;
                 reconciliation::backfill_body_digests(
                     conn,
                     &context.artifact_dir,
@@ -2305,18 +3424,6 @@ impl ArtifactService for ArtifactStore {
             .await
         })
     }
-}
-
-/// Filesystem-only work still has to leave the async worker threads.
-async fn blocking<T, F>(work: F) -> Result<T, AppError>
-where
-    F: FnOnce() -> Result<T, AppError> + Send + 'static,
-    T: Send + 'static,
-{
-    tokio::task::spawn_blocking(work).await.map_err(|error| {
-        tracing::error!(error = %error, "artifact blocking task failed");
-        AppError::Internal
-    })?
 }
 
 #[cfg(test)]

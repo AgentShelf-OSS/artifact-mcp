@@ -1,21 +1,25 @@
 //! Authenticated POST/OPTIONS `/mcp` transport.
 
-use std::{future::poll_fn, pin::Pin};
+use std::time::Duration;
 
 use axum::{
     Json, Router,
-    body::{Body, HttpBody},
-    extract::{Request, State},
+    body::HttpBody,
+    extract::{Query, Request, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
-use serde::Serialize;
+use serde::Deserialize;
 use serde_json::{Value, json};
 
 use crate::{
     AppDeps,
+    http::ingress::{
+        BodyReadError, McpCost, McpRequestPermit, discard_body_bounded, peer_addr,
+        read_body_limited, validate_json_complexity,
+    },
     mcp::{
         dispatch::{
             MODERN_PROTOCOL_VERSION, PROTOCOL_VERSION, ProtocolEra, SUPPORTED_PROTOCOL_VERSIONS,
@@ -23,12 +27,17 @@ use crate::{
         protocol::{self, OrderedJson},
     },
     observability::{McpMetricLabels, McpOutcome, labels_for},
-    security::oauth::{SUPPORTED_SCOPES, required_scope},
+    security::{
+        audit::with_mcp_request_id,
+        oauth::{SUPPORTED_SCOPES, required_scope},
+    },
 };
 
 pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/mcp", post(mcp).options(mcp_options))
+        .route("/audit/events", get(audit_events))
+        .route("/audit/export", get(audit_export))
         .route("/metrics", get(metrics))
         .route(
             "/.well-known/oauth-protected-resource",
@@ -40,10 +49,119 @@ pub(crate) fn router() -> Router<AppDeps> {
         )
 }
 
+#[derive(Deserialize)]
+struct AuditEventsParams {
+    tenant: Option<String>,
+    cursor: Option<String>,
+    limit: Option<u64>,
+}
+
+async fn audit_route_auth(
+    deps: &AppDeps,
+    headers: &HeaderMap,
+) -> Result<crate::model::PublisherIdentity, Response> {
+    deps.publisher_auth
+        .authenticate(headers)
+        .await
+        .map_err(|error| {
+            deps.mcp_telemetry.record_security_signal("auth_failure");
+            error.into_response()
+        })
+}
+
+/// A deliberately small, authenticated read-only operational surface. It accepts no actor fields
+/// or secrets in query parameters; the verified publisher projection and configured audit key are
+/// the only authority inputs. Legacy API keys are rejected by the audit capability gate.
+async fn audit_events(
+    State(deps): State<AppDeps>,
+    Query(params): Query<AuditEventsParams>,
+    request: Request,
+) -> Response {
+    let auth = match audit_route_auth(&deps, request.headers()).await {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
+    let Some(audit) = deps.audit_access.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    match audit
+        .query(
+            &auth,
+            crate::security::audit::AuditQuery {
+                tenant: params.tenant,
+                cursor: params.cursor,
+                limit: params.limit,
+            },
+        )
+        .await
+    {
+        Ok(page) => Json(page).into_response(),
+        Err(error) => error.into_response(),
+    }
+}
+
+async fn audit_export(
+    State(deps): State<AppDeps>,
+    Query(params): Query<AuditEventsParams>,
+    request: Request,
+) -> Response {
+    let auth = match audit_route_auth(&deps, request.headers()).await {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
+    let Some(audit) = deps.audit_access.as_ref() else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
+    match audit
+        .export(
+            &auth,
+            crate::security::audit::AuditExportQuery {
+                tenant: params.tenant,
+                cursor: params.cursor,
+                limit: params.limit,
+            },
+        )
+        .await
+    {
+        Ok(export) => {
+            let mut response = (
+                [
+                    (
+                        header::CONTENT_TYPE,
+                        HeaderValue::from_static("application/x-ndjson; charset=utf-8"),
+                    ),
+                    (header::CACHE_CONTROL, HeaderValue::from_static("no-store")),
+                ],
+                export.ndjson,
+            )
+                .into_response();
+            if let Some(next) = export
+                .next
+                .and_then(|value| HeaderValue::from_str(&value).ok())
+            {
+                response.headers_mut().insert("x-audit-next", next);
+            }
+            if export.truncated {
+                response
+                    .headers_mut()
+                    .insert("x-audit-truncated", HeaderValue::from_static("true"));
+            }
+            if let Some(reason) = export.reason {
+                response
+                    .headers_mut()
+                    .insert("x-audit-export-reason", HeaderValue::from_static(reason));
+            }
+            response
+        }
+        Err(error) => error.into_response(),
+    }
+}
+
 async fn mcp(State(deps): State<AppDeps>, request: Request) -> Response {
     let mut observation = deps.mcp_telemetry.begin();
     let request_id = observation.request_id().to_owned();
-    let (mut response, labels, outcome) = mcp_inner(&deps, request).await;
+    let (mut response, labels, outcome) =
+        with_mcp_request_id(request_id.clone(), mcp_inner(&deps, request)).await;
     observation.set_labels(labels);
     let result_bytes = response
         .body()
@@ -59,21 +177,40 @@ async fn mcp(State(deps): State<AppDeps>, request: Request) -> Response {
 }
 
 async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabels, McpOutcome) {
+    // `admit` transfers this guard for MCP because only the parsed operation can distinguish a
+    // cancellable read from a durable mutation. Retaining it in the spawned read task means a
+    // client-facing 408 never turns into hidden concurrent work.
+    let request_permit = request
+        .extensions()
+        .get::<McpRequestPermit>()
+        .and_then(McpRequestPermit::take);
     let transport_headers = request.headers().clone();
+    let peer = peer_addr(&request);
     let initial_labels = labels_for(protocol_dimension(&transport_headers), None, None);
     // This await happens before the body is read or bounded. `/mcp` is Access-bypassed, so the
     // publisher key is the only gate protecting the multi-megabyte JSON parser.
     let auth = match deps.publisher_auth.authenticate(request.headers()).await {
         Ok(auth) => auth,
         Err(_) => {
-            // Authentication deliberately precedes body reading, but the request body still has to
-            // be drained before the 401 is written. Returning immediately drops the body unread,
-            // so hyper closes the connection while the client is mid-upload and the client sees
-            // `write EPIPE` instead of the status. Node's HTTP layer discards the remainder for
-            // us; axum does not. Retained bytes stay bounded by the configured limit, so an
-            // unauthenticated caller still cannot make us buffer an unbounded body.
-            let limit = usize::try_from(deps.config.body.mcp_json).unwrap_or(usize::MAX);
-            let _ = read_body_and_drain(request.into_body(), limit).await;
+            deps.mcp_telemetry.record_security_signal("auth_failure");
+            let rate_limited = !deps.ingress.allow_auth_failure_request(&request);
+            // Authentication deliberately precedes parser work, but an HTTP/1 response must not
+            // abandon an active upload. Consume and discard through the ingress deadline before
+            // returning either fixed authentication rejection. This path intentionally performs
+            // no parser buffering, regardless of MCP_JSON_LIMIT.
+            let _ = discard_body_bounded(
+                request.into_body(),
+                Duration::from_millis(deps.config.ingress.read_timeout_ms),
+            )
+            .await;
+            if rate_limited {
+                deps.mcp_telemetry.record_security_signal("rate_limit");
+                return observed(
+                    deps.ingress.mcp_rate_limited_response(),
+                    initial_labels,
+                    McpOutcome::AuthenticationFailure,
+                );
+            }
             return observed(
                 unauthorized_response(&deps.config),
                 initial_labels,
@@ -81,12 +218,60 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             );
         }
     };
+    if !deps
+        .ingress
+        .allow_verified_publisher_request(&request, &auth)
+    {
+        deps.mcp_telemetry.record_security_signal("rate_limit");
+        return observed(
+            deps.ingress.mcp_rate_limited_response(),
+            initial_labels,
+            McpOutcome::AuthenticationFailure,
+        );
+    }
+    let json_content_type = request
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .and_then(|value| value.to_str().ok())
+        .is_some_and(|value| {
+            value
+                .split(';')
+                .next()
+                .is_some_and(|mime| mime.trim().eq_ignore_ascii_case("application/json"))
+        });
+    if !json_content_type {
+        return observed(
+            crate::http::ingress::mcp_admission_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, None),
+            initial_labels,
+            McpOutcome::ValidationFailure,
+        );
+    }
     let limit = usize::try_from(deps.config.body.mcp_json).unwrap_or(usize::MAX);
-    let bytes = match read_body_and_drain(request.into_body(), limit).await {
-        Ok(BufferedRequestBody::Complete(bytes)) => bytes,
-        Ok(BufferedRequestBody::TooLarge) | Err(_) => {
+    let bytes = match read_body_limited(
+        request.into_body(),
+        limit,
+        Duration::from_millis(deps.config.ingress.read_timeout_ms),
+    )
+    .await
+    {
+        Ok(bytes) => bytes,
+        Err(BodyReadError::Timeout) => {
             return observed(
-                json_error(StatusCode::PAYLOAD_TOO_LARGE, "payload too large"),
+                crate::http::ingress::mcp_admission_response(StatusCode::REQUEST_TIMEOUT, None),
+                initial_labels,
+                McpOutcome::ValidationFailure,
+            );
+        }
+        Err(BodyReadError::TooLarge) => {
+            return observed(
+                crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
+                initial_labels,
+                McpOutcome::ValidationFailure,
+            );
+        }
+        Err(BodyReadError::Invalid) => {
+            return observed(
+                crate::http::ingress::mcp_admission_response(StatusCode::BAD_REQUEST, None),
                 initial_labels,
                 McpOutcome::ValidationFailure,
             );
@@ -96,12 +281,28 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
         Ok(payload) => payload,
         Err(_) => {
             return observed(
-                json_error(StatusCode::BAD_REQUEST, "invalid JSON"),
+                crate::http::ingress::mcp_admission_response(StatusCode::BAD_REQUEST, None),
                 initial_labels,
                 McpOutcome::ValidationFailure,
             );
         }
     };
+    if validate_json_complexity(&payload, &deps.config.ingress).is_err() {
+        return observed(
+            crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
+            initial_labels,
+            McpOutcome::ValidationFailure,
+        );
+    }
+    if payload.as_array().is_some_and(|batch| {
+        batch.len() > usize::try_from(deps.config.ingress.json_max_batch).unwrap_or(usize::MAX)
+    }) {
+        return observed(
+            crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
+            initial_labels,
+            McpOutcome::ValidationFailure,
+        );
+    }
     let era = match validate_transport(&payload, &transport_headers) {
         Ok(era) => era,
         Err(error) => {
@@ -139,6 +340,56 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
         Some(method),
         name,
     );
+    if let Some(batch) = payload.as_array() {
+        // Legacy JSON-RPC retains read-only batches. Mixed or state-changing batches are
+        // rejected atomically before dispatch so one cheap outer admission cannot buy writes.
+        for message in batch {
+            let method = message
+                .get("method")
+                .and_then(OrderedJson::as_str)
+                .unwrap_or_default();
+            let name = request_name(message);
+            if mcp_cost(method, name) != McpCost::Read {
+                return observed(
+                    (
+                        StatusCode::BAD_REQUEST,
+                        Json(protocol::rpc_error(
+                            Value::Null,
+                            -32_600,
+                            "Legacy batches may contain read-only requests only",
+                        )),
+                    )
+                        .into_response(),
+                    labels,
+                    McpOutcome::ValidationFailure,
+                );
+            }
+            if let Some(scope) = required_scope(method, name)
+                && !auth.has_scope(scope)
+            {
+                return observed(
+                    insufficient_scope_response(&deps.config, request_id(message), scope),
+                    labels,
+                    McpOutcome::AuthorizationFailure,
+                );
+            }
+        }
+        if !deps.ingress.allow_verified_publisher_operation_weight(
+            &transport_headers,
+            peer,
+            &auth,
+            McpCost::Read,
+            batch.len() as u64,
+        ) {
+            deps.mcp_telemetry.record_security_signal("rate_limit");
+            return observed(
+                deps.ingress.mcp_operation_rate_limited_response(),
+                labels,
+                McpOutcome::AuthenticationFailure,
+            );
+        }
+        return dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await;
+    }
     if let Some(scope) = required_scope(method, name)
         && !auth.has_scope(scope)
     {
@@ -148,6 +399,36 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             McpOutcome::AuthorizationFailure,
         );
     }
+    let operation_cost = mcp_cost(method, name);
+    if !deps.ingress.allow_verified_publisher_operation(
+        &transport_headers,
+        peer,
+        &auth,
+        operation_cost,
+    ) {
+        deps.mcp_telemetry.record_security_signal("rate_limit");
+        return observed(
+            deps.ingress.mcp_operation_rate_limited_response(),
+            labels,
+            McpOutcome::AuthenticationFailure,
+        );
+    }
+    if operation_cost == McpCost::Read {
+        return dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await;
+    }
+    let _mutation_permit = match deps.ingress.try_acquire_mutation() {
+        Some(permit) => permit,
+        None => {
+            return observed(
+                crate::http::ingress::mcp_admission_response(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    Some(1),
+                ),
+                labels,
+                McpOutcome::ValidationFailure,
+            );
+        }
+    };
     match protocol::handle_mcp_for_era(payload, &auth, deps, era).await {
         Some(response) => {
             let outcome = response_outcome(&response);
@@ -169,6 +450,116 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             labels,
             McpOutcome::Success,
         ),
+    }
+}
+
+/// Run a parsed MCP read behind a client-facing deadline without cancelling the underlying
+/// operation. The task owns the admission permit until the service call has actually completed.
+/// Writes never call this helper: their request and mutation permits remain in the handler until
+/// durable execution returns.
+async fn dispatch_read_with_deadline(
+    deps: &AppDeps,
+    payload: protocol::OrderedJson,
+    auth: crate::model::PublisherIdentity,
+    era: ProtocolEra,
+    request_permit: Option<tokio::sync::OwnedSemaphorePermit>,
+    labels: McpMetricLabels,
+) -> (Response, McpMetricLabels, McpOutcome) {
+    let deadline = Duration::from_millis(deps.config.ingress.read_handler_timeout_ms);
+    let task_deps = deps.clone();
+    let (send, receive) = tokio::sync::oneshot::channel();
+    tokio::spawn(async move {
+        // Keep this binding in the task rather than the waiter. If the client times out, the
+        // task still holds its capacity until the read service returns.
+        let _request_permit = request_permit;
+        let response = protocol::handle_mcp_for_era(payload, &auth, &task_deps, era).await;
+        let _ = send.send(response);
+    });
+    match tokio::time::timeout(deadline, receive).await {
+        Ok(Ok(response)) => dispatch_response(response, era, labels),
+        Ok(Err(_)) => observed(
+            crate::http::ingress::mcp_admission_response(StatusCode::SERVICE_UNAVAILABLE, Some(1)),
+            labels,
+            McpOutcome::ServerFailure,
+        ),
+        Err(_) => observed(
+            crate::http::ingress::mcp_admission_response(StatusCode::REQUEST_TIMEOUT, None),
+            labels,
+            McpOutcome::Cancelled,
+        ),
+    }
+}
+
+fn dispatch_response(
+    response: Option<Value>,
+    era: ProtocolEra,
+    labels: McpMetricLabels,
+) -> (Response, McpMetricLabels, McpOutcome) {
+    match response {
+        Some(response) => {
+            let outcome = response_outcome(&response);
+            let status = if era == ProtocolEra::Modern
+                && response
+                    .get("error")
+                    .and_then(|error| error.get("code"))
+                    .and_then(Value::as_i64)
+                    == Some(-32_601)
+            {
+                StatusCode::NOT_FOUND
+            } else {
+                StatusCode::OK
+            };
+            observed((status, Json(response)).into_response(), labels, outcome)
+        }
+        None => observed(
+            StatusCode::ACCEPTED.into_response(),
+            labels,
+            McpOutcome::Success,
+        ),
+    }
+}
+
+fn mcp_cost(method: &str, name: Option<&str>) -> McpCost {
+    match method {
+        "tools/call" => match name {
+            Some("publish_artifact" | "publish_bundle" | "update_artifact") => McpCost::Upload,
+            Some(
+                "patch_artifact"
+                | "delete_artifact"
+                | "set_visibility"
+                | "set_category"
+                | "create_category"
+                | "delete_category"
+                | "create_share"
+                | "revoke_share"
+                | "restore_artifact"
+                | "resolve_feedback"
+                | "reopen_feedback"
+                | "submit_feedback"
+                | "regenerate_artifact_preview",
+            ) => McpCost::Mutation,
+            Some(
+                "list_artifacts" | "read_artifact" | "list_categories" | "list_revisions"
+                | "list_shares" | "artifact_stats" | "list_feedback",
+            ) => McpCost::Read,
+            // An unrecognised tool may be added by a newer server. Reserve mutation capacity
+            // until its semantics are explicitly classified rather than silently admitting a
+            // future write as a read.
+            _ => McpCost::Mutation,
+        },
+        "tasks/cancel" | "tasks/update" => McpCost::Mutation,
+        "initialize"
+        | "ping"
+        | "notifications/initialized"
+        | "server/discover"
+        | "tools/list"
+        | "resources/list"
+        | "resources/templates/list"
+        | "resources/read"
+        | "tasks/get" => McpCost::Read,
+        // Unknown protocol methods receive the conservative class too. They are rejected by
+        // dispatch today; this keeps a later state-changing addition from bypassing permits.
+        _ => McpCost::Mutation,
     }
 }
 
@@ -231,6 +622,10 @@ fn response_outcome(response: &Value) -> McpOutcome {
 }
 
 async fn metrics(State(deps): State<AppDeps>) -> Response {
+    let mut metrics = deps.mcp_telemetry.render_prometheus();
+    metrics.push_str(&deps.ingress.render_prometheus());
+    metrics.push_str(&deps.delivery_telemetry.render_prometheus());
+    metrics.push_str(&crate::integrations::discord_gateway_runtime::render_prometheus());
     (
         [
             (
@@ -239,7 +634,7 @@ async fn metrics(State(deps): State<AppDeps>) -> Response {
             ),
             (header::CACHE_CONTROL, HeaderValue::from_static("no-store")),
         ],
-        deps.mcp_telemetry.render_prometheus(),
+        metrics,
     )
         .into_response()
 }
@@ -521,89 +916,103 @@ fn insufficient_scope_response(
     response
 }
 
-#[derive(Serialize)]
-struct HttpError<'a> {
-    error: &'a str,
-}
-
-fn json_error(status: StatusCode, message: &str) -> Response {
-    (status, Json(HttpError { error: message })).into_response()
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum BufferedRequestBody {
-    Complete(Vec<u8>),
-    TooLarge,
-}
-
-/// Buffer at most `limit` bytes while continuing to poll an oversized body to end-of-stream.
-///
-/// Returning the 413 only after the body has been drained keeps Hyper from closing the request
-/// side while the client is still writing, which otherwise surfaces as `EPIPE` instead of the
-/// response. The caller deliberately authenticates before entering this function.
-async fn read_body_and_drain(
-    mut body: Body,
-    limit: usize,
-) -> Result<BufferedRequestBody, axum::Error> {
-    let hinted_size = body
-        .size_hint()
-        .upper()
-        .and_then(|size| usize::try_from(size).ok());
-    let mut too_large = hinted_size.is_some_and(|size| size > limit);
-    let capacity = if too_large {
-        0
-    } else {
-        hinted_size.unwrap_or_default().min(limit)
-    };
-    let mut content = Vec::with_capacity(capacity);
-
-    loop {
-        let frame = poll_fn(|context| Pin::new(&mut body).poll_frame(context)).await;
-        let Some(frame) = frame else {
-            break;
-        };
-        let frame = frame?;
-        let Ok(data) = frame.into_data() else {
-            continue;
-        };
-        if too_large {
-            continue;
-        }
-        if data.len() > limit.saturating_sub(content.len()) {
-            too_large = true;
-            content.clear();
-            content.shrink_to_fit();
-        } else {
-            content.extend_from_slice(&data);
-        }
-    }
-
-    if too_large {
-        Ok(BufferedRequestBody::TooLarge)
-    } else {
-        Ok(BufferedRequestBody::Complete(content))
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use axum::body::Body;
+    use std::time::Duration;
 
-    use super::{BufferedRequestBody, read_body_and_drain};
+    use axum::body::to_bytes;
+
+    use super::{insufficient_scope_response, mcp_cost};
+    use crate::{
+        config::AppConfig,
+        http::ingress::{BodyReadError, McpCost, read_body_limited},
+        security::oauth::{
+            SCOPE_AUDIT_EXPORT, SCOPE_AUDIT_GLOBAL, SCOPE_AUDIT_READ, SCOPE_READ, SUPPORTED_SCOPES,
+            required_scope,
+        },
+    };
+
+    #[test]
+    fn publish_tools_use_the_stricter_upload_budget() {
+        assert_eq!(
+            mcp_cost("tools/call", Some("publish_artifact")),
+            McpCost::Upload
+        );
+        assert_eq!(
+            mcp_cost("tools/call", Some("delete_artifact")),
+            McpCost::Mutation
+        );
+        assert_eq!(mcp_cost("resources/read", None), McpCost::Read);
+    }
+
+    #[test]
+    fn audit_scopes_are_advertised_for_the_live_audit_routes() {
+        for scope in [SCOPE_AUDIT_READ, SCOPE_AUDIT_EXPORT, SCOPE_AUDIT_GLOBAL] {
+            assert!(SUPPORTED_SCOPES.contains(&scope));
+        }
+    }
+
+    #[test]
+    fn every_state_changing_dispatch_path_uses_mutation_admission() {
+        for tool in [
+            "patch_artifact",
+            "delete_artifact",
+            "set_visibility",
+            "set_category",
+            "create_category",
+            "delete_category",
+            "create_share",
+            "revoke_share",
+            "restore_artifact",
+            "resolve_feedback",
+            "reopen_feedback",
+            "submit_feedback",
+            "regenerate_artifact_preview",
+        ] {
+            assert_eq!(
+                mcp_cost("tools/call", Some(tool)),
+                McpCost::Mutation,
+                "{tool}"
+            );
+        }
+        assert_eq!(mcp_cost("tasks/cancel", None), McpCost::Mutation);
+        assert_eq!(mcp_cost("tasks/update", None), McpCost::Mutation);
+        assert_eq!(mcp_cost("future/write", None), McpCost::Mutation);
+    }
+
+    #[tokio::test]
+    async fn scoped_read_without_its_required_scope_returns_the_json_rpc_scope_envelope() {
+        assert_eq!(required_scope("resources/read", None), Some(SCOPE_READ));
+        let response = insufficient_scope_response(
+            &AppConfig::default(),
+            serde_json::json!("read-id"),
+            SCOPE_READ,
+        );
+        assert_eq!(response.status(), axum::http::StatusCode::FORBIDDEN);
+        let payload = serde_json::from_slice::<serde_json::Value>(
+            &to_bytes(response.into_body(), 4_096)
+                .await
+                .expect("read scope envelope"),
+        )
+        .expect("JSON-RPC scope envelope");
+        assert_eq!(payload["jsonrpc"], "2.0");
+        assert_eq!(payload["id"], "read-id");
+        assert_eq!(payload["error"]["message"], "insufficient_scope");
+        assert_eq!(payload["error"]["data"]["requiredScope"], SCOPE_READ);
+    }
 
     #[tokio::test]
     async fn request_body_limit_accepts_the_exact_boundary() {
-        let body = read_body_and_drain(Body::from("1234"), 4)
+        let body = read_body_limited(Body::from("1234"), 4, Duration::from_secs(1))
             .await
             .expect("read request body");
-        assert_eq!(body, BufferedRequestBody::Complete(b"1234".to_vec()));
+        assert_eq!(body, b"1234".to_vec());
     }
 
     #[tokio::test]
     async fn oversized_request_body_is_drained_and_reported_after_the_boundary() {
-        let body = read_body_and_drain(Body::from("12345"), 4)
-            .await
-            .expect("drain request body");
-        assert_eq!(body, BufferedRequestBody::TooLarge);
+        let body = read_body_limited(Body::from("12345"), 4, Duration::from_secs(1)).await;
+        assert_eq!(body, Err(BodyReadError::TooLarge));
     }
 }

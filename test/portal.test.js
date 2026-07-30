@@ -173,6 +173,10 @@ test("delete controls render only for administrators and recorded owners", () =>
   );
   assert.match(ownerShell, /id="vdelete-trigger"/);
   assert.match(ownerShell, /id="delete-dialog"/);
+  assert.match(ownerShell, /id="vdiscussion-state"/);
+  assert.match(ownerShell, /id="vdiscussion-actions"/);
+  assert.match(ownerShell, /data-can-manage-discussion="1"/);
+  assert.doesNotMatch(ownerShell, /Open Thread/i);
 
   const memberShell = renderArtifactShell(
     ownedMeta,
@@ -184,6 +188,9 @@ test("delete controls render only for administrators and recorded owners", () =>
   );
   assert.doesNotMatch(memberShell, /id="vdelete-trigger"/);
   assert.doesNotMatch(memberShell, /id="delete-dialog"/);
+  assert.match(memberShell, /id="vdiscussion-state"/);
+  assert.doesNotMatch(memberShell, /id="vdiscussion-actions"/);
+  assert.match(memberShell, /data-can-manage-discussion="0"/);
 
   const adminShell = renderArtifactShell(
     { ...meta, owner_email: null },
@@ -195,6 +202,7 @@ test("delete controls render only for administrators and recorded owners", () =>
   );
   assert.match(adminShell, /id="vdelete-trigger"/);
   assert.match(adminShell, /id="delete-dialog"/);
+  assert.match(adminShell, /id="vdiscussion-actions"/);
 });
 
 test("bundle shell scopes anchors to the current page and resets bridge state on navigation", () => {

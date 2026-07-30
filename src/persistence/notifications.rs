@@ -44,7 +44,8 @@ use rusqlite::Connection;
 
 use crate::error::AppError;
 use crate::model::{
-    ArtifactId, EmailAddress, FeedbackId, OrgId, Timestamp, Viewer, ViewerNotification,
+    ArtifactId, EmailAddress, FeedbackAuthor, FeedbackId, OrgId, Timestamp, Viewer,
+    ViewerNotification,
 };
 use crate::persistence::db::{self, DbPool};
 
@@ -60,28 +61,30 @@ pub const MAX_LIMIT: usize = 100;
 /// `lib/notifications.js:9-21`.
 const RECENT_ADMIN_SQL: &str = "\
 SELECT f.id, f.artifact_id, a.title AS artifact_title, a.org,
-       f.body, f.viewer_email, f.created_at, f.parent_id,
+       f.body, f.viewer_email, f.author_source, f.external_author_id,
+       f.external_author_display, f.created_at, f.parent_id,
        (f.resolved_at IS NOT NULL) AS resolved,
        (f.anchor_x IS NOT NULL AND f.anchor_y IS NOT NULL) AS has_anchor,
        (f.created_at > COALESCE(r.seen_at, @epoch)) AS unread
 FROM feedback f
 JOIN artifacts a ON a.id = f.artifact_id AND a.org = f.org
 LEFT JOIN notification_reads r ON r.viewer_email = @email
-WHERE f.viewer_email <> @email
+WHERE (f.viewer_email IS NULL OR f.viewer_email <> @email)
 ORDER BY f.created_at DESC, f.id DESC
 LIMIT @limit";
 
 /// `lib/notifications.js:22-34`.
 const RECENT_MEMBER_SQL: &str = "\
 SELECT f.id, f.artifact_id, a.title AS artifact_title, a.org,
-       f.body, f.viewer_email, f.created_at, f.parent_id,
+       f.body, f.viewer_email, f.author_source, f.external_author_id,
+       f.external_author_display, f.created_at, f.parent_id,
        (f.resolved_at IS NOT NULL) AS resolved,
        (f.anchor_x IS NOT NULL AND f.anchor_y IS NOT NULL) AS has_anchor,
        (f.created_at > COALESCE(r.seen_at, @epoch)) AS unread
 FROM feedback f
 JOIN artifacts a ON a.id = f.artifact_id AND a.org = f.org
 LEFT JOIN notification_reads r ON r.viewer_email = @email
-WHERE a.org = @org AND f.viewer_email <> @email
+WHERE a.org = @org AND (f.viewer_email IS NULL OR f.viewer_email <> @email)
 ORDER BY f.created_at DESC, f.id DESC
 LIMIT @limit";
 
@@ -91,7 +94,7 @@ SELECT COUNT(*) AS count
 FROM feedback f
 JOIN artifacts a ON a.id = f.artifact_id AND a.org = f.org
 LEFT JOIN notification_reads r ON r.viewer_email = @email
-WHERE f.viewer_email <> @email
+WHERE (f.viewer_email IS NULL OR f.viewer_email <> @email)
   AND f.created_at > COALESCE(r.seen_at, @epoch)";
 
 /// `lib/notifications.js:43-50`.
@@ -100,7 +103,7 @@ SELECT COUNT(*) AS count
 FROM feedback f
 JOIN artifacts a ON a.id = f.artifact_id AND a.org = f.org
 LEFT JOIN notification_reads r ON r.viewer_email = @email
-WHERE a.org = @org AND f.viewer_email <> @email
+WHERE a.org = @org AND (f.viewer_email IS NULL OR f.viewer_email <> @email)
   AND f.created_at > COALESCE(r.seen_at, @epoch)";
 
 /// `lib/notifications.js:51-55`.
@@ -176,12 +179,43 @@ pub fn recent_for_viewer(
                 artifact_title: row.get(2)?,
                 org: OrgId(row.get(3)?),
                 body: row.get(4)?,
-                viewer_email: EmailAddress(row.get(5)?),
-                created_at: Timestamp(row.get(6)?),
-                parent_id: row.get::<_, Option<String>>(7)?.map(FeedbackId),
-                resolved: row.get::<_, i64>(8)? != 0,
-                has_anchor: row.get::<_, i64>(9)? != 0,
-                unread: row.get::<_, i64>(10)? != 0,
+                author: match row.get::<_, String>(6)?.as_str() {
+                    "artifact" => FeedbackAuthor::Artifact {
+                        viewer_email: EmailAddress(row.get::<_, Option<String>>(5)?.ok_or_else(
+                            || {
+                                rusqlite::Error::InvalidColumnType(
+                                    5,
+                                    "viewer_email".to_owned(),
+                                    rusqlite::types::Type::Null,
+                                )
+                            },
+                        )?),
+                    },
+                    "discord" => FeedbackAuthor::Discord {
+                        external_author_id: row.get::<_, Option<String>>(7)?.ok_or_else(|| {
+                            rusqlite::Error::InvalidColumnType(
+                                7,
+                                "external_author_id".to_owned(),
+                                rusqlite::types::Type::Null,
+                            )
+                        })?,
+                        external_author_display: row.get::<_, Option<String>>(8)?.ok_or_else(
+                            || {
+                                rusqlite::Error::InvalidColumnType(
+                                    8,
+                                    "external_author_display".to_owned(),
+                                    rusqlite::types::Type::Null,
+                                )
+                            },
+                        )?,
+                    },
+                    _ => return Err(rusqlite::Error::InvalidQuery),
+                },
+                created_at: Timestamp(row.get(9)?),
+                parent_id: row.get::<_, Option<String>>(10)?.map(FeedbackId),
+                resolved: row.get::<_, i64>(11)? != 0,
+                has_anchor: row.get::<_, i64>(12)? != 0,
+                unread: row.get::<_, i64>(13)? != 0,
             })
         })
         .map_err(|error| internal("query notifications", &error))?;

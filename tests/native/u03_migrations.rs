@@ -424,13 +424,18 @@ fn existing_plaintext_webhook_rows_are_encrypted_in_place() {
             [],
         )
         .expect("insert blank webhook");
+        conn.execute(
+            "INSERT INTO org_discord_discussion_connections (id, org, url) VALUES (?1, ?2, ?3)",
+            ["legacy-discussion", "migration-test", secret_url],
+        )
+        .expect("insert discussion connection");
     }
 
     let mut conn = db::open_bootstrap_connection(&db::database_path(dir.path()))
         .expect("open bootstrap connection");
     let converted =
         migrations::encrypt_plaintext_webhook_urls(&mut conn, &ReversingCipher).expect("convert");
-    assert_eq!(converted, 1, "blank URLs must be left alone");
+    assert_eq!(converted, 2, "blank URLs must be left alone");
 
     let (url, cipher, nonce, tag): (String, String, String, String) = conn
         .query_row(
@@ -446,6 +451,17 @@ fn existing_plaintext_webhook_rows_are_encrypted_in_place() {
     assert!(!nonce.is_empty() && !tag.is_empty());
     let decoded = String::from_utf8(BASE64.decode(&cipher).expect("base64")).expect("utf8");
     assert_eq!(decoded.chars().rev().collect::<String>(), secret_url);
+
+    let (discussion_url, discussion_cipher): (String, String) = conn
+        .query_row(
+            "SELECT url, url_cipher FROM org_discord_discussion_connections WHERE id = 'legacy-discussion'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("read encrypted discussion connection");
+    assert_eq!(discussion_url, mask_webhook_url(secret_url));
+    assert!(!discussion_url.contains("existing-plaintext-token"));
+    assert!(!discussion_cipher.contains("existing-plaintext-token"));
 
     // A second bootstrap must not double-encrypt.
     assert_eq!(
@@ -499,8 +515,28 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (21, "explicit-email-org-membership".to_owned()),
         (22, "api-key-capabilities".to_owned()),
         (23, "verified-artifact-owner".to_owned()),
+        (24, "artifact-durability-intents".to_owned()),
+        (25, "security-audit-ledger".to_owned()),
+        (26, "security-audit-protocol-hardening".to_owned()),
+        (27, "provider-delivery-outbox".to_owned()),
+        (28, "discord-discussion-mirror".to_owned()),
+        (29, "discord-notification-threads".to_owned()),
+        (30, "discord-organization-threading-policy".to_owned()),
+        (31, "discord-two-way-inbound-sync".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
+    assert!(
+        column_names(&conn, "security_audit_receipts")
+            .iter()
+            .any(|column| column == "receipt_mac"),
+        "v26 authenticates pending receipt snapshots"
+    );
+    assert!(
+        column_names(&conn, "security_audit_chain_head")
+            .iter()
+            .any(|column| column == "pending_receipts_root"),
+        "v26 commits the complete pending receipt set"
+    );
     assert_eq!(
         scalar::<i64>(
             &conn,

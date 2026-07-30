@@ -4,6 +4,7 @@ use std::{future::Future, pin::Pin};
 
 pub mod admin;
 pub mod artifacts;
+pub mod discussions;
 pub mod engagement;
 pub mod identity;
 pub mod integrations;
@@ -11,6 +12,11 @@ pub mod rendering;
 
 pub use admin::AdminService;
 pub use artifacts::ArtifactService;
+pub use discussions::{
+    ArtifactDiscussionOverrideView, ArtifactDiscussionView, DiscussionConnectionView,
+    DiscussionModeRequest, DiscussionOverrideRequest, DiscussionService, InertDiscussionService,
+    OrganizationThreadingView,
+};
 pub use engagement::{EngagementService, ShareService};
 pub use identity::{PublisherAuthenticator, ViewerIdentity};
 pub use integrations::{HealthProbe, NotificationSink, PreviewService};

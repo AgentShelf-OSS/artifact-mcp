@@ -1,10 +1,11 @@
 //! Artifact-scoped human actions.
 
+use std::time::Duration;
+
 use axum::{
     Json, Router,
-    body::to_bytes,
     extract::Request,
-    extract::{Path, State},
+    extract::{Extension, Path, State},
     http::{HeaderMap, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{delete, get, post},
@@ -13,13 +14,20 @@ use serde::Serialize;
 
 use crate::{
     AppDeps,
+    artifacts::lifecycle::normalize_category,
     error::AppError,
+    http::ingress::{
+        BodyReadError, ViewerCost, complexity_response, read_body_limited, validate_json_complexity,
+    },
     mcp::protocol::OrderedJson,
     model::{
-        ArtifactMeta, ArtifactRevision, CreateShare, NotificationPayload, OrgId, PublicShare,
-        ReactionUpdate, ShareToken, Timestamp, Viewer, WebhookEvent,
+        ArtifactRevision, CreateShare, OrgId, PublicShare, ReactionUpdate, ShareToken, Timestamp,
+        Viewer,
     },
-    security::access::{AccessPolicy, AuthorizedArtifact, FORBIDDEN_MESSAGE, resolve_for_viewer},
+    security::{
+        access::{AccessPolicy, AuthorizedArtifact, FORBIDDEN_MESSAGE, resolve_for_viewer},
+        audit::{AuditRequestId, MutationAudit},
+    },
 };
 
 pub(crate) fn router() -> Router<AppDeps> {
@@ -36,14 +44,31 @@ pub(crate) fn router() -> Router<AppDeps> {
         .route("/{id}/restore", post(restore))
 }
 
-pub(super) async fn authorize(
+pub(crate) async fn authorize(
     deps: &AppDeps,
     headers: &HeaderMap,
     id: &str,
 ) -> Result<(AuthorizedArtifact, Viewer), AppError> {
     let viewer = deps.viewer_identity.resolve(headers).await?;
+    if !deps
+        .ingress
+        .allow_verified_viewer(headers, &viewer, ViewerCost::Read)
+    {
+        return Err(AppError::RateLimited);
+    }
     let artifact = resolve_for_viewer(deps.artifacts.as_ref(), &viewer, id).await?;
     Ok((artifact, viewer))
+}
+
+fn request_id_from_request(request: &Request) -> Option<AuditRequestId> {
+    request.extensions().get::<AuditRequestId>().cloned()
+}
+
+pub(crate) fn viewer_audit(
+    viewer: &Viewer,
+    request_id: Option<&AuditRequestId>,
+) -> Result<MutationAudit, AppError> {
+    MutationAudit::viewer_with_request_id(viewer, request_id)
 }
 
 #[derive(Serialize)]
@@ -55,6 +80,7 @@ struct DeleteResponse {
 async fn delete_artifact(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,
+    request_id: Option<Extension<AuditRequestId>>,
     headers: HeaderMap,
 ) -> Result<Json<DeleteResponse>, AppError> {
     let (artifact, viewer) = authorize(&deps, &headers, &id).await?;
@@ -62,20 +88,32 @@ async fn delete_artifact(
         return Err(AppError::Forbidden(FORBIDDEN_MESSAGE.to_owned()));
     }
     let meta = artifact.meta().clone();
-    let deleted = deps.artifacts.delete(artifact).await?;
+    let deleted = deps
+        .artifacts
+        .delete(
+            artifact,
+            viewer_audit(&viewer, request_id.as_ref().map(|id| &id.0))?,
+        )
+        .await?;
     if deleted {
+        deps.delivery_wake.wake();
         let previews = deps.previews.clone();
         let artifact_id = meta.id.clone();
         tokio::spawn(async move {
             let _ignored = previews.remove_artifact(&artifact_id).await;
         });
-        notify_artifact(WebhookEvent::Deleted, &meta, None, &deps).await;
     }
     Ok(Json(DeleteResponse { id, deleted }))
 }
 
 async fn react(State(deps): State<AppDeps>, Path(id): Path<String>, request: Request) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.reaction_json).await {
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.reaction_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
@@ -152,32 +190,47 @@ async fn set_category(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.category_json).await {
+    let audit_request_id = request_id_from_request(&request);
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.category_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
-    let (artifact, _viewer) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, &headers, &id).await {
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
-    match deps
-        .artifacts
-        .set_category(artifact, javascript_or_empty(body.get("category")))
-        .await
+    if !body.contains_key("category") {
+        return AppError::Validation("category is required".to_owned()).into_response();
+    }
+    let category = javascript_or_empty(body.get("category"));
+    let registered_category = normalize_category(&category);
+    let audit = match viewer_audit(&viewer, audit_request_id.as_ref()) {
+        Ok(audit) => audit,
+        Err(error) => return error.into_response(),
+    };
+    // The two services cannot share a transaction through their public ports. Registering first
+    // makes its audited write a required precondition: an audit/registry failure leaves the
+    // artifact untouched rather than returning success with an invisible category.
+    if !registered_category.is_empty()
+        && let Err(error) = deps
+            .admin
+            .add_category(&artifact.meta().org, &registered_category, audit.clone())
+            .await
     {
-        Ok(meta) => {
-            // Best-effort: register the category on the org so it appears in the Settings picker,
-            // exactly as the MCP set_category tool does. Without this a category assigned through
-            // the web UI never reaches org_categories and stays invisible in Settings.
-            if !meta.category.is_empty() {
-                let _ignored = deps.admin.add_category(&meta.org, &meta.category).await;
-            }
-            Json(CategoryResponse {
-                id,
-                category: meta.category,
-            })
-            .into_response()
-        }
+        return error.into_response();
+    }
+    match deps.artifacts.set_category(artifact, category, audit).await {
+        Ok(meta) => Json(CategoryResponse {
+            id,
+            category: meta.category,
+        })
+        .into_response(),
         Err(error) => error.into_response(),
     }
 }
@@ -193,7 +246,14 @@ async fn set_visibility(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.category_json).await {
+    let audit_request_id = request_id_from_request(&request);
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.category_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
@@ -209,7 +269,18 @@ async fn set_visibility(
     if !AccessPolicy::viewer_can_manage_artifact(&viewer, artifact.meta()) {
         return AppError::Forbidden(FORBIDDEN_MESSAGE.to_owned()).into_response();
     }
-    match deps.artifacts.set_hidden(artifact, hidden).await {
+    match deps
+        .artifacts
+        .set_hidden(
+            artifact,
+            hidden,
+            match viewer_audit(&viewer, audit_request_id.as_ref()) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
+        .await
+    {
         Ok(meta) => Json(VisibilityResponse {
             id,
             hidden: meta.hidden,
@@ -231,7 +302,14 @@ async fn create_share(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.category_json).await {
+    let audit_request_id = request_id_from_request(&request);
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.category_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
@@ -240,12 +318,26 @@ async fn create_share(
         Err(error) => return error.into_response(),
     };
     let request = CreateShare {
-        created_by: viewer.email.map_or_else(String::new, |email| email.0),
+        created_by: viewer
+            .email
+            .as_ref()
+            .map_or_else(String::new, |email| email.0.clone()),
         expires: body
             .get("expires")
             .map_or_else(String::new, javascript_string),
     };
-    match deps.shares.create(artifact, request).await {
+    match deps
+        .shares
+        .create(
+            artifact,
+            request,
+            match viewer_audit(&viewer, audit_request_id.as_ref()) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
+        .await
+    {
         Ok(share) => {
             let url = format!("{}/s/{}", deps.config.public_base_url, share.token);
             Json(CreateShareResponse {
@@ -288,15 +380,23 @@ struct RevokeShareResponse {
 async fn revoke_share(
     State(deps): State<AppDeps>,
     Path((id, token)): Path<(String, String)>,
+    request_id: Option<Extension<AuditRequestId>>,
     headers: HeaderMap,
 ) -> Response {
-    let (artifact, _viewer) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, &headers, &id).await {
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
     match deps
         .shares
-        .revoke(artifact, ShareToken(token.clone()))
+        .revoke(
+            artifact,
+            ShareToken(token.clone()),
+            match viewer_audit(&viewer, request_id.as_ref().map(|id| &id.0)) {
+                Ok(audit) => audit,
+                Err(error) => return error.into_response(),
+            },
+        )
         .await
     {
         Ok(true) => Json(RevokeShareResponse {
@@ -380,11 +480,18 @@ async fn restore(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.category_json).await {
+    let audit_request_id = request_id_from_request(&request);
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.category_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
-    let (artifact, _viewer) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, &headers, &id).await {
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
@@ -392,9 +499,17 @@ async fn restore(
         return AppError::Validation("revision must be a positive integer".to_owned())
             .into_response();
     };
-    match deps.artifacts.restore(artifact, revision, None).await {
+    let audit = match viewer_audit(&viewer, audit_request_id.as_ref()) {
+        Ok(audit) => audit,
+        Err(error) => return error.into_response(),
+    };
+    match deps
+        .artifacts
+        .restore(artifact, revision, None, audit)
+        .await
+    {
         Ok(result) => {
-            notify_artifact(WebhookEvent::Restored, &result.meta, None, &deps).await;
+            deps.delivery_wake.wake();
             Json(RestoreResponse {
                 id,
                 revision: result.meta.revision,
@@ -458,7 +573,14 @@ async fn move_artifact(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
-    let (headers, body) = match parse_json_request(request, deps.config.body.category_json).await {
+    let audit_request_id = request_id_from_request(&request);
+    let (headers, body) = match parse_json_request(
+        request,
+        deps.config.body.category_json,
+        &deps.config.ingress,
+    )
+    .await
+    {
         Ok(parsed) => parsed,
         Err(response) => return response,
     };
@@ -470,32 +592,60 @@ async fn move_artifact(
         return error.into_response();
     }
 
+    if !body.contains_key("org") && !body.contains_key("category") {
+        return AppError::Validation("org or category is required".to_owned()).into_response();
+    }
+
+    let audit = match viewer_audit(&viewer, audit_request_id.as_ref()) {
+        Ok(audit) => audit,
+        Err(error) => return error.into_response(),
+    };
+    let target_category = if body.contains_key("org") {
+        if body.contains_key("category") {
+            javascript_or_empty(body.get("category"))
+        } else {
+            artifact.meta().category.clone()
+        }
+    } else {
+        javascript_or_empty(body.get("category"))
+    };
+    let registered_category = normalize_category(&target_category);
+    let target_org = if body.contains_key("org") {
+        OrgId(javascript_or_empty(body.get("org")))
+    } else {
+        artifact.meta().org.clone()
+    };
+    // As above, category registration is a prerequisite because the ports do not expose a
+    // cross-service transaction. Do not move or retag when its ledger write fails.
+    if !registered_category.is_empty()
+        && let Err(error) = deps
+            .admin
+            .add_category(&target_org, &registered_category, audit.clone())
+            .await
+    {
+        return error.into_response();
+    }
+
     let result = if body.contains_key("org") {
         let target_org = OrgId(javascript_or_empty(body.get("org")));
         let category = body
             .contains_key("category")
             .then(|| javascript_or_empty(body.get("category")));
         deps.artifacts
-            .move_to_org(artifact, target_org, category)
+            .move_to_org(artifact, target_org, category, audit)
             .await
     } else {
         deps.artifacts
-            .set_category(artifact, javascript_or_empty(body.get("category")))
+            .set_category(artifact, target_category, audit)
             .await
     };
     match result {
-        Ok(meta) => {
-            // Register the resulting category on the artifact's (possibly new) org, same as above.
-            if !meta.category.is_empty() {
-                let _ignored = deps.admin.add_category(&meta.org, &meta.category).await;
-            }
-            Json(MoveResponse {
-                id,
-                org: meta.org,
-                category: meta.category,
-            })
-            .into_response()
-        }
+        Ok(meta) => Json(MoveResponse {
+            id,
+            org: meta.org,
+            category: meta.category,
+        })
+        .into_response(),
         Err(AppError::NotFound(reason)) if reason == "not_found" => {
             AppError::ConcealedNotFound.into_response()
         }
@@ -503,18 +653,37 @@ async fn move_artifact(
     }
 }
 
-pub(super) async fn parse_json_request(
+pub(crate) async fn parse_json_request(
     request: Request,
     limit: u64,
+    ingress: &crate::config::IngressConfig,
 ) -> Result<(HeaderMap, OrderedJson), Response> {
     let headers = request.headers().clone();
-    if !is_json_content_type(&headers) {
-        return Ok((headers, OrderedJson::Null));
-    }
     let limit = usize::try_from(limit).unwrap_or(usize::MAX);
-    let bytes = to_bytes(request.into_body(), limit)
-        .await
-        .map_err(|_| json_error(StatusCode::PAYLOAD_TOO_LARGE, "payload too large"))?;
+    let bytes = read_body_limited(
+        request.into_body(),
+        limit,
+        Duration::from_millis(ingress.read_timeout_ms),
+    )
+    .await
+    .map_err(|error| match error {
+        BodyReadError::Timeout => json_error(StatusCode::REQUEST_TIMEOUT, "request timeout"),
+        BodyReadError::TooLarge => json_error(StatusCode::PAYLOAD_TOO_LARGE, "payload too large"),
+        BodyReadError::Invalid => json_error(StatusCode::BAD_REQUEST, "invalid JSON"),
+    })?;
+    // Bodyless portal actions retain Node's `req.body = {}`-style behaviour. Any actual bytes
+    // with an unsupported content type, including chunked bodies without Content-Length, are
+    // rejected before authorization or mutation instead of silently executing as `Null`.
+    if !is_json_content_type(&headers) {
+        return if bytes.is_empty() {
+            Ok((headers, OrderedJson::Null))
+        } else {
+            Err(json_error(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "unsupported media type",
+            ))
+        };
+    }
     if bytes.is_empty() {
         return Ok((headers, OrderedJson::Null));
     }
@@ -527,6 +696,7 @@ pub(super) async fn parse_json_request(
     }
     let body = serde_json::from_slice(&bytes)
         .map_err(|_| json_error(StatusCode::BAD_REQUEST, "invalid JSON"))?;
+    validate_json_complexity(&body, ingress).map_err(complexity_response)?;
     Ok((headers, body))
 }
 
@@ -581,29 +751,4 @@ pub(super) fn javascript_or_empty(value: Option<&OrderedJson>) -> String {
     value
         .filter(|value| javascript_truthy(value))
         .map_or_else(String::new, javascript_string)
-}
-
-async fn notify_artifact(
-    event: WebhookEvent,
-    meta: &ArtifactMeta,
-    resolver: Option<String>,
-    deps: &AppDeps,
-) {
-    let payload = NotificationPayload {
-        artifact_id: meta.id.clone(),
-        title: meta.title.clone(),
-        url: format!("{}/{}", deps.config.public_base_url, meta.id),
-        description: meta.description.clone(),
-        uploader_label: meta.uploader_label.clone(),
-        category: meta.category.clone(),
-        revision: meta.revision,
-        bytes: meta.bytes,
-        viewer_email: None,
-        body: None,
-        resolver,
-    };
-    let _ignored = deps
-        .notifications
-        .emit(event, meta.org.clone(), payload)
-        .await;
 }

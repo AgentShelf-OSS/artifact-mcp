@@ -38,8 +38,11 @@
 
 use std::sync::Arc;
 
-use rusqlite::{Connection, OptionalExtension, Row};
+use rusqlite::{Connection, OptionalExtension, Row, TransactionBehavior};
 
+use crate::security::audit::{
+    AuditEvent, MutationAudit, append_in_transaction, mutate_in_transaction,
+};
 use crate::{
     config::IdSource,
     error::AppError,
@@ -74,6 +77,22 @@ pub const MAX_ERROR_UTF16: usize = 500;
 
 /// Default recorded failure text. [lib/webhooks.js:128]
 pub const DEFAULT_DELIVERY_ERROR: &str = "Webhook delivery failed.";
+
+/// A deliberately data-free result for the durable worker's just-in-time webhook lookup.
+///
+/// This API is narrower than [`WebhookStore::delivery`]: it binds the row to the outbox tenant
+/// before materialising its URL and keeps database availability separate from an invalid target
+/// and an authenticated-ciphertext failure.  The variants contain neither a webhook URL nor
+/// cipher/key material, so they are safe to put in worker diagnostics.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum WebhookDeliveryResolutionFailure {
+    /// The store could not complete its database operation. The outbox item may succeed later.
+    Retryable,
+    /// The reference is blank, missing, or belongs to another tenant.
+    InvalidReference,
+    /// The encrypted row could not be authenticated or its configured key is unavailable.
+    DecryptFailed,
+}
 
 /// Column list shared by every read; `SELECT *` is avoided so a later migration cannot silently
 /// change the row shape underneath the mapper.
@@ -463,48 +482,224 @@ impl WebhookStore {
         let stored = self.protection.protect(&url)?;
 
         db::interact(&self.pool, move |conn| {
-            // Node's order is unknown-organization first, then invalid-URL. [lib/webhooks.js:86-87]
-            if !org_exists(conn, &org)? {
-                return Err(AppError::Validation(format!(
-                    "Unknown organization \"{org}\"."
-                )));
-            }
-            if !url_is_allowed {
-                return Err(AppError::Validation(INVALID_URL_MESSAGE.to_owned()));
-            }
-            conn.execute(
-                "INSERT INTO org_webhooks \
-                 (id, org, url, url_cipher, url_nonce, url_tag, label, events) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-                (
-                    &id.0,
-                    &org,
-                    &stored.url,
-                    stored.encrypted.as_ref().map(|record| &record.ciphertext),
-                    stored.encrypted.as_ref().map(|record| &record.nonce),
-                    stored.encrypted.as_ref().map(|record| &record.tag),
-                    &label,
-                    &events,
-                ),
+            create_in(
+                conn,
+                &org,
+                &id,
+                &url,
+                url_is_allowed,
+                &label,
+                &events,
+                &stored,
             )
-            .map_err(internal)?;
-            // Node re-reads the row so database defaults (`created_at`) are authoritative.
-            // [lib/webhooks.js:101]
-            row_by_id(conn, &id.0)?
-                .map(|row| row.public())
-                .ok_or(AppError::Internal)
         })
         .await
     }
 
-    /// Port of `remove(org, id)` — [lib/webhooks.js:104-106].
-    ///
-    /// # Errors
-    /// Returns a database fault.
+    pub async fn create_audited(
+        &self,
+        request: CreateWebhook,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<WebhookSummary, AppError> {
+        let org = trimmed(&request.org.0);
+        let url = trimmed(&request.url);
+        let label = truncate_utf16(&trimmed(&request.label), MAX_LABEL_UTF16);
+        let events = encode_events(&normalize_events(request.events.as_deref(), true));
+        let url_is_allowed = is_discord_webhook_url(&url);
+        let id = self.ids.webhook_id()?;
+        let stored = self.protection.protect(&url)?;
+        let target = org.clone();
+        db::interact(&self.pool, move |conn| {
+            let audit = audit.for_target_tenant(&org)?;
+            mutate_in_transaction(conn, &audit_key, &audit, |tx| {
+                let row = create_in(
+                    tx,
+                    &org,
+                    &id,
+                    &url,
+                    url_is_allowed,
+                    &label,
+                    &events,
+                    &stored,
+                )?;
+                Ok((
+                    row,
+                    AuditEvent {
+                        operation: "webhook.config.create".to_owned(),
+                        target_type: "organization".to_owned(),
+                        target_id: target,
+                        result: "success".to_owned(),
+                        classification: "webhook_config_created".to_owned(),
+                        revision: None,
+                    },
+                ))
+            })
+        })
+        .await
+    }
+
+    pub async fn remove_audited(
+        &self,
+        org: OrgId,
+        id: WebhookId,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<bool, AppError> {
+        let org = trimmed(&org.0);
+        let id = trimmed(&id.0);
+        let target = org.clone();
+        db::interact(&self.pool, move |conn| {
+            let audit = audit.for_target_tenant(&org)?;
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            if discussion_anchor_exists(&tx, &org, &id)? {
+                return Err(AppError::Conflict(
+                    "Remove the Discord notification-thread connection before deleting this webhook."
+                        .to_owned(),
+                ));
+            }
+            let changed = tx
+                .execute(
+                    "DELETE FROM org_webhooks WHERE org = ?1 AND id = ?2",
+                    (&org, &id),
+                )
+                .map_err(internal)?
+                > 0;
+            if !changed {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(false);
+            }
+            let event = AuditEvent {
+                operation: "webhook.config.remove".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: "webhook_config_removed".to_owned(),
+                revision: None,
+            };
+            append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(true)
+        })
+        .await
+    }
+
+    pub async fn set_events_audited(
+        &self,
+        org: OrgId,
+        id: WebhookId,
+        events: Vec<WebhookEvent>,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Option<WebhookSummary>, AppError> {
+        let normalized = encode_events(&normalize_events(Some(&events), false));
+        let org = trimmed(&org.0);
+        let id = trimmed(&id.0);
+        let target = org.clone();
+        db::interact(&self.pool, move |conn| {
+            let audit = audit.for_target_tenant(&org)?;
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let Some(current) = row_by_id(&tx, &id)?.filter(|row| row.org.0 == org) else {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(None);
+            };
+            if !normalized.split(',').any(|event| event == "published")
+                && discussion_anchor_exists(&tx, &org, &id)?
+            {
+                return Err(AppError::Conflict(
+                    "Published notifications are required by the Discord thread connection."
+                        .to_owned(),
+                ));
+            }
+            if encode_events(&current.events) == normalized {
+                let row = current.public();
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(Some(row));
+            }
+            tx.execute(
+                "UPDATE org_webhooks SET events = ?1 WHERE org = ?2 AND id = ?3",
+                (&normalized, &org, &id),
+            )
+            .map_err(internal)?;
+            let row = row_by_id(&tx, &id)?
+                .map(|row| row.public())
+                .ok_or(AppError::Internal)?;
+            let event = AuditEvent {
+                operation: "webhook.config.update".to_owned(),
+                target_type: "organization".to_owned(),
+                target_id: target,
+                result: "success".to_owned(),
+                classification: "webhook_config_updated".to_owned(),
+                revision: None,
+            };
+            append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(Some(row))
+        })
+        .await
+    }
+
+    /// Persist one half of the explicitly non-atomic webhook-test protocol. `None` records the
+    /// durable pre-I/O request marker; `Some` records the terminal external delivery result.
+    /// The persisted target is only `(tenant org, webhook id)`; the decrypted URL never crosses
+    /// this boundary. A crash after delivery can therefore leave a visible requested-only record
+    /// rather than silently losing evidence of the attempt.
+    pub async fn audit_test(
+        &self,
+        org: OrgId,
+        id: WebhookId,
+        outcome: Option<bool>,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<(), AppError> {
+        let org = trimmed(&org.0);
+        let id = trimmed(&id.0);
+        db::interact(&self.pool, move |conn| {
+            let audit = audit.for_target_tenant(&org)?;
+            let event = match outcome {
+                None => AuditEvent {
+                    operation: "webhook.test.requested".to_owned(),
+                    target_type: "webhook".to_owned(),
+                    target_id: id,
+                    result: "success".to_owned(),
+                    classification: "external_delivery_requested".to_owned(),
+                    revision: None,
+                },
+                Some(ok) => AuditEvent {
+                    operation: "webhook.test.completed".to_owned(),
+                    target_type: "webhook".to_owned(),
+                    target_id: id,
+                    result: if ok { "success" } else { "failure" }.to_owned(),
+                    classification: if ok {
+                        "external_delivery_succeeded"
+                    } else {
+                        "external_delivery_failed"
+                    }
+                    .to_owned(),
+                    revision: None,
+                },
+            };
+            mutate_in_transaction(conn, &audit_key, &audit, |_tx| Ok(((), event)))
+        })
+        .await
+    }
+
+    /// `remove` remains the non-audited persistence primitive used by legacy/unit callers.
+    /// Production settings mutations use [`Self::remove_audited`].
     pub async fn remove(&self, org: &OrgId, id: &WebhookId) -> Result<bool, AppError> {
         let org = trimmed(&org.0);
         let id = trimmed(&id.0);
         db::interact(&self.pool, move |conn| {
+            if discussion_anchor_exists(conn, &org, &id)? {
+                return Err(AppError::Conflict(
+                    "Remove the Discord notification-thread connection before deleting this webhook."
+                        .to_owned(),
+                ));
+            }
             let changed = conn
                 .execute(
                     "DELETE FROM org_webhooks WHERE org = ?1 AND id = ?2",
@@ -515,7 +710,52 @@ impl WebhookStore {
         })
         .await
     }
+}
 
+#[allow(clippy::too_many_arguments)]
+fn create_in(
+    conn: &Connection,
+    org: &str,
+    id: &WebhookId,
+    _url: &str,
+    url_is_allowed: bool,
+    label: &str,
+    events: &str,
+    stored: &StoredWebhookUrl,
+) -> Result<WebhookSummary, AppError> {
+    // Node's order is unknown-organization first, then invalid-URL. [lib/webhooks.js:86-87]
+    if !org_exists(conn, org)? {
+        return Err(AppError::Validation(format!(
+            "Unknown organization \"{org}\"."
+        )));
+    }
+    if !url_is_allowed {
+        return Err(AppError::Validation(INVALID_URL_MESSAGE.to_owned()));
+    }
+    conn.execute(
+        "INSERT INTO org_webhooks \
+                 (id, org, url, url_cipher, url_nonce, url_tag, label, events) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        (
+            &id.0,
+            &org,
+            &stored.url,
+            stored.encrypted.as_ref().map(|record| &record.ciphertext),
+            stored.encrypted.as_ref().map(|record| &record.nonce),
+            stored.encrypted.as_ref().map(|record| &record.tag),
+            &label,
+            &events,
+        ),
+    )
+    .map_err(internal)?;
+    // Node re-reads the row so database defaults (`created_at`) are authoritative.
+    // [lib/webhooks.js:101]
+    row_by_id(conn, &id.0)?
+        .map(|row| row.public())
+        .ok_or(AppError::Internal)
+}
+
+impl WebhookStore {
     /// Port of `setEvents(org, id, events)` — [lib/webhooks.js:108-114].
     ///
     /// `None` means no row matched; the parsed set defaults to **empty**, not to every event.
@@ -532,6 +772,14 @@ impl WebhookStore {
         let org = trimmed(&org.0);
         let id = trimmed(&id.0);
         db::interact(&self.pool, move |conn| {
+            if !normalized.split(',').any(|event| event == "published")
+                && discussion_anchor_exists(conn, &org, &id)?
+            {
+                return Err(AppError::Conflict(
+                    "Published notifications are required by the Discord thread connection."
+                        .to_owned(),
+                ));
+            }
             let changed = conn
                 .execute(
                     "UPDATE org_webhooks SET events = ?1 WHERE org = ?2 AND id = ?3",
@@ -555,6 +803,35 @@ impl WebhookStore {
         let id = trimmed(&id.0);
         let row = db::interact(&self.pool, move |conn| row_by_id(conn, &id)).await?;
         row.map(|row| row.delivery(&self.protection)).transpose()
+    }
+
+    /// Resolve one worker target while binding it to the durable record's tenant.
+    ///
+    /// Unlike [`Self::delivery`], this is intentionally typed and redacted for the background
+    /// delivery path: transient database faults retry, while missing/cross-tenant references and
+    /// ciphertext/key failures terminally fail without letting the worker call a provider.
+    /// The long-standing [`Self::delivery`] API remains for the awaited admin webhook test path.
+    pub async fn resolve_delivery(
+        &self,
+        id: &WebhookId,
+        expected_org: &OrgId,
+    ) -> Result<WebhookDelivery, WebhookDeliveryResolutionFailure> {
+        let id = trimmed(&id.0);
+        let expected_org = trimmed(&expected_org.0);
+        if id.is_empty() || expected_org.is_empty() {
+            return Err(WebhookDeliveryResolutionFailure::InvalidReference);
+        }
+        let row = db::interact(&self.pool, move |conn| row_by_id(conn, &id))
+            .await
+            .map_err(|_| WebhookDeliveryResolutionFailure::Retryable)?;
+        let Some(row) = row else {
+            return Err(WebhookDeliveryResolutionFailure::InvalidReference);
+        };
+        if row.org.0 != expected_org {
+            return Err(WebhookDeliveryResolutionFailure::InvalidReference);
+        }
+        row.delivery(&self.protection)
+            .map_err(|_| WebhookDeliveryResolutionFailure::DecryptFailed)
     }
 
     /// The masked view of one webhook, for callers that must not see the URL at all.
@@ -655,6 +932,21 @@ fn org_exists(conn: &Connection, org: &str) -> Result<bool, AppError> {
         .optional()
         .map(|found: Option<()>| found.is_some())
         .map_err(internal)
+}
+
+fn discussion_anchor_exists(
+    conn: &Connection,
+    org: &str,
+    webhook_id: &str,
+) -> Result<bool, AppError> {
+    conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM org_discord_discussion_connections \
+         WHERE org = ?1 AND notification_webhook_id = ?2 \
+           AND strategy = 'notification_thread')",
+        (org, webhook_id),
+        |row| row.get(0),
+    )
+    .map_err(internal)
 }
 
 /// `String(value || "").trim()` — the normalization every Node entry point applies.

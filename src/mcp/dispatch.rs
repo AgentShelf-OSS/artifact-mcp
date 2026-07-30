@@ -4,14 +4,20 @@ use serde_json::{Value, json};
 
 use crate::{
     AppDeps,
-    artifacts::validation::{js_trim, sanitize_relative_path},
+    artifacts::{
+        lifecycle::normalize_category,
+        validation::{js_trim, sanitize_relative_path},
+    },
     error::{AppError, JsonRpcError, McpError},
     model::{
         ArtifactContent, ArtifactId, ArtifactMeta, ArtifactRevision, ArtifactUpdate, CreateShare,
-        EmailAddress, Feedback, NotificationPayload, OrgId, PublicShare, PublisherIdentity,
-        ShareToken, SubmitFeedback, Timestamp, ViewerView, WebhookEvent,
+        EmailAddress, Feedback, OrgId, PublicShare, PublisherIdentity, ShareToken, SubmitFeedback,
+        Timestamp, ViewerView,
     },
-    security::access::{AccessPolicy, OwnedArtifact, PUBLISH_PERMISSION_ERROR},
+    security::{
+        access::{AccessPolicy, OwnedArtifact, PUBLISH_PERMISSION_ERROR},
+        audit::MutationAudit,
+    },
 };
 
 use super::{
@@ -581,16 +587,21 @@ async fn publish_artifact(
     let target_org = target_org(arguments, auth, deps).await?;
     let published = deps
         .artifacts
-        .publish(crate::model::PublishArtifact {
-            publisher: auth.clone(),
-            target_org: target_org.clone(),
-            title: optional_string(arguments, "title"),
-            description: optional_string(arguments, "description"),
-            category: optional_string(arguments, "category"),
-            content: ArtifactContent::SingleHtml(required_string(arguments, "html")?.to_owned()),
-        })
+        .publish(
+            crate::model::PublishArtifact {
+                publisher: auth.clone(),
+                target_org: target_org.clone(),
+                title: optional_string(arguments, "title"),
+                description: optional_string(arguments, "description"),
+                category: optional_string(arguments, "category"),
+                content: ArtifactContent::SingleHtml(
+                    required_string(arguments, "html")?.to_owned(),
+                ),
+            },
+            MutationAudit::publisher(auth)?,
+        )
         .await?;
-    notify_artifact(WebhookEvent::Published, &published.meta, None, deps).await;
+    deps.delivery_wake.wake();
     tool_result(object! {
         "id" => OrderedJson::string(published.meta.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &published.meta.id)),
@@ -610,19 +621,22 @@ async fn publish_bundle(
     let files = bundle_files(arguments.get("files"))?;
     let published = deps
         .artifacts
-        .publish(crate::model::PublishArtifact {
-            publisher: auth.clone(),
-            target_org: target_org.clone(),
-            title: optional_string(arguments, "title"),
-            description: optional_string(arguments, "description"),
-            category: optional_string(arguments, "category"),
-            content: ArtifactContent::Bundle {
-                files,
-                entry: optional_string(arguments, "entry"),
+        .publish(
+            crate::model::PublishArtifact {
+                publisher: auth.clone(),
+                target_org: target_org.clone(),
+                title: optional_string(arguments, "title"),
+                description: optional_string(arguments, "description"),
+                category: optional_string(arguments, "category"),
+                content: ArtifactContent::Bundle {
+                    files,
+                    entry: optional_string(arguments, "entry"),
+                },
             },
-        })
+            MutationAudit::publisher(auth)?,
+        )
         .await?;
-    notify_artifact(WebhookEvent::Published, &published.meta, None, deps).await;
+    deps.delivery_wake.wake();
     let file_count = u64::try_from(published.file_count.unwrap_or(0)).unwrap_or(u64::MAX);
     tool_result(object! {
         "id" => OrderedJson::string(published.meta.id.0.clone()),
@@ -823,10 +837,12 @@ async fn delete_artifact(
 ) -> Result<Value, McpError> {
     let id = nonempty_protocol_string(arguments, "id")?;
     let owned = publisher_delete(id, auth, deps).await?;
-    let meta = owned.meta().clone();
-    let deleted = deps.artifacts.delete(owned.into_authorized()).await?;
+    let deleted = deps
+        .artifacts
+        .delete(owned.into_authorized(), MutationAudit::publisher(auth)?)
+        .await?;
     if deleted {
-        notify_artifact(WebhookEvent::Deleted, &meta, None, deps).await;
+        deps.delivery_wake.wake();
     }
     tool_result(object! {
         "id" => OrderedJson::string(id),
@@ -931,6 +947,7 @@ async fn patch_artifact(
                 category: None,
                 content: Some(content),
             },
+            MutationAudit::publisher(auth)?,
         )
         .await
     {
@@ -947,7 +964,7 @@ async fn patch_artifact(
         Err(error) => return Err(error.into()),
     };
     if result.changed {
-        notify_artifact(WebhookEvent::Updated, &result.meta, None, deps).await;
+        deps.delivery_wake.wake();
     }
     tool_result(object! {
         "id" => OrderedJson::string(result.meta.id.0.clone()),
@@ -1015,7 +1032,15 @@ async fn update_artifact(
         category: optional_string(arguments, "category"),
         content,
     };
-    let result = match deps.artifacts.update(owned.into_authorized(), update).await {
+    let result = match deps
+        .artifacts
+        .update(
+            owned.into_authorized(),
+            update,
+            MutationAudit::publisher(auth)?,
+        )
+        .await
+    {
         Ok(result) => result,
         Err(AppError::Conflict(_)) => {
             return Err(AppError::Conflict(
@@ -1029,7 +1054,7 @@ async fn update_artifact(
         Err(error) => return Err(error.into()),
     };
     if result.changed {
-        notify_artifact(WebhookEvent::Updated, &result.meta, None, deps).await;
+        deps.delivery_wake.wake();
     }
     tool_result(object! {
         "id" => OrderedJson::string(result.meta.id.0.clone()),
@@ -1054,7 +1079,11 @@ async fn set_visibility(
         .ok_or_else(|| JsonRpcError::InvalidParams("hidden is required".to_owned()))?;
     let result = deps
         .artifacts
-        .set_hidden(owned.into_authorized(), hidden)
+        .set_hidden(
+            owned.into_authorized(),
+            hidden,
+            MutationAudit::publisher(auth)?,
+        )
         .await?;
     tool_result(object! {
         "id" => OrderedJson::string(result.id.0),
@@ -1084,13 +1113,20 @@ async fn set_category(
     let owned = publisher_write(id, auth, deps).await?;
     let org = owned.meta().org.clone();
     let category = required_string(arguments, "category")?.to_owned();
+    let registered_category = normalize_category(&category);
+    let audit = MutationAudit::publisher(auth)?;
+    // The artifact and organization ports own separate transactions. Make the audited registry
+    // write a prerequisite so a failed audit key/write cannot report a successful category
+    // mutation while leaving Settings without the category.
+    if !registered_category.is_empty() {
+        deps.admin
+            .add_category(&org, &registered_category, audit.clone())
+            .await?;
+    }
     let result = deps
         .artifacts
-        .set_category(owned.into_authorized(), category)
+        .set_category(owned.into_authorized(), category, audit)
         .await?;
-    if !result.category.is_empty() {
-        let _ignored = deps.admin.add_category(&org, &result.category).await;
-    }
     tool_result(object! {
         "id" => OrderedJson::string(id),
         "category" => OrderedJson::string(result.category),
@@ -1105,7 +1141,11 @@ async fn create_category(
     let org = category_org(arguments, auth)?;
     let name = deps
         .admin
-        .add_category(&org, required_string(arguments, "name")?)
+        .add_category(
+            &org,
+            required_string(arguments, "name")?,
+            MutationAudit::publisher(auth)?,
+        )
         .await?;
     tool_result(object! {
         "org" => OrderedJson::string(org.0),
@@ -1120,7 +1160,10 @@ async fn delete_category(
 ) -> Result<Value, McpError> {
     let org = category_org(arguments, auth)?;
     let name = required_string(arguments, "name")?;
-    let removed = deps.admin.remove_category(&org, name).await?;
+    let removed = deps
+        .admin
+        .remove_category(&org, name, MutationAudit::publisher(auth)?)
+        .await?;
     tool_result(object! {
         "org" => OrderedJson::string(org.0),
         "name" => OrderedJson::string(name),
@@ -1161,6 +1204,7 @@ async fn create_share(
                 created_by: format!("agent:{}", auth.client_id),
                 expires: required_string(arguments, "expires")?.to_owned(),
             },
+            MutationAudit::publisher(auth)?,
         )
         .await?;
     let url = format!("{}/s/{}", deps.config.public_base_url, share.token);
@@ -1208,7 +1252,11 @@ async fn revoke_share(
         })?;
     let revoked = deps
         .shares
-        .revoke(owned.into_authorized(), token.clone())
+        .revoke(
+            owned.into_authorized(),
+            token.clone(),
+            MutationAudit::publisher(auth)?,
+        )
         .await?;
     tool_result(object! {
         "token" => OrderedJson::string(token.0),
@@ -1254,6 +1302,7 @@ async fn restore_artifact(
             owned.into_authorized(),
             revision,
             Some(auth.client_id.clone()),
+            MutationAudit::publisher(auth)?,
         )
         .await
     {
@@ -1280,7 +1329,7 @@ async fn restore_artifact(
         }
         Err(error) => return Err(error.into()),
     };
-    notify_artifact(WebhookEvent::Restored, &result.meta, None, deps).await;
+    deps.delivery_wake.wake();
     tool_result(object! {
         "id" => OrderedJson::string(result.meta.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),
@@ -1329,14 +1378,13 @@ async fn submit_feedback(
     let id = nonempty_protocol_string(arguments, "id")?;
     let body = required_string(arguments, "body")?;
     let owned = publisher_read(id, auth, deps).await?;
-    let meta = owned.meta().clone();
     let viewer_email = EmailAddress::from(format!("agent:{}", auth.client_id));
     let created = deps
         .engagement
         .submit_feedback(
             owned.into_authorized(),
             SubmitFeedback {
-                viewer_email: viewer_email.clone(),
+                viewer_email,
                 body: body.to_owned(),
                 parent_id: None,
                 anchor: None,
@@ -1345,23 +1393,7 @@ async fn submit_feedback(
             },
         )
         .await?;
-    let payload = NotificationPayload {
-        artifact_id: meta.id.clone(),
-        title: meta.title,
-        url: artifact_url(deps, &meta.id),
-        description: meta.description,
-        uploader_label: meta.uploader_label,
-        category: meta.category,
-        revision: meta.revision,
-        bytes: meta.bytes,
-        viewer_email: Some(viewer_email),
-        body: Some(created.body),
-        resolver: None,
-    };
-    let _ignored = deps
-        .notifications
-        .emit(WebhookEvent::Feedback, meta.org, payload)
-        .await;
+    deps.delivery_wake.wake();
     tool_result(object! {
         "feedback_id" => OrderedJson::string(created.id.0),
         "artifact_id" => OrderedJson::string(id),
@@ -1386,14 +1418,13 @@ async fn resolve_feedback(
         AppError::NotFound(_) => AppError::NotFound(format!("Unknown feedback: {id}")),
         other => other,
     })?;
-    let notify_meta = owned.meta().clone();
     let resolver = format!("agent:{}", auth.client_id);
     let resolved = deps
         .engagement
-        .resolve_feedback_as_publisher(owned, feedback_id, resolver.clone())
+        .resolve_feedback_as_publisher(owned, feedback_id, resolver)
         .await?;
     if resolved {
-        notify_artifact(WebhookEvent::Resolved, &notify_meta, Some(resolver), deps).await;
+        deps.delivery_wake.wake();
     }
     tool_result(object! {
         "feedback_id" => OrderedJson::string(id),
@@ -1689,11 +1720,28 @@ fn viewer_json(viewer: &ViewerView) -> OrderedJson {
 }
 
 fn feedback_json(feedback: &Feedback) -> OrderedJson {
+    let author = match &feedback.author {
+        crate::model::FeedbackAuthor::Artifact { viewer_email } => object! {
+            "source" => OrderedJson::string("artifact"),
+            "viewer_email" => OrderedJson::string(viewer_email.0.clone()),
+        },
+        crate::model::FeedbackAuthor::Discord {
+            external_author_id,
+            external_author_display,
+        } => object! {
+            "source" => OrderedJson::string("discord"),
+            "external_author_id" => OrderedJson::string(external_author_id.clone()),
+            "external_author_display" => OrderedJson::string(external_author_display.clone()),
+        },
+    };
     object! {
         "id" => OrderedJson::string(feedback.id.0.clone()),
         "artifact_id" => OrderedJson::string(feedback.artifact_id.0.clone()),
         "parent_id" => optional_id(feedback.parent_id.as_ref().map(|id| id.0.as_str())),
-        "viewer_email" => OrderedJson::string(feedback.viewer_email.0.clone()),
+        "viewer_email" => optional_string_value(
+            feedback.viewer_email.as_ref().map(|email| email.0.clone())
+        ),
+        "author" => author,
         "body" => OrderedJson::string(feedback.body.clone()),
         "artifact_revision" => OrderedJson::number_u64(feedback.artifact_revision),
         "anchor_path" => optional_id(feedback.anchor_path.as_deref()),
@@ -1725,31 +1773,6 @@ fn optional_id(value: Option<&str>) -> OrderedJson {
 
 fn optional_number(value: Option<f64>) -> OrderedJson {
     value.map_or(OrderedJson::Null, OrderedJson::number_f64)
-}
-
-async fn notify_artifact(
-    event: WebhookEvent,
-    meta: &ArtifactMeta,
-    resolver: Option<String>,
-    deps: &AppDeps,
-) {
-    let payload = NotificationPayload {
-        artifact_id: meta.id.clone(),
-        title: meta.title.clone(),
-        url: artifact_url(deps, &meta.id),
-        description: meta.description.clone(),
-        uploader_label: meta.uploader_label.clone(),
-        category: meta.category.clone(),
-        revision: meta.revision,
-        bytes: meta.bytes,
-        viewer_email: None,
-        body: None,
-        resolver,
-    };
-    let _ignored = deps
-        .notifications
-        .emit(event, meta.org.clone(), payload)
-        .await;
 }
 
 fn artifact_url(deps: &AppDeps, id: &ArtifactId) -> String {

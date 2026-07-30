@@ -1,0 +1,107 @@
+{
+  "id": "human-request-authenticity.pbi032",
+  "tags": ["human", "csrf", "PBI-032", "CONF-HTTP"],
+  "fixture": "empty-v21",
+  "note": "The portal authenticity boundary accepts first-party human mutations and rejects both cross-site and sandboxed requests before their route handler can mutate state. Origin is covered as the fallback when Fetch Metadata is absent.",
+  "steps": [
+    {
+      "name": "same-origin admin mutation is accepted",
+      "request": {
+        "method": "POST",
+        "path": "/settings/keys",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "clientId": "conf-csrf-fetch-site",
+          "org": "acme",
+          "label": "Fetch Metadata acceptance",
+          "role": "reader"
+        }
+      },
+      "expect": { "status": 200 }
+    },
+    {
+      "name": "cross-site admin mutation is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/keys",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "cross-site"
+        },
+        "json": {
+          "clientId": "conf-csrf-cross-site",
+          "org": "acme",
+          "label": "Must not be created",
+          "role": "reader"
+        }
+      },
+      "expect": {
+        "status": 403,
+        "headers": { "mode": "exact-header" },
+        "body": { "mode": "exact-bytes" }
+      }
+    },
+    {
+      "name": "sandboxed admin mutation is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/keys",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "none",
+          "origin": "null"
+        },
+        "json": {
+          "clientId": "conf-csrf-sandboxed",
+          "org": "acme",
+          "label": "Must not be created",
+          "role": "reader"
+        }
+      },
+      "expect": {
+        "status": 403,
+        "headers": { "mode": "exact-header" },
+        "body": { "mode": "exact-bytes" },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "canonical Origin fallback is accepted without Fetch Metadata",
+      "request": {
+        "method": "POST",
+        "path": "/settings/keys",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "content-type": "application/json",
+          "x-artifact-mutation": "1",
+          "origin": "${public_base}"
+        },
+        "json": {
+          "clientId": "conf-csrf-origin",
+          "org": "acme",
+          "label": "Origin fallback acceptance",
+          "role": "reader"
+        }
+      },
+      "expect": { "status": 200 }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "authenticity_boundary_effects",
+        "query": "SELECT client_id FROM api_keys WHERE client_id LIKE 'conf-csrf-%' ORDER BY client_id",
+        "volatileFields": []
+      }
+    ]
+  }
+}

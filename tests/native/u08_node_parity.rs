@@ -27,7 +27,9 @@ use artifact_mcp::ports::ArtifactService as _;
 use serde_json::Value;
 
 use crate::u03_support::TempDataDir;
-use crate::u08_support::{Fixture, bundle_content, html_update, publisher, sha256_hex};
+use crate::u08_support::{
+    Fixture, bundle_content, html_update, mutation_audit, publisher, sha256_hex,
+};
 
 /// Setting this to `1` turns "Node is unavailable" from a skip into a failure.
 const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
@@ -647,6 +649,7 @@ async fn update_and_restore_bookkeeping_matches_the_node_oracle() {
                 content: Some(ArtifactContent::SingleHtml(OLD.to_owned())),
                 acting_client_id: None,
             },
+            mutation_audit(),
         )
         .await
         .expect("no-op update");
@@ -662,7 +665,7 @@ async fn update_and_restore_bookkeeping_matches_the_node_oracle() {
     // 2. A real update bumps the revision and records the OUTGOING one.
     let changed = fixture
         .store
-        .update_for(&meta, html_update(1, NEW))
+        .update_for(&meta, html_update(1, NEW), mutation_audit())
         .await
         .expect("body update");
     let node_meta = field(&response, "meta");
@@ -692,7 +695,7 @@ async fn update_and_restore_bookkeeping_matches_the_node_oracle() {
     // 3. A stale expected revision conflicts and leaves no staged body behind.
     let stale = fixture
         .store
-        .update_for(&meta, html_update(1, "stale"))
+        .update_for(&meta, html_update(1, "stale"), mutation_audit())
         .await
         .expect_err("stale revision");
     assert_eq!(
@@ -712,7 +715,7 @@ async fn update_and_restore_bookkeeping_matches_the_node_oracle() {
     let current = fixture.reload(&meta).expect("row");
     let restored = fixture
         .store
-        .restore_for(&current, 1, None)
+        .restore_for(&current, 1, None, mutation_audit())
         .await
         .expect("restore succeeds");
     let node_restored = field(&response, "restored");
@@ -954,7 +957,7 @@ async fn crash_safe_revision_and_staging_recovery_matches_the_node_oracle() {
     let current = fixture.reload(&a2).expect("recovered row");
     let restored = fixture
         .store
-        .restore_for(&current, 1, None)
+        .restore_for(&current, 1, None, mutation_audit())
         .await
         .expect("revision 1 restores");
     let node_restore = field(&response, "a2Restore");
@@ -1053,6 +1056,7 @@ async fn bundle_files_are_never_round_tripped_through_a_sorted_container() {
                 content: Some(bundle_content(&[("y.html", "Y"), ("b.html", "B")], None)),
                 ..ArtifactUpdate::default()
             },
+            mutation_audit(),
         )
         .await
         .expect("update succeeds");

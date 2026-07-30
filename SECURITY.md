@@ -18,7 +18,12 @@ and a fix or mitigation will be coordinated before public disclosure.
   an explicit loopback-only dev opt-in (`TRUST_ACCESS_HEADERS=1`) that additionally refuses
   to start on a non-loopback bind. **Set the JWT vars in production.**
 - **Untrusted artifact content** is served with a CSP sandbox (no `allow-same-origin`)
-  on every raw/download/share response, so it runs in a null origin.
+  on every raw/download/share response, so it runs in a null origin. In addition, every
+  cookie-authenticated portal mutation requires a first-party `X-Artifact-Mutation: 1` header and
+  same-origin browser metadata (or a canonical `Origin` fallback). This closes the otherwise
+  possible artifact-iframe → administrator-action forgery: sandboxed artifact JavaScript can issue
+  a credentialed `no-cors` request, but cannot attach the non-simple portal header. `/mcp` uses
+  explicit bearer authentication and is not an ambient-cookie surface.
 - **Public share links** (`/s/:token`) are opt-in, read-only, `noindex`, `no-store`,
   and gated only by an unguessable token — treat them as "anyone with the link."
   They rely on a Cloudflare Access **Bypass** on `/s/*`.
