@@ -1,6 +1,6 @@
 {
   "name": "artifact-mcp",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "type": "module",
   "description": "Self-hostable MCP server for publishing agent-made HTML artifacts to your own domain, with multi-org tenancy",
   "license": "Apache-2.0",
