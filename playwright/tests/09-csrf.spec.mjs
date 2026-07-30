@@ -66,26 +66,19 @@ test.describe("portal request authenticity", () => {
     expect(result.id).toBeTruthy();
   });
 
-  test("the discussion control uses the same CSRF mutation header", async ({ page, request, publisherKey, org }) => {
+  test("the discussion control uses the same CSRF mutation header", async ({ page, request, publisherKey, org }, testInfo) => {
+    test.skip(testInfo.project.name === "node", "organization threading overrides are Rust-owned");
     const artifact = await publish(request, publisherKey, {
       title: `PW CSRF discussion ${org}`,
       html: "<!doctype html><h1>discussion action</h1>"
     });
-    const current = await api(request, "get", `/settings/orgs/${encodeURIComponent(org)}/discord-discussion`);
-    expect(current.status(), await current.text()).toBe(200);
-    if (!(await current.json()).configured) {
-      const configured = await api(request, "put", `/settings/orgs/${encodeURIComponent(org)}/discord-discussion`, {
-        label: "csrf", url: "https://discord.com/api/webhooks/123456789012345678/pw-csrf-token"
-      });
-      expect(configured.status(), await configured.text()).toBe(200);
-    }
 
     await page.goto(`/${artifact.id}`);
     await page.locator("#vmore-toggle").click();
     await page.getByRole("button", { name: "Details" }).click();
     const [response] = await Promise.all([
-      page.waitForResponse((candidate) => candidate.url().includes(`/${artifact.id}/discussion`) && candidate.request().method() === "PUT"),
-      page.getByRole("button", { name: "Enable mirroring" }).click(),
+      page.waitForResponse((candidate) => candidate.url().includes(`/${artifact.id}/discussion/override`) && candidate.request().method() === "PUT"),
+      page.getByRole("button", { name: "Keep discussion in Artifact MCP" }).click(),
     ]);
     expect(response.status()).toBe(200);
     expect(response.request().headers()["x-artifact-mutation"]).toBe("1");
