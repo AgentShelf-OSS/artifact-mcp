@@ -90,7 +90,6 @@ async fn process(
             (RecoveryState::Recovered, Some(message_id))
         }
         ExactRecoveryOutcome::NotFound => (RecoveryState::NotFound, None),
-        ExactRecoveryOutcome::Ambiguous => (RecoveryState::Ambiguous, None),
         ExactRecoveryOutcome::PermissionDenied => (RecoveryState::PermissionDenied, None),
         ExactRecoveryOutcome::RateLimited => (RecoveryState::RateLimited, None),
         ExactRecoveryOutcome::Retryable => (RecoveryState::Retryable, None),

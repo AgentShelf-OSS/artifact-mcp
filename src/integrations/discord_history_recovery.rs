@@ -54,6 +54,7 @@ pub enum HistoryProviderFailure {
 }
 
 pub trait DiscordHistoryProvider: Send + Sync {
+    /// Return each page newest-to-oldest, matching Discord's channel-history contract.
     fn list_messages<'a>(
         &'a self,
         credential: &'a Secret,
@@ -66,13 +67,16 @@ pub trait DiscordHistoryProvider: Send + Sync {
 pub enum ExactRecoveryOutcome {
     Recovered { message_id: String },
     NotFound,
-    Ambiguous,
     PermissionDenied,
     RateLimited,
     Retryable,
 }
 
-/// Match one and only one message from the exact configured provider webhook and canonical URL.
+/// Recover the newest message from the exact configured provider webhook and canonical URL.
+///
+/// Discord returns channel history newest-to-oldest. Stopping at the first exact match makes
+/// repeated publication/update cards deterministic without weakening the destination boundary or
+/// scanning older pages unnecessarily.
 pub async fn recover_exact(
     provider: &dyn DiscordHistoryProvider,
     credential: &Secret,
@@ -89,7 +93,6 @@ pub async fn recover_exact(
     let deadline = tokio::time::Instant::now() + RECOVERY_DEADLINE;
     let mut before: Option<String> = None;
     let mut seen_cursors = BTreeSet::new();
-    let mut matches = BTreeSet::new();
     let mut scanned = 0_usize;
     for _ in 0..MAX_PAGES {
         if scanned >= MAX_MESSAGES || tokio::time::Instant::now() >= deadline {
@@ -135,22 +138,14 @@ pub async fn recover_exact(
                 .iter()
                 .any(|url| url == &artifact.canonical_url)
             {
-                matches.insert(message.id);
-                if matches.len() > 1 {
-                    return ExactRecoveryOutcome::Ambiguous;
-                }
+                return ExactRecoveryOutcome::Recovered {
+                    message_id: message.id,
+                };
             }
         }
         match page.next_before {
             Some(cursor) if !cursor.is_empty() => before = Some(cursor),
-            _ => {
-                return matches
-                    .into_iter()
-                    .next()
-                    .map_or(ExactRecoveryOutcome::NotFound, |message_id| {
-                        ExactRecoveryOutcome::Recovered { message_id }
-                    });
-            }
+            _ => return ExactRecoveryOutcome::NotFound,
         }
     }
     ExactRecoveryOutcome::Retryable
@@ -371,13 +366,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn local_registration_id_cannot_match_provider_webhook_and_ambiguity_fails_closed() {
+    async fn local_registration_id_cannot_match_and_newest_exact_notification_wins() {
         let fake = Fake {
             pages: Mutex::new(vec![Ok(HistoryPage {
                 messages: vec![
-                    message("423456789012345678", "local-webhook-registration"),
-                    message("523456789012345678", "323456789012345678"),
+                    message("723456789012345678", "local-webhook-registration"),
                     message("623456789012345678", "323456789012345678"),
+                    message("523456789012345678", "323456789012345678"),
                 ],
                 next_before: None,
             })]),
@@ -392,7 +387,41 @@ mod tests {
                 }
             )
             .await,
-            ExactRecoveryOutcome::Ambiguous
+            ExactRecoveryOutcome::Recovered {
+                message_id: "623456789012345678".into()
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn newest_exact_match_does_not_scan_older_pages() {
+        let fake = Fake {
+            pages: Mutex::new(vec![
+                Ok(HistoryPage {
+                    messages: vec![message("623456789012345678", "323456789012345678")],
+                    next_before: Some("523456789012345678".into()),
+                }),
+                Err(HistoryProviderFailure::PermissionDenied),
+            ]),
+        };
+        assert_eq!(
+            recover_exact(
+                &fake,
+                &Secret::new("synthetic"),
+                &destination(),
+                &HistoryArtifact {
+                    canonical_url: "https://artifact.example.test/a".into()
+                }
+            )
+            .await,
+            ExactRecoveryOutcome::Recovered {
+                message_id: "623456789012345678".into()
+            }
+        );
+        assert_eq!(
+            fake.pages.lock().expect("pages").len(),
+            1,
+            "an older Discord history page must not be requested after the newest exact match"
         );
     }
 

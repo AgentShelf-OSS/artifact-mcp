@@ -86,7 +86,7 @@ test("recovery rejects same-URL messages from another webhook or channel", async
   assert.deepEqual(result, { state: "not_found" });
 });
 
-test("recovery detects ambiguity across bounded pages and does not choose an anchor", async () => {
+test("recovery chooses the newest exact match without scanning older pages", async () => {
   const cursors = [];
   const result = await recoverExactNotification(request({
     rest: { async listChannelMessages({ before }) {
@@ -96,8 +96,12 @@ test("recovery detects ambiguity across bounded pages and does not choose an anc
         : { messages: [exactMessage("message-2")], nextCursor: null };
     } }
   }));
-  assert.deepEqual(result, { state: "ambiguous" });
-  assert.deepEqual(cursors, [null, "older"]);
+  assert.deepEqual(result, {
+    state: "recovered",
+    messageId: "message-1",
+    provenance: "exact_selected_webhook_canonical_url"
+  });
+  assert.deepEqual(cursors, [null]);
 });
 
 test("recovery fails closed when notification embeds are redacted or a scan is rate-limited", async () => {

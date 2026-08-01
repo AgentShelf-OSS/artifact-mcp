@@ -146,13 +146,14 @@ reuse the retained mapping. Ordinary `feedback`/`resolved` fan-out is suppressed
 selected webhook while its mirror is active; other organization webhooks are unchanged.
 
 Enabling the organization also queues bounded recovery for eligible older artifacts that lack a
-retained notification receipt. Recovery scans only the configured channel and accepts exactly one
+retained notification receipt. Recovery scans only the configured channel and accepts the newest
 message authored by the selected provider webhook whose visible embed URL equals the canonical
-artifact URL. It stores provider IDs and a fixed outcome classification, never Discord message
-content. Ambiguous, missing, permission-denied, rate-limited, redacted, or unavailable history
-stays local and never triggers a replacement publication card. Restore Read Message History or
-provider availability and use the Settings recovery action to retry supported outcomes; do not
-edit recovery rows directly.
+artifact URL. Discord returns channel history newest-to-oldest, so older duplicate publication or
+update cards do not make the anchor ambiguous. It stores provider IDs and a fixed outcome
+classification, never Discord message content. Missing, permission-denied, rate-limited, redacted,
+or unavailable history stays local and never triggers a replacement publication card. Restore
+Read Message History or provider availability and use the Settings recovery action to retry
+supported outcomes; do not edit recovery rows directly.
 
 Rotating a token validates the replacement before the encrypted row is replaced. A failed
 validation leaves the previous credential active. Removing a credential disables new organization
@@ -173,8 +174,8 @@ Before expanding scope, verify in a disposable Discord environment:
    not affect the other.
 2. A new artifact's first comment creates one thread on its exact publication notification without
    a per-artifact enable action; an artifact-only exception remains local.
-3. One historical exact match is recovered, wrong-webhook and ambiguous matches fail closed, and
-   removing Read Message History degrades recovery without affecting Artifact MCP feedback.
+3. The newest historical exact match is recovered, wrong-webhook matches fail closed, and removing
+   Read Message History degrades recovery without affecting Artifact MCP feedback.
 4. Concurrent first comments produce one generation-scoped root job and correlated comment jobs.
 5. `connected`, `pending`, `pending_threads`, queue age, and terminal-failure metrics behave as
    expected. Preserve dead letters and duplicate-risk evidence.
