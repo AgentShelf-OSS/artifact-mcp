@@ -35,7 +35,7 @@ use crate::config::{OsRandom, RandomSource, Secret};
 use crate::error::AppError;
 use crate::model::{
     ClientId, CreatePublisherKey, CreatedPublisherKey, KeyOwnerUpdate, OrgId, OwnerBackfillResult,
-    PublisherKeySummary, Timestamp,
+    PublisherKeySummary, Timestamp, UpdatePublisherKey, UpdatedPublisherKey,
 };
 use crate::persistence::db::{self, DbPool};
 use crate::persistence::orgs::{js_trim, truncate_utf16};
@@ -284,6 +284,65 @@ pub fn revoke_key(conn: &Connection, client_id: &str) -> Result<bool, AppError> 
     )
     .map(|changes| changes > 0)
     .map_err(|error| database_failure("revoke key", &error))
+}
+
+fn update_key_state(
+    conn: &Connection,
+    client_id: &str,
+    request: &UpdatePublisherKey,
+) -> Result<Option<(UpdatedPublisherKey, bool)>, AppError> {
+    let current = conn
+        .query_row(
+            "SELECT org, label, role, owner_email FROM api_keys WHERE client_id = ?1",
+            [client_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, Option<String>>(3)?,
+                ))
+            },
+        )
+        .optional()
+        .map_err(|error| database_failure("load key metadata", &error))?;
+    let Some((org, current_label, current_role, current_owner)) = current else {
+        return Ok(None);
+    };
+    let label = truncate_utf16(js_trim(&request.label), KEY_LABEL_MAX_LENGTH);
+    let role = js_trim(&request.role).to_owned();
+    if !matches!(role.as_str(), "reader" | "author" | "collaborator") {
+        return Err(AppError::Validation(INVALID_KEY_ROLE_MESSAGE.to_owned()));
+    }
+    let owner_email = normalize_verified_owner(conn, request.owner_email.as_deref(), &org)?;
+    let changed = label != current_label || role != current_role || owner_email != current_owner;
+    if changed {
+        conn.execute(
+            "UPDATE api_keys SET label = ?1, role = ?2, owner_email = ?3 WHERE client_id = ?4",
+            rusqlite::params![label, role, owner_email, client_id],
+        )
+        .map_err(|error| database_failure("update key metadata", &error))?;
+    }
+    Ok(Some((
+        UpdatedPublisherKey {
+            client_id: ClientId(client_id.to_owned()),
+            org: OrgId(org),
+            label,
+            role,
+            owner_email,
+        },
+        changed,
+    )))
+}
+
+/// Update the mutable metadata on one credential. Identity, tenant, creation, and revocation
+/// history are intentionally immutable.
+pub fn update_key(
+    conn: &Connection,
+    client_id: &str,
+    request: &UpdatePublisherKey,
+) -> Result<Option<UpdatedPublisherKey>, AppError> {
+    update_key_state(conn, client_id, request).map(|result| result.map(|(updated, _)| updated))
 }
 
 /// Change a verified owner on the key only. Artifact rows contain their own immutable snapshots,
@@ -603,6 +662,56 @@ impl KeyStore {
             )?;
             tx.commit().map_err(|_| AppError::Internal)?;
             Ok(true)
+        })
+        .await
+    }
+
+    pub async fn update_key(
+        &self,
+        client_id: ClientId,
+        request: UpdatePublisherKey,
+    ) -> Result<Option<UpdatedPublisherKey>, AppError> {
+        db::interact(&self.pool, move |conn| {
+            update_key(conn, &client_id.0, &request)
+        })
+        .await
+    }
+
+    pub async fn update_key_audited(
+        &self,
+        client_id: ClientId,
+        request: UpdatePublisherKey,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<Option<UpdatedPublisherKey>, AppError> {
+        db::interact(&self.pool, move |conn| {
+            let tx = conn
+                .transaction_with_behavior(TransactionBehavior::Immediate)
+                .map_err(|_| AppError::Internal)?;
+            let Some((updated, changed)) = update_key_state(&tx, &client_id.0, &request)? else {
+                tx.commit().map_err(|_| AppError::Internal)?;
+                return Ok(None);
+            };
+            if changed {
+                let event = AuditEvent {
+                    operation: "key.update".to_owned(),
+                    target_type: "publisher_key".to_owned(),
+                    target_id: client_id.0.clone(),
+                    result: "success".to_owned(),
+                    classification: "credential_metadata_updated".to_owned(),
+                    revision: None,
+                };
+                let audit = audit.for_target_tenant(&updated.org.0)?;
+                crate::security::audit::append_in_transaction(
+                    &tx,
+                    &audit_key,
+                    &audit.event_id()?,
+                    audit.context(),
+                    &event,
+                )?;
+            }
+            tx.commit().map_err(|_| AppError::Internal)?;
+            Ok(Some(updated))
         })
         .await
     }

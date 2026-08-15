@@ -12,7 +12,7 @@ use artifact_mcp::config::{
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
     ArtifactId, ArtifactMeta, ClientId, CreateOrganization, CreatePublisherKey, CreateShare,
-    CreateWebhook, EmailAddress, OrgId, Timestamp, Viewer, WebhookId,
+    CreateWebhook, EmailAddress, OrgId, Timestamp, UpdatePublisherKey, Viewer, WebhookId,
 };
 use artifact_mcp::persistence::{
     keys::KeyStore,
@@ -247,6 +247,43 @@ async fn key_mutations_are_atomic_target_scoped_redacted_and_noop_safe() {
         .expect_err("duplicate is rejected");
     assert_eq!(audit_rows(&db).len(), 1, "rejection is not ledgered");
 
+    let updated = store
+        .update_key_audited(
+            ClientId("publisher-1".to_owned()),
+            UpdatePublisherKey {
+                label: "Human publisher".to_owned(),
+                role: "collaborator".to_owned(),
+                owner_email: None,
+            },
+            admin_audit(),
+            AUDIT_KEY,
+        )
+        .await
+        .expect("update audited key")
+        .expect("key exists");
+    assert_eq!(updated.label, "Human publisher");
+    assert_eq!(updated.role, "collaborator");
+    let rows = audit_rows(&db);
+    assert_eq!(rows.len(), 2);
+    assert_eq!(rows[1].operation, "key.update");
+    assert_eq!(rows[1].tenant, "acme");
+
+    store
+        .update_key_audited(
+            ClientId("publisher-1".to_owned()),
+            UpdatePublisherKey {
+                label: "Human publisher".to_owned(),
+                role: "collaborator".to_owned(),
+                owner_email: None,
+            },
+            admin_audit(),
+            AUDIT_KEY,
+        )
+        .await
+        .expect("no-op update")
+        .expect("key exists");
+    assert_eq!(audit_rows(&db).len(), 2, "no-op update has no event");
+
     assert!(
         store
             .revoke_key_audited(ClientId("publisher-1".to_owned()), admin_audit(), AUDIT_KEY,)
@@ -259,7 +296,7 @@ async fn key_mutations_are_atomic_target_scoped_redacted_and_noop_safe() {
             .await
             .expect("second revoke")
     );
-    assert_eq!(audit_rows(&db).len(), 2, "no-op retry has no event");
+    assert_eq!(audit_rows(&db).len(), 3, "no-op retry has no event");
 
     let rollback = TestDb::new("u58-key-audit-rollback");
     seed_and_seal(&rollback, Some("acme"));
@@ -277,17 +314,55 @@ async fn key_mutations_are_atomic_target_scoped_redacted_and_noop_safe() {
             .await,
         Err(AppError::Internal)
     );
-    let conn = rollback.conn();
-    assert_eq!(
-        conn.query_row(
-            "SELECT count(*) FROM api_keys WHERE client_id='publisher-rollback'",
-            [],
-            |row| row.get::<_, i64>(0),
-        )
-        .expect("count keys"),
-        0
-    );
+    {
+        let conn = rollback.conn();
+        assert_eq!(
+            conn.query_row(
+                "SELECT count(*) FROM api_keys WHERE client_id='publisher-rollback'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .expect("count keys"),
+            0
+        );
+    }
     assert!(audit_rows(&rollback).is_empty());
+
+    rollback_store
+        .create_key_audited(key_request("publisher-rollback"), admin_audit(), AUDIT_KEY)
+        .await
+        .expect("seed rollback update key");
+    assert_eq!(
+        rollback_store
+            .update_key_audited(
+                ClientId("publisher-rollback".to_owned()),
+                UpdatePublisherKey {
+                    label: "Must roll back".to_owned(),
+                    role: "collaborator".to_owned(),
+                    owner_email: None,
+                },
+                admin_audit(),
+                WRONG_AUDIT_KEY,
+            )
+            .await,
+        Err(AppError::Internal)
+    );
+    assert_eq!(
+        rollback
+            .conn()
+            .query_row(
+                "SELECT label, role FROM api_keys WHERE client_id='publisher-rollback'",
+                [],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .expect("rolled back key metadata"),
+        ("Production publisher".to_owned(), "author".to_owned())
+    );
+    assert_eq!(
+        audit_rows(&rollback).len(),
+        1,
+        "failed update is not ledgered"
+    );
 }
 
 #[tokio::test]

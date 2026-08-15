@@ -7,7 +7,7 @@ use axum::{
     extract::{Extension, Path, Request, State},
     http::{HeaderMap, header},
     response::{Html, IntoResponse, Response},
-    routing::{delete, get, post},
+    routing::{delete, get, patch, post},
 };
 use serde::Serialize;
 use serde_json::{Map, Number, Value};
@@ -22,7 +22,7 @@ use crate::{
     mcp::protocol::OrderedJson,
     model::{
         ClientId, CreateOrganization, CreatePublisherKey, CreateWebhook, DeliveryResult,
-        EmailAddress, OrgId, Viewer, WebhookEvent, WebhookId,
+        EmailAddress, OrgId, UpdatePublisherKey, Viewer, WebhookEvent, WebhookId,
     },
     render::view_models::{SettingsOrganization, SettingsView},
     security::{
@@ -35,6 +35,7 @@ pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/settings", get(settings))
         .route("/settings/keys", post(create_key))
+        .route("/settings/keys/{id}", patch(update_key))
         .route("/settings/keys/{id}/revoke", post(revoke_key))
         .route("/settings/keys/{id}/owner", post(set_key_owner))
         .route(
@@ -186,6 +187,53 @@ async fn revoke_key(
         Err(error) => return error.into_response(),
     };
     Json(serde_json::json!({ "id": id, "revoked": revoked })).into_response()
+}
+
+#[derive(Serialize)]
+struct UpdatedKeyResponse {
+    #[serde(rename = "clientId")]
+    client_id: ClientId,
+    org: OrgId,
+    label: String,
+    role: String,
+    #[serde(rename = "ownerEmail")]
+    owner_email: Option<String>,
+}
+
+async fn update_key(
+    State(deps): State<AppDeps>,
+    Path(id): Path<String>,
+    request: Request,
+) -> Response {
+    let (_viewer, body, audit) = match admin_json_request(&deps, request).await {
+        Ok(authorized) => authorized,
+        Err(response) => return response,
+    };
+    let owner_email = js_trim(&js_or_empty(body.get("ownerEmail"))).to_owned();
+    match deps
+        .admin
+        .update_key(
+            ClientId(id),
+            UpdatePublisherKey {
+                label: js_or_empty(body.get("label")),
+                role: js_or_empty(body.get("role")),
+                owner_email: (!owner_email.is_empty()).then_some(owner_email),
+            },
+            audit,
+        )
+        .await
+    {
+        Ok(Some(updated)) => Json(UpdatedKeyResponse {
+            client_id: updated.client_id,
+            org: updated.org,
+            label: updated.label,
+            role: updated.role,
+            owner_email: updated.owner_email,
+        })
+        .into_response(),
+        Ok(None) => AppError::ConcealedNotFound.into_response(),
+        Err(error) => error.into_response(),
+    }
 }
 
 #[derive(Serialize)]

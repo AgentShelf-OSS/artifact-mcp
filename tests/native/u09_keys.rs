@@ -6,7 +6,7 @@
 use std::sync::Arc;
 
 use artifact_mcp::config::{RandomSource, SeededRandom};
-use artifact_mcp::model::{ClientId, CreatePublisherKey, OrgId};
+use artifact_mcp::model::{ClientId, CreatePublisherKey, OrgId, UpdatePublisherKey};
 use artifact_mcp::persistence::keys::{self, KeyStore};
 use artifact_mcp::persistence::orgs;
 
@@ -265,6 +265,79 @@ fn revokes_once_and_never_matches_an_untrimmed_id() {
     assert!(!keys::revoke_key(&conn, "missing").expect("revoke"));
     assert!(keys::revoke_key(&conn, "pub").expect("revoke"));
     assert!(!keys::revoke_key(&conn, "pub").expect("revoke again"));
+}
+
+#[test]
+fn updates_only_mutable_key_metadata_and_preserves_published_snapshots() {
+    let db = TestDb::new("u09-key-update");
+    let mut conn = db.conn();
+    seed_org(&mut conn, "acme");
+    orgs::add_email_member(&conn, "acme", "author@acme.test").expect("verified member");
+    keys::create_key(&conn, &request("publisher", "acme", "Old label"), &random())
+        .expect("create key");
+    conn.execute(
+        "INSERT INTO artifacts (id, client_id, org, title, uploader_label, owner_email) \
+         VALUES ('existing', 'publisher', 'acme', 'Existing', 'Old label', NULL)",
+        [],
+    )
+    .expect("seed published snapshot");
+
+    let updated = keys::update_key(
+        &conn,
+        "publisher",
+        &UpdatePublisherKey {
+            label: "  Human publisher  ".to_owned(),
+            role: "collaborator".to_owned(),
+            owner_email: Some("AUTHOR@ACME.TEST".to_owned()),
+        },
+    )
+    .expect("update key")
+    .expect("key exists");
+    assert_eq!(updated.client_id, ClientId::from("publisher"));
+    assert_eq!(updated.org, OrgId::from("acme"));
+    assert_eq!(updated.label, "Human publisher");
+    assert_eq!(updated.role, "collaborator");
+    assert_eq!(updated.owner_email.as_deref(), Some("author@acme.test"));
+    assert_eq!(
+        conn.query_row(
+            "SELECT org, uploader_label, owner_email FROM artifacts WHERE id='existing'",
+            [],
+            |row| Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?
+            )),
+        )
+        .expect("published snapshot"),
+        ("acme".to_owned(), "Old label".to_owned(), None),
+        "editing a key must never rewrite an existing artifact"
+    );
+
+    assert_eq!(
+        validation_message(keys::update_key(
+            &conn,
+            "publisher",
+            &UpdatePublisherKey {
+                label: "Ignored".to_owned(),
+                role: "owner".to_owned(),
+                owner_email: None,
+            },
+        )),
+        keys::INVALID_KEY_ROLE_MESSAGE
+    );
+    assert_eq!(
+        keys::update_key(
+            &conn,
+            "missing",
+            &UpdatePublisherKey {
+                label: String::new(),
+                role: "author".to_owned(),
+                owner_email: None,
+            },
+        )
+        .expect("missing lookup"),
+        None
+    );
 }
 
 // ---------------------------------------------------------------------------

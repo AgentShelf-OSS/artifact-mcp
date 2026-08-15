@@ -12,7 +12,7 @@ import { ACCESS_IDENTITY_MODE, assertReady, resolveViewer } from "./lib/identity
 import { accessRetryTarget } from "./lib/access-retry.js";
 import { accessSessionRetryPage, renderGallery, renderArtifactShell, notFoundPage, notSignedInPage } from "./lib/portal.js";
 import { renderSettings } from "./lib/settings.js";
-import { listKeys, createKey, revokeKey, setKeyOwner, backfillKeyOwner } from "./lib/keys.js";
+import { listKeys, createKey, revokeKey, updateKey, setKeyOwner, backfillKeyOwner } from "./lib/keys.js";
 import * as orgs from "./lib/orgs.js";
 import { getReaction, setReaction, reactionsFor, sentimentMap } from "./lib/reactions.js";
 import * as views from "./lib/views.js";
@@ -197,7 +197,7 @@ const app = createApp({
   artifacts: artifactStore,
   thumbnails,
   shares,
-  keys: { list: listKeys, create: createKey, revoke: revokeKey, setOwner: setKeyOwner, backfillOwner: backfillKeyOwner },
+  keys: { list: listKeys, create: createKey, revoke: revokeKey, update: updateKey, setOwner: setKeyOwner, backfillOwner: backfillKeyOwner },
   orgs: {
     list: orgs.listOrgs,
     names: orgs.listOrgNames,

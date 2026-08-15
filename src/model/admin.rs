@@ -26,6 +26,26 @@ pub struct CreatePublisherKey {
     pub owner_email: Option<String>,
 }
 
+/// Administrator-editable metadata for an existing publisher credential.
+///
+/// The credential identity and tenant are deliberately absent: changing either would break the
+/// publish-time attribution snapshots held by existing artifacts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdatePublisherKey {
+    pub label: String,
+    pub role: String,
+    pub owner_email: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UpdatedPublisherKey {
+    pub client_id: ClientId,
+    pub org: OrgId,
+    pub label: String,
+    pub role: String,
+    pub owner_email: Option<String>,
+}
+
 /// A newly minted publisher key, including the one-time plaintext secret.
 ///
 /// `Debug` is implemented by hand to REDACT `secret`. The derived implementation printed the live

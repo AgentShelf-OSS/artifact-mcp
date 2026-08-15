@@ -215,6 +215,9 @@ fn settings_renders_management_surfaces_without_trusting_runtime_values() {
     assert!(html.contains("data-ui=\"nav-artifacts\""));
     assert!(html.contains("data-ui=\"nav-administration\""));
     assert!(html.contains("aria-current=\"page\""));
+    assert!(html.contains("class=\"key-edit\""));
+    assert!(html.contains("data-owner=\"\""));
+    assert!(html.contains("Save changes"));
     assert!(!html.contains("<span>Gallery</span>"));
 }
 

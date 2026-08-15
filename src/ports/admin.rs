@@ -8,7 +8,8 @@ use crate::{
     model::{
         ClientId, CreateOrganization, CreatePublisherKey, CreateWebhook, CreatedPublisherKey,
         EmailAddress, KeyOwnerUpdate, OrgId, Organization, OwnerBackfillResult,
-        PublisherKeySummary, WebhookDelivery, WebhookEvent, WebhookId, WebhookSummary,
+        PublisherKeySummary, UpdatePublisherKey, UpdatedPublisherKey, WebhookDelivery,
+        WebhookEvent, WebhookId, WebhookSummary,
     },
     security::audit::MutationAudit,
 };
@@ -25,6 +26,14 @@ pub trait AdminService: Send + Sync {
         client_id: &'a ClientId,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>>;
+    fn update_key(
+        &self,
+        _client_id: ClientId,
+        _request: UpdatePublisherKey,
+        _audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<Option<UpdatedPublisherKey>, AppError>> {
+        Box::pin(async { Err(AppError::Internal) })
+    }
     fn set_key_owner(
         &self,
         _client_id: ClientId,

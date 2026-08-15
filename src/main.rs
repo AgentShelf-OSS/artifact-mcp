@@ -240,6 +240,18 @@ impl AdminService for ProductionAdmin {
         )
     }
 
+    fn update_key(
+        &self,
+        client_id: ClientId,
+        request: artifact_mcp::model::UpdatePublisherKey,
+        audit: MutationAudit,
+    ) -> BoxFuture<'_, Result<Option<artifact_mcp::model::UpdatedPublisherKey>, AppError>> {
+        Box::pin(
+            self.keys
+                .update_key_audited(client_id, request, audit, self.audit_key),
+        )
+    }
+
     fn set_key_owner(
         &self,
         client_id: ClientId,
