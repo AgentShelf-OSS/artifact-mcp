@@ -40,6 +40,64 @@ test.describe("settings administration", () => {
     expect([200, 204]).toContain(revoked.status());
   });
 
+  test("existing publisher keys can fill missing metadata without changing identity", async ({ page, request, org }) => {
+    const clientId = `pwedit-${runId()}`;
+    const ownerEmail = `editor-${runId()}@example.test`;
+    const member = await api(
+      request,
+      "post",
+      `/settings/orgs/${encodeURIComponent(org)}/emails`,
+      { email: ownerEmail },
+    );
+    expect(member.status(), await member.text()).toBe(200);
+    const created = await api(request, "post", "/settings/keys", {
+      clientId,
+      org,
+      label: "",
+      role: "author",
+      ownerEmail: "",
+    });
+    expect(created.status(), await created.text()).toBe(200);
+
+    await page.goto("/settings#tab=keys");
+    const row = page.locator(`#keys tr[data-id="${clientId}"]`);
+    await expect(row).toBeVisible();
+    await expect(row.locator(".key-label")).toHaveText("Not labeled");
+    await row.getByRole("button", { name: "Edit" }).click();
+
+    const editor = page.locator(".key-edit-row");
+    await expect(editor).toBeVisible();
+    await expect(editor.getByText(new RegExp(`organization ${org}`))).toBeVisible();
+    await expect(editor.locator('input[name="label"]')).toHaveValue("");
+    await editor.locator('input[name="label"]').fill("Alex publisher");
+    await editor.locator('select[name="role"]').selectOption("collaborator");
+    await editor.locator('input[name="ownerEmail"]').fill(ownerEmail);
+
+    const updateRequest = page.waitForRequest((candidate) =>
+      candidate.method() === "PATCH" && candidate.url().endsWith(`/settings/keys/${clientId}`),
+    );
+    await editor.getByRole("button", { name: "Save changes" }).click();
+    const sent = await updateRequest;
+    expect(sent.postDataJSON()).toEqual({
+      label: "Alex publisher",
+      role: "collaborator",
+      ownerEmail,
+    });
+    await expect(editor.locator(".key-edit-status")).toContainText("Saved");
+    await expect(row.locator(".key-label")).toHaveText("Alex publisher");
+    await expect(row.locator(".key-role")).toHaveText("collaborator");
+    const ownerCard = page.locator(`[data-key-owner-id="${clientId}"]`);
+    await expect(ownerCard.locator('input[type="email"]')).toHaveValue(ownerEmail);
+
+    await page.reload();
+    await page.getByRole("tab", { name: /Publisher keys/ }).click();
+    const persisted = page.locator(`#keys tr[data-id="${clientId}"]`);
+    await expect(persisted.locator(".key-label")).toHaveText("Alex publisher");
+    await expect(persisted.locator(".key-role")).toHaveText("collaborator");
+    await persisted.getByRole("button", { name: "Edit" }).click();
+    await expect(page.locator('.key-edit-row input[name="ownerEmail"]')).toHaveValue(ownerEmail);
+  });
+
   test("publisher owner assignment previews a null-only legacy backfill", async ({ page, request, org }) => {
     const clientId = `pwowner-${runId()}`;
     const ownerEmail = `owner-${runId()}@example.test`;

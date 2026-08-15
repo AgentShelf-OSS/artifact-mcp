@@ -62,6 +62,7 @@ struct Harness {
 enum AdminCall {
     OrgExists(OrgId),
     CreateKey(CreatePublisherKey),
+    UpdateKey(ClientId, UpdatePublisherKey),
     RevokeKey(ClientId),
     CreateOrg(CreateOrganization),
     DeleteOrg(OrgId),
@@ -221,6 +222,27 @@ impl AdminService for Harness {
             .push(AdminCall::RevokeKey(client_id.clone()));
         let revoked = client_id.0 == "publisher-2";
         Box::pin(async move { Ok(revoked) })
+    }
+
+    fn update_key(
+        &self,
+        client_id: ClientId,
+        request: UpdatePublisherKey,
+        _audit: artifact_mcp::security::audit::MutationAudit,
+    ) -> BoxFuture<'_, Result<Option<UpdatedPublisherKey>, AppError>> {
+        self.calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .push(AdminCall::UpdateKey(client_id.clone(), request.clone()));
+        Box::pin(async move {
+            Ok(Some(UpdatedPublisherKey {
+                client_id,
+                org: OrgId::from("acme"),
+                label: request.label,
+                role: request.role,
+                owner_email: request.owner_email,
+            }))
+        })
     }
 
     fn org_exists<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<bool, AppError>> {
@@ -1137,6 +1159,57 @@ async fn publisher_key_revoke_returns_the_service_result_for_the_raw_path_id() {
 }
 
 #[tokio::test]
+async fn publisher_key_update_changes_only_mutable_metadata() {
+    let harness = Harness::admin();
+    let response = artifact_mcp::build_router(harness.deps())
+        .oneshot(
+            Request::patch("/settings/keys/publisher-2")
+                .header(header::CONTENT_TYPE, "application/json")
+                .body(Body::from(
+                    json!({
+                        "label": "Alex",
+                        "role": "collaborator",
+                        "ownerEmail": "alex@acme.test"
+                    })
+                    .to_string(),
+                ))
+                .expect("valid request"),
+        )
+        .await
+        .expect("route response");
+
+    assert_eq!(response.status(), StatusCode::OK);
+    let body = to_bytes(response.into_body(), 2048)
+        .await
+        .expect("update response body");
+    assert_eq!(
+        serde_json::from_slice::<Value>(&body).expect("update response JSON"),
+        json!({
+            "clientId": "publisher-2",
+            "org": "acme",
+            "label": "Alex",
+            "role": "collaborator",
+            "ownerEmail": "alex@acme.test"
+        })
+    );
+    assert_eq!(
+        harness
+            .calls
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .as_slice(),
+        [AdminCall::UpdateKey(
+            ClientId::from("publisher-2"),
+            UpdatePublisherKey {
+                label: "Alex".to_owned(),
+                role: "collaborator".to_owned(),
+                owner_email: Some("alex@acme.test".to_owned()),
+            },
+        )]
+    );
+}
+
+#[tokio::test]
 async fn organization_creation_passes_optional_fields_and_keeps_the_node_response_shape() {
     let harness = Harness::admin();
     let response = artifact_mcp::build_router(harness.deps())
@@ -1939,6 +2012,7 @@ import(process.argv[1]).then(async ({ createApp }) => {
     keys: {
       list: () => [],
       create: (request) => ({ ...request, role: request.role || "author", secret: "one-time-secret" }),
+      update: (id, request) => ({ clientId: id, org: "acme", ...request }),
       revoke: (id) => id === "publisher-2"
     },
     orgs: {
@@ -2051,6 +2125,11 @@ fn parity_cases() -> Value {
         {
             "method": "post", "route": "/settings/keys/:id/revoke",
             "uri": "/settings/keys/publisher-2/revoke", "params": { "id": "publisher-2" }
+        },
+        {
+            "method": "patch", "route": "/settings/keys/:id",
+            "uri": "/settings/keys/publisher-2", "params": { "id": "publisher-2" },
+            "body": { "label": "Alex", "role": "collaborator", "ownerEmail": "alex@acme.test" }
         },
         {
             "method": "post", "route": "/settings/orgs", "uri": "/settings/orgs", "params": {},
