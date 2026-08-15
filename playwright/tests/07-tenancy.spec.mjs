@@ -85,25 +85,29 @@ test.describe("visibility & tenancy", () => {
     await expect(owner.card.locator('[data-action="visibility"]')).toBeVisible();
     await owner.card.locator('[data-action="more"]').click();
     await expect(owner.card.getByRole("button", { name: "Delete artifact" })).toBeVisible();
-    const hidden = await owner.context.request.post(`${baseURL}/${artifact.id}/visibility`, {
-      headers: {
-        "content-type": "application/json",
-        "X-Artifact-Mutation": "1",
-        "Sec-Fetch-Site": "same-origin",
-      },
-      data: { hidden: true },
-    });
-    expect(hidden.status(), await hidden.text()).toBe(200);
-    const shown = await owner.context.request.post(`${baseURL}/${artifact.id}/visibility`, {
-      headers: {
-        "content-type": "application/json",
-        "X-Artifact-Mutation": "1",
-        "Sec-Fetch-Site": "same-origin",
-      },
-      data: { hidden: false },
-    });
-    expect(shown.status(), await shown.text()).toBe(200);
-    await owner.context.close();
+    const eye = owner.card.locator('[data-action="visibility"]');
+    const hiddenRequest = owner.page.waitForResponse((response) => response.url().endsWith(`/${artifact.id}/visibility`) && response.request().method() === "POST");
+    await eye.click();
+    expect((await hiddenRequest).status()).toBe(200);
+    await expect(eye).toHaveAttribute("aria-label", /Show .* in the gallery/);
+    await expect(eye).toHaveAttribute("title", "Show in gallery");
+    await expect(eye.locator("svg path").first()).toHaveAttribute("d", "m3 3 18 18");
+    await expect(owner.page.locator("#toast")).toHaveText("Artifact hidden from Gallery");
+    await owner.page.reload();
+    await expect(owner.card).toBeVisible();
+    await expect(owner.card.locator('[data-action="visibility"]')).toHaveAttribute("aria-label", /Show .* in the gallery/);
+    const hiddenMember = await memberPage(memberEmail);
+    await expect(hiddenMember.card).toHaveCount(0);
+    await hiddenMember.context.close();
+    const showEye = owner.card.locator('[data-action="visibility"]');
+    const shownRequest = owner.page.waitForResponse((response) => response.url().endsWith(`/${artifact.id}/visibility`) && response.request().method() === "POST");
+    await showEye.click();
+    expect((await shownRequest).status()).toBe(200);
+    await expect(showEye).toHaveAttribute("title", "Hide from gallery");
+    await expect(showEye.locator("svg path").first()).toHaveAttribute("d", /M2\.062 12\.348/);
+    await expect(owner.page.locator("#toast")).toHaveText("Artifact shown in Gallery");
+    await owner.page.reload();
+    await expect(owner.card.locator('[data-action="visibility"]')).toHaveAttribute("aria-label", /Hide .* in the gallery/);
 
     const nonOwner = await memberPage(memberEmail);
     await expect(nonOwner.card).toHaveAttribute("data-owned", "0");
@@ -120,6 +124,7 @@ test.describe("visibility & tenancy", () => {
     });
     expect(denied.status()).toBe(403);
     await nonOwner.context.close();
+    await owner.context.close();
 
     const admin = await browser.newContext({ extraHTTPHeaders: adminHeaders });
     const adminPage = await admin.newPage();

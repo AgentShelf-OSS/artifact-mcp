@@ -50,15 +50,20 @@ test.describe("settings administration", () => {
       { email: ownerEmail },
     );
     expect(member.status(), await member.text()).toBe(200);
-    const created = await api(request, "post", "/settings/keys", { clientId, org, label: "owner-ui" });
-    expect(created.status(), await created.text()).toBe(200);
-
     await page.goto("/settings");
     await page.getByRole("tab", { name: /Publisher keys/ }).click();
+    await page.locator("#name").fill(clientId);
+    await page.locator("#label").fill("owner-ui");
+    await page.locator("#org").selectOption(org);
+    await page.locator("#owner-email").fill(ownerEmail);
+    await page.getByRole("button", { name: "Generate key" }).click();
+    await expect(page.locator("#reveal")).toHaveClass(/show/);
     const ownerCard = page.locator(`[data-key-owner-id="${clientId}"]`);
+    await expect(ownerCard).toBeVisible();
+    await expect(ownerCard.locator(".owner-current")).toHaveText(`Human-owned author key: ${ownerEmail}`);
     await ownerCard.locator('input[type="email"]').fill(ownerEmail);
-    await ownerCard.getByRole("button", { name: "Save owner" }).click();
-    await expect(ownerCard.locator(".owner-current")).toHaveText(`Owner: ${ownerEmail}`);
+    await ownerCard.getByRole("button", { name: "Save binding" }).click();
+    await expect(ownerCard.locator(".owner-current")).toHaveText(`Human-owned author key: ${ownerEmail}`);
     await expect(ownerCard.locator(".inline-status")).toContainText("future publishes only");
 
     await ownerCard.getByRole("button", { name: "Preview legacy backfill" }).click();
