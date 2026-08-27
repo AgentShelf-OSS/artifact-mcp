@@ -29,16 +29,18 @@ new Discord work without deleting canonical feedback or already committed provid
 The published-notification outbox row is the preferred durable thread anchor. The first comment's
 discussion job depends on that row reaching `accepted` with a validated Discord message ID. For an
 older artifact whose exact receipt predates retained message IDs, a bounded asynchronous worker may
-recover an anchor only when one message matches all of:
+recover the newest message that matches all of:
 
 - the selected Artifact MCP webhook registration;
 - Discord's provider webhook snowflake for that exact registration;
 - the validated organization guild and channel; and
 - the exact canonical artifact URL in a visible embed.
 
-Missing, redacted, cross-destination, or multiple matching messages fail closed. Recovery never
-guesses by title or date and never posts a replacement publication card. With either retained or
-exact recovered provenance, the delivery worker:
+Missing, redacted, or cross-destination history fails closed. When the selected webhook posted
+multiple cards for the same canonical artifact URL, Discord's newest-to-oldest channel ordering
+selects the newest exact match. Recovery never guesses by title, never crosses the configured
+destination, and never posts a replacement publication card. With either retained or exact
+recovered provenance, the delivery worker:
 
 1. resolves the encrypted organization credential and starts a public thread from the notification
    message;
@@ -68,8 +70,8 @@ silently authorize the Discord Gateway or inbound message content.
   channel.
 - Outbound operation requires a bot with View Channel, Create Public Threads, and Send Messages in
   Threads. Historical recovery additionally needs Read Message History.
-- Older artifacts remain local until retained delivery evidence or one exact recovered notification
-  is available.
+- Older artifacts remain local until retained delivery evidence or a newest exact recovered
+  notification is available.
 - Delivery remains bounded at-least-once. Thread creation is retry-safe, while an ambiguous webhook
   comment response may still duplicate the comment as documented by the outbox contract.
 - Discord replies remain Discord-only unless the separately authorized two-way synchronization
