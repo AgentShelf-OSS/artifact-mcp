@@ -423,13 +423,19 @@ fn frozen_v29_fixture_upgrades_and_reopens_without_mutating_source() {
     std::fs::copy(&source, db::database_path(dir.path())).expect("copy immutable fixture");
     let pool = Database::open_at(dir.path()).expect("upgrade frozen v29 fixture");
     let conn = db::checkout(&pool).expect("checkout upgraded fixture");
-    assert_eq!(migrations::current_version(&conn).expect("version"), 31);
+    assert_eq!(
+        migrations::current_version(&conn).expect("version"),
+        migrations::LATEST_SCHEMA_VERSION
+    );
     assert_eq!(scalar::<String>(&conn, "PRAGMA integrity_check"), "ok");
     drop(conn);
     drop(pool);
     let reopened = Database::open_at(dir.path()).expect("reopen upgraded v29 fixture");
     let conn = db::checkout(&reopened).expect("checkout reopened fixture");
-    assert_eq!(migrations::current_version(&conn).expect("version"), 31);
+    assert_eq!(
+        migrations::current_version(&conn).expect("version"),
+        migrations::LATEST_SCHEMA_VERSION
+    );
     assert_eq!(foreign_key_violations(&conn), 0);
     assert_eq!(
         std::fs::read(source).expect("re-read immutable fixture"),
@@ -497,7 +503,10 @@ fn v30_records_cascade_from_their_existing_owners() {
     std::fs::copy(source, db::database_path(dir.path())).expect("copy immutable v29 fixture");
     let reopened = Database::open_at(dir.path()).expect("upgrade v29 fixture");
     let conn = db::checkout(&reopened).expect("checkout");
-    assert_eq!(migrations::current_version(&conn).expect("version"), 31);
+    assert_eq!(
+        migrations::current_version(&conn).expect("version"),
+        migrations::LATEST_SCHEMA_VERSION
+    );
     conn.execute("INSERT INTO orgs (name) VALUES ('acme')", [])
         .expect("org");
     conn.execute("INSERT INTO artifacts (id, client_id, org, title) VALUES ('artifact-a', 'publisher', 'acme', 'Artifact')", []).expect("artifact");
