@@ -134,6 +134,7 @@ try {
       docker(["run", "--detach", "--rm", "--name", container, "--publish", "127.0.0.1::3480",
         "--volume", `${data}:/data-rust`,
         "--env", `ARTIFACT_API_KEYS=fixture-key:fixture:${manifest.authentication.token}`,
+        "--env", "AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
         "--env", "WEBHOOK_ENC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=", image]);
       const portResult = spawnSync("docker", ["port", container, "3480/tcp"], { encoding: "utf8" });
       const port = portResult.status === 0 ? portResult.stdout.match(/127\.0\.0\.1:(\d+)/)?.[1] : null;

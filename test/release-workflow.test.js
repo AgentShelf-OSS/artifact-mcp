@@ -6,6 +6,7 @@ const root = new URL("..", import.meta.url);
 
 test("public release workflow stays independent of homelab deployment", async () => {
   const workflow = await readFile(new URL(".github/workflows/release-provenance.yml", root), "utf8");
+  const fixtureVerifier = await readFile(new URL("scripts/release/verify-historical-fixtures-in-image.mjs", root), "utf8");
 
   for (const deploymentGate of [
     "trusted-release-signers",
@@ -27,7 +28,9 @@ test("public release workflow stays independent of homelab deployment", async ()
   assert.doesNotMatch(workflow, /status=success/);
   assert.match(workflow, /git merge-base --is-ancestor/);
   assert.match(workflow, /docker\/build-push-action/);
+  assert.match(workflow, /--env AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/);
   assert.match(workflow, /verify-historical-fixtures-in-image\.mjs/);
+  assert.match(fixtureVerifier, /AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/);
   assert.match(workflow, /anchore\/sbom-action/);
   assert.match(workflow, /anchore\/scan-action/);
   assert.equal(workflow.match(/actions\/attest-build-provenance/g)?.length, 2);
