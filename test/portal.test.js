@@ -195,6 +195,8 @@ test("viewer shell gives review actions priority and keeps secondary actions in 
   assert.match(html, /aria-label="Back to artifact library"/);
   assert.match(html, /id="vtitle-toggle"[^>]*aria-controls="vtitle-menu"/);
   assert.match(html, /id="vcomment-toggle"[^>]*aria-label="Comment on a place"/);
+  assert.match(html, /id="vcomment-toggle"[^>]*><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15/);
+  assert.doesNotMatch(html, /id="vcomment-toggle"[^>]*>▣/);
   assert.match(html, /id="vshare-toggle"/);
   assert.match(html, /id="vmore-toggle"/);
   assert.match(html, /id="vinspector"[^>]*aria-hidden="true"[^>]*inert/);

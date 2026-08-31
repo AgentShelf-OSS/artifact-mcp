@@ -133,6 +133,7 @@ struct Icons {
     forward: TrustedStatic,
     eye: TrustedStatic,
     eye_off: TrustedStatic,
+    comment: TrustedStatic,
     share: TrustedStatic,
     more: TrustedStatic,
 }
@@ -176,6 +177,9 @@ const ICONS: Icons = Icons {
     ),
     eye_off: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 6.2A10.5 10.5 0 0 1 12 6c6 0 9.5 6 9.5 6a17.7 17.7 0 0 1-3.1 3.8M6.1 6.1C3.8 7.7 2.5 10 2.5 12c0 0 3.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>"#,
+    ),
+    comment: TrustedStatic::new(
+        r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"></path><path d="M8 9h8M8 13h5"></path></svg>"#,
     ),
     share: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.7 10.6 6.6-4.1M8.7 13.4l6.6 4.1"></path></svg>"#,

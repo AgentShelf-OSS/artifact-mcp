@@ -350,6 +350,8 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
     assert!(html.contains("id=\"vtitle-toggle\""));
     assert!(html.contains("id=\"vtitle-menu\" role=\"menu\""));
     assert!(html.contains("id=\"vcomment-toggle\""));
+    assert!(html.contains("id=\"vcomment-toggle\" type=\"button\" title=\"Comment on a place\" aria-label=\"Comment on a place\" aria-pressed=\"false\"><svg"));
+    assert!(!html.contains("id=\"vcomment-toggle\" type=\"button\" title=\"Comment on a place\" aria-label=\"Comment on a place\" aria-pressed=\"false\">▣"));
     assert!(html.contains("id=\"vshare-toggle\""));
     assert!(html.contains("id=\"vmore-menu\" role=\"menu\""));
     assert!(html.contains("aria-label=\"Back to artifact library\""));
