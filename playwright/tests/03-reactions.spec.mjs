@@ -19,19 +19,20 @@ test.describe("reactions", () => {
   test("upvote and downvote toggle", async ({ page, request, publisherKey, org }) => {
     const a = await publish(request, publisherKey, { title: `PW Vote ${org}`, html: "<!doctype html><h1>v</h1>" });
     await page.goto(`/${a.id}`);
+    await page.locator("#vtitle-toggle").click();
     const up = page.locator(".vreact.up");
     await Promise.all([
       page.waitForResponse((r) => r.url().includes(`/${a.id}/react`)),
       up.click(),
     ]);
-    await expect(up).toHaveAttribute("aria-pressed", "true");
+    await expect(up).toHaveAttribute("aria-checked", "true");
     const down = page.locator(".vreact.down");
     await Promise.all([
       page.waitForResponse((r) => r.url().includes(`/${a.id}/react`)),
       down.click(),
     ]);
-    await expect(down).toHaveAttribute("aria-pressed", "true");
-    await expect(up).toHaveAttribute("aria-pressed", "false");
+    await expect(down).toHaveAttribute("aria-checked", "true");
+    await expect(up).toHaveAttribute("aria-checked", "false");
   });
 
   test("reaction persists across reload", async ({ page, request, publisherKey, org }) => {

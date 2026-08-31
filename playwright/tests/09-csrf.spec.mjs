@@ -74,8 +74,8 @@ test.describe("portal request authenticity", () => {
     });
 
     await page.goto(`/${artifact.id}`);
-    await page.locator("#vmore-toggle").click();
-    await page.getByRole("button", { name: "Details" }).click();
+    await page.locator("#vtitle-toggle").click();
+    await page.getByRole("menuitem", { name: "Details" }).click();
     const [response] = await Promise.all([
       page.waitForResponse((candidate) => candidate.url().includes(`/${artifact.id}/discussion/override`) && candidate.request().method() === "PUT"),
       page.getByRole("button", { name: "Keep discussion in Artifact MCP" }).click(),

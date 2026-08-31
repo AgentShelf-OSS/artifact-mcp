@@ -39,8 +39,8 @@ test.describe("feedback", () => {
       html: "<!doctype html><h1>discussion modes</h1>",
     });
     await page.goto(`/${a.id}`);
-    await page.locator("#vmore-toggle").click();
-    await page.getByRole("button", { name: "Details" }).click();
+    await page.locator("#vtitle-toggle").click();
+    await page.getByRole("menuitem", { name: "Details" }).click();
 
     await expect(page.getByRole("button", { name: "Keep discussion in Artifact MCP" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Enable two-way Discord sync" })).toBeVisible();
