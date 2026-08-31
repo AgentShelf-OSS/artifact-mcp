@@ -33,26 +33,41 @@ reference for release testing.
 - **Role-aware by construction.** Administrators can operate across organizations. Members see one
   organization, and Hide/Show or Delete appears only on files attributed to that verified uploader.
 
+### New in v1.7.0
+
+- **A rebuilt artifact library.** The left filter rail is gone. Search, quick views, organization
+  and category dropdowns, sorting, and the grid/list switch now share one toolbar above equal-height
+  cards. The library restores filters and scroll position when a viewer returns from an artifact.
+- **A focused review shell.** Opening an artifact removes the Gallery masthead and gives the
+  sandboxed artifact the page. Back returns to the library; details, feedback, sharing, history,
+  audience, reactions, and file actions live in compact menus and the inspector.
+- **Anchor v2 feedback.** Point and region comments persist semantic evidence such as anchor kind,
+  DOM path, node id, and quote alongside normalized coordinates. Copy prompt packages that context
+  with the exact artifact revision for an agent, while stale-revision markers fail safely.
+- **Safer self-service administration.** Verified upload owners can hide, show, or delete their own
+  artifacts. Administrators can edit a publisher key's label, role, and verified owner without
+  rotating the credential.
+
 ## Screenshots
 
-*Screenshots are from an isolated Rust release-candidate server seeded with fictional organizations
-(acme / globex / initech / umbrella) and captured with the optional preview renderer enabled. Both
-light and dark themes ship; light shown here.*
+*Screenshots are from an isolated Rust v1.7.0 release-candidate server at schema 32, seeded with 12
+fictional artifacts across acme, globex, initech, and umbrella. The optional preview renderer is
+enabled. Both light and dark themes ship; light is shown here.*
 
 | Administrator gallery | Card actions |
 |---|---|
 | [![administrator gallery](docs/screenshots/01-gallery-admin-grid.png)](docs/screenshots/01-gallery-admin-grid.png) | [![administrator card actions](docs/screenshots/02-gallery-admin-actions.png)](docs/screenshots/02-gallery-admin-actions.png) |
-| One searchable collection with organization, category, favorites, and review filters. | Grid and list cards keep Open, Save, Share, download, Hide/Show, and More; destructive actions live behind confirmation. |
+| Search, quick views, organization and category dropdowns, sorting, and layout controls share one top toolbar. | Change category or organization in place; deletion remains explicit and confirmed. |
 
 | List layout | Member gallery |
 |---|---|
 | [![list layout](docs/screenshots/03-gallery-admin-list.png)](docs/screenshots/03-gallery-admin-list.png) | [![member gallery](docs/screenshots/04-gallery-member-grid.png)](docs/screenshots/04-gallery-member-grid.png) |
-| A compact list with a fixed preview column and non-overlapping metadata/actions. | Members get honest org-scoped counts and filters; ownership controls appear only on their uploads. |
+| A compact list keeps previews, metadata, and controls readable without changing the underlying collection. | Members get org-scoped counts and filters; ownership controls appear only on their verified uploads. |
 
 | Anchored review | Version history |
 |---|---|
 | [![feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) | [![history inspector](docs/screenshots/06-viewer-history.png)](docs/screenshots/06-viewer-history.png) |
-| The sandboxed artifact stays visible while the trusted inspector handles anchored, threaded feedback. | Browse current and retained revisions, open an older body, or restore it as a new revision. |
+| The artifact takes priority while the inspector handles threaded anchor-v2 feedback, point/region markers, and Copy prompt. | Browse current and retained revisions, open an older body, or restore it as a new revision. |
 
 | Organization administration | Publisher credentials |
 |---|---|
@@ -85,8 +100,9 @@ light and dark themes ship; light shown here.*
   email identity. Cross-org reads return 404; cross-org mutations for a known id return 403. Admins see every org.
 
 ### Organize
-- **One role-scoped collection** — search titles, publishers, and categories; switch grid/list
-  layout; combine organization/category/favorites/review filters; keep compact result counts honest.
+- **One role-scoped collection** — search titles, publishers, and categories; use organization and
+  category dropdowns; switch grid/list layout; combine favorites, review, hidden, and sort states;
+  keep compact result counts honest. Filters stay in the top toolbar, so cards use the full width.
 - **Categories** — group an org's artifacts and edit an artifact's category from its More menu or
   the Viewer Details inspector.
 - **Show / hide** — unlist an artifact (`set_visibility`): it drops from the member collection and
@@ -98,12 +114,17 @@ light and dark themes ship; light shown here.*
   revisions, feedback, reactions, audience records, and active shares.
 
 ### Collaborate
+- **Focused artifact review** — the full viewer omits the Gallery masthead, keeps the artifact in a
+  sandboxed iframe, and moves secondary work into a trusted inspector. Back returns to the library
+  with its filter and scroll snapshot intact.
 - **Viewer feedback threads** — in-org viewers leave feedback from the trusted shell; each comment
   is its own thread with nested replies, so discussion about different items stays separate.
 - **Delete / resolve** — a viewer can delete or resolve their own comments; admins any in-org; the
   publishing agent resolves/reopens via MCP. Resolve is reversible.
-- **Anchored comments** — pin a comment to a **point** (click) or drag a **region box** (drag) on
-  the artifact; markers scroll/resize-track the content. Older-revision pins are marked stale.
+- **Anchored comments** — pin a comment to a **point** or drag a **region box** on the artifact.
+  Anchor v2 stores semantic evidence with normalized coordinates, and markers track scroll and
+  resize. Copy prompt includes the artifact id, exact revision, page, anchor evidence, and comment
+  for an agent. Older-revision pins remain visible as stale feedback but do not repaint or deep-link.
 
 ### Insight
 - **View analytics** — named, Access-verified views per artifact: total views, unique viewers, and
@@ -135,10 +156,10 @@ light and dark themes ship; light shown here.*
   [Discord runbook](docs/ops/discord-durable-delivery.md#organization-discord-threading).
 
 ### Operate
-- **Settings (admin)** — manage orgs / domains / categories / webhooks, and generate/revoke
-  per-org upload keys with a human display label and optional verified owner (keys hashed, secrets
-  shown once, revocable without a redeploy). Task tabs separate Organizations, Publisher keys, and
-  Notifications.
+- **Settings (admin)** — manage orgs / domains / categories / webhooks, and generate, edit, or
+  revoke per-org upload keys with a human display label, role, and optional verified owner. Keys
+  stay hashed, secrets are shown once, and metadata edits do not rotate the credential. Task tabs
+  separate Organizations, Publisher keys, and Notifications.
 - **Crash-safe storage** — staging→rename lifecycle, commit-then-swap updates, and startup audit
   recovery reconcile the DB and files on disk after an interrupted operation.
 - **MCP observability** — privacy-safe Prometheus metrics, opaque request correlation, bounded
