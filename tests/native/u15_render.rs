@@ -228,6 +228,7 @@ fn settings_renders_management_surfaces_without_trusting_runtime_values() {
     assert!(!html.contains("</script>\"&"));
     assert!(html.contains("&#60;/script&#62;"));
     assert!(html.contains("Specific emails"));
+    assert!(html.contains("class=\"chip-value\""));
     assert!(html.contains("Cloudflare Access Allow policy"));
     assert!(html.contains("Legacy domain-shaped organization"));
     assert!(html.contains("data-event=\"published\""));

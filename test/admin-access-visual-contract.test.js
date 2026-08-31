@@ -34,6 +34,7 @@ test("settings and MCP review preserve their operational contracts while using t
 
   assert.match(html, /data-ui="app-frame"/);
   assert.match(html, /data-owner-contract="pending"/);
+  assert.match(html, /class="chip-value"/);
   assert.match(html, /type="password"/);
   assert.match(html, /PBI-087 administration/);
   assert.match(html, /@media\(forced-colors:active\)/);
