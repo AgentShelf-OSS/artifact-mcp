@@ -10,8 +10,8 @@ test("Rust gallery template places every collection control in the top toolbar",
 
   assert.match(template, /<section class="collection-tools" aria-label="Artifact library controls">/);
   assert.match(template, /data-filter-view="all"/);
-  assert.match(template, /data-filter-org="all"/);
-  assert.match(template, /data-filter-category="all"/);
+  assert.match(template, /<select id="org-filter" aria-label="Filter by organization">/);
+  assert.match(template, /<select id="category-filter" aria-label="Filter by category">/);
   assert.match(template, /data-filter-view="hidden"/);
   assert.match(template, /<select id="sort" aria-label="Sort artifacts">/);
   assert.match(template, /data-layout="grid"/);
@@ -39,6 +39,8 @@ test("gallery foundation keeps three, two, then one responsive columns and state
   assert.match(script, /if \(!event\.persisted\) return;/);
   assert.match(script, /requestAnimationFrame\(function \(\) \{ window\.scrollTo\(0, returnScrollY\); \}\)/);
   assert.match(script, /localStorage\.setItem\("artifact-layout"/);
+  assert.match(script, /orgFilter\.addEventListener\("change"/);
+  assert.match(script, /categoryFilter\.addEventListener\("change"/);
   assert.match(script, /x-artifact-mutation/);
 });
 
@@ -50,7 +52,9 @@ test("Node gallery renderer mirrors the no-rail toolbar contract", () => {
 
   assert.match(html, /<section class="collection-tools" aria-label="Artifact library controls">/);
   assert.match(html, /data-filter-view="hidden"/);
-  assert.match(html, /data-filter-category="Reports"/);
+  assert.match(html, /id="org-filter" aria-label="Filter by organization"/);
+  assert.match(html, /id="category-filter" aria-label="Filter by category"/);
+  assert.match(html, /<option value="Reports">Reports \(1\)<\/option>/);
   assert.match(html, /id="sort" aria-label="Sort artifacts"/);
   assert.match(html, /data-reset-filters/);
   assert.doesNotMatch(html, /<aside[^>]*filter-rail/);

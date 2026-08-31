@@ -86,6 +86,9 @@
   var empty = document.getElementById("empty");
   var grid = document.getElementById("artifact-grid");
   var sort = document.getElementById("sort");
+  var orgFilter = document.getElementById("org-filter");
+  var categoryFilter = document.getElementById("category-filter");
+  var resetFilters = document.querySelector("[data-reset-filters]");
   var sortLabel = document.getElementById("sort-label");
   var activeView = "all";
   var activeOrg = "all";
@@ -158,6 +161,9 @@
     });
     if (empty) empty.hidden = shown !== 0;
     if (count) count.textContent = "Showing " + shown + " of " + visibleCards().length;
+    if (resetFilters) {
+      resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");
+    }
     saveLibraryState();
   }
 
@@ -169,37 +175,31 @@
       applyFilters();
       return;
     }
-    var orgFilter = event.target.closest("[data-filter-org]");
-    if (orgFilter) {
-      activeOrg = orgFilter.dataset.filterOrg;
-      pressOnly("[data-filter-org]", orgFilter);
-      applyFilters();
-      return;
-    }
-    var categoryFilter = event.target.closest("[data-filter-category]");
-    if (categoryFilter) {
-      activeCategory = categoryFilter.dataset.filterCategory;
-      pressOnly("[data-filter-category]", categoryFilter);
-      applyFilters();
-      return;
-    }
-    var resetFilters = event.target.closest("[data-reset-filters]");
-    if (resetFilters) {
+    var resetButton = event.target.closest("[data-reset-filters]");
+    if (resetButton) {
       activeView = "all";
       activeOrg = "all";
       activeCategory = "all";
       if (search) search.value = "";
       if (sort) sort.value = "recent";
-      ["[data-filter-view]", "[data-filter-org]", "[data-filter-category]"].forEach(function (selector) {
-        var all = document.querySelector(selector.slice(0, -1) + '="all"]');
-        if (all) pressOnly(selector, all);
-      });
+      if (orgFilter) orgFilter.value = "all";
+      if (categoryFilter) categoryFilter.value = "all";
+      var all = document.querySelector('[data-filter-view="all"]');
+      if (all) pressOnly("[data-filter-view]", all);
       applyFilters();
     }
   });
 
   if (search) search.addEventListener("input", applyFilters);
   if (sort) sort.addEventListener("change", applyFilters);
+  if (orgFilter) orgFilter.addEventListener("change", function () {
+    activeOrg = orgFilter.value;
+    applyFilters();
+  });
+  if (categoryFilter) categoryFilter.addEventListener("change", function () {
+    activeCategory = categoryFilter.value;
+    applyFilters();
+  });
 
   // The viewer's Back link is deliberately a clean `href="/"`. Preserve a return snapshot
   // only when the viewer was opened from this library, rather than writing on every scroll.
@@ -258,17 +258,20 @@
     if (!state) return null;
     if (search && state.q) search.value = state.q;
     if (sort && state.sort && Array.prototype.some.call(sort.options, function (option) { return option.value === state.sort; })) sort.value = state.sort;
-    [["view", "activeView", "[data-filter-view]"], ["org", "activeOrg", "[data-filter-org]"], ["category", "activeCategory", "[data-filter-category]"]].forEach(function (entry) {
-      var value = state[entry[0]] || "all";
-      var button = Array.prototype.find.call(document.querySelectorAll(entry[2]), function (candidate) {
-        return candidate.getAttribute(entry[2].slice(1, -1)) === value;
-      });
-      if (!button) return;
-      if (entry[1] === "activeView") activeView = value;
-      if (entry[1] === "activeOrg") activeOrg = value;
-      if (entry[1] === "activeCategory") activeCategory = value;
-      pressOnly(entry[2], button);
-    });
+    var viewValue = state.view || "all";
+    var viewButton = document.querySelector('[data-filter-view="' + CSS.escape(viewValue) + '"]');
+    if (viewButton) {
+      activeView = viewValue;
+      pressOnly("[data-filter-view]", viewButton);
+    }
+    if (orgFilter && state.org && Array.prototype.some.call(orgFilter.options, function (option) { return option.value === state.org; })) {
+      activeOrg = state.org;
+      orgFilter.value = state.org;
+    }
+    if (categoryFilter && state.category && Array.prototype.some.call(categoryFilter.options, function (option) { return option.value === state.category; })) {
+      activeCategory = state.category;
+      categoryFilter.value = state.category;
+    }
     return restoreScroll && Number.isFinite(Number(state.scrollY)) ? Math.max(0, Number(state.scrollY)) : null;
   }
 
@@ -380,7 +383,7 @@
           range.selectNodeContents(url);
           selection.removeAllRanges();
           selection.addRange(range);
-          toast("Link selected — copy it manually");
+          toast("Link selected. Copy it manually");
         };
         if (!navigator.clipboard) {
           fallback();

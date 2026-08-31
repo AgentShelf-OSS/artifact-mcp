@@ -529,8 +529,12 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
   assert.match(member, /data-id="other123"[^>]*data-owned="0"/);
   assert.doesNotMatch(member, /other@acme\.test/);
   assert.match(member, /My needs-work votes/);
-  assert.match(member, /data-filter-category="Reports"/);
-  assert.match(member, /data-filter-category="Dashboards"/);
+  assert.match(member, /id="org-filter"[^>]*aria-label="Filter by organization"/);
+  assert.match(member, /id="category-filter"[^>]*aria-label="Filter by category"/);
+  assert.match(member, /<option value="Reports">Reports \(1\)<\/option>/);
+  assert.match(member, /<option value="Dashboards">Dashboards \(1\)<\/option>/);
+  assert.match(member, /Find every published artifact\./);
+  assert.doesNotMatch(member, /data-filter-category=/);
   assert.ok(member.indexOf('data-id="owned123"') < member.indexOf('data-id="other123"'));
   assert.equal(
     (member.match(/<button class="act save[^"]*"[^>]*data-action="favorite"/g) || []).length,

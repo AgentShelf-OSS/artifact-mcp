@@ -202,9 +202,10 @@ struct GalleryTemplate<'a> {
     role: String,
     identity_color: String,
     total: usize,
+    organization_total: usize,
     favorite_total: usize,
     needs_review_total: usize,
-    show_chips: bool,
+    hidden_total: usize,
     has_delete_actions: bool,
     cards: Vec<CardTemplate>,
     chips: Vec<GalleryChipTemplate>,
@@ -215,7 +216,6 @@ struct GalleryTemplate<'a> {
 
 struct GalleryChipTemplate {
     org: String,
-    color: String,
     count: usize,
 }
 
@@ -629,6 +629,8 @@ fn gallery_template<'a>(
                 .is_some_and(|reaction| reaction.favorite != 0)
         })
         .count();
+    let hidden_total = artifacts.iter().filter(|artifact| artifact.hidden).count();
+    let organization_total = view.sections.len();
     let needs_review_total = artifacts
         .iter()
         .filter(|artifact| {
@@ -648,7 +650,6 @@ fn gallery_template<'a>(
         .iter()
         .map(|section| GalleryChipTemplate {
             org: section.org.0.clone(),
-            color: color_for(&section.org, &view.org_colors),
             count: section.items.len(),
         })
         .collect();
@@ -748,9 +749,10 @@ fn gallery_template<'a>(
         },
         identity_color: org_color(identity_org, identity_color),
         total,
+        organization_total,
         favorite_total,
         needs_review_total,
-        show_chips: view.sections.len() > 1,
+        hidden_total,
         has_delete_actions,
         cards,
         chips,

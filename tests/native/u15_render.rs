@@ -70,7 +70,7 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     galleryHasBytes: gallery.includes('1.3 MB'),
     galleryHasJustNow: gallery.includes('Just now'),
     settingsEscaped: !settingsHtml.includes(input.attack) && settingsHtml.includes('Specific emails'),
-    categoryFilters: Array.from(gallery.matchAll(/data-filter-category="([^"]*)"/g), row => row[1]).slice(1),
+    categoryFilters: Array.from((gallery.match(/<select id="category-filter"[^>]*>([\s\S]*?)<\/select>/) || ['', ''])[1].matchAll(/<option value="([^"]*)"/g), row => row[1]).slice(1),
     cardOrder: Array.from(gallery.matchAll(/<article class="card[^"]*"[^>]*data-id="([^"]*)"/g), row => row[1]),
     notificationHref: match(gallery, /<a class="notif-row[^\"]*" href="([^"]+)"/)
   }));
@@ -568,8 +568,11 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             .as_str()
             .expect("Node thumbnail source")
     );
-    assert!(gallery.contains("data-filter-category=\"Reports\""));
-    assert!(gallery.contains("data-filter-category=\"\""));
+    assert!(gallery.contains("id=\"org-filter\""));
+    assert!(gallery.contains("id=\"category-filter\""));
+    assert!(gallery.contains("<option value=\"Reports\">Reports (1)</option>"));
+    assert!(gallery.contains("<option value=\"\">Uncategorized (1)</option>"));
+    assert!(gallery.contains("Find every published artifact."));
     assert_eq!(
         html_attributes_after(&gallery, "<article class=\"card", "data-id"),
         vec!["artifact1234", "artifact5678"]
