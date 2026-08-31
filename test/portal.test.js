@@ -161,6 +161,43 @@ test("viewer shell includes an escaped public-share inspector", () => {
   assert.doesNotMatch(html, /<script><\/script><img>/);
 });
 
+test("viewer shell gives review actions priority and keeps secondary actions in deterministic menus", () => {
+  const html = renderArtifactShell(
+    meta,
+    { prevId: "newer", nextId: "older", index: 2, total: 3 },
+    { favorite: 1, vote: -1 },
+    [],
+    { counts: { views: 7 }, viewers: [] },
+  );
+  const titleMenu = html.slice(html.indexOf('id="vtitle-menu"'), html.indexOf('id="vmore-menu"'));
+  const moreMenu = html.slice(html.indexOf('id="vmore-menu"'), html.indexOf('</header>'));
+
+  assert.match(html, /aria-label="Back to artifact library"/);
+  assert.match(html, /id="vtitle-toggle"[^>]*aria-controls="vtitle-menu"/);
+  assert.match(html, /id="vcomment-toggle"[^>]*aria-label="Comment on a place"/);
+  assert.match(html, /id="vshare-toggle"/);
+  assert.match(html, /id="vmore-toggle"/);
+  assert.match(titleMenu, /data-inspector-open="details"/);
+  assert.match(titleMenu, /data-inspector-open="history"/);
+  assert.match(titleMenu, /data-inspector-open="audience"/);
+  assert.match(titleMenu, /id="vfb-toggle"[^>]*data-inspector-open="feedback"/);
+  assert.match(titleMenu, /href="\/newer"[^>]*rel="prev"/);
+  assert.match(titleMenu, /href="\/older"[^>]*rel="next"/);
+  assert.match(titleMenu, /role="menuitemcheckbox"[^>]*aria-checked="true"/);
+  assert.doesNotMatch(titleMenu, /role="menuitemcheckbox"[^>]*aria-pressed/);
+  assert.doesNotMatch(moreMenu, /data-inspector-open/);
+  assert.match(moreMenu, /Open raw artifact/);
+  assert.match(moreMenu, /Download HTML/);
+  assert.match(moreMenu, /Change theme/);
+  assert.match(moreMenu, /Sign out/);
+  assert.match(html, /function bindMenu/);
+  assert.match(html, /e\.key==='ArrowDown'/);
+  assert.match(html, /closeShellMenus/);
+  assert.match(html, /input,textarea,select,\[contenteditable\],\[role="menu"\],dialog,\[role="dialog"\]/);
+  assert.doesNotMatch(html, /page\.replace\(\/\<header/);
+  assert.match(html, /commentMode\)\{e\.preventDefault\(\);setCommentMode\(false\)/);
+});
+
 test("delete controls render only for administrators and recorded owners", () => {
   const ownedMeta = { ...meta, owner_email: "owner@acme.test" };
   const ownerShell = renderArtifactShell(

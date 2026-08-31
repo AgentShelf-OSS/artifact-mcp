@@ -11,6 +11,68 @@ test.describe("artifact viewer", () => {
     expect(sandbox).not.toContain("allow-same-origin");
   });
 
+  test("viewer chrome keeps menus, focus, and mobile targets predictable", async ({ page, request, publisherKey, org }) => {
+    const artifact = await publish(request, publisherKey, { title: `PW Chrome ${org}`, html: "<!doctype html><h1>chrome</h1>" });
+    const consoleErrors = [];
+    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+    for (const viewport of [
+      { width: 1440, height: 900 },
+      { width: 768, height: 1024 },
+      { width: 390, height: 844 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await page.goto(`/${artifact.id}`);
+
+      const title = page.locator("#vtitle-toggle");
+      const titleMenu = page.getByRole("menu", { name: "Artifact overview" });
+      const more = page.getByRole("button", { name: "More artifact actions" });
+      const moreMenu = page.getByRole("menu", { name: "More artifact actions" });
+      const comment = page.getByRole("button", { name: "Comment on a place" });
+
+      await title.press("Enter");
+      await expect(titleMenu).toBeVisible();
+      await title.press("ArrowDown");
+      await expect(page.getByRole("menuitem", { name: "Details" })).toBeFocused();
+      await page.keyboard.press("End");
+      await expect(page.getByRole("menuitemcheckbox", { name: "Mark as needing work" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(title).toBeFocused();
+
+      await more.press("Enter");
+      await expect(moreMenu).toBeVisible();
+      await more.press("ArrowDown");
+      await expect(moreMenu.getByRole("menuitem", { name: "Open raw artifact" })).toBeFocused();
+      await page.keyboard.press("Escape");
+      await expect(more).toBeFocused();
+
+      await title.press("Enter");
+      await title.press("ArrowDown");
+      await page.getByRole("menuitem", { name: "Details" }).click();
+      await page.getByRole("tab", { name: "History" }).click();
+      await page.getByRole("button", { name: "Close inspector" }).click();
+      await expect(title).toBeFocused();
+
+      await comment.click();
+      await expect(comment).toHaveAttribute("aria-pressed", "true");
+      await page.keyboard.press("Escape");
+      await expect(comment).toHaveAttribute("aria-pressed", "false");
+      await expect(comment).toBeFocused();
+
+      expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+      if (viewport.width <= 760) {
+        for (const target of [title, page.getByRole("link", { name: "Back to artifact library" }), page.getByRole("button", { name: "Save to favorites" }), comment, page.getByRole("button", { name: "Share" }), more]) {
+          const box = await target.boundingBox();
+          expect(box?.width).toBeGreaterThanOrEqual(44);
+          expect(box?.height).toBeGreaterThanOrEqual(44);
+        }
+      }
+    }
+
+    expect(consoleErrors).toEqual([]);
+  });
+
   test("raw delivery carries the CSP sandbox and never allow-same-origin", async ({ request, publisherKey, org }) => {
     const a = await publish(request, publisherKey, { title: `PW Raw ${org}`, html: "<!doctype html><h1>raw</h1>" });
     const res = await request.get(`/raw/${a.id}`);
@@ -41,7 +103,7 @@ test.describe("artifact viewer", () => {
   test("discussion details fail safely on Node and expose guarded Rust policy controls without an untrusted thread link", async ({ page, request, publisherKey, org }, testInfo) => {
     const artifact = await publish(request, publisherKey, { title: `PW Discussion ${org}`, html: "<!doctype html><h1>discussion</h1>" });
     await page.goto(`/${artifact.id}`);
-    await page.locator("#vmore-toggle").click();
+    await page.locator("#vtitle-toggle").click();
     await page.getByRole("button", { name: "Details" }).click();
     await expect(page.getByRole("link", { name: /Open Thread/i })).toHaveCount(0);
 
@@ -81,7 +143,7 @@ test.describe("artifact viewer", () => {
     const ownerContext = await browser.newContext({ extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": owner } });
     const ownerPage = await ownerContext.newPage();
     await ownerPage.goto(`${baseURL}/${artifact.id}`);
-    await ownerPage.locator("#vmore-toggle").click();
+    await ownerPage.locator("#vtitle-toggle").click();
     await ownerPage.getByRole("button", { name: "Details" }).click();
     await expect(ownerPage.locator("#vdiscussion-actions")).toBeAttached();
     await ownerContext.close();
@@ -89,7 +151,7 @@ test.describe("artifact viewer", () => {
     const context = await browser.newContext({ extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": member } });
     const page = await context.newPage();
     await page.goto(`${baseURL}/${artifact.id}`);
-    await page.locator("#vmore-toggle").click();
+    await page.locator("#vtitle-toggle").click();
     await page.getByRole("button", { name: "Details" }).click();
     await expect(page.locator("#vdiscussion")).toBeVisible();
     await expect(page.locator("#vdiscussion-actions button")).toHaveCount(0);
