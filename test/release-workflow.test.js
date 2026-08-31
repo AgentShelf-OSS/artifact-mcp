@@ -29,8 +29,13 @@ test("public release workflow stays independent of homelab deployment", async ()
   assert.match(workflow, /git merge-base --is-ancestor/);
   assert.match(workflow, /docker\/build-push-action/);
   assert.match(workflow, /--env AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/);
+  assert.match(workflow, /--tmpfs \/data-rust:rw,nosuid,nodev,noexec,size=64m,mode=1777,uid=65532,gid=65532/);
+  assert.doesNotMatch(workflow, /docker run --detach --rm --name artifact-mcp-release-candidate/);
+  assert.match(workflow, /docker rm --force artifact-mcp-release-candidate/);
   assert.match(workflow, /verify-historical-fixtures-in-image\.mjs/);
   assert.match(fixtureVerifier, /AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/);
+  assert.doesNotMatch(fixtureVerifier, /"--detach", "--rm"/);
+  assert.match(fixtureVerifier, /\["rm", "--force", container\]/);
   assert.match(workflow, /anchore\/sbom-action/);
   assert.match(workflow, /anchore\/scan-action/);
   assert.equal(workflow.match(/actions\/attest-build-provenance/g)?.length, 2);

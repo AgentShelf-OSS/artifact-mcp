@@ -157,12 +157,13 @@ jobs:
         run: |
           set -euo pipefail
           docker pull "$IMAGE@$DIGEST"
-          docker run --detach --rm --name artifact-mcp-release-candidate \
-            --tmpfs /data-rust:rw,nosuid,nodev,noexec,size=64m \
-            --env AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
-            --publish 127.0.0.1:3480:3480 "$IMAGE@$DIGEST"
-          cleanup() { docker stop artifact-mcp-release-candidate >/dev/null 2>&1 || true; }
+          cleanup() { docker rm --force artifact-mcp-release-candidate >/dev/null 2>&1 || true; }
           trap cleanup EXIT
+          docker run --detach --name artifact-mcp-release-candidate \
+            --tmpfs /data-rust:rw,nosuid,nodev,noexec,size=64m,mode=1777,uid=65532,gid=65532 \
+            --env AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            --env WEBHOOK_ENC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA= \
+            --publish 127.0.0.1:3480:3480 "$IMAGE@$DIGEST"
           for _ in $(seq 1 30); do
             if curl --fail --silent http://127.0.0.1:3480/health >/dev/null; then
               break
