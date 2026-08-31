@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,7 +13,6 @@ const sourceSbomTool = join(root, "scripts/release/generate-source-sbom.mjs");
 const commit = "a".repeat(40);
 const created = "2026-07-29T18:00:00Z";
 const imageDigest = `sha256:${"b".repeat(64)}`;
-const rollbackImage = `ghcr.io/agentshelf-oss/artifact-mcp@sha256:${"c".repeat(64)}`;
 const immutableImage = `ghcr.io/agentshelf-oss/artifact-mcp@${imageDigest}`;
 const fixturePreflight = JSON.stringify({ schemaVersion: 1, image: immutableImage, fixtures: [{ status: "passed" }] });
 const sourceCommit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
@@ -32,8 +32,8 @@ test("release manifest is deterministic and self-verifying", async () => {
     "--out", "release-manifest.json", "--tag", "v1.6.0", "--version", "1.6.0", "--commit", commit,
     "--created", created, "--binary", "artifact-mcp", "--image-ref", "ghcr.io/agentshelf-oss/artifact-mcp:v1.6.0",
     "--image-digest", imageDigest, "--schema-min", "0", "--schema-current", "23", "--schema-max", "23",
-    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json", "--backup-identity", "pbs:artifact-mcp:42",
-    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json", "--rollback-image", rollbackImage,
+    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json",
+    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json",
     "--repository", "AgentShelf-OSS/artifact-mcp",
     "--binary-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/1",
     "--image-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/2",
@@ -46,8 +46,10 @@ test("release manifest is deterministic and self-verifying", async () => {
   assert.match(run(verifyTool, ["release-manifest.json"], directory), /verified v1\.6\.0/);
   const manifest = JSON.parse(first);
   assert.equal(manifest.image.immutableReference, `ghcr.io/agentshelf-oss/artifact-mcp@${imageDigest}`);
-  assert.equal(manifest.recovery.historicalFixturePreflight, "exact-oci-historical-fixtures/v1");
-  assert.equal(manifest.recovery.historicalFixturePreflightReport.path, "historical-fixture-preflight.json");
+  assert.equal(manifest.schemaVersion, 2);
+  assert.equal(manifest.validation.historicalFixturePreflight, "exact-oci-historical-fixtures/v1");
+  assert.equal(manifest.validation.historicalFixturePreflightReport.path, "historical-fixture-preflight.json");
+  assert.equal("recovery" in manifest, false);
 });
 
 test("release manifest verification rejects a changed artifact", async () => {
@@ -61,8 +63,8 @@ test("release manifest verification rejects a changed artifact", async () => {
     "--out", "release-manifest.json", "--tag", "v1.6.0", "--version", "1.6.0", "--commit", commit,
     "--created", created, "--binary", "artifact-mcp", "--image-ref", "ghcr.io/agentshelf-oss/artifact-mcp:v1.6.0",
     "--image-digest", imageDigest, "--schema-min", "0", "--schema-current", "23", "--schema-max", "23",
-    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json", "--backup-identity", "pbs:artifact-mcp:42",
-    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json", "--rollback-image", rollbackImage,
+    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json",
+    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json",
     "--repository", "AgentShelf-OSS/artifact-mcp",
     "--binary-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/1",
     "--image-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/2",
@@ -84,8 +86,8 @@ test("release manifest verification rejects redirected image identity and change
     "--out", "release-manifest.json", "--tag", "v1.6.0", "--version", "1.6.0", "--commit", commit,
     "--created", created, "--binary", "artifact-mcp", "--image-ref", "ghcr.io/agentshelf-oss/artifact-mcp:v1.6.0",
     "--image-digest", imageDigest, "--schema-min", "0", "--schema-current", "23", "--schema-max", "23",
-    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json", "--backup-identity", "pbs:artifact-mcp:42",
-    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json", "--rollback-image", rollbackImage,
+    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json",
+    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json",
     "--repository", "AgentShelf-OSS/artifact-mcp",
     "--binary-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/1",
     "--image-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/2",
@@ -118,6 +120,60 @@ test("release manifest verification rejects redirected image identity and change
   result = spawnSync(process.execPath, [verifyTool, "release-manifest.json"], { cwd: directory, encoding: "utf8" });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /migration notes/);
+});
+
+test("release manifest verification rejects missing or inconsistent validation evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "artifact-mcp-release-validation-"));
+  await writeFile(join(directory, "artifact-mcp"), "native binary\n");
+  await writeFile(join(directory, "source.spdx.json"), "source\n");
+  await writeFile(join(directory, "image.spdx.json"), "image\n");
+  await writeFile(join(directory, "migration-notes.md"), "No schema migration.\n");
+  await writeFile(join(directory, "historical-fixture-preflight.json"), `${fixturePreflight}\n`);
+  const args = [
+    "--out", "release-manifest.json", "--tag", "v1.6.0", "--version", "1.6.0", "--commit", commit,
+    "--created", created, "--binary", "artifact-mcp", "--image-ref", "ghcr.io/agentshelf-oss/artifact-mcp:v1.6.0",
+    "--image-digest", imageDigest, "--schema-min", "0", "--schema-current", "23", "--schema-max", "23",
+    "--source-sbom", "source.spdx.json", "--image-sbom", "image.spdx.json",
+    "--migration-notes", "migration-notes.md", "--fixture-preflight", "historical-fixture-preflight.json",
+    "--repository", "AgentShelf-OSS/artifact-mcp",
+    "--binary-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/1",
+    "--image-attestation", "https://github.com/AgentShelf-OSS/artifact-mcp/attestations/2",
+  ];
+  const manifestPath = join(directory, "release-manifest.json");
+
+  run(manifestTool, args, directory);
+  const missingValidation = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete missingValidation.validation;
+  await writeFile(manifestPath, `${JSON.stringify(missingValidation, null, 2)}\n`);
+  let result = spawnSync(process.execPath, [verifyTool, "release-manifest.json"], { cwd: directory, encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /invalid migration notes digest record/);
+
+  run(manifestTool, args, directory);
+  const missingFixtureReport = JSON.parse(await readFile(manifestPath, "utf8"));
+  delete missingFixtureReport.validation.historicalFixturePreflightReport;
+  await writeFile(manifestPath, `${JSON.stringify(missingFixtureReport, null, 2)}\n`);
+  result = spawnSync(process.execPath, [verifyTool, "release-manifest.json"], { cwd: directory, encoding: "utf8" });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /invalid historical fixture preflight report digest record/);
+
+  for (const fixtureReport of [
+    { schemaVersion: 1, image: "ghcr.io/agentshelf-oss/other@sha256:" + "c".repeat(64), fixtures: [{ status: "passed" }] },
+    { schemaVersion: 1, image: immutableImage, fixtures: [{ status: "failed" }] },
+  ]) {
+    run(manifestTool, args, directory);
+    const reportBytes = `${JSON.stringify(fixtureReport)}\n`;
+    await writeFile(join(directory, "historical-fixture-preflight.json"), reportBytes);
+    const inconsistent = JSON.parse(await readFile(manifestPath, "utf8"));
+    inconsistent.validation.historicalFixturePreflightReport.sha256 = createHash("sha256").update(reportBytes).digest("hex");
+    await writeFile(manifestPath, `${JSON.stringify(inconsistent, null, 2)}\n`);
+    result = spawnSync(process.execPath, [verifyTool, "release-manifest.json"], { cwd: directory, encoding: "utf8" });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, fixtureReport.image === immutableImage
+      ? /historical fixture preflight has missing or failed cases/
+      : /historical fixture preflight image does not match immutable release image/);
+    await writeFile(join(directory, "historical-fixture-preflight.json"), `${fixturePreflight}\n`);
+  }
 });
 
 test("source SBOM is stable for a fixed commit and timestamp", async () => {

@@ -49,7 +49,7 @@ try {
   fail(`cannot read JSON: ${error.message}`);
 }
 
-if (manifest?.schemaVersion !== 1) fail("unsupported schemaVersion");
+if (manifest?.schemaVersion !== 2) fail("unsupported schemaVersion");
 const release = manifest.release;
 if (!RELEASE_TAG.test(release?.tag ?? "")) fail("invalid tag");
 if (!RELEASE_VERSION.test(release.version ?? "") || release.tag.slice(1) !== release.version) {
@@ -86,20 +86,13 @@ for (const [index, item] of manifest.sboms.entries()) {
   await verifyHashedArtifact(manifestDirectory, item, `${item.kind} SBOM`);
 }
 
-const recovery = manifest.recovery;
-if (typeof recovery?.backupIdentity !== "string" || !/\S/.test(recovery.backupIdentity)
-  || recovery.backupIdentity.length > 512 || /[\r\n\0]/.test(recovery.backupIdentity)) {
-  fail("invalid backup identity");
-}
-if (!new RegExp(`^${repositoryPart.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}@sha256:[a-f0-9]{64}$`).test(recovery.rollbackImage ?? "")) {
-  fail("invalid rollback image");
-}
-await verifyHashedArtifact(manifestDirectory, recovery.migrationNotes, "migration notes");
-if (recovery.historicalFixturePreflight !== "exact-oci-historical-fixtures/v1") fail("unexpected fixture preflight state");
-await verifyHashedArtifact(manifestDirectory, recovery.historicalFixturePreflightReport, "historical fixture preflight report");
+const validation = manifest.validation;
+await verifyHashedArtifact(manifestDirectory, validation?.migrationNotes, "migration notes");
+if (validation?.historicalFixturePreflight !== "exact-oci-historical-fixtures/v1") fail("unexpected fixture preflight state");
+await verifyHashedArtifact(manifestDirectory, validation?.historicalFixturePreflightReport, "historical fixture preflight report");
 let fixtureReport;
 try {
-  fixtureReport = JSON.parse(await readFile(resolve(manifestDirectory, recovery.historicalFixturePreflightReport.path), "utf8"));
+  fixtureReport = JSON.parse(await readFile(resolve(manifestDirectory, validation.historicalFixturePreflightReport.path), "utf8"));
 } catch (error) {
   fail(`cannot parse historical fixture preflight report: ${error.message}`);
 }

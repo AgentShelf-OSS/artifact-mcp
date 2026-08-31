@@ -1,4 +1,4 @@
-name: Release provenance
+name: Release
 
 on:
   push:
@@ -7,22 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing signed tag to release (for example v1.7.0)
+        description: Existing annotated tag to release (for example v1.7.0)
         required: true
         type: string
-      backup_identity:
-        description: Immutable, pre-migration backup identity
-        required: false
-        type: string
-      rollback_image:
-        description: Previously verified image in repository@sha256:digest form
-        required: false
-        type: string
 
-# A candidate can be published for scanning, but promotion of the stable tag and GitHub Release is
-# serialized and protected. The workflow never rebuilds after obtaining its candidate digest.
+# Build and verify one candidate digest, then publish that same digest as the stable image and
+# GitHub Release. Homelab backup, approval, and rollback checks belong to the deployment process.
 concurrency:
-  group: ${{ github.repository }}-production-release
+  group: ${{ github.repository }}-release
   cancel-in-progress: false
 
 permissions:
@@ -30,7 +22,7 @@ permissions:
 
 jobs:
   prepare:
-    name: Verify signed release input
+    name: Verify release input
     runs-on: ubuntu-latest
     outputs:
       commit: ${{ steps.release.outputs.commit }}
@@ -45,7 +37,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
       - id: release
-        name: Verify tag, version, and trusted signature
+        name: Verify tag and version
         env:
           INPUT_TAG: ${{ inputs.tag }}
         run: |
@@ -56,19 +48,16 @@ jobs:
           }
           git rev-parse --verify "refs/tags/$tag" >/dev/null
           [[ "$(git cat-file -t "refs/tags/$tag")" == tag ]] || {
-            echo "Release tags must be annotated and signed" >&2; exit 1;
+            echo "Release tags must be annotated" >&2; exit 1;
           }
-          [[ -s ops/release/trusted-release-signers.asc ]] || {
-            echo "Missing ops/release/trusted-release-signers.asc; see docs/release-provenance.md" >&2; exit 1;
-          }
-          export GNUPGHOME="$(mktemp -d)"
-          trap 'rm -rf "$GNUPGHOME"' EXIT
-          gpg --batch --import ops/release/trusted-release-signers.asc
-          git verify-tag "$tag"
           commit="$(git rev-parse "$tag^{commit}")"
           version="$(sed -nE 's/^version = "([^"]+)"/\1/p' Cargo.toml | head -n1)"
           [[ "$tag" == "v$version" ]] || {
             echo "Tag $tag does not match Cargo.toml version $version" >&2; exit 1;
+          }
+          package_version="$(node -p "require('./package.json').version")"
+          [[ "$version" == "$package_version" ]] || {
+            echo "Cargo.toml version $version does not match package.json version $package_version" >&2; exit 1;
           }
           schema_current="$(sed -nE 's/^pub const LATEST_SCHEMA_VERSION: i64 = ([0-9]+);/\1/p' src/persistence/migrations.rs)"
           [[ -n "$schema_current" ]] || { echo "Could not determine schema version" >&2; exit 1; }
@@ -84,9 +73,38 @@ jobs:
             echo "version=$version"
           } >> "$GITHUB_OUTPUT"
 
+  verify-ci:
+    name: Require successful CI for tagged commit
+    needs: prepare
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      - name: Verify default-branch ancestry and CI result
+        env:
+          COMMIT: ${{ needs.prepare.outputs.commit }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          git fetch origin "$DEFAULT_BRANCH"
+          git merge-base --is-ancestor "$COMMIT" "origin/$DEFAULT_BRANCH" || {
+            echo "Tagged commit $COMMIT is not on $DEFAULT_BRANCH" >&2; exit 1;
+          }
+          successful_runs="$(gh api \
+            "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs?head_sha=$COMMIT&event=push&status=completed&per_page=100" \
+            --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+          [[ "$successful_runs" -gt 0 ]] || {
+            echo "No successful CI push run exists for $COMMIT" >&2; exit 1;
+          }
+
   candidate:
     name: Build, test, scan, and attest candidate
-    needs: prepare
+    needs: [prepare, verify-ci]
     runs-on: ubuntu-latest
     permissions:
       attestations: write
@@ -194,19 +212,17 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  promote:
-    name: Promote verified digest and publish release evidence
+  publish:
+    name: Publish verified digest and release evidence
     needs: [prepare, candidate]
     runs-on: ubuntu-latest
-    environment: production
     permissions:
+      attestations: read
       contents: write
       packages: write
     env:
-      BACKUP_IDENTITY: ${{ inputs.backup_identity || vars.RELEASE_BACKUP_IDENTITY }}
       GH_TOKEN: ${{ github.token }}
       IMAGE: ${{ needs.prepare.outputs.image }}
-      ROLLBACK_IMAGE: ${{ inputs.rollback_image || vars.RELEASE_ROLLBACK_IMAGE }}
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -227,10 +243,6 @@ jobs:
           DIGEST: ${{ needs.candidate.outputs.image_digest }}
         run: |
           set -euo pipefail
-          [[ -n "$BACKUP_IDENTITY" ]] || { echo "Missing immutable backup identity" >&2; exit 1; }
-          [[ "$ROLLBACK_IMAGE" =~ ^[a-z0-9./:_-]+@sha256:[a-f0-9]{64}$ ]] || {
-            echo "ROLLBACK_IMAGE must be an immutable image reference" >&2; exit 1;
-          }
           [[ -f "docs/releases/$TAG.md" ]] || {
             echo "Missing docs/releases/$TAG.md migration notes" >&2; exit 1;
           }
@@ -243,17 +255,19 @@ jobs:
           gh attestation verify release/artifact-mcp --repo "$GITHUB_REPOSITORY"
           gh attestation verify "oci://$IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
           if docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
-            echo "Refusing to replace an existing release image tag" >&2; exit 1;
-          fi
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Refusing to replace an existing GitHub Release" >&2; exit 1;
+            existing="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
+            [[ "$existing" == "$DIGEST" ]] || {
+              echo "Existing release image digest $existing does not match candidate $DIGEST" >&2; exit 1;
+            }
           fi
       - name: Promote without rebuilding
         env:
           DIGEST: ${{ needs.candidate.outputs.image_digest }}
         run: |
           set -euo pipefail
-          docker buildx imagetools create --tag "$IMAGE:$TAG" "$IMAGE@$DIGEST"
+          if ! docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+            docker buildx imagetools create --tag "$IMAGE:$TAG" "$IMAGE@$DIGEST"
+          fi
           published="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
           [[ "$published" == "$DIGEST" ]] || {
             echo "Published digest $published did not match verified candidate $DIGEST" >&2; exit 1;
@@ -279,10 +293,8 @@ jobs:
             --schema-max '${{ needs.prepare.outputs.schema_current }}' \
             --source-sbom source.spdx.json \
             --image-sbom image.spdx.json \
-            --backup-identity "$BACKUP_IDENTITY" \
             --migration-notes migration-notes.md \
             --fixture-preflight historical-fixture-preflight.json \
-            --rollback-image "$ROLLBACK_IMAGE" \
             --repository '${{ github.repository }}' \
             --binary-attestation '${{ needs.candidate.outputs.binary_attestation }}' \
             --image-attestation '${{ needs.candidate.outputs.image_attestation }}'
@@ -292,6 +304,9 @@ jobs:
       - name: Publish immutable release evidence
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
+          prerelease: ${{ contains(needs.prepare.outputs.tag, '-') }}
+          make_latest: ${{ !contains(needs.prepare.outputs.tag, '-') }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |

@@ -9,8 +9,8 @@ import { dirname, resolve } from "node:path";
 
 const REQUIRED = [
   "--out", "--tag", "--version", "--commit", "--created", "--binary", "--image-ref", "--image-digest",
-  "--schema-min", "--schema-current", "--schema-max", "--source-sbom", "--image-sbom", "--backup-identity",
-  "--migration-notes", "--fixture-preflight", "--rollback-image", "--repository", "--binary-attestation", "--image-attestation",
+  "--schema-min", "--schema-current", "--schema-max", "--source-sbom", "--image-sbom",
+  "--migration-notes", "--fixture-preflight", "--repository", "--binary-attestation", "--image-attestation",
 ];
 
 function usage(message) {
@@ -55,7 +55,6 @@ const schema = ["--schema-min", "--schema-current", "--schema-max"].map((key) =>
 });
 if (schema[0] > schema[1] || schema[1] > schema[2]) usage("schema range must satisfy min <= current <= max");
 const repository = valid(input["--repository"], /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/, "repository");
-const rollbackImage = valid(input["--rollback-image"], /^[a-z0-9./:_-]+@sha256:[a-f0-9]{64}$/, "rollback image");
 const binaryAttestation = valid(input["--binary-attestation"], /^https:\/\/github\.com\/.+$/, "binary attestation");
 const imageAttestation = valid(input["--image-attestation"], /^https:\/\/github\.com\/.+$/, "image attestation");
 
@@ -65,7 +64,7 @@ const imageSbom = resolve(input["--image-sbom"]);
 const migrationNotes = resolve(input["--migration-notes"]);
 const fixturePreflight = resolve(input["--fixture-preflight"]);
 const manifest = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   release: { tag, version, commit, created },
   image: {
     reference: input["--image-ref"],
@@ -94,10 +93,8 @@ const manifest = {
       verification: `gh attestation verify oci://${input["--image-ref"].replace(/:[^/:]+$/, "")}@${imageDigest} --repo ${repository}`,
     },
   ],
-  recovery: {
-    backupIdentity: input["--backup-identity"],
+  validation: {
     migrationNotes: { path: input["--migration-notes"], sha256: await digest(migrationNotes) },
-    rollbackImage,
     // The release workflow runs scripts/release/verify-historical-fixtures-in-image.mjs against
     // the exact OCI digest before this manifest is generated; its JSON report is checksummed and
     // attached beside this manifest.
