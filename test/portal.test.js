@@ -361,10 +361,12 @@ test("marker preview placement clamps horizontally and chooses above or below", 
   assert.equal(nearBottom.vertical, "above");
   assert.ok(nearTop.left >= 8 - 4);
   assert.ok(nearBottom.left <= 768 - 208 - 8 - 760);
+  assert.ok(nearTop.top + 5 >= 8);
+  assert.ok(nearBottom.top + 900 + 54 <= stage.height - 8);
   const html = renderArtifactShell(meta, nav, {}, []);
   assert.match(html, /beforeunload/);
   assert.match(html, /This discards the current draft comment/);
-  assert.match(html, /draftAnchor=null;appendFeedback\(saved\)/);
+  assert.match(html, /draftAnchor=null;showDraftPosition\(0,0,0,0,true\);appendFeedback\(saved\)/);
 });
 
 test("shell brokers an iframe outbound link only after an explicit confirm click", () => {
