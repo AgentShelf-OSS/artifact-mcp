@@ -97,6 +97,27 @@ fn standalone_pages_autoescape_request_derived_values() {
 }
 
 #[test]
+fn standalone_pages_keep_the_saved_theme_and_access_contracts() {
+    let renderer = AskamaPageRenderer::from_config(&AppConfig::default());
+    let pages = [
+        renderer.not_found(None).expect("render not found"),
+        renderer.not_signed_in().expect("render signed-out page"),
+        renderer
+            .access_retry("/artifact?cf_access_retry=1")
+            .expect("render retry page"),
+    ];
+
+    for page in &pages {
+        assert!(page.contains("artifact-theme"));
+        assert!(page.contains(":root[data-theme=\"dark\"]"));
+        assert!(page.contains("min-height:100dvh"));
+        assert!(page.contains("@media(forced-colors:active)"));
+    }
+    assert!(pages[2].contains("content=\"0;url=/artifact?cf_access_retry=1\""));
+    assert!(pages[2].contains("href=\"/artifact?cf_access_retry=1\""));
+}
+
+#[test]
 fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
     let renderer = AskamaPageRenderer::with_fixed_clock(&AppConfig::default(), 0);
     let attack = "</script>\"&\u{2028}🎉";

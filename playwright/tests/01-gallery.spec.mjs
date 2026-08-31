@@ -98,4 +98,35 @@ test.describe("gallery", () => {
     }
   });
 
+  test("viewer Back link restores the library scroll snapshot", async ({ page, request, publisherKey, org }) => {
+    const title = `PW Return ${org}`;
+    await Promise.all(Array.from({ length: 4 }, (_, index) =>
+      publish(request, publisherKey, { title: `${title} ${index}`, html: `<!doctype html><h1>${index}</h1>` }),
+    ));
+    await page.setViewportSize({ width: 900, height: 320 });
+    await page.goto("/");
+    await expect(page.getByText(`${title} 0`)).toBeVisible();
+    await page.evaluate(() => window.scrollTo(0, 280));
+    const before = await page.evaluate(() => window.scrollY);
+
+    const open = page.locator(".card", { hasText: `${title} 0` }).getByRole("link", { name: "Open", exact: true });
+    const viewerHref = await open.getAttribute("href");
+    await open.click();
+    await expect(page.locator(".vhome")).toBeVisible();
+    await page.locator(".vhome").click();
+    await expect(page.locator(".collection-tools")).toBeVisible();
+    await page.waitForFunction((expected) => window.scrollY >= expected - 4, before);
+
+    await open.click();
+    await expect(page.locator(".vhome")).toBeVisible();
+    await page.goBack();
+    await expect(page.locator(".collection-tools")).toBeVisible();
+    expect(await page.evaluate(() => sessionStorage.getItem("artifact-library-return"))).toBeNull();
+
+    await page.goto(viewerHref);
+    await page.locator(".vhome").click();
+    await expect(page.locator(".collection-tools")).toBeVisible();
+    expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  });
+
 });

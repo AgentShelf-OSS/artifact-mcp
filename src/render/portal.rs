@@ -1006,6 +1006,7 @@ fn encode_uri_component(value: &str) -> String {
 #[template(path = "not-found.html")]
 struct NotFoundTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     message: &'a str,
     css: TrustedStatic,
@@ -1015,6 +1016,7 @@ struct NotFoundTemplate<'a> {
 #[template(path = "not-signed-in.html")]
 struct NotSignedInTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     app_brand: &'a str,
     site_host: &'a str,
@@ -1025,6 +1027,7 @@ struct NotSignedInTemplate<'a> {
 #[template(path = "access-retry.html")]
 struct AccessRetryTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     target: &'a str,
     css: TrustedStatic,
@@ -1050,6 +1053,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn not_found(&self, message: Option<&str>) -> Result<String, AppError> {
         render(&NotFoundTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             message: message
                 .filter(|message| !message.is_empty())
@@ -1061,6 +1065,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn not_signed_in(&self) -> Result<String, AppError> {
         render(&NotSignedInTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             app_brand: &self.app_brand,
             site_host: &self.site_host,
@@ -1071,6 +1076,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn access_retry(&self, target: &str) -> Result<String, AppError> {
         render(&AccessRetryTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             target: if target.is_empty() {
                 "/?cf_access_retry=1"

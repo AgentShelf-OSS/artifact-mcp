@@ -7,6 +7,24 @@ test.describe("settings administration", () => {
     await expect(page.getByRole("tab", { name: /Organizations/i })).toBeVisible();
   });
 
+  test("administration keeps compact usable controls in dark phone layout", async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.addInitScript(() => localStorage.setItem("artifact-theme", "dark"));
+    await page.goto("/settings");
+
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    await expect(page.getByRole("heading", { name: /Operate the registry/i })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      targetHeights: Array.from(document.querySelectorAll(".admin-tab, .new-org-trigger, .primary-button, .secondary-button, .field input, .field select"), (node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map((rect) => rect.height),
+    }));
+    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    expect(Math.min(...dimensions.targetHeights)).toBeGreaterThanOrEqual(44);
+  });
+
   test("org lifecycle: create, add domain and email, set colour, delete", async ({ request }) => {
     const name = `pwtmp-${runId()}`;
     const created = await api(request, "post", "/settings/orgs", { name, label: "Temp" });

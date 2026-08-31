@@ -32,6 +32,12 @@ test("gallery foundation keeps three, two, then one responsive columns and state
   assert.match(css, /@media\(max-width:760px\)\{[\s\S]*?\.artifact-grid\{grid-template-columns:1fr;/);
   assert.match(script, /activeView === "hidden"/);
   assert.match(script, /artifact-library-state/);
+  assert.match(script, /scrollY: Math\.max\(0, window\.scrollY/);
+  assert.match(script, /artifact-library-return/);
+  assert.match(script, /window\.addEventListener\("pagehide", function \(\) \{ saveLibraryState\(\); \}\)/);
+  assert.match(script, /window\.addEventListener\("pageshow", function \(event\) \{/);
+  assert.match(script, /if \(!event\.persisted\) return;/);
+  assert.match(script, /requestAnimationFrame\(function \(\) \{ window\.scrollTo\(0, returnScrollY\); \}\)/);
   assert.match(script, /localStorage\.setItem\("artifact-layout"/);
   assert.match(script, /x-artifact-mutation/);
 });

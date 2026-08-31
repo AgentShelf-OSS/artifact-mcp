@@ -117,7 +117,8 @@
       view: activeView,
       org: activeOrg,
       category: activeCategory,
-      sort: sort && sort.value || "recent"
+      sort: sort && sort.value || "recent",
+      scrollY: Math.max(0, window.scrollY || window.pageYOffset || 0)
     };
     try { sessionStorage.setItem("artifact-library-state", JSON.stringify(state)); } catch (_error) {}
     try {
@@ -200,6 +201,22 @@
   if (search) search.addEventListener("input", applyFilters);
   if (sort) sort.addEventListener("change", applyFilters);
 
+  // The viewer's Back link is deliberately a clean `href="/"`. Preserve a return snapshot
+  // only when the viewer was opened from this library, rather than writing on every scroll.
+  document.addEventListener("click", function (event) {
+    var artifactLink = event.target.closest(".card a[href]");
+    if (!artifactLink || artifactLink.hasAttribute("download") || /\/raw\//.test(artifactLink.pathname || "")) return;
+    saveLibraryState();
+    try { sessionStorage.setItem("artifact-library-return", "1"); } catch (_error) {}
+  }, true);
+  window.addEventListener("pagehide", function () { saveLibraryState(); });
+  // A browser Back can revive this document from bfcache without rerunning restoreLibraryState.
+  // Its DOM already has the prior library state, so discard the one-shot marker immediately.
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+    try { sessionStorage.removeItem("artifact-library-return"); } catch (_error) {}
+  });
+
   document.querySelectorAll("[data-layout]").forEach(function (button) {
     if (!button.closest(".layout-toggle")) return;
     button.addEventListener("click", function () {
@@ -227,15 +244,18 @@
 
   function restoreLibraryState() {
     var state = null;
+    var restoreScroll = false;
     try {
       var url = new URL(location.href);
       if (["q", "view", "org", "category", "sort"].some(function (key) { return url.searchParams.has(key); })) {
         state = Object.fromEntries(url.searchParams.entries());
-      } else {
+      } else if (sessionStorage.getItem("artifact-library-return") === "1") {
         state = JSON.parse(sessionStorage.getItem("artifact-library-state") || "null");
       }
+      restoreScroll = sessionStorage.getItem("artifact-library-return") === "1";
+      sessionStorage.removeItem("artifact-library-return");
     } catch (_error) {}
-    if (!state) return;
+    if (!state) return null;
     if (search && state.q) search.value = state.q;
     if (sort && state.sort && Array.prototype.some.call(sort.options, function (option) { return option.value === state.sort; })) sort.value = state.sort;
     [["view", "activeView", "[data-filter-view]"], ["org", "activeOrg", "[data-filter-org]"], ["category", "activeCategory", "[data-filter-category]"]].forEach(function (entry) {
@@ -249,6 +269,7 @@
       if (entry[1] === "activeCategory") activeCategory = value;
       pressOnly(entry[2], button);
     });
+    return restoreScroll && Number.isFinite(Number(state.scrollY)) ? Math.max(0, Number(state.scrollY)) : null;
   }
 
   document.addEventListener("keydown", function (event) {
@@ -651,6 +672,7 @@
     // The success message is optional when URL APIs are unavailable.
   }
 
-  restoreLibraryState();
+  var returnScrollY = restoreLibraryState();
   applyFilters();
+  if (returnScrollY !== null) requestAnimationFrame(function () { window.scrollTo(0, returnScrollY); });
 }());
