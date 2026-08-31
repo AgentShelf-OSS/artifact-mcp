@@ -174,7 +174,19 @@
     "properties": {
       "artifact_id": { "type": "string" },
       "count": { "type": "integer" },
-      "feedback": { "type": "array", "items": { "type": "object" } }
+      "feedback": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "anchor_version": { "type": "integer" },
+            "anchor_kind": {},
+            "anchor_node_id": {},
+            "anchor_quote": {}
+          },
+          "required": ["anchor_version", "anchor_kind", "anchor_node_id", "anchor_quote"]
+        }
+      }
     },
     "required": ["count", "feedback"]
   },

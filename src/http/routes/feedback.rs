@@ -19,8 +19,8 @@ use crate::{
     http::artifact_response::is_html_content_type,
     mcp::protocol::OrderedJson,
     model::{
-        ArtifactId, Feedback, FeedbackAnchor, FeedbackAuthor, FeedbackId, OrgId, SubmitFeedback,
-        Timestamp,
+        ArtifactId, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor, FeedbackId,
+        OrgId, SubmitFeedback, Timestamp,
     },
     persistence::feedback::{
         ANCHOR_NOT_OBJECT_MESSAGE, ANCHOR_PAGE_MISSING_MESSAGE, ANCHOR_PAGE_NOT_BUNDLE_MESSAGE,
@@ -56,6 +56,10 @@ struct FeedbackResponse {
     anchor_h: Option<f64>,
     anchor_approx: i64,
     anchor_page: Option<String>,
+    anchor_kind: Option<String>,
+    anchor_node_id: Option<String>,
+    anchor_quote: Option<String>,
+    anchor_version: u8,
 }
 
 impl From<Feedback> for FeedbackResponse {
@@ -79,6 +83,10 @@ impl From<Feedback> for FeedbackResponse {
             anchor_h: feedback.anchor_h,
             anchor_approx: i64::from(feedback.anchor_approx),
             anchor_page: feedback.anchor_page,
+            anchor_kind: feedback.anchor_kind,
+            anchor_node_id: feedback.anchor_node_id,
+            anchor_quote: feedback.anchor_quote,
+            anchor_version: feedback.anchor_version,
         }
     }
 }
@@ -121,6 +129,10 @@ struct CreatedFeedbackResponse {
     anchor_h: Option<f64>,
     anchor_approx: i64,
     anchor_page: Option<String>,
+    anchor_kind: Option<String>,
+    anchor_node_id: Option<String>,
+    anchor_quote: Option<String>,
+    anchor_version: u8,
     artifact_revision: u64,
     created_at: Timestamp,
 }
@@ -141,6 +153,10 @@ impl From<Feedback> for CreatedFeedbackResponse {
             anchor_h: feedback.anchor_h,
             anchor_approx: i64::from(feedback.anchor_approx),
             anchor_page: feedback.anchor_page,
+            anchor_kind: feedback.anchor_kind,
+            anchor_node_id: feedback.anchor_node_id,
+            anchor_quote: feedback.anchor_quote,
+            anchor_version: feedback.anchor_version,
             artifact_revision: feedback.artifact_revision,
             created_at: feedback.created_at,
         }
@@ -208,6 +224,7 @@ async fn submit_feedback(
         anchor: parsed_anchor.value,
         anchor_path: anchor_path(body.get("anchor")),
         anchor_page,
+        anchor_v2: parsed_anchor.v2,
     };
     let created = match deps.engagement.submit_feedback(artifact, submission).await {
         Ok(created) => created,
@@ -250,6 +267,7 @@ fn validate_feedback_object(body: &OrderedJson) -> Result<(), AppError> {
 
 struct ParsedAnchor {
     value: Option<FeedbackAnchor>,
+    v2: Option<FeedbackAnchorV2>,
     not_object: bool,
 }
 
@@ -257,6 +275,7 @@ fn parse_anchor(value: Option<&OrderedJson>) -> ParsedAnchor {
     let Some(value) = value.filter(|value| !matches!(value, OrderedJson::Null)) else {
         return ParsedAnchor {
             value: None,
+            v2: None,
             not_object: false,
         };
     };
@@ -272,9 +291,11 @@ fn parse_anchor(value: Option<&OrderedJson>) -> ParsedAnchor {
                 h: None,
                 approx: false,
             }),
+            v2: None,
             not_object: true,
         };
     };
+    let v2 = anchor_v2(value);
     ParsedAnchor {
         value: Some(FeedbackAnchor {
             x: anchor_number(value.get("x")),
@@ -283,8 +304,36 @@ fn parse_anchor(value: Option<&OrderedJson>) -> ParsedAnchor {
             h: optional_anchor_number(value.get("h")),
             approx: value.get("approx").is_some_and(javascript_truthy),
         }),
+        v2,
         not_object: false,
     }
+}
+
+fn anchor_v2(value: &OrderedJson) -> Option<FeedbackAnchorV2> {
+    let v2_keys = ["version", "kind", "nodeId", "quote"];
+    if !value
+        .object_entries()
+        .into_iter()
+        .any(|(key, _)| v2_keys.iter().any(|v2_key| *v2_key == key))
+    {
+        return None;
+    }
+    let node = value.get("nodeId");
+    let quote = value.get("quote");
+    let approx = value.get("approx");
+    Some(FeedbackAnchorV2 {
+        version: value
+            .get("version")
+            .and_then(OrderedJson::as_number)
+            .and_then(serde_json::Number::as_f64),
+        kind: value.get("kind").and_then(OrderedJson::as_str).map(ToOwned::to_owned),
+        node_id: node.and_then(OrderedJson::as_str).map(ToOwned::to_owned),
+        quote: quote.and_then(OrderedJson::as_str).map(ToOwned::to_owned),
+        path_is_string: value.get("path").and_then(OrderedJson::as_str).is_some(),
+        node_id_is_string_or_null: matches!(node, None | Some(OrderedJson::Null | OrderedJson::String(_))),
+        quote_is_string_or_null: matches!(quote, None | Some(OrderedJson::Null | OrderedJson::String(_))),
+        approx_is_boolean_or_absent: matches!(approx, None | Some(OrderedJson::Bool(_))),
+    })
 }
 
 fn anchor_number(value: Option<&OrderedJson>) -> f64 {

@@ -122,6 +122,7 @@ impl Fixture {
                 anchor: None,
                 anchor_path: None,
                 anchor_page: None,
+                anchor_v2: None,
             },
             4_000,
         )
@@ -320,6 +321,7 @@ fn capacity_rejection_rolls_back_both_submit_and_resolve() {
         anchor: None,
         anchor_path: None,
         anchor_page: None,
+        anchor_v2: None,
     };
     assert_eq!(
         feedback_delivery::submit(
@@ -396,6 +398,7 @@ fn stale_tenant_or_ownership_scope_is_denied_inside_the_transaction() {
         anchor: None,
         anchor_path: None,
         anchor_page: None,
+        anchor_v2: None,
     };
     assert_eq!(
         feedback_delivery::submit(
