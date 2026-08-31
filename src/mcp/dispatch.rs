@@ -1390,6 +1390,7 @@ async fn submit_feedback(
                 anchor: None,
                 anchor_path: None,
                 anchor_page: None,
+                anchor_v2: None,
             },
         )
         .await?;
@@ -1751,6 +1752,10 @@ fn feedback_json(feedback: &Feedback) -> OrderedJson {
         "anchor_h" => optional_number(feedback.anchor_h),
         "anchor_approx" => OrderedJson::number_i64(i64::from(feedback.anchor_approx)),
         "anchor_page" => optional_id(feedback.anchor_page.as_deref()),
+        "anchor_kind" => optional_id(feedback.anchor_kind.as_deref()),
+        "anchor_node_id" => optional_id(feedback.anchor_node_id.as_deref()),
+        "anchor_quote" => optional_string_value(feedback.anchor_quote.clone()),
+        "anchor_version" => OrderedJson::number_u64(u64::from(feedback.anchor_version)),
         "created_at" => OrderedJson::string(feedback.created_at.0.clone()),
         "resolved_at" => optional_timestamp(feedback.resolved_at.clone()),
         "resolved_by" => optional_string_value(feedback.resolved_by.clone()),

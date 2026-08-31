@@ -7,7 +7,7 @@ import { renderArtifactShell, renderGallery } from "../lib/portal.js";
 const meta = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 3, bytes: 1, category: "" };
 const nav = { prevId: null, nextId: null, index: 1, total: 1 };
 
-function shellBrokerHarness(scriptOverride = null) {
+function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3 } = {}) {
   const created = [];
   function element(tagName = "div") {
     const listeners = new Map();
@@ -32,6 +32,7 @@ function shellBrokerHarness(scriptOverride = null) {
         }
       },
       setAttribute(name, value) { attributes.set(name, String(value)); },
+      removeAttribute(name) { attributes.delete(name); },
       getAttribute(name) { return attributes.get(name) ?? null; },
       appendChild(child) { this.children.push(child); return child; },
       remove() {},
@@ -51,6 +52,13 @@ function shellBrokerHarness(scriptOverride = null) {
     "reaction-status": element("div"),
     "vfb-list": element("div"),
     "vanchor-overlay": element("div"),
+    "vanchor-composer": element("section"),
+    "vanchor-body": element("textarea"),
+    "vanchor-save": element("button"),
+    "vanchor-copy": element("button"),
+    "vanchor-dismiss": element("button"),
+    "vanchor-summary": element("p"),
+    "vanchor-status": element("p"),
     vframe: element("iframe")
   };
   elements["shell-config"].dataset = {
@@ -63,9 +71,9 @@ function shellBrokerHarness(scriptOverride = null) {
     vote: "0",
     viewerEmail: JSON.stringify("viewer@acme.test"),
     viewerIsAdmin: "0",
-    isBundle: "0",
+    isBundle: isBundle ? "1" : "0",
     feedback: JSON.stringify("[]"),
-    revision: "1",
+    revision: String(revision),
     title: JSON.stringify("Artifact"),
     bytes: "1"
   };
@@ -85,6 +93,7 @@ function shellBrokerHarness(scriptOverride = null) {
   };
   const window = {
     location: { search: "" },
+    __artifactMcpTestHooks: {},
     addEventListener(type, listener) { windowListeners.set(type, listener); },
     open(href, target, features) { opens.push({ href, target, features, userActivation }); }
   };
@@ -92,11 +101,16 @@ function shellBrokerHarness(scriptOverride = null) {
   const script = scriptOverride || [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
   runInNewContext(script, {
     document, window, URL, URLSearchParams, JSON, Number, Array, String, Math,
-    setTimeout() {}, clearTimeout() {}, fetch() {}, localStorage: {}
+    setTimeout() {}, clearTimeout() {}, fetch() {}, localStorage: {}, navigator: {}
   });
   return {
     created,
     opens,
+    buildAnchorPrompt: window.__artifactMcpTestHooks.buildAnchorPrompt,
+    composerPlacement: window.__artifactMcpTestHooks.composerPlacement,
+    markerPreviewPlacement: window.__artifactMcpTestHooks.markerPreviewPlacement,
+    draftAnchorFromSelection: window.__artifactMcpTestHooks.draftAnchorFromSelection,
+    feedbackPayload: window.__artifactMcpTestHooks.feedbackPayload,
     message(data) {
       windowListeners.get("message")({ source: elements.vframe.contentWindow, data });
     },
@@ -128,6 +142,12 @@ test("feedback drawer nests one-level replies and only renders viewer management
   const adminHtml = renderArtifactShell(meta, nav, {}, feedback, {}, { email: "admin@acme.test", isAdmin: true });
   const adminDrawer = adminHtml.slice(adminHtml.indexOf('<section class="inspector-pane" id="inspector-feedback"'), adminHtml.indexOf('<section class="inspector-pane" id="inspector-details"'));
   assert.equal((adminDrawer.match(/data-feedback-action=/g) || []).length, 4);
+
+  const discord = renderArtifactShell(meta, nav, {}, [{ id: "discord-1", viewer_email: null, author_source: "discord", external_author_display: "Díscord <reviewer>", body: "note", artifact_revision: 3, parent_id: null, anchor_x: 0.1, anchor_y: 0.2 }]);
+  assert.match(discord, /author_source/);
+  assert.match(discord, /external_author_display/);
+  assert.match(discord, /Díscord/);
+  assert.doesNotMatch(discord, /Díscord <reviewer>/);
 });
 
 test("notification rows link to a feedback deep link and the shell focuses its fid parameter", () => {
@@ -159,6 +179,48 @@ test("viewer shell includes an escaped public-share inspector", () => {
   assert.match(html, /No expiration/);
   assert.match(html, /data-artifact-id="&quot;abc123&quot;"/);
   assert.doesNotMatch(html, /<script><\/script><img>/);
+});
+
+test("viewer shell gives review actions priority and keeps secondary actions in deterministic menus", () => {
+  const html = renderArtifactShell(
+    meta,
+    { prevId: "newer", nextId: "older", index: 2, total: 3 },
+    { favorite: 1, vote: -1 },
+    [],
+    { counts: { views: 7 }, viewers: [] },
+  );
+  const titleMenu = html.slice(html.indexOf('id="vtitle-menu"'), html.indexOf('id="vmore-menu"'));
+  const moreMenu = html.slice(html.indexOf('id="vmore-menu"'), html.indexOf('</header>'));
+
+  assert.match(html, /aria-label="Back to artifact library"/);
+  assert.match(html, /id="vtitle-toggle"[^>]*aria-controls="vtitle-menu"/);
+  assert.match(html, /id="vcomment-toggle"[^>]*aria-label="Comment on a place"/);
+  assert.match(html, /id="vcomment-toggle"[^>]*><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15/);
+  assert.doesNotMatch(html, /id="vcomment-toggle"[^>]*>▣/);
+  assert.match(html, /id="vshare-toggle"/);
+  assert.match(html, /id="vmore-toggle"/);
+  assert.match(html, /id="vinspector"[^>]*aria-hidden="true"[^>]*inert/);
+  assert.match(html, /inspector\.removeAttribute\('inert'\)/);
+  assert.match(html, /inspector\.setAttribute\('inert',''\)/);
+  assert.match(titleMenu, /data-inspector-open="details"/);
+  assert.match(titleMenu, /data-inspector-open="history"/);
+  assert.match(titleMenu, /data-inspector-open="audience"/);
+  assert.match(titleMenu, /id="vfb-toggle"[^>]*data-inspector-open="feedback"/);
+  assert.match(titleMenu, /href="\/newer"[^>]*rel="prev"/);
+  assert.match(titleMenu, /href="\/older"[^>]*rel="next"/);
+  assert.match(titleMenu, /role="menuitemcheckbox"[^>]*aria-checked="true"/);
+  assert.doesNotMatch(titleMenu, /role="menuitemcheckbox"[^>]*aria-pressed/);
+  assert.doesNotMatch(moreMenu, /data-inspector-open/);
+  assert.match(moreMenu, /Open raw artifact/);
+  assert.match(moreMenu, /Download HTML/);
+  assert.match(moreMenu, /Change theme/);
+  assert.match(moreMenu, /Sign out/);
+  assert.match(html, /function bindMenu/);
+  assert.match(html, /e\.key==='ArrowDown'/);
+  assert.match(html, /closeShellMenus/);
+  assert.match(html, /input,textarea,select,\[contenteditable\],\[role="menu"\],dialog,\[role="dialog"\]/);
+  assert.doesNotMatch(html, /page\.replace\(\/\<header/);
+  assert.match(html, /commentMode\)\{e\.preventDefault\(\);setCommentMode\(false\)/);
 });
 
 test("delete controls render only for administrators and recorded owners", () => {
@@ -219,6 +281,129 @@ test("bundle shell scopes anchors to the current page and resets bridge state on
   assert.match(html, /bridgeReady=false/);
   assert.match(html, /hideAllMarkers/);
   assert.match(html, /anchor_page:anchor&&anchor\.page/);
+});
+
+test("anchored-comment shell retains the v2 envelope and keeps prompt copy separate from saving", () => {
+  const feedback = [{
+    id: "saved-1", parent_id: null, viewer_email: "<author>", body: "<body>",
+    artifact_revision: 2, anchor_path: "main > p", anchor_x: 0.1, anchor_y: 0.2,
+    anchor_w: 0.3, anchor_h: 0.4, anchor_approx: 1, anchor_page: "pages/report.html",
+    anchor_kind: "region", anchor_node_id: "revenue-table", anchor_quote: "Quarterly <revenue>", anchor_version: 2
+  }];
+  const html = renderArtifactShell({ ...meta, is_bundle: 1, revision: 3 }, nav, {}, feedback);
+  assert.match(html, /id="vanchor-composer"/);
+  assert.match(html, /id="vanchor-copy"[^>]*>Copy prompt/);
+  assert.match(html, /id="vanchor-save"[^>]*>Add comment/);
+  assert.match(html, /data-copy-prompt="saved-1"/);
+  assert.match(html, /anchor_kind/);
+  assert.match(html, /anchor_node_id/);
+  assert.match(html, /anchor_quote/);
+  assert.match(html, /anchor_version/);
+  assert.match(html, /Artifact MCP review handoff/);
+  assert.match(html, /list_feedback/);
+  assert.match(html, /single 65,536-byte read may be incomplete/);
+  assert.match(html, /__artifactMcpTestHooks/);
+  assert.match(html, /pin\.stale\|\|!pinOnCurrentPage/);
+  assert.match(html, /id:'__draft__'/);
+});
+
+test("bridge and fallback selections produce valid v2 feedback POST payloads", () => {
+  const shell = shellBrokerHarness();
+  const bridge = shell.draftAnchorFromSelection({
+    version: 2, kind: "element", path: "main > p", nodeId: "target",
+    quote: "anchor target", approx: false,
+  }, 0.2, 0.3, 0.4, 0.1, true);
+  const bridgePayload = shell.feedbackPayload("Bridge comment", null, bridge);
+  assert.deepEqual(JSON.parse(JSON.stringify(bridgePayload.anchor)), {
+    version: 2, kind: "element", x: 0.2, y: 0.3, page: null,
+    path: "main > p", nodeId: "target", quote: "anchor target",
+    approx: false, w: 0.4, h: 0.1,
+  });
+  assert.equal(typeof bridgePayload.anchor.approx, "boolean");
+
+  const fallbackPoint = shell.draftAnchorFromSelection({ approx: true }, 0.4, 0.5, null, null, false);
+  const fallbackPointPayload = shell.feedbackPayload("Fallback point", null, fallbackPoint);
+  assert.deepEqual(JSON.parse(JSON.stringify(fallbackPointPayload.anchor)), {
+    version: 2, kind: "element", x: 0.4, y: 0.5, page: null,
+    path: "", approx: true,
+  });
+
+  const fallbackRegion = shell.draftAnchorFromSelection({ kind: "region", path: "", approx: true }, 0.1, 0.15, 0.2, 0.25, true);
+  const fallbackRegionPayload = shell.feedbackPayload("Fallback region", null, fallbackRegion);
+  assert.deepEqual(JSON.parse(JSON.stringify(fallbackRegionPayload.anchor)), {
+    version: 2, kind: "region", x: 0.1, y: 0.15, page: null,
+    path: "", approx: true, w: 0.2, h: 0.25,
+  });
+});
+
+test("anchored prompt matrix is deterministic across draft/saved, single/bundle, semantic/legacy, and stale", () => {
+  const cases = [
+    { draft: true, isBundle: false, semantic: true, stale: false },
+    { draft: false, isBundle: false, semantic: false, stale: false },
+    { draft: true, isBundle: true, semantic: true, stale: false },
+    { draft: false, isBundle: true, semantic: false, stale: true },
+  ];
+  for (const item of cases) {
+    const shell = shellBrokerHarness(null, { isBundle: item.isBundle, revision: 7 });
+    assert.equal(typeof shell.buildAnchorPrompt, "function");
+    const anchor = {
+      id: "feedback-9", artifact_revision: item.stale ? 6 : 7,
+      anchor_page: item.isBundle ? "docs/report.html" : null,
+      anchor_path: "main > p:nth-child(2)", anchor_x: 0.125, anchor_y: 0.25,
+      anchor_w: 0.5, anchor_h: 0.125, anchor_approx: true,
+      anchor_kind: item.semantic ? "region" : null,
+      anchor_node_id: item.semantic ? "revenue-α" : null,
+      anchor_quote: item.semantic ? "Quarterly <revenue>" : null,
+      anchor_version: item.semantic ? 2 : 1,
+      anchor_page_stale: item.stale, body: "Verbatim <saved> body"
+    };
+    const prompt = shell.buildAnchorPrompt({ anchor, draft: item.draft, body: item.draft ? "Verbatim <draft> body" : anchor.body, artifactId: "abc123", currentRevision: 7, isBundle: item.isBundle });
+    assert.match(prompt, new RegExp(`State: ${item.draft ? "draft" : "saved"}`));
+    assert.match(prompt, /Connector: Artifact MCP/);
+    assert.match(prompt, /Artifact ID: abc123/);
+    assert.match(prompt, new RegExp(`Canonical artifact revision: ${item.stale ? 6 : 7}`));
+    assert.match(prompt, new RegExp(`Anchor version: ${item.semantic ? 2 : 1}`));
+    assert.match(prompt, /Normalized bounds: x=0.125 y=0.25 w=0.5 h=0.125/);
+    assert.match(prompt, item.semantic ? /Node ID: revenue-α/ : /Node ID: \(none\)/);
+    assert.match(prompt, item.isBundle ? /Bundle file path: \/files\/docs\/report.html/ : /Bundle file path: \(none\)/);
+    assert.match(prompt, new RegExp(`artifact://abc123/revisions/${item.stale ? 6 : 7}${item.isBundle ? "/files/docs/report.html" : ""}`));
+    assert.match(prompt, /single 65,536-byte read may be incomplete/);
+    if (item.draft) assert.match(prompt, /Feedback ID: \(draft; not persisted yet\)/);
+    else assert.match(prompt, /Feedback ID: feedback-9/);
+    if (item.stale) assert.match(prompt, /Do not switch this stale feedback to the latest revision/);
+    if (!item.draft) assert.match(prompt, /Call Artifact MCP list_feedback/);
+  }
+});
+
+test("composer placement chooses a side and clamps inside each desktop viewport", () => {
+  const shell = shellBrokerHarness();
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024 }]) {
+    const right = shell.composerPlacement({ x: 120, y: 200, w: 20, h: 20 }, viewport, { width: 400, height: 330 });
+    const left = shell.composerPlacement({ x: viewport.width - 30, y: viewport.height - 10, w: 20, h: 20 }, viewport, { width: 400, height: 330 });
+    assert.equal(right.side, "right");
+    assert.equal(left.side, "left");
+    for (const placement of [right, left]) {
+      assert.ok(placement.left >= 8 && placement.left <= viewport.width - 408);
+      assert.ok(placement.top >= 8 && placement.top <= viewport.height - 338);
+    }
+  }
+});
+
+test("marker preview placement clamps horizontally and chooses above or below", () => {
+  const shell = shellBrokerHarness();
+  const stage = { width: 768, height: 1024 };
+  const nearTop = shell.markerPreviewPlacement({ x: 4, y: 5 }, stage, { width: 208, height: 54 });
+  const nearBottom = shell.markerPreviewPlacement({ x: 760, y: 900 }, stage, { width: 208, height: 54 });
+  assert.equal(nearTop.vertical, "below");
+  assert.equal(nearBottom.vertical, "above");
+  assert.ok(nearTop.left >= 8 - 4);
+  assert.ok(nearBottom.left <= 768 - 208 - 8 - 760);
+  assert.ok(nearTop.top + 5 >= 8);
+  assert.ok(nearBottom.top + 900 + 54 <= stage.height - 8);
+  const html = renderArtifactShell(meta, nav, {}, []);
+  assert.match(html, /beforeunload/);
+  assert.match(html, /This discards the current draft comment/);
+  assert.match(html, /draftAnchor=null;showDraftPosition\(0,0,0,0,true\);appendFeedback\(saved\)/);
 });
 
 test("shell brokers an iframe outbound link only after an explicit confirm click", () => {
@@ -346,8 +531,12 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
   assert.match(member, /data-id="other123"[^>]*data-owned="0"/);
   assert.doesNotMatch(member, /other@acme\.test/);
   assert.match(member, /My needs-work votes/);
-  assert.match(member, /data-filter-category="Reports"/);
-  assert.match(member, /data-filter-category="Dashboards"/);
+  assert.match(member, /id="org-filter"[^>]*aria-label="Filter by organization"/);
+  assert.match(member, /id="category-filter"[^>]*aria-label="Filter by category"/);
+  assert.match(member, /<option value="Reports">Reports \(1\)<\/option>/);
+  assert.match(member, /<option value="Dashboards">Dashboards \(1\)<\/option>/);
+  assert.match(member, /Find every published artifact\./);
+  assert.doesNotMatch(member, /data-filter-category=/);
   assert.ok(member.indexOf('data-id="owned123"') < member.indexOf('data-id="other123"'));
   assert.equal(
     (member.match(/<button class="act save[^"]*"[^>]*data-action="favorite"/g) || []).length,

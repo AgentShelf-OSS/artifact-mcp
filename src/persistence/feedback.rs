@@ -34,8 +34,8 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use crate::config::IdSource;
 use crate::error::AppError;
 use crate::model::{
-    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAuthor, FeedbackId,
-    FeedbackMutation, FeedbackRef, OrgId, SubmitFeedback, Timestamp,
+    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor,
+    FeedbackId, FeedbackMutation, FeedbackRef, OrgId, SubmitFeedback, Timestamp,
 };
 
 // ---------------------------------------------------------------------------
@@ -63,6 +63,14 @@ pub const ANCHOR_BOX_RANGE_MESSAGE: &str = "Anchor w and h must be finite number
 pub const ANCHOR_BOX_POSITIVE_MESSAGE: &str = "Box anchor w and h must be greater than 0.";
 /// [lib/feedback.js:32]
 pub const ANCHOR_BOX_BOUNDS_MESSAGE: &str = "Box anchor must fit within document bounds.";
+/// PBI-084 v2 structured-anchor validation messages. These are intentionally distinct from the
+/// legacy geometry errors: a malformed v2 envelope must fail rather than silently persist as v1.
+pub const ANCHOR_VERSION_MESSAGE: &str = "Anchor version must be 2.";
+pub const ANCHOR_KIND_MESSAGE: &str = "Anchor kind must be \"element\" or \"region\".";
+pub const ANCHOR_PATH_V2_MESSAGE: &str = "Anchor path must be a string for version 2 anchors.";
+pub const ANCHOR_NODE_ID_MESSAGE: &str = "Anchor nodeId must be a string or null.";
+pub const ANCHOR_QUOTE_MESSAGE: &str = "Anchor quote must be a string or null.";
+pub const ANCHOR_APPROX_V2_MESSAGE: &str = "Anchor approx must be a boolean for version 2 anchors.";
 /// [lib/app.js:15]
 pub const ANCHOR_PAGE_UNANCHORED_MESSAGE: &str =
     "anchor_page is only valid for anchored bundle feedback.";
@@ -86,6 +94,10 @@ pub const FORBIDDEN_MESSAGE: &str = "Forbidden";
 
 /// `String(anchor.path).slice(0, 512)` — [lib/feedback.js:35]
 pub const ANCHOR_PATH_MAX_UTF16: usize = 512;
+/// PBI-083 bridge cap for `data-artifact-node`.
+pub const ANCHOR_NODE_ID_MAX_UTF16: usize = 128;
+/// PBI-083 bridge cap for a normalized text quote.
+pub const ANCHOR_QUOTE_MAX_UTF16: usize = 240;
 
 /// `Feedback is too long (max ${FEEDBACK_MAX_BODY} characters).` — [lib/feedback.js:87]
 #[must_use]
@@ -102,20 +114,22 @@ pub fn too_long_message(max_body: u64) -> String {
 const COLUMNS: &str = "id, artifact_id, org, viewer_email, body, artifact_revision, parent_id, \
      anchor_path, anchor_x, anchor_y, anchor_w, anchor_h, anchor_approx, anchor_page, created_at, \
      resolved_at, resolved_by, author_source, external_author_id, external_author_display, \
-     external_created_at, external_edited_at, external_deleted_at";
+     external_created_at, external_edited_at, external_deleted_at, anchor_kind, anchor_node_id, \
+     anchor_quote";
 
 /// The same list qualified for the `feedback f JOIN artifacts a` listings.
 const JOINED_COLUMNS: &str = "f.id, f.artifact_id, f.org, f.viewer_email, f.body, \
      f.artifact_revision, f.parent_id, f.anchor_path, f.anchor_x, f.anchor_y, f.anchor_w, \
      f.anchor_h, f.anchor_approx, f.anchor_page, f.created_at, f.resolved_at, f.resolved_by, \
      f.author_source, f.external_author_id, f.external_author_display, f.external_created_at, \
-     f.external_edited_at, f.external_deleted_at";
+     f.external_edited_at, f.external_deleted_at, f.anchor_kind, f.anchor_node_id, \
+     f.anchor_quote";
 
 /// `insertStmt` — [lib/feedback.js:45-48]
 const INSERT_SQL: &str = "INSERT INTO feedback (id, artifact_id, org, viewer_email, body, \
      artifact_revision, parent_id, anchor_path, anchor_x, anchor_y, anchor_w, anchor_h, \
-     anchor_approx, anchor_page) \
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)";
+     anchor_approx, anchor_page, anchor_kind, anchor_node_id, anchor_quote) \
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)";
 
 /// `resolveStmt` — [lib/feedback.js:53-55]
 const RESOLVE_SQL: &str = "UPDATE feedback SET resolved_at = datetime('now'), resolved_by = ?1 \
@@ -187,7 +201,12 @@ pub struct NormalizedAnchor {
     pub anchor_w: Option<f64>,
     pub anchor_h: Option<f64>,
     pub anchor_approx: bool,
+    pub anchor_kind: Option<String>,
+    pub anchor_node_id: Option<String>,
+    pub anchor_quote: Option<String>,
 }
+
+type NormalizedAnchorV2 = (Option<String>, Option<String>, Option<String>);
 
 /// `normalizeAnchor(anchor)` — [lib/feedback.js:12-42].
 ///
@@ -206,6 +225,16 @@ pub struct NormalizedAnchor {
 pub fn normalize_anchor(
     anchor: Option<&FeedbackAnchor>,
     path: Option<&str>,
+) -> Result<NormalizedAnchor, AppError> {
+    normalize_anchor_with_v2(anchor, path, None)
+}
+
+/// Extends [`normalize_anchor`] with the v2 structured envelope. Kept separate so existing
+/// persistence callers remain source-compatible while v2-aware HTTP paths cannot discard it.
+pub fn normalize_anchor_with_v2(
+    anchor: Option<&FeedbackAnchor>,
+    path: Option<&str>,
+    v2: Option<&FeedbackAnchorV2>,
 ) -> Result<NormalizedAnchor, AppError> {
     let Some(anchor) = anchor else {
         return Ok(NormalizedAnchor::default());
@@ -240,6 +269,11 @@ pub fn normalize_anchor(
         }
     }
 
+    let (anchor_kind, anchor_node_id, anchor_quote) = match v2 {
+        None => (None, None, None),
+        Some(v2) => normalize_v2(v2)?,
+    };
+
     Ok(NormalizedAnchor {
         anchor_path: path.map(|path| slice_utf16(path, ANCHOR_PATH_MAX_UTF16)),
         anchor_x: Some(anchor.x),
@@ -247,7 +281,41 @@ pub fn normalize_anchor(
         anchor_w,
         anchor_h,
         anchor_approx: anchor.approx,
+        anchor_kind,
+        anchor_node_id,
+        anchor_quote,
     })
+}
+
+fn normalize_v2(v2: &FeedbackAnchorV2) -> Result<NormalizedAnchorV2, AppError> {
+    if v2.version != Some(2.0) {
+        return Err(AppError::Validation(ANCHOR_VERSION_MESSAGE.to_owned()));
+    }
+    let kind = v2.kind.as_deref();
+    if !matches!(kind, Some("element" | "region")) {
+        return Err(AppError::Validation(ANCHOR_KIND_MESSAGE.to_owned()));
+    }
+    if !v2.path_is_string {
+        return Err(AppError::Validation(ANCHOR_PATH_V2_MESSAGE.to_owned()));
+    }
+    if !v2.node_id_is_string_or_null {
+        return Err(AppError::Validation(ANCHOR_NODE_ID_MESSAGE.to_owned()));
+    }
+    if !v2.quote_is_string_or_null {
+        return Err(AppError::Validation(ANCHOR_QUOTE_MESSAGE.to_owned()));
+    }
+    if !v2.approx_is_boolean_or_absent {
+        return Err(AppError::Validation(ANCHOR_APPROX_V2_MESSAGE.to_owned()));
+    }
+    Ok((
+        kind.map(ToOwned::to_owned),
+        v2.node_id
+            .as_deref()
+            .map(|value| slice_utf16(value, ANCHOR_NODE_ID_MAX_UTF16)),
+        v2.quote
+            .as_deref()
+            .map(|value| slice_utf16(value, ANCHOR_QUOTE_MAX_UTF16)),
+    ))
 }
 
 /// `Number.isFinite(v) && v >= 0 && v <= 1`.
@@ -416,7 +484,15 @@ pub fn add(
     } else {
         input.submission.anchor.as_ref()
     };
-    let normalized = normalize_anchor(anchor, input.submission.anchor_path.as_deref())?;
+    let normalized = normalize_anchor_with_v2(
+        anchor,
+        input.submission.anchor_path.as_deref(),
+        if parent_id.is_some() {
+            None
+        } else {
+            input.submission.anchor_v2.as_ref()
+        },
+    )?;
     let anchor_page = if parent_id.is_some() || anchor.is_none() {
         None
     } else {
@@ -447,6 +523,9 @@ pub fn add(
             normalized.anchor_h,
             i64::from(normalized.anchor_approx),
             anchor_page,
+            normalized.anchor_kind,
+            normalized.anchor_node_id,
+            normalized.anchor_quote,
         ],
     )
     .map_err(|error| insert_failure(&error))?;
@@ -736,6 +815,20 @@ fn read_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Feedback> {
         external_created_at: row.get::<_, Option<String>>(20)?.map(Timestamp),
         external_edited_at: row.get::<_, Option<String>>(21)?.map(Timestamp),
         external_deleted_at: row.get::<_, Option<String>>(22)?.map(Timestamp),
+        anchor_kind: row.get(23)?,
+        anchor_node_id: row.get(24)?,
+        anchor_quote: row.get(25)?,
+        anchor_version: if row.get::<_, Option<String>>(23)?.is_some()
+            || row.get::<_, Option<String>>(24)?.is_some()
+            || row.get::<_, Option<String>>(25)?.is_some()
+        {
+            2
+        } else if row.get::<_, Option<f64>>(8)?.is_some() && row.get::<_, Option<f64>>(9)?.is_some()
+        {
+            1
+        } else {
+            0
+        },
     })
 }
 

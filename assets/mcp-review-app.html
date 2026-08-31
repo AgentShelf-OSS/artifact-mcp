@@ -386,6 +386,45 @@
     @media (prefers-reduced-motion: reduce) {
       .loading { animation: none; }
     }
+
+    /* PBI-087: align the trusted review app with the portal's compact slate/paper system. */
+    :root {
+      --canvas: light-dark(#e9ecee, #11171c);
+      --surface: light-dark(#f8f9f8, #1a2228);
+      --surface-raised: light-dark(#ffffff, #202a31);
+      --ink: light-dark(#15202a, #edf1f2);
+      --muted: light-dark(#64717a, #99a5ab);
+      --line: light-dark(#ccd3d6, #354149);
+      --navy: light-dark(#15202a, #edf1f2);
+      --blue: #b76d2e;
+      --gold: #b76d2e;
+      --gold-soft: light-dark(#f3e4d5, #3b2b20);
+      --radius: 8px;
+      --sans: Aptos, "Segoe UI Variable", "Segoe UI", ui-sans-serif, system-ui, sans-serif;
+      --mono: "SFMono-Regular", Consolas, "Liberation Mono", ui-monospace, monospace;
+    }
+    .app { padding: 10px; }
+    .frame { min-height: 238px; border-radius: 8px; box-shadow: 0 12px 30px -24px rgba(35,47,54,.42); }
+    .frame::before { width: 3px; background: var(--blue); }
+    .preview { min-height: 238px; }
+    .preview img { min-height: 238px; }
+    .preview::after { border-radius: 4px; font: 700 9px/1 var(--mono); }
+    .details { padding: 18px 18px 14px; }
+    .eyebrow { color: var(--blue); font: 750 10px/1.2 var(--mono); }
+    .dot { display: none; }
+    h1 { font: 760 clamp(23px,4vw,33px)/.98 var(--sans); letter-spacing: -.04em; }
+    .description { margin: 10px 0 14px; font-size: 13px; }
+    .fact { padding-top: 7px; }
+    .fact-label { font: 700 8px/1.2 var(--mono); }
+    .fact-value { font: 650 11px/1.3 var(--sans); }
+    .secondary,.open,.nav { min-height: 36px; border-radius: 5px; font: 700 11px var(--mono); }
+    .open { border-color: var(--ink); background: var(--ink); color: var(--surface-raised); }
+    .open:hover { border-color: var(--blue); background: var(--blue); }
+    .panel,.revision-row { border-radius: 6px; }
+    .secondary:hover { border-color: color-mix(in srgb,var(--blue) 55%,var(--line)); }
+    .secondary:focus-visible,.open:focus-visible,.nav:focus-visible,textarea:focus-visible { outline-color: color-mix(in srgb,var(--blue) 45%,transparent); }
+    @media (max-width:560px) { .secondary,.open,.nav { min-height:44px; }.frame,.preview,.preview img { min-height:154px; } }
+    @media (forced-colors:active) { .frame,.panel,.revision-row { border:2px solid CanvasText; }.frame::before { background:CanvasText; } }
   </style>
 </head>
 <body>

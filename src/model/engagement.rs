@@ -56,6 +56,23 @@ pub struct FeedbackAnchor {
     pub approx: bool,
 }
 
+/// Structured anchor metadata introduced by anchor protocol v2.
+///
+/// The geometry remains in [`FeedbackAnchor`] so v1 rows and v2 rows share the same durable
+/// bounds. `version` is deliberately not persisted: the non-null v2 columns are the durable
+/// discriminator, and projections compute `anchor_version` from them.
+#[derive(Clone, Debug, PartialEq)]
+pub struct FeedbackAnchorV2 {
+    pub version: Option<f64>,
+    pub kind: Option<String>,
+    pub node_id: Option<String>,
+    pub quote: Option<String>,
+    pub path_is_string: bool,
+    pub node_id_is_string_or_null: bool,
+    pub quote_is_string_or_null: bool,
+    pub approx_is_boolean_or_absent: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Feedback {
     pub id: FeedbackId,
@@ -73,6 +90,10 @@ pub struct Feedback {
     pub anchor_h: Option<f64>,
     pub anchor_approx: bool,
     pub anchor_page: Option<String>,
+    pub anchor_kind: Option<String>,
+    pub anchor_node_id: Option<String>,
+    pub anchor_quote: Option<String>,
+    pub anchor_version: u8,
     pub created_at: Timestamp,
     pub resolved_at: Option<Timestamp>,
     pub resolved_by: Option<String>,
@@ -118,6 +139,9 @@ pub struct SubmitFeedback {
     pub anchor: Option<FeedbackAnchor>,
     pub anchor_path: Option<String>,
     pub anchor_page: Option<String>,
+    /// `Some` means one of the v2-only members appeared in the input. Its raw validation state
+    /// is retained until persistence so a malformed structured anchor cannot become a v1 row.
+    pub anchor_v2: Option<FeedbackAnchorV2>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

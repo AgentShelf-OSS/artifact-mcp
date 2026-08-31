@@ -113,6 +113,53 @@ test("feedback persists and lists anchor page identity while legacy and reply ro
   });
 });
 
+test("feedback preserves a valid structured v2 anchor and rejects malformed v2 metadata", () => {
+  withFeedbackStore(({ feedback }) => {
+    const v2 = feedback.addFeedback({
+      artifactId: "artifact-a", org: "acme", viewerEmail: "owner@acme.test", body: "Section",
+      artifactRevision: 7,
+      anchor: {
+        version: 2, kind: "element", path: "main:nth-child(1)", nodeId: "revenue-table",
+        quote: "Quarterly revenue", x: 0.25, y: 0.5, w: 0.25, h: 0.2, approx: false
+      }
+    });
+    assert.deepEqual(
+      {
+        anchor_version: v2.anchor_version, anchor_kind: v2.anchor_kind, anchor_node_id: v2.anchor_node_id,
+        anchor_quote: v2.anchor_quote, anchor_path: v2.anchor_path
+      },
+      {
+        anchor_version: 2, anchor_kind: "element", anchor_node_id: "revenue-table",
+        anchor_quote: "Quarterly revenue", anchor_path: "main:nth-child(1)"
+      }
+    );
+    assert.equal(v2.artifact_revision, 7, "the anchor stays pinned to the exact revision that accepted it");
+    const legacy = feedback.addFeedback({
+      artifactId: "artifact-a", org: "acme", viewerEmail: "owner@acme.test", body: "Legacy",
+      artifactRevision: 7, anchor: { path: "body", x: 0.1, y: 0.2 }
+    });
+    const plain = feedback.addFeedback({
+      artifactId: "artifact-a", org: "acme", viewerEmail: "owner@acme.test", body: "Plain", artifactRevision: 7
+    });
+    assert.equal(legacy.anchor_version, 1);
+    assert.equal(plain.anchor_version, 0);
+    for (const anchor of [
+      { version: 1, kind: "element", path: "body", x: 0.1, y: 0.2 },
+      { version: 2, kind: "unknown", path: "body", x: 0.1, y: 0.2 },
+      { version: 2, kind: "element", path: 9, x: 0.1, y: 0.2 },
+      { version: 2, kind: "element", path: "body", nodeId: 9, x: 0.1, y: 0.2 },
+      { version: 2, kind: "element", path: "body", quote: 9, x: 0.1, y: 0.2 },
+      { version: 2, kind: "element", path: "body", approx: "yes", x: 0.1, y: 0.2 },
+      { version: 2, kind: "element", path: "body", approx: null, x: 0.1, y: 0.2 }
+    ]) {
+      assert.throws(
+        () => feedback.addFeedback({ artifactId: "artifact-a", org: "acme", viewerEmail: "x", body: "Invalid", artifactRevision: 7, anchor }),
+        /Anchor version|Anchor kind|Anchor path|Anchor nodeId|Anchor quote|Anchor approx/
+      );
+    }
+  });
+});
+
 test("viewer delete and resolve enforce ownership, admin access, and parent cascade", () => {
   withFeedbackStore(({ feedback }) => {
     const parent = feedback.addFeedback({ artifactId: "artifact-a", org: "acme", viewerEmail: "owner@acme.test", body: "Parent", artifactRevision: 2 });

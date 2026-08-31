@@ -8,6 +8,7 @@ use artifact_mcp::persistence::migrations::{
 use base64::Engine;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use rusqlite::Connection;
+use rusqlite::types::Value;
 
 use crate::u03_support::{
     TempDataDir, column_names, foreign_key_violations, quick_check, recorded_migrations, scalar,
@@ -523,6 +524,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (29, "discord-notification-threads".to_owned()),
         (30, "discord-organization-threading-policy".to_owned()),
         (31, "discord-two-way-inbound-sync".to_owned()),
+        (32, "feedback-anchor-v2".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert!(
@@ -544,5 +546,107 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         ),
         0,
         "every ledger row records an applied_at timestamp"
+    );
+}
+
+/// Reads every `feedback` row without collapsing SQLite value types.
+fn feedback_rows(conn: &Connection) -> Vec<Vec<Value>> {
+    let width = column_names(conn, "feedback").len();
+    let mut statement = conn
+        .prepare("SELECT * FROM feedback ORDER BY id")
+        .expect("prepare feedback query");
+    let mut rows_iter = statement.query([]).expect("query feedback");
+    let mut rows = Vec::new();
+    while let Some(row) = rows_iter.next().expect("read feedback row") {
+        let mut values = Vec::new();
+        for index in 0..width {
+            values.push(row.get(index).expect("read feedback value"));
+        }
+        rows.push(values);
+    }
+    rows
+}
+
+#[test]
+fn populated_schema_31_databases_upgrade_to_the_latest_version_and_reopen_cleanly() {
+    let dir = TempDataDir::new("v31-feedback");
+    let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("conformance/fixtures/historical/boundary-v31/artifacts.db");
+    let destination = db::database_path(dir.path());
+    std::fs::copy(&source, &destination).expect("copy immutable v31 fixture");
+
+    // Immutable pre-upgrade evidence straight from the copy: ledger and every feedback value.
+    let pre_rows = {
+        let conn = Connection::open(&destination).expect("open raw v31 copy");
+        let ledger = recorded_migrations(&conn);
+        assert_eq!(
+            ledger.last().map(|(version, _)| *version),
+            Some(31),
+            "the boundary copy records through v31"
+        );
+        let rows = feedback_rows(&conn);
+        assert!(
+            !rows.is_empty(),
+            "the v31 fixture is populated with feedback"
+        );
+        rows
+    };
+
+    let pool = Database::open_with(dir.path(), &MigrationContext::empty(), None).expect("upgrade");
+    {
+        let conn = db::checkout(&pool).expect("checkout");
+        assert_eq!(
+            migrations::current_version(&conn).expect("version"),
+            LATEST_SCHEMA_VERSION
+        );
+        assert_eq!(
+            migrations::applied_versions(&conn).expect("versions"),
+            (1..=LATEST_SCHEMA_VERSION).collect::<Vec<_>>()
+        );
+        assert_eq!(quick_check(&conn), "ok");
+        assert_eq!(foreign_key_violations(&conn), 0);
+        assert_eq!(
+            scalar::<i64>(
+                &conn,
+                "SELECT COUNT(*) FROM feedback WHERE anchor_kind IS NULL                  AND anchor_node_id IS NULL AND anchor_quote IS NULL"
+            ),
+            scalar::<i64>(&conn, "SELECT COUNT(*) FROM feedback"),
+            "the anchor-v2 columns are null for every pre-existing row"
+        );
+        let post_rows = feedback_rows(&conn);
+        assert_eq!(
+            post_rows.len(),
+            pre_rows.len(),
+            "no feedback rows were added or dropped"
+        );
+        for (pre_row, post_row) in pre_rows.iter().zip(post_rows.iter()) {
+            assert_eq!(
+                &post_row[..pre_row.len()],
+                pre_row.as_slice(),
+                "pre-existing feedback values survived the v32 migration"
+            );
+        }
+    }
+    drop(pool);
+
+    // A second bootstrap must not apply any migration and must keep the new columns null.
+    let mut conn = db::open_bootstrap_connection(&db::database_path(dir.path()))
+        .expect("bootstrap connection");
+    let applied = migrations::apply(&mut conn, &MigrationContext::empty()).expect("re-apply");
+    assert!(
+        applied.is_empty(),
+        "reopening applied {applied:?} instead of nothing"
+    );
+    assert_eq!(
+        migrations::current_version(&conn).expect("version"),
+        LATEST_SCHEMA_VERSION
+    );
+    assert_eq!(
+        scalar::<i64>(
+            &conn,
+            "SELECT COUNT(*) FROM feedback WHERE anchor_kind IS NOT NULL              OR anchor_node_id IS NOT NULL OR anchor_quote IS NOT NULL"
+        ),
+        0,
+        "the anchor-v2 columns remain null after the reopen"
     );
 }

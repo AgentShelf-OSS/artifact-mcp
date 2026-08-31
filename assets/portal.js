@@ -85,9 +85,54 @@
   var count = document.getElementById("count");
   var empty = document.getElementById("empty");
   var grid = document.getElementById("artifact-grid");
+  var sort = document.getElementById("sort");
+  var orgFilter = document.getElementById("org-filter");
+  var categoryFilter = document.getElementById("category-filter");
+  var resetFilters = document.querySelector("[data-reset-filters]");
+  var sortLabel = document.getElementById("sort-label");
   var activeView = "all";
   var activeOrg = "all";
   var activeCategory = "all";
+
+  function visibleCards() {
+    return cards.filter(function (card) { return card.isConnected; });
+  }
+
+  function viewCount(card) {
+    var badge = card.querySelector(".view-badge");
+    return badge ? Number(String(badge.textContent || "").replace(/[^0-9]/g, "")) || 0 : 0;
+  }
+
+  function applySort() {
+    if (!grid || !sort) return;
+    var mode = sort.value;
+    visibleCards().sort(function (left, right) {
+      if (mode === "title") return (left.querySelector(".card-title").textContent || "").localeCompare(right.querySelector(".card-title").textContent || "");
+      if (mode === "views") return viewCount(right) - viewCount(left);
+      return String(right.dataset.updated || "").localeCompare(String(left.dataset.updated || ""));
+    }).forEach(function (card) { grid.appendChild(card); });
+    if (sortLabel && sort.selectedOptions[0]) sortLabel.textContent = sort.selectedOptions[0].textContent;
+  }
+
+  function saveLibraryState() {
+    var state = {
+      q: search && search.value || "",
+      view: activeView,
+      org: activeOrg,
+      category: activeCategory,
+      sort: sort && sort.value || "recent",
+      scrollY: Math.max(0, window.scrollY || window.pageYOffset || 0)
+    };
+    try { sessionStorage.setItem("artifact-library-state", JSON.stringify(state)); } catch (_error) {}
+    try {
+      var url = new URL(location.href);
+      ["q", "view", "org", "category", "sort"].forEach(function (key) {
+        if (state[key] && state[key] !== "all" && state[key] !== "recent") url.searchParams.set(key, state[key]);
+        else url.searchParams.delete(key);
+      });
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch (_error) {}
+  }
 
   function pressOnly(selector, active) {
     document.querySelectorAll(selector).forEach(function (button) {
@@ -98,13 +143,15 @@
   function applyFilters() {
     var term = (search && search.value || "").trim().toLowerCase();
     var shown = 0;
-    cards.forEach(function (card) {
+    applySort();
+    visibleCards().forEach(function (card) {
       if (!card.isConnected) return;
       card.classList.add("settled");
       var viewMatch =
         activeView === "all" ||
         (activeView === "favorites" && card.dataset.fav === "1") ||
-        (activeView === "review" && card.dataset.needsReview === "1");
+        (activeView === "review" && card.dataset.needsReview === "1") ||
+        (activeView === "hidden" && card.dataset.hidden === "1");
       var orgMatch = activeOrg === "all" || card.dataset.org === activeOrg;
       var categoryMatch = activeCategory === "all" || card.dataset.category === activeCategory;
       var termMatch = !term || card.dataset.q.indexOf(term) !== -1;
@@ -113,7 +160,11 @@
       if (visible) shown += 1;
     });
     if (empty) empty.hidden = shown !== 0;
-    if (count) count.textContent = "Showing " + shown + " of " + cards.filter(function (card) { return card.isConnected; }).length;
+    if (count) count.textContent = "Showing " + shown + " of " + visibleCards().length;
+    if (resetFilters) {
+      resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");
+    }
+    saveLibraryState();
   }
 
   document.addEventListener("click", function (event) {
@@ -124,32 +175,47 @@
       applyFilters();
       return;
     }
-    var orgFilter = event.target.closest("[data-filter-org]");
-    if (orgFilter) {
-      activeOrg = orgFilter.dataset.filterOrg;
-      pressOnly("[data-filter-org]", orgFilter);
-      applyFilters();
-      return;
-    }
-    var categoryFilter = event.target.closest("[data-filter-category]");
-    if (categoryFilter) {
-      activeCategory = categoryFilter.dataset.filterCategory;
-      pressOnly("[data-filter-category]", categoryFilter);
+    var resetButton = event.target.closest("[data-reset-filters]");
+    if (resetButton) {
+      activeView = "all";
+      activeOrg = "all";
+      activeCategory = "all";
+      if (search) search.value = "";
+      if (sort) sort.value = "recent";
+      if (orgFilter) orgFilter.value = "all";
+      if (categoryFilter) categoryFilter.value = "all";
+      var all = document.querySelector('[data-filter-view="all"]');
+      if (all) pressOnly("[data-filter-view]", all);
       applyFilters();
     }
   });
 
   if (search) search.addEventListener("input", applyFilters);
+  if (sort) sort.addEventListener("change", applyFilters);
+  if (orgFilter) orgFilter.addEventListener("change", function () {
+    activeOrg = orgFilter.value;
+    applyFilters();
+  });
+  if (categoryFilter) categoryFilter.addEventListener("change", function () {
+    activeCategory = categoryFilter.value;
+    applyFilters();
+  });
 
-  var filterToggle = document.getElementById("filter-toggle");
-  var filterRail = document.getElementById("filter-rail");
-  if (filterToggle && filterRail) {
-    filterToggle.addEventListener("click", function () {
-      var open = !filterRail.classList.contains("open");
-      filterRail.classList.toggle("open", open);
-      filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-  }
+  // The viewer's Back link is deliberately a clean `href="/"`. Preserve a return snapshot
+  // only when the viewer was opened from this library, rather than writing on every scroll.
+  document.addEventListener("click", function (event) {
+    var artifactLink = event.target.closest(".card a[href]");
+    if (!artifactLink || artifactLink.hasAttribute("download") || /\/raw\//.test(artifactLink.pathname || "")) return;
+    saveLibraryState();
+    try { sessionStorage.setItem("artifact-library-return", "1"); } catch (_error) {}
+  }, true);
+  window.addEventListener("pagehide", function () { saveLibraryState(); });
+  // A browser Back can revive this document from bfcache without rerunning restoreLibraryState.
+  // Its DOM already has the prior library state, so discard the one-shot marker immediately.
+  window.addEventListener("pageshow", function (event) {
+    if (!event.persisted) return;
+    try { sessionStorage.removeItem("artifact-library-return"); } catch (_error) {}
+  });
 
   document.querySelectorAll("[data-layout]").forEach(function (button) {
     if (!button.closest(".layout-toggle")) return;
@@ -174,6 +240,39 @@
     } catch (_error) {
       // Layout persistence is optional.
     }
+  }
+
+  function restoreLibraryState() {
+    var state = null;
+    var restoreScroll = false;
+    try {
+      var url = new URL(location.href);
+      if (["q", "view", "org", "category", "sort"].some(function (key) { return url.searchParams.has(key); })) {
+        state = Object.fromEntries(url.searchParams.entries());
+      } else if (sessionStorage.getItem("artifact-library-return") === "1") {
+        state = JSON.parse(sessionStorage.getItem("artifact-library-state") || "null");
+      }
+      restoreScroll = sessionStorage.getItem("artifact-library-return") === "1";
+      sessionStorage.removeItem("artifact-library-return");
+    } catch (_error) {}
+    if (!state) return null;
+    if (search && state.q) search.value = state.q;
+    if (sort && state.sort && Array.prototype.some.call(sort.options, function (option) { return option.value === state.sort; })) sort.value = state.sort;
+    var viewValue = state.view || "all";
+    var viewButton = document.querySelector('[data-filter-view="' + CSS.escape(viewValue) + '"]');
+    if (viewButton) {
+      activeView = viewValue;
+      pressOnly("[data-filter-view]", viewButton);
+    }
+    if (orgFilter && state.org && Array.prototype.some.call(orgFilter.options, function (option) { return option.value === state.org; })) {
+      activeOrg = state.org;
+      orgFilter.value = state.org;
+    }
+    if (categoryFilter && state.category && Array.prototype.some.call(categoryFilter.options, function (option) { return option.value === state.category; })) {
+      activeCategory = state.category;
+      categoryFilter.value = state.category;
+    }
+    return restoreScroll && Number.isFinite(Number(state.scrollY)) ? Math.max(0, Number(state.scrollY)) : null;
   }
 
   document.addEventListener("keydown", function (event) {
@@ -284,7 +383,7 @@
           range.selectNodeContents(url);
           selection.removeAllRanges();
           selection.addRange(range);
-          toast("Link selected — copy it manually");
+          toast("Link selected. Copy it manually");
         };
         if (!navigator.clipboard) {
           fallback();
@@ -576,5 +675,7 @@
     // The success message is optional when URL APIs are unavailable.
   }
 
+  var returnScrollY = restoreLibraryState();
   applyFilters();
+  if (returnScrollY !== null) requestAnimationFrame(function () { window.scrollTo(0, returnScrollY); });
 }());

@@ -34,51 +34,49 @@
     <section class="collection-head" aria-labelledby="page-title">
       <div>
         <p class="eyebrow">Private artifact collection</p>
-        <h1 id="page-title">{% if viewer_is_admin %}Artifacts{% else %}{{ viewer_org }} artifacts{% endif %}</h1>
-        <p class="intro-copy">{% if viewer_is_admin %}Published work across every organization you can access, including hidden artifacts.{% else %}Visible {{ viewer_org }} work, plus uploads you have hidden.{% endif %}</p>
+        <h1 id="page-title">Find every published artifact.</h1>
+        <p class="intro-copy">Browse every artifact your role can access. Search the content, check review status, or return to the latest revision.</p>
       </div>
-      <div class="collection-stats" aria-label="{{ total }} artifacts, {{ favorite_total }} favorites, {{ unread_notifications }} unread notifications">
+      <div class="collection-stats" aria-label="{{ total }} artifacts, {{ organization_total }} organizations, {{ needs_review_total }} need review, {{ hidden_total }} hidden">
         <span><strong>{{ total }}</strong>artifacts</span>
-        <span><strong>{{ favorite_total }}</strong>favorites</span>
-        <span><strong>{{ unread_notifications }}</strong>unread</span>
+        <span><strong>{{ organization_total }}</strong>organizations</span>
+        <span><strong>{{ needs_review_total }}</strong>need review</span>
+        <span><strong>{{ hidden_total }}</strong>hidden</span>
       </div>
     </section>
 
-    <div class="collection-tools">
+    <section class="collection-tools" aria-label="Artifact library controls">
       <label class="search">{{ icons.search }}
         <input id="q" type="search" placeholder="Search artifacts, publishers, categories" aria-label="Search artifacts" autocomplete="off">
         <kbd aria-hidden="true">/</kbd>
       </label>
-      <button class="filter-toggle" id="filter-toggle" type="button" aria-expanded="false" aria-controls="filter-rail">Filters</button>
-      <div class="layout-toggle" aria-label="Collection layout">
-        <button type="button" data-layout="grid" aria-pressed="true">Grid</button>
-        <button type="button" data-layout="list" aria-pressed="false">List</button>
-      </div>
-    </div>
-
-    <div class="collection-layout">
-      <aside class="filter-rail" id="filter-rail" aria-label="Artifact filters">
-        <div class="filter-group" id="view-filters">
-          <p class="filter-title">View</p>
-          <button class="filter-choice" data-filter-view="all" aria-pressed="true">All artifacts <span>{{ total }}</span></button>
+      <div class="toolbar-actions">
+        <div class="quick-filters" id="view-filters" aria-label="Quick filters">
+          <button class="filter-choice" data-filter-view="all" aria-pressed="true">All <span>{{ total }}</span></button>
           <button class="filter-choice" data-filter-view="favorites" aria-pressed="false">Favorites <span>{{ favorite_total }}</span></button>
           <button class="filter-choice" data-filter-view="review" aria-pressed="false">{% if viewer_is_admin %}Needs review{% else %}My needs-work votes{% endif %} <span>{{ needs_review_total }}</span></button>
+          {% if viewer_is_admin %}<button class="filter-choice" data-filter-view="hidden" aria-pressed="false">Hidden <span>{{ hidden_total }}</span></button>{% endif %}
         </div>
-        {% if show_chips %}<div class="filter-group" id="org-filters" aria-label="Filter by organization">
-          <p class="filter-title">Organization</p>
-          <button class="filter-choice" data-filter-org="all" aria-pressed="true">All organizations <span>{{ total }}</span></button>
-          {% for chip in chips %}<button class="filter-choice" data-filter-org="{{ chip.org }}" aria-pressed="false"><span><span class="dot" style="background:{{ chip.color }}"></span>{{ chip.org }}</span><span>{{ chip.count }}</span></button>{% endfor %}
-        </div>{% endif %}
-        {% if !categories.is_empty() %}<div class="filter-group" id="category-filters" aria-label="Filter by category">
-          <p class="filter-title">Category</p>
-          <button class="filter-choice" data-filter-category="all" aria-pressed="true">All categories <span>{{ total }}</span></button>
-          {% for category in categories %}<button class="filter-choice" data-filter-category="{{ category.key }}" aria-pressed="false"><span>{{ category.label }}</span><span>{{ category.count }}</span></button>{% endfor %}
-        </div>{% endif %}
-      </aside>
+        <label class="select-control"><span class="sr-only">Organization</span><select id="org-filter" aria-label="Filter by organization">
+          <option value="all">All organizations</option>
+          {% for chip in chips %}<option value="{{ chip.org }}">{{ chip.org }} ({{ chip.count }})</option>{% endfor %}
+        </select></label>
+        <label class="select-control"><span class="sr-only">Category</span><select id="category-filter" aria-label="Filter by category">
+          <option value="all">All categories</option>
+          {% for category in categories %}<option value="{{ category.key }}">{{ category.label }} ({{ category.count }})</option>{% endfor %}
+        </select></label>
+        <label class="select-control sort-control"><span class="sr-only">Sort artifacts</span><select id="sort" aria-label="Sort artifacts"><option value="recent">Updated recently</option><option value="views">Most viewed</option><option value="title">Title A-Z</option></select></label>
+        <button class="reset-filters" type="button" data-reset-filters hidden>Clear</button>
+        <div class="layout-toggle" aria-label="Collection layout">
+          <button type="button" data-layout="grid" aria-pressed="true">Grid</button>
+          <button type="button" data-layout="list" aria-pressed="false">List</button>
+        </div>
+      </div>
+    </section>
 
-      <section class="collection-results" aria-label="Artifact results">
+    <section class="collection-results" aria-label="Artifact results">
         <div class="result-summary">
-          <span>{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %} · Updated recently</span>
+          <span>{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %} · <span id="sort-label">Updated recently</span></span>
           <span class="count" id="count" aria-live="polite">Showing {{ total }} of {{ total }}</span>
         </div>
 
@@ -129,8 +127,7 @@
             </div>
           </article>{% endfor %}
         </div>{% endif %}
-      </section>
-    </div>
+    </section>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="empty" id="empty" hidden><p class="empty-kicker">No matches</p><h2>Nothing in the collection fits those filters.</h2><p>Try another title, publisher, category, or organization.</p></div>

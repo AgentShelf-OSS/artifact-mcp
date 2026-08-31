@@ -392,6 +392,7 @@ fn rust_submission(
             .and_then(Value::as_str)
             .map(str::to_owned),
         anchor_page: None,
+        anchor_v2: None,
     };
     (
         submission,

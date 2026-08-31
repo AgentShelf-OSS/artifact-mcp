@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 31;
+pub const LATEST_SCHEMA_VERSION: i64 = 32;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -246,6 +246,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 31,
         name: "discord-two-way-inbound-sync",
         up: m031_discord_two_way_inbound_sync,
+    },
+    Migration {
+        version: 32,
+        name: "feedback-anchor-v2",
+        up: m32_feedback_anchor_v2,
     },
 ];
 
@@ -1583,6 +1588,16 @@ fn m031_discord_two_way_inbound_sync(
         );
         ",
     )
+}
+
+/// Port of migration 32 (`feedback-anchor-v2`) in `lib/migrations.js`: the dense anchor-v2
+/// metadata columns. Purely additive, idempotent `ALTER TABLE` statements, in Node's exact
+/// order; a NULL value retains the existing anchor semantics.
+fn m32_feedback_anchor_v2(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
+    ensure_column(tx, "feedback", "anchor_kind", "TEXT")?;
+    ensure_column(tx, "feedback", "anchor_node_id", "TEXT")?;
+    ensure_column(tx, "feedback", "anchor_quote", "TEXT")?;
+    Ok(())
 }
 
 /// Encrypted webhook URL record produced by U04's cipher.

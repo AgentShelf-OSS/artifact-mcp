@@ -934,6 +934,10 @@ fn feedback_row(meta: &ArtifactMeta) -> Feedback {
         anchor_h: None,
         anchor_approx: false,
         anchor_page: None,
+        anchor_kind: None,
+        anchor_node_id: None,
+        anchor_quote: None,
+        anchor_version: 0,
         created_at: Timestamp("2026-07-21 00:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,
@@ -1510,6 +1514,7 @@ async fn feedback_submission_uses_u11_without_invoking_the_legacy_notifier() {
             anchor: None,
             anchor_path: None,
             anchor_page: None,
+            anchor_v2: None,
         })
     );
     assert_eq!(
@@ -1517,6 +1522,41 @@ async fn feedback_submission_uses_u11_without_invoking_the_legacy_notifier() {
         ["resolve_viewer", "find_meta", "submit_feedback"]
     );
     assert!(harness.notifications().is_empty());
+}
+
+#[tokio::test]
+async fn feedback_submission_preserves_structured_v2_anchor_metadata() {
+    let harness = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
+    let response = build_router(deps(harness.clone()))
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/abc123def456/feedback")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"body":"Pinned","anchor":{"version":2,"kind":"element","path":"main:nth-child(1)","nodeId":"revenue-table","quote":"Quarterly revenue","x":0.25,"y":0.5,"w":0.25,"h":0.2,"approx":false}}"#,
+                ))
+                .expect("request"),
+        )
+        .await
+        .expect("router response");
+
+    assert_eq!(response.status(), StatusCode::CREATED);
+    let submitted = harness.feedback_submission().expect("submission");
+    assert_eq!(submitted.anchor_path.as_deref(), Some("main:nth-child(1)"));
+    assert_eq!(
+        submitted.anchor_v2,
+        Some(FeedbackAnchorV2 {
+            version: Some(2.0),
+            kind: Some("element".to_owned()),
+            node_id: Some("revenue-table".to_owned()),
+            quote: Some("Quarterly revenue".to_owned()),
+            path_is_string: true,
+            node_id_is_string_or_null: true,
+            quote_is_string_or_null: true,
+            approx_is_boolean_or_absent: true,
+        })
+    );
 }
 
 #[tokio::test]

@@ -196,6 +196,7 @@ impl Fixture {
                 anchor: None,
                 anchor_path: None,
                 anchor_page: None,
+                anchor_v2: None,
             },
             4_000,
         )
@@ -580,6 +581,7 @@ fn discussion_queue_admission_failure_rolls_back_the_feedback_and_link() {
                 anchor: None,
                 anchor_path: None,
                 anchor_page: None,
+                anchor_v2: None,
             },
             4_000,
         ),

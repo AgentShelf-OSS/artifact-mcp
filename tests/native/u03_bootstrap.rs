@@ -98,6 +98,37 @@ fn fresh_database_matches_the_node_schema_shape() {
             "client_id"
         ]
     );
+    assert_eq!(
+        column_names(&conn, "feedback"),
+        [
+            "id",
+            "artifact_id",
+            "org",
+            "viewer_email",
+            "body",
+            "artifact_revision",
+            "created_at",
+            "resolved_at",
+            "resolved_by",
+            "anchor_path",
+            "anchor_x",
+            "anchor_y",
+            "anchor_approx",
+            "parent_id",
+            "anchor_w",
+            "anchor_h",
+            "anchor_page",
+            "author_source",
+            "external_author_id",
+            "external_author_display",
+            "external_created_at",
+            "external_edited_at",
+            "external_deleted_at",
+            "anchor_kind",
+            "anchor_node_id",
+            "anchor_quote"
+        ]
+    );
     assert!(
         index_names(&conn, "org_email_members")
             .iter()

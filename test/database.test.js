@@ -48,6 +48,16 @@ test("fresh databases apply ordered migrations with foreign keys enabled", () =>
         "is_bundle", "entry", "created_at", "body_sha256", "client_id"
       ]
     );
+    assert.deepEqual(
+      runtime.db.prepare("PRAGMA table_info(feedback)").all().map((column) => column.name),
+      [
+        "id", "artifact_id", "org", "viewer_email", "body", "artifact_revision", "created_at",
+        "resolved_at", "resolved_by", "anchor_path", "anchor_x", "anchor_y", "anchor_approx",
+        "parent_id", "anchor_w", "anchor_h", "anchor_page", "author_source",
+        "external_author_id", "external_author_display", "external_created_at",
+        "external_edited_at", "external_deleted_at", "anchor_kind", "anchor_node_id", "anchor_quote"
+      ]
+    );
     runtime.db.prepare("INSERT INTO api_keys (client_id, key_hash) VALUES (?, ?)")
       .run("pre-v22-author", "pre-v22-hash");
     runtime.db.prepare("INSERT INTO artifacts (id, client_id, org, title) VALUES (?, ?, ?, ?)")
@@ -100,6 +110,78 @@ test("a frozen v25 audit database upgrades through v26 without rewriting its his
     assert.deepEqual(db.prepare("PRAGMA table_info(security_audit_receipts)").all().filter((column) => ["actor_id", "result", "canonical_version", "receipt_mac"].includes(column.name)).map((column) => column.name), ["result", "actor_id", "canonical_version", "receipt_mac"]);
   } finally {
     db.close();
+    rmSync(dataDir, { recursive: true, force: true });
+  }
+});
+
+test("a populated schema-31 database upgrades to the latest version and reopens without further migrations", () => {
+  const dataDir = mkdtempSync(path.join(tmpdir(), "artifact-db-v31-anchor-"));
+  const boundary = new Database(path.join(dataDir, "artifacts.db"));
+  boundary.pragma("foreign_keys = ON");
+  try {
+    migrateDatabaseThrough(boundary, 31);
+    assert.deepEqual(
+      boundary.prepare("SELECT version FROM schema_migrations ORDER BY version").pluck().all(),
+      Array.from({ length: 31 }, (_, i) => i + 1),
+      "the boundary database starts exactly at schema 31"
+    );
+    boundary.prepare("INSERT INTO artifacts (id, client_id, org, title) VALUES (?, ?, ?, ?)")
+      .run("v31-artifact", "v31-key", "default", "Schema 31 artifact");
+    boundary.prepare(
+      "INSERT INTO feedback (id, artifact_id, org, viewer_email, body, artifact_revision, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    ).run(
+      "v31-feedback", "v31-artifact", "default", "v31-viewer@example.test",
+      "Feedback written before anchor v2", 2, "2026-07-30 19:32:23"
+    );
+    boundary.prepare(
+      "UPDATE feedback SET anchor_path = 'index.html', anchor_x = 12.5, anchor_y = 30, anchor_approx = 1, anchor_page = '2' WHERE id = 'v31-feedback'"
+    ).run();
+  } finally {
+    boundary.close();
+  }
+
+  const upgraded = openDatabase({ dataDir });
+  try {
+    assert.deepEqual(
+      upgraded.db.prepare("SELECT version FROM schema_migrations ORDER BY version").pluck().all(),
+      ALL_VERSIONS,
+      "the upgrade applies only the unapplied migration 32"
+    );
+    const row = upgraded.db.prepare("SELECT * FROM feedback WHERE id = 'v31-feedback'").get();
+    assert.equal(row.artifact_id, "v31-artifact");
+    assert.equal(row.org, "default");
+    assert.equal(row.viewer_email, "v31-viewer@example.test");
+    assert.equal(row.body, "Feedback written before anchor v2");
+    assert.equal(row.artifact_revision, 2);
+    assert.equal(row.created_at, "2026-07-30 19:32:23");
+    assert.equal(row.anchor_path, "index.html");
+    assert.equal(row.anchor_x, 12.5);
+    assert.equal(row.anchor_y, 30);
+    assert.equal(row.anchor_approx, 1);
+    assert.equal(row.anchor_page, "2");
+    assert.equal(row.anchor_kind, null);
+    assert.equal(row.anchor_node_id, null);
+    assert.equal(row.anchor_quote, null);
+  } finally {
+    upgraded.db.close();
+  }
+
+  // A second open must be a no-op for the ledger and keep the new columns null.
+  const reopened = openDatabase({ dataDir });
+  try {
+    assert.deepEqual(
+      reopened.db.prepare("SELECT version FROM schema_migrations ORDER BY version").pluck().all(),
+      ALL_VERSIONS,
+      "reopening applies no further migration"
+    );
+    const row = reopened.db.prepare("SELECT * FROM feedback WHERE id = 'v31-feedback'").get();
+    assert.equal(row.body, "Feedback written before anchor v2");
+    assert.equal(row.created_at, "2026-07-30 19:32:23");
+    assert.equal(row.anchor_kind, null);
+    assert.equal(row.anchor_node_id, null);
+    assert.equal(row.anchor_quote, null);
+  } finally {
+    reopened.db.close();
     rmSync(dataDir, { recursive: true, force: true });
   }
 });

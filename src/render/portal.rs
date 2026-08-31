@@ -131,9 +131,9 @@ struct Icons {
     down: TrustedStatic,
     back: TrustedStatic,
     forward: TrustedStatic,
-    home: TrustedStatic,
     eye: TrustedStatic,
     eye_off: TrustedStatic,
+    comment: TrustedStatic,
     share: TrustedStatic,
     more: TrustedStatic,
 }
@@ -172,14 +172,14 @@ const ICONS: Icons = Icons {
     forward: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg>"#,
     ),
-    home: TrustedStatic::new(
-        r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m4 11 8-7 8 7"></path><path d="M6.5 9.5V20h11V9.5M10 20v-6h4v6"></path></svg>"#,
-    ),
     eye: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="2.5"></circle></svg>"#,
     ),
     eye_off: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 6.2A10.5 10.5 0 0 1 12 6c6 0 9.5 6 9.5 6a17.7 17.7 0 0 1-3.1 3.8M6.1 6.1C3.8 7.7 2.5 10 2.5 12c0 0 3.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>"#,
+    ),
+    comment: TrustedStatic::new(
+        r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"></path><path d="M8 9h8M8 13h5"></path></svg>"#,
     ),
     share: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><path d="m8.7 10.6 6.6-4.1M8.7 13.4l6.6 4.1"></path></svg>"#,
@@ -206,9 +206,10 @@ struct GalleryTemplate<'a> {
     role: String,
     identity_color: String,
     total: usize,
+    organization_total: usize,
     favorite_total: usize,
     needs_review_total: usize,
-    show_chips: bool,
+    hidden_total: usize,
     has_delete_actions: bool,
     cards: Vec<CardTemplate>,
     chips: Vec<GalleryChipTemplate>,
@@ -219,7 +220,6 @@ struct GalleryTemplate<'a> {
 
 struct GalleryChipTemplate {
     org: String,
-    color: String,
     count: usize,
 }
 
@@ -320,6 +320,7 @@ struct ShellTemplate<'a> {
     bundle_raw_prefix_literal: String,
     version_query_literal: String,
     viewer_email_literal: String,
+    viewer_email: String,
     viewer_is_admin: bool,
     can_delete: bool,
     feedback_literal: String,
@@ -354,6 +355,12 @@ struct ViewerTemplate {
 struct FeedbackScriptRow<'a> {
     id: &'a str,
     parent_id: Option<&'a str>,
+    viewer_email: &'a str,
+    author_source: Option<&'a str>,
+    external_author_display: Option<&'a str>,
+    body: &'a str,
+    created_at: &'a str,
+    resolved_at: Option<&'a str>,
     anchor_path: Option<&'a str>,
     anchor_x: Option<f64>,
     anchor_y: Option<f64>,
@@ -362,6 +369,10 @@ struct FeedbackScriptRow<'a> {
     anchor_approx: bool,
     anchor_page: Option<&'a str>,
     anchor_page_stale: bool,
+    anchor_kind: Option<&'a str>,
+    anchor_node_id: Option<&'a str>,
+    anchor_quote: Option<&'a str>,
+    anchor_version: u8,
     artifact_revision: u64,
 }
 
@@ -419,19 +430,38 @@ fn shell_template<'a>(
         &view
             .feedback
             .iter()
-            .map(|feedback| FeedbackScriptRow {
-                id: &feedback.id.0,
-                parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
-                anchor_path: feedback.anchor_path.as_deref(),
-                anchor_x: feedback.anchor_x,
-                anchor_y: feedback.anchor_y,
-                anchor_w: feedback.anchor_w,
-                anchor_h: feedback.anchor_h,
-                anchor_approx: feedback.anchor_approx,
-                anchor_page: feedback.anchor_page.as_deref(),
-                // The frozen Feedback model does not expose Node's projection-only stale flag.
-                anchor_page_stale: false,
-                artifact_revision: feedback.artifact_revision,
+            .map(|feedback| {
+                let (author_source, external_author_display) = match &feedback.author {
+                    crate::model::FeedbackAuthor::Artifact { .. } => (None, None),
+                    crate::model::FeedbackAuthor::Discord {
+                        external_author_display,
+                        ..
+                    } => (Some("discord"), Some(external_author_display.as_str())),
+                };
+                FeedbackScriptRow {
+                    id: &feedback.id.0,
+                    parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
+                    viewer_email: feedback_author_label(&feedback.author),
+                    author_source,
+                    external_author_display,
+                    body: &feedback.body,
+                    created_at: &feedback.created_at.0,
+                    resolved_at: feedback.resolved_at.as_ref().map(|value| value.0.as_str()),
+                    anchor_path: feedback.anchor_path.as_deref(),
+                    anchor_x: feedback.anchor_x,
+                    anchor_y: feedback.anchor_y,
+                    anchor_w: feedback.anchor_w,
+                    anchor_h: feedback.anchor_h,
+                    anchor_approx: feedback.anchor_approx,
+                    anchor_page: feedback.anchor_page.as_deref(),
+                    // The frozen Feedback model does not expose Node's projection-only stale flag.
+                    anchor_page_stale: false,
+                    anchor_kind: feedback.anchor_kind.as_deref(),
+                    anchor_node_id: feedback.anchor_node_id.as_deref(),
+                    anchor_quote: feedback.anchor_quote.as_deref(),
+                    anchor_version: feedback.anchor_version,
+                    artifact_revision: feedback.artifact_revision,
+                }
             })
             .collect::<Vec<_>>(),
     )
@@ -510,12 +540,23 @@ fn shell_template<'a>(
         bundle_raw_prefix_literal: js_literal(&format!("/raw/{}/", meta.id.0)),
         version_query_literal: js_literal(&version_query),
         viewer_email_literal: js_literal(viewer_email),
+        viewer_email: viewer_email.to_owned(),
         viewer_is_admin: view.viewer.is_admin,
         can_delete: AccessPolicy::viewer_can_manage_artifact(&view.viewer, meta),
         feedback_literal: js_literal(&feedback_json),
         title_literal: js_literal(&meta.title),
         bytes: meta.bytes,
     })
+}
+
+fn feedback_author_label(author: &crate::model::FeedbackAuthor) -> &str {
+    match author {
+        crate::model::FeedbackAuthor::Artifact { viewer_email } => &viewer_email.0,
+        crate::model::FeedbackAuthor::Discord {
+            external_author_display,
+            ..
+        } => external_author_display,
+    }
 }
 
 fn feedback_template(
@@ -592,6 +633,8 @@ fn gallery_template<'a>(
                 .is_some_and(|reaction| reaction.favorite != 0)
         })
         .count();
+    let hidden_total = artifacts.iter().filter(|artifact| artifact.hidden).count();
+    let organization_total = view.sections.len();
     let needs_review_total = artifacts
         .iter()
         .filter(|artifact| {
@@ -611,7 +654,6 @@ fn gallery_template<'a>(
         .iter()
         .map(|section| GalleryChipTemplate {
             org: section.org.0.clone(),
-            color: color_for(&section.org, &view.org_colors),
             count: section.items.len(),
         })
         .collect();
@@ -711,9 +753,10 @@ fn gallery_template<'a>(
         },
         identity_color: org_color(identity_org, identity_color),
         total,
+        organization_total,
         favorite_total,
         needs_review_total,
-        show_chips: view.sections.len() > 1,
+        hidden_total,
         has_delete_actions,
         cards,
         chips,
@@ -1010,6 +1053,7 @@ fn encode_uri_component(value: &str) -> String {
 #[template(path = "not-found.html")]
 struct NotFoundTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     message: &'a str,
     css: TrustedStatic,
@@ -1019,6 +1063,7 @@ struct NotFoundTemplate<'a> {
 #[template(path = "not-signed-in.html")]
 struct NotSignedInTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     app_brand: &'a str,
     site_host: &'a str,
@@ -1029,6 +1074,7 @@ struct NotSignedInTemplate<'a> {
 #[template(path = "access-retry.html")]
 struct AccessRetryTemplate<'a> {
     favicon: TrustedStatic,
+    theme_boot: TrustedStatic,
     app_name: &'a str,
     target: &'a str,
     css: TrustedStatic,
@@ -1054,6 +1100,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn not_found(&self, message: Option<&str>) -> Result<String, AppError> {
         render(&NotFoundTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             message: message
                 .filter(|message| !message.is_empty())
@@ -1065,6 +1112,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn not_signed_in(&self) -> Result<String, AppError> {
         render(&NotSignedInTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             app_brand: &self.app_brand,
             site_host: &self.site_host,
@@ -1075,6 +1123,7 @@ impl PageRenderer for AskamaPageRenderer {
     fn access_retry(&self, target: &str) -> Result<String, AppError> {
         render(&AccessRetryTemplate {
             favicon: FAVICON,
+            theme_boot: THEME_BOOT,
             app_name: &self.app_name,
             target: if target.is_empty() {
                 "/?cf_access_retry=1"

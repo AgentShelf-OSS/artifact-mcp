@@ -74,7 +74,7 @@ fn anchor_and_preview_transforms_match_the_node_order() {
 
     let stripped = strip_scripts(&bridged);
     assert_eq!(stripped, b"<body><p>ok</p></body>");
-    assert_eq!(ANCHOR_BRIDGE.len(), 7_620);
+    assert_eq!(ANCHOR_BRIDGE.len(), 12_707);
     assert!(ANCHOR_BRIDGE.contains("type:\"anchor:navigate\""));
     assert!(ANCHOR_BRIDGE.contains("url.protocol===\"http:\"||url.protocol===\"https:\""));
     assert!(!ANCHOR_BRIDGE.contains("allow-popups-to-escape-sandbox"));

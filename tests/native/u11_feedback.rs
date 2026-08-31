@@ -3,8 +3,8 @@
 use artifact_mcp::config::{FEEDBACK_ID_ALPHABET, FEEDBACK_ID_LENGTH, IdSource, NanoIdSource};
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
-    ArtifactId, EmailAddress, Feedback, FeedbackAnchor, FeedbackId, FeedbackRef, OrgId,
-    SubmitFeedback,
+    ArtifactId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackId, FeedbackRef,
+    OrgId, SubmitFeedback,
 };
 use artifact_mcp::persistence::feedback::{
     self, ANCHOR_BOX_BOUNDS_MESSAGE, ANCHOR_BOX_PAIR_MESSAGE, ANCHOR_BOX_POSITIVE_MESSAGE,
@@ -31,6 +31,7 @@ fn submission(body: &str) -> SubmitFeedback {
         anchor: None,
         anchor_path: None,
         anchor_page: None,
+        anchor_v2: None,
     }
 }
 
@@ -407,6 +408,72 @@ fn anchor_validation_matrix() {
     assert_eq!(empty.anchor_path, None);
     assert_eq!(empty.anchor_x, None);
     assert!(!empty.anchor_approx);
+}
+
+#[test]
+fn structured_anchor_v2_persists_and_malformed_metadata_is_rejected() {
+    let fixture = Fixture::new("u11-anchor-v2");
+    let conn = fixture.conn();
+    let artifact = fixture.seed_artifact("anchorv20001", ORG, CLIENT);
+    let org_id = org(ORG);
+    let anchor = FeedbackAnchor {
+        x: 0.25,
+        y: 0.5,
+        w: Some(0.25),
+        h: Some(0.2),
+        approx: false,
+    };
+    let mut input = submission("Structured");
+    input.anchor = Some(anchor);
+    input.anchor_path = Some("main:nth-child(1)".to_owned());
+    input.anchor_v2 = Some(FeedbackAnchorV2 {
+        version: Some(2.0),
+        kind: Some("element".to_owned()),
+        node_id: Some("revenue-table".to_owned()),
+        quote: Some("Quarterly revenue".to_owned()),
+        path_is_string: true,
+        node_id_is_string_or_null: true,
+        quote_is_string_or_null: true,
+        approx_is_boolean_or_absent: true,
+    });
+    let stored = feedback::add(
+        &conn,
+        &fixture.ids,
+        &new_feedback_in(&artifact, &org_id, &input),
+    )
+    .expect("persist v2 anchor");
+    assert_eq!(stored.anchor_version, 2);
+    assert_eq!(stored.anchor_kind.as_deref(), Some("element"));
+    assert_eq!(stored.anchor_node_id.as_deref(), Some("revenue-table"));
+    assert_eq!(stored.anchor_quote.as_deref(), Some("Quarterly revenue"));
+
+    let mut malformed = input;
+    malformed.anchor_v2.as_mut().expect("v2").version = Some(1.0);
+    assert_eq!(
+        feedback::add(
+            &conn,
+            &fixture.ids,
+            &new_feedback_in(&artifact, &org_id, &malformed),
+        ),
+        Err(AppError::Validation(
+            feedback::ANCHOR_VERSION_MESSAGE.to_owned()
+        ))
+    );
+
+    let mut malformed_approx = malformed;
+    let v2 = malformed_approx.anchor_v2.as_mut().expect("v2");
+    v2.version = Some(2.0);
+    v2.approx_is_boolean_or_absent = false;
+    assert_eq!(
+        feedback::add(
+            &conn,
+            &fixture.ids,
+            &new_feedback_in(&artifact, &org_id, &malformed_approx),
+        ),
+        Err(AppError::Validation(
+            feedback::ANCHOR_APPROX_V2_MESSAGE.to_owned()
+        ))
+    );
 }
 
 #[test]

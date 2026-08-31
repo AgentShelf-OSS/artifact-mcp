@@ -171,7 +171,7 @@ fn rust_raw_response_helpers_are_byte_identical_to_the_node_oracle() {
     let node = run_node(&root, &request);
 
     assert_eq!(node["bridge"].as_str(), Some(ANCHOR_BRIDGE));
-    assert_eq!(ANCHOR_BRIDGE.len(), 7_620);
+    assert_eq!(ANCHOR_BRIDGE.len(), 12_707);
 
     for ((content, page_path), expected) in injections.iter().zip(array(&node, "injected")) {
         let rust = inject_anchor_bridge(content.as_bytes(), *page_path);

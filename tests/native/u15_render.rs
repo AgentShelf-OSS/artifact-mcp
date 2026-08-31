@@ -70,7 +70,7 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     galleryHasBytes: gallery.includes('1.3 MB'),
     galleryHasJustNow: gallery.includes('Just now'),
     settingsEscaped: !settingsHtml.includes(input.attack) && settingsHtml.includes('Specific emails'),
-    categoryFilters: Array.from(gallery.matchAll(/data-filter-category="([^"]*)"/g), row => row[1]).slice(1),
+    categoryFilters: Array.from((gallery.match(/<select id="category-filter"[^>]*>([\s\S]*?)<\/select>/) || ['', ''])[1].matchAll(/<option value="([^"]*)"/g), row => row[1]).slice(1),
     cardOrder: Array.from(gallery.matchAll(/<article class="card[^"]*"[^>]*data-id="([^"]*)"/g), row => row[1]),
     notificationHref: match(gallery, /<a class="notif-row[^\"]*" href="([^"]+)"/)
   }));
@@ -94,6 +94,27 @@ fn standalone_pages_autoescape_request_derived_values() {
 
     let signed_out = renderer.not_signed_in().expect("render signed-out page");
     assert!(signed_out.contains("Sign in to view your organization’s artifacts."));
+}
+
+#[test]
+fn standalone_pages_keep_the_saved_theme_and_access_contracts() {
+    let renderer = AskamaPageRenderer::from_config(&AppConfig::default());
+    let pages = [
+        renderer.not_found(None).expect("render not found"),
+        renderer.not_signed_in().expect("render signed-out page"),
+        renderer
+            .access_retry("/artifact?cf_access_retry=1")
+            .expect("render retry page"),
+    ];
+
+    for page in &pages {
+        assert!(page.contains("artifact-theme"));
+        assert!(page.contains(":root[data-theme=\"dark\"]"));
+        assert!(page.contains("min-height:100dvh"));
+        assert!(page.contains("@media(forced-colors:active)"));
+    }
+    assert!(pages[2].contains("content=\"0;url=/artifact?cf_access_retry=1\""));
+    assert!(pages[2].contains("href=\"/artifact?cf_access_retry=1\""));
 }
 
 #[test]
@@ -207,6 +228,7 @@ fn settings_renders_management_surfaces_without_trusting_runtime_values() {
     assert!(!html.contains("</script>\"&"));
     assert!(html.contains("&#60;/script&#62;"));
     assert!(html.contains("Specific emails"));
+    assert!(html.contains("class=\"chip-value\""));
     assert!(html.contains("Cloudflare Access Allow policy"));
     assert!(html.contains("Legacy domain-shaped organization"));
     assert!(html.contains("data-event=\"published\""));
@@ -268,6 +290,10 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         anchor_h: Some(0.4),
         anchor_approx: false,
         anchor_page: Some(attack.to_owned()),
+        anchor_kind: None,
+        anchor_node_id: None,
+        anchor_quote: None,
+        anchor_version: 1,
         created_at: Timestamp("2026-07-21 12:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,
@@ -322,6 +348,16 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
     assert!(html.contains("data-thread-id=\"feedback-1\""));
     assert!(html.contains("id=\"vdelete-trigger\""));
     assert!(html.contains("id=\"delete-dialog\""));
+    assert!(html.contains("id=\"vtitle-toggle\""));
+    assert!(html.contains("id=\"vtitle-menu\" role=\"menu\""));
+    assert!(html.contains("id=\"vcomment-toggle\""));
+    assert!(html.contains("id=\"vcomment-toggle\" type=\"button\" title=\"Comment on a place\" aria-label=\"Comment on a place\" aria-pressed=\"false\"><svg"));
+    assert!(!html.contains("id=\"vcomment-toggle\" type=\"button\" title=\"Comment on a place\" aria-label=\"Comment on a place\" aria-pressed=\"false\">▣"));
+    assert!(html.contains("id=\"vshare-toggle\""));
+    assert!(html.contains("id=\"vmore-menu\" role=\"menu\""));
+    assert!(html.contains("aria-label=\"Back to artifact library\""));
+    assert!(html.contains("role=\"menuitemcheckbox\""));
+    assert!(html.contains("aria-checked=\"true\""));
 }
 
 #[test]
@@ -351,6 +387,8 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             "artifact_revision": 3, "anchor_path": attack, "anchor_x": 0.1,
             "anchor_y": 0.2, "anchor_w": 0.3, "anchor_h": 0.4,
             "anchor_approx": false, "anchor_page": attack,
+            "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null,
+            "anchor_version": 1,
             "created_at": "1970-01-01 00:00:00", "resolved_at": null
         }],
         "analytics": { "counts": { "views": 5, "unique_viewers": 2 }, "viewers": null },
@@ -533,8 +571,11 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             .as_str()
             .expect("Node thumbnail source")
     );
-    assert!(gallery.contains("data-filter-category=\"Reports\""));
-    assert!(gallery.contains("data-filter-category=\"\""));
+    assert!(gallery.contains("id=\"org-filter\""));
+    assert!(gallery.contains("id=\"category-filter\""));
+    assert!(gallery.contains("<option value=\"Reports\">Reports (1)</option>"));
+    assert!(gallery.contains("<option value=\"\">Uncategorized (1)</option>"));
+    assert!(gallery.contains("Find every published artifact."));
     assert_eq!(
         html_attributes_after(&gallery, "<article class=\"card", "data-id"),
         vec!["artifact1234", "artifact5678"]
@@ -589,6 +630,10 @@ fn parity_feedback(attack: &str) -> Feedback {
         anchor_h: Some(0.4),
         anchor_approx: false,
         anchor_page: Some(attack.to_owned()),
+        anchor_kind: None,
+        anchor_node_id: None,
+        anchor_quote: None,
+        anchor_version: 1,
         created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         resolved_at: None,
         resolved_by: None,

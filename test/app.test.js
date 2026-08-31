@@ -1006,7 +1006,10 @@ test("every anchored bundle HTML page receives a page-aware bridge", async () =>
 });
 
 test("same-org viewers can fetch the current feedback list", async () => {
-  const rows = [{ id: "feedback1", artifact_id: "abc123", body: "Review this" }];
+  const rows = [{
+    id: "feedback1", artifact_id: "abc123", body: "Review this", anchor_version: 0,
+    anchor_kind: null, anchor_node_id: null, anchor_quote: null
+  }];
   const app = createApp(dependencies({
     resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
     feedback: { listForArtifact: (id) => id === "abc123" ? rows : [] }
@@ -1096,6 +1099,44 @@ test("bundle feedback records a validated anchor page and exposes it on create",
   assert.equal(response.headers["cache-control"], "no-store");
   assert.equal(received.anchorPage, "pages/two.html");
   assert.equal(response.body.anchor_page, "pages/two.html");
+});
+
+test("feedback HTTP creates and projects structured v2 anchors without degrading them to legacy", async () => {
+  let received;
+  const artifact = { id: "abc123", org: "acme", title: "Single", client_id: "publisher", is_bundle: 0, revision: 7 };
+  const base = dependencies({ resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }) });
+  base.artifacts = { ...base.artifacts, getArtifactMeta: () => artifact };
+  base.feedback = {
+    listForArtifact: () => [],
+    add(input) {
+      received = input;
+      return {
+        id: "feedback-v2", viewer_email: input.viewerEmail, body: input.body, created_at: "2026-07-14",
+        artifact_revision: input.artifactRevision, parent_id: null,
+        anchor_path: input.anchor.path, anchor_x: input.anchor.x, anchor_y: input.anchor.y,
+        anchor_w: input.anchor.w, anchor_h: input.anchor.h, anchor_approx: 0, anchor_page: null,
+        anchor_kind: input.anchor.kind, anchor_node_id: input.anchor.nodeId, anchor_quote: input.anchor.quote,
+        anchor_version: 2
+      };
+    }
+  };
+  const anchor = {
+    version: 2, kind: "element", path: "main:nth-child(1)", nodeId: "revenue-table",
+    quote: "Quarterly revenue", x: 0.25, y: 0.5, w: 0.25, h: 0.2, approx: false
+  };
+  const response = await invokeRoute(createApp(base), "post", "/:id/feedback", {
+    params: { id: "abc123" }, body: { body: "Pinned", anchor }
+  });
+
+  assert.equal(response.status, 201);
+  assert.deepEqual(received.anchor, anchor);
+  assert.deepEqual(
+    {
+      anchor_version: response.body.anchor_version, anchor_kind: response.body.anchor_kind,
+      anchor_node_id: response.body.anchor_node_id, anchor_quote: response.body.anchor_quote
+    },
+    { anchor_version: 2, anchor_kind: "element", anchor_node_id: "revenue-table", anchor_quote: "Quarterly revenue" }
+  );
 });
 
 test("bundle anchor pages reject traversal, absolute, missing, and non-HTML paths", async () => {
