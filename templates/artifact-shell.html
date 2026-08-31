@@ -36,7 +36,7 @@
       <p class="vanchor-status" id="vanchor-status" role="status" aria-live="polite"></p>
     </section>
   </div>
-  <aside class="vinspector" id="vinspector" aria-label="Artifact inspector" aria-hidden="true" tabindex="-1">
+  <aside class="vinspector" id="vinspector" aria-label="Artifact inspector" aria-hidden="true" tabindex="-1" inert>
     <div class="inspector-head"><h2 id="inspector-title">Artifact inspector</h2><button class="inspector-close" id="vinspector-close" type="button" aria-label="Close inspector">&#10005;</button></div>
     <div class="inspector-tabs" role="tablist" aria-label="Artifact inspector"><button class="inspector-tab" id="tab-feedback" data-inspector-tab="feedback" type="button" role="tab" aria-selected="false" aria-controls="inspector-feedback" tabindex="-1">Feedback <span class="vfb-count" {% if unresolved == 0 %}hidden{% endif %}>{{ unresolved }}</span></button><button class="inspector-tab" id="tab-details" data-inspector-tab="details" type="button" role="tab" aria-selected="false" aria-controls="inspector-details" tabindex="-1">Details</button><button class="inspector-tab" id="tab-share" data-inspector-tab="share" type="button" role="tab" aria-selected="false" aria-controls="inspector-share" tabindex="-1">Share</button><button class="inspector-tab" id="tab-history" data-inspector-tab="history" type="button" role="tab" aria-selected="false" aria-controls="inspector-history" tabindex="-1">History</button>{% if has_viewers %}<button class="inspector-tab" id="tab-audience" data-inspector-tab="audience" type="button" role="tab" aria-selected="false" aria-controls="inspector-audience" tabindex="-1">Audience</button>{% endif %}</div>
     <div class="inspector-body">

@@ -30,6 +30,11 @@ test.describe("artifact viewer", () => {
       const more = page.getByRole("button", { name: "More artifact actions" });
       const moreMenu = page.getByRole("menu", { name: "More artifact actions" });
       const comment = page.getByRole("button", { name: "Comment on a place" });
+      const inspector = page.locator("#vinspector");
+
+      await expect(inspector).toHaveAttribute("inert", "");
+      await inspector.locator("#vinspector-close").evaluate((button) => button.focus());
+      expect(await inspector.evaluate((panel) => panel.contains(document.activeElement))).toBeFalsy();
 
       await title.press("Enter");
       await expect(titleMenu).toBeVisible();
@@ -50,9 +55,13 @@ test.describe("artifact viewer", () => {
       await title.press("Enter");
       await title.press("ArrowDown");
       await page.getByRole("menuitem", { name: "Details" }).click();
+      await expect(inspector).not.toHaveAttribute("inert", "");
       await page.getByRole("tab", { name: "History" }).click();
       await page.getByRole("button", { name: "Close inspector" }).click();
+      await expect(inspector).toHaveAttribute("inert", "");
       await expect(title).toBeFocused();
+      await inspector.locator("#vinspector-close").evaluate((button) => button.focus());
+      expect(await inspector.evaluate((panel) => panel.contains(document.activeElement))).toBeFalsy();
 
       await comment.click();
       await expect(comment).toHaveAttribute("aria-pressed", "true");
@@ -82,7 +91,7 @@ test.describe("artifact viewer", () => {
     const frame = page.frameLocator("#vframe");
     await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:ready" }, "*"));
     await page.getByRole("button", { name: "Comment on a place" }).click();
-    await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:picked", version: 2, kind: "point", path: "main > p", nodeId: "target", quote: "anchor target", x: 0.2, y: 0.3, approx: false }, "*"));
+    await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:picked", version: 2, kind: "element", path: "main > p", nodeId: "target", quote: "anchor target", x: 0.2, y: 0.3, approx: false }, "*"));
     const composer = page.locator("#vanchor-composer");
     await expect(composer).toBeVisible();
     await composer.getByLabel("Anchored feedback").fill("Please revise the target copy.");
@@ -95,7 +104,13 @@ test.describe("artifact viewer", () => {
     await composer.getByRole("button", { name: "Copy prompt" }).click();
     await expect(composer).toBeVisible();
     await expect(composer.getByLabel("Anchored feedback")).toHaveValue("Please revise the target copy.");
+    const postedFeedback = page.waitForRequest((request) => request.method() === "POST" && request.url().endsWith(`/${artifact.id}/feedback`));
     await composer.getByRole("button", { name: "Add comment" }).click();
+    const feedbackRequest = await postedFeedback;
+    expect(feedbackRequest.postDataJSON().anchor).toMatchObject({
+      version: 2, kind: "element", path: "main > p", nodeId: "target",
+      quote: "anchor target", approx: false, x: 0.2, y: 0.3,
+    });
     await expect(composer.getByText(/Saved feedback/)).toBeVisible();
     await expect(composer.getByRole("button", { name: "Saved" })).toBeDisabled();
     await expect(composer.getByLabel("Anchored feedback")).toHaveValue("Please revise the target copy.");

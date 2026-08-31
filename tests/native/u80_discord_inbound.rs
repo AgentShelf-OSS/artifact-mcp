@@ -12,6 +12,7 @@ use artifact_mcp::{
         db::{self, Database, DbPool},
         discord_inbound::DiscordInboundStore,
         feedback_delivery::{self, DeliveryPlanningContext},
+        migrations::LATEST_SCHEMA_VERSION,
     },
     security::audit::MutationAudit,
 };
@@ -775,7 +776,7 @@ fn frozen_v30_feedback_threads_anchors_and_resolution_upgrade_reopen_and_cascade
         let conn = db::checkout(&pool).expect("checkout");
         assert_eq!(
             scalar::<i64>(&conn, "SELECT MAX(version) FROM schema_migrations"),
-            31
+            LATEST_SCHEMA_VERSION
         );
         assert_eq!(
             scalar::<i64>(

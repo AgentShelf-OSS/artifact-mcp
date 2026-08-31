@@ -3,8 +3,8 @@
 use artifact_mcp::config::{FEEDBACK_ID_ALPHABET, FEEDBACK_ID_LENGTH, IdSource, NanoIdSource};
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
-    ArtifactId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackId,
-    FeedbackRef, OrgId, SubmitFeedback,
+    ArtifactId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackId, FeedbackRef,
+    OrgId, SubmitFeedback,
 };
 use artifact_mcp::persistence::feedback::{
     self, ANCHOR_BOX_BOUNDS_MESSAGE, ANCHOR_BOX_PAIR_MESSAGE, ANCHOR_BOX_POSITIVE_MESSAGE,
@@ -455,7 +455,9 @@ fn structured_anchor_v2_persists_and_malformed_metadata_is_rejected() {
             &fixture.ids,
             &new_feedback_in(&artifact, &org_id, &malformed),
         ),
-        Err(AppError::Validation(feedback::ANCHOR_VERSION_MESSAGE.to_owned()))
+        Err(AppError::Validation(
+            feedback::ANCHOR_VERSION_MESSAGE.to_owned()
+        ))
     );
 
     let mut malformed_approx = malformed;
@@ -468,7 +470,9 @@ fn structured_anchor_v2_persists_and_malformed_metadata_is_rejected() {
             &fixture.ids,
             &new_feedback_in(&artifact, &org_id, &malformed_approx),
         ),
-        Err(AppError::Validation(feedback::ANCHOR_APPROX_V2_MESSAGE.to_owned()))
+        Err(AppError::Validation(
+            feedback::ANCHOR_APPROX_V2_MESSAGE.to_owned()
+        ))
     );
 }
 

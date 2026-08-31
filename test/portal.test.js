@@ -32,6 +32,7 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
         }
       },
       setAttribute(name, value) { attributes.set(name, String(value)); },
+      removeAttribute(name) { attributes.delete(name); },
       getAttribute(name) { return attributes.get(name) ?? null; },
       appendChild(child) { this.children.push(child); return child; },
       remove() {},
@@ -108,6 +109,8 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     buildAnchorPrompt: window.__artifactMcpTestHooks.buildAnchorPrompt,
     composerPlacement: window.__artifactMcpTestHooks.composerPlacement,
     markerPreviewPlacement: window.__artifactMcpTestHooks.markerPreviewPlacement,
+    draftAnchorFromSelection: window.__artifactMcpTestHooks.draftAnchorFromSelection,
+    feedbackPayload: window.__artifactMcpTestHooks.feedbackPayload,
     message(data) {
       windowListeners.get("message")({ source: elements.vframe.contentWindow, data });
     },
@@ -194,6 +197,9 @@ test("viewer shell gives review actions priority and keeps secondary actions in 
   assert.match(html, /id="vcomment-toggle"[^>]*aria-label="Comment on a place"/);
   assert.match(html, /id="vshare-toggle"/);
   assert.match(html, /id="vmore-toggle"/);
+  assert.match(html, /id="vinspector"[^>]*aria-hidden="true"[^>]*inert/);
+  assert.match(html, /inspector\.removeAttribute\('inert'\)/);
+  assert.match(html, /inspector\.setAttribute\('inert',''\)/);
   assert.match(titleMenu, /data-inspector-open="details"/);
   assert.match(titleMenu, /data-inspector-open="history"/);
   assert.match(titleMenu, /data-inspector-open="audience"/);
@@ -297,6 +303,35 @@ test("anchored-comment shell retains the v2 envelope and keeps prompt copy separ
   assert.match(html, /__artifactMcpTestHooks/);
   assert.match(html, /pin\.stale\|\|!pinOnCurrentPage/);
   assert.match(html, /id:'__draft__'/);
+});
+
+test("bridge and fallback selections produce valid v2 feedback POST payloads", () => {
+  const shell = shellBrokerHarness();
+  const bridge = shell.draftAnchorFromSelection({
+    version: 2, kind: "element", path: "main > p", nodeId: "target",
+    quote: "anchor target", approx: false,
+  }, 0.2, 0.3, 0.4, 0.1, true);
+  const bridgePayload = shell.feedbackPayload("Bridge comment", null, bridge);
+  assert.deepEqual(JSON.parse(JSON.stringify(bridgePayload.anchor)), {
+    version: 2, kind: "element", x: 0.2, y: 0.3, page: null,
+    path: "main > p", nodeId: "target", quote: "anchor target",
+    approx: false, w: 0.4, h: 0.1,
+  });
+  assert.equal(typeof bridgePayload.anchor.approx, "boolean");
+
+  const fallbackPoint = shell.draftAnchorFromSelection({ approx: true }, 0.4, 0.5, null, null, false);
+  const fallbackPointPayload = shell.feedbackPayload("Fallback point", null, fallbackPoint);
+  assert.deepEqual(JSON.parse(JSON.stringify(fallbackPointPayload.anchor)), {
+    version: 2, kind: "element", x: 0.4, y: 0.5, page: null,
+    path: "", approx: true,
+  });
+
+  const fallbackRegion = shell.draftAnchorFromSelection({ kind: "region", path: "", approx: true }, 0.1, 0.15, 0.2, 0.25, true);
+  const fallbackRegionPayload = shell.feedbackPayload("Fallback region", null, fallbackRegion);
+  assert.deepEqual(JSON.parse(JSON.stringify(fallbackRegionPayload.anchor)), {
+    version: 2, kind: "region", x: 0.1, y: 0.15, page: null,
+    path: "", approx: true, w: 0.2, h: 0.25,
+  });
 });
 
 test("anchored prompt matrix is deterministic across draft/saved, single/bundle, semantic/legacy, and stale", () => {

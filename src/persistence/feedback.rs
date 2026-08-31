@@ -34,8 +34,8 @@ use rusqlite::{Connection, OptionalExtension, params, params_from_iter};
 use crate::config::IdSource;
 use crate::error::AppError;
 use crate::model::{
-    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2,
-    FeedbackAuthor, FeedbackId, FeedbackMutation, FeedbackRef, OrgId, SubmitFeedback, Timestamp,
+    ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor,
+    FeedbackId, FeedbackMutation, FeedbackRef, OrgId, SubmitFeedback, Timestamp,
 };
 
 // ---------------------------------------------------------------------------
@@ -487,7 +487,11 @@ pub fn add(
     let normalized = normalize_anchor_with_v2(
         anchor,
         input.submission.anchor_path.as_deref(),
-        if parent_id.is_some() { None } else { input.submission.anchor_v2.as_ref() },
+        if parent_id.is_some() {
+            None
+        } else {
+            input.submission.anchor_v2.as_ref()
+        },
     )?;
     let anchor_page = if parent_id.is_some() || anchor.is_none() {
         None
@@ -819,7 +823,8 @@ fn read_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Feedback> {
             || row.get::<_, Option<String>>(25)?.is_some()
         {
             2
-        } else if row.get::<_, Option<f64>>(8)?.is_some() && row.get::<_, Option<f64>>(9)?.is_some() {
+        } else if row.get::<_, Option<f64>>(8)?.is_some() && row.get::<_, Option<f64>>(9)?.is_some()
+        {
             1
         } else {
             0

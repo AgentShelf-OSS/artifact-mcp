@@ -1544,16 +1544,19 @@ async fn feedback_submission_preserves_structured_v2_anchor_metadata() {
     assert_eq!(response.status(), StatusCode::CREATED);
     let submitted = harness.feedback_submission().expect("submission");
     assert_eq!(submitted.anchor_path.as_deref(), Some("main:nth-child(1)"));
-    assert_eq!(submitted.anchor_v2, Some(FeedbackAnchorV2 {
-        version: Some(2.0),
-        kind: Some("element".to_owned()),
-        node_id: Some("revenue-table".to_owned()),
-        quote: Some("Quarterly revenue".to_owned()),
-        path_is_string: true,
-        node_id_is_string_or_null: true,
-        quote_is_string_or_null: true,
-        approx_is_boolean_or_absent: true,
-    }));
+    assert_eq!(
+        submitted.anchor_v2,
+        Some(FeedbackAnchorV2 {
+            version: Some(2.0),
+            kind: Some("element".to_owned()),
+            node_id: Some("revenue-table".to_owned()),
+            quote: Some("Quarterly revenue".to_owned()),
+            path_is_string: true,
+            node_id_is_string_or_null: true,
+            quote_is_string_or_null: true,
+            approx_is_boolean_or_absent: true,
+        })
+    );
 }
 
 #[tokio::test]

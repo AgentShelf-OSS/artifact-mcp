@@ -7,9 +7,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use askama::{filters::HtmlSafe, Template};
+use askama::{Template, filters::HtmlSafe};
 use serde::Serialize;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use url::{Position, Url};
 
 use crate::{

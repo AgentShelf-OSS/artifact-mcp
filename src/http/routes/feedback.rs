@@ -19,8 +19,8 @@ use crate::{
     http::artifact_response::is_html_content_type,
     mcp::protocol::OrderedJson,
     model::{
-        ArtifactId, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor, FeedbackId,
-        OrgId, SubmitFeedback, Timestamp,
+        ArtifactId, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor, FeedbackId, OrgId,
+        SubmitFeedback, Timestamp,
     },
     persistence::feedback::{
         ANCHOR_NOT_OBJECT_MESSAGE, ANCHOR_PAGE_MISSING_MESSAGE, ANCHOR_PAGE_NOT_BUNDLE_MESSAGE,
@@ -326,12 +326,21 @@ fn anchor_v2(value: &OrderedJson) -> Option<FeedbackAnchorV2> {
             .get("version")
             .and_then(OrderedJson::as_number)
             .and_then(serde_json::Number::as_f64),
-        kind: value.get("kind").and_then(OrderedJson::as_str).map(ToOwned::to_owned),
+        kind: value
+            .get("kind")
+            .and_then(OrderedJson::as_str)
+            .map(ToOwned::to_owned),
         node_id: node.and_then(OrderedJson::as_str).map(ToOwned::to_owned),
         quote: quote.and_then(OrderedJson::as_str).map(ToOwned::to_owned),
         path_is_string: value.get("path").and_then(OrderedJson::as_str).is_some(),
-        node_id_is_string_or_null: matches!(node, None | Some(OrderedJson::Null | OrderedJson::String(_))),
-        quote_is_string_or_null: matches!(quote, None | Some(OrderedJson::Null | OrderedJson::String(_))),
+        node_id_is_string_or_null: matches!(
+            node,
+            None | Some(OrderedJson::Null | OrderedJson::String(_))
+        ),
+        quote_is_string_or_null: matches!(
+            quote,
+            None | Some(OrderedJson::Null | OrderedJson::String(_))
+        ),
         approx_is_boolean_or_absent: matches!(approx, None | Some(OrderedJson::Bool(_))),
     })
 }
