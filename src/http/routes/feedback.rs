@@ -314,7 +314,7 @@ fn anchor_v2(value: &OrderedJson) -> Option<FeedbackAnchorV2> {
     if !value
         .object_entries()
         .into_iter()
-        .any(|(key, _)| v2_keys.iter().any(|v2_key| *v2_key == key))
+        .any(|(key, _)| v2_keys.contains(&key))
     {
         return None;
     }

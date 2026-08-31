@@ -206,6 +206,8 @@ pub struct NormalizedAnchor {
     pub anchor_quote: Option<String>,
 }
 
+type NormalizedAnchorV2 = (Option<String>, Option<String>, Option<String>);
+
 /// `normalizeAnchor(anchor)` — [lib/feedback.js:12-42].
 ///
 /// `path` is `anchor.path` in Node, which lives inside the anchor object; the frozen
@@ -285,9 +287,7 @@ pub fn normalize_anchor_with_v2(
     })
 }
 
-fn normalize_v2(
-    v2: &FeedbackAnchorV2,
-) -> Result<(Option<String>, Option<String>, Option<String>), AppError> {
+fn normalize_v2(v2: &FeedbackAnchorV2) -> Result<NormalizedAnchorV2, AppError> {
     if v2.version != Some(2.0) {
         return Err(AppError::Validation(ANCHOR_VERSION_MESSAGE.to_owned()));
     }
