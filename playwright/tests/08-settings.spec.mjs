@@ -14,14 +14,35 @@ test.describe("settings administration", () => {
 
     await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
     await expect(page.getByRole("heading", { name: /Operate the registry/i })).toBeVisible();
-    const dimensions = await page.evaluate(() => ({
-      clientWidth: document.documentElement.clientWidth,
-      scrollWidth: document.documentElement.scrollWidth,
-      targetHeights: Array.from(document.querySelectorAll(".admin-tab, .new-org-trigger, .primary-button, .secondary-button, .field input, .field select"), (node) => node.getBoundingClientRect())
-        .filter((rect) => rect.width > 0 && rect.height > 0)
-        .map((rect) => rect.height),
-    }));
-    expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
+    const dimensions = await page.evaluate(() => {
+      const root = document.documentElement;
+      const clientWidth = root.clientWidth;
+      return {
+        clientWidth,
+        scrollWidth: root.scrollWidth,
+        offenders: Array.from(document.querySelectorAll("*"), (node) => {
+          const rect = node.getBoundingClientRect();
+          const style = getComputedStyle(node);
+          return {
+            selector: `${node.tagName.toLowerCase()}${node.id ? `#${node.id}` : ""}${typeof node.className === "string" && node.className ? `.${node.className.trim().replace(/\s+/g, ".")}` : ""}`,
+            left: Math.round(rect.left),
+            right: Math.round(rect.right),
+            width: Math.round(rect.width),
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            overflowX: style.overflowX,
+            minWidth: style.minWidth,
+          };
+        })
+          .filter((entry) => entry.left < -1 || entry.right > clientWidth + 1 || (entry.overflowX === "visible" && entry.scrollWidth > entry.clientWidth + 1))
+          .sort((a, b) => Math.max(b.right, b.scrollWidth) - Math.max(a.right, a.scrollWidth))
+          .slice(0, 12),
+        targetHeights: Array.from(document.querySelectorAll(".admin-tab, .new-org-trigger, .primary-button, .secondary-button, .field input, .field select"), (node) => node.getBoundingClientRect())
+          .filter((rect) => rect.width > 0 && rect.height > 0)
+          .map((rect) => rect.height),
+      };
+    });
+    expect(dimensions.scrollWidth, JSON.stringify(dimensions.offenders)).toBeLessThanOrEqual(dimensions.clientWidth + 1);
     expect(Math.min(...dimensions.targetHeights)).toBeGreaterThanOrEqual(44);
   });
 
