@@ -44,7 +44,10 @@ test("public release workflow stays independent of homelab deployment", async ()
   assert.match(workflow, /sha256sum --check SHA256SUMS/);
   assert.match(workflow, /tag_name: \$\{\{ needs\.prepare\.outputs\.tag \}\}/);
   assert.match(workflow, /prerelease: \$\{\{ contains\(needs\.prepare\.outputs\.tag, '-'\) \}\}/);
-  assert.match(workflow, /make_latest: \$\{\{ !contains\(needs\.prepare\.outputs\.tag, '-'\) \}\}/);
+  assert.match(workflow, /draft: true/);
+  assert.match(workflow, /gh release edit "\$TAG" --draft=false/);
+  assert.match(workflow, /if: steps\.release_state\.outputs\.published != 'true'/);
+  assert.doesNotMatch(workflow, /make_latest: \$\{\{ !contains\(needs\.prepare\.outputs\.tag, '-'\) \}\}/);
   assert.match(workflow, /Existing release image digest .* does not match candidate/);
   for (const asset of [
     "artifact-mcp",
@@ -57,6 +60,19 @@ test("public release workflow stays independent of homelab deployment", async ()
   ]) {
     assert.match(workflow, new RegExp(`release/${asset.replace(".", "\\.")}`));
   }
+});
+
+test("GitHub workflows use pinned Node 24 action runtimes", async () => {
+  const workflows = await Promise.all([
+    ".github/workflows/ci.yml",
+    ".github/workflows/dco.yml",
+    ".github/workflows/release-provenance.yml",
+  ].map((path) => readFile(new URL(path, root), "utf8")));
+  const combined = workflows.join("\n");
+
+  assert.doesNotMatch(combined, /actions\/checkout@v4|actions\/setup-node@v4/);
+  assert.match(combined, /actions\/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7\.0\.1/);
+  assert.match(combined, /actions\/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7\.0\.0/);
 });
 
 test("release documentation keeps deployment evidence local", async () => {

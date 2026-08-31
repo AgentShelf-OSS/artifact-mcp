@@ -32,7 +32,7 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       version: ${{ steps.release.outputs.version }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ inputs.tag || github.ref }}
@@ -81,7 +81,7 @@ jobs:
       actions: read
       contents: read
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - name: Verify default-branch ancestry and CI result
@@ -119,7 +119,7 @@ jobs:
       IMAGE: ${{ needs.prepare.outputs.image }}
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
@@ -230,7 +230,7 @@ jobs:
       IMAGE: ${{ needs.prepare.outputs.image }}
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
@@ -306,12 +306,32 @@ jobs:
           node ../scripts/release/verify-manifest.mjs release-manifest.json
           sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
           sha256sum --check SHA256SUMS
-      - name: Publish immutable release evidence
+      - id: release_state
+        name: Check existing release state
+        run: |
+          set -euo pipefail
+          if release_json="$(gh release view "$TAG" --json isDraft,assets 2>/dev/null)"; then
+            if [[ "$(jq -r '.isDraft' <<<"$release_json")" == "false" ]]; then
+              for asset in artifact-mcp SHA256SUMS release-manifest.json source.spdx.json \
+                image.spdx.json historical-fixture-preflight.json migration-notes.md; do
+                jq -e --arg asset "$asset" '.assets | map(.name) | index($asset) != null' \
+                  <<<"$release_json" >/dev/null || {
+                    echo "Published release $TAG is missing $asset" >&2; exit 1;
+                  }
+              done
+              echo "published=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+          fi
+          echo "published=false" >> "$GITHUB_OUTPUT"
+      - name: Create or update draft release evidence
+        if: steps.release_state.outputs.published != 'true'
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
+          draft: true
           prerelease: ${{ contains(needs.prepare.outputs.tag, '-') }}
-          make_latest: ${{ !contains(needs.prepare.outputs.tag, '-') }}
+          make_latest: false
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
@@ -322,3 +342,12 @@ jobs:
             release/image.spdx.json
             release/historical-fixture-preflight.json
             release/migration-notes.md
+      - name: Publish and lock release
+        if: steps.release_state.outputs.published != 'true'
+        run: |
+          set -euo pipefail
+          if [[ "$TAG" == *-* ]]; then
+            gh release edit "$TAG" --draft=false
+          else
+            gh release edit "$TAG" --draft=false --latest
+          fi

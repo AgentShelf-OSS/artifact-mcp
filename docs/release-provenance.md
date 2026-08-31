@@ -13,7 +13,8 @@ approve or perform a deployment.
 4. GitHub's OIDC-backed attestation service records provenance for the native binary and OCI
    digest. No repository signing key is required.
 5. The workflow assigns the stable image tag to the verified digest without rebuilding it, writes
-   the release manifest and checksums, and publishes the GitHub Release assets.
+   the release manifest and checksums, attaches every asset to a draft GitHub Release, and then
+   publishes the complete draft.
 
 The stable GHCR tag is a pointer. The digest recorded in `release-manifest.json` is the immutable
 image identity. A retry may reuse an existing stable tag only when it already resolves to the same
@@ -35,7 +36,9 @@ git push origin v1.7.2
 
 Repository Actions must be allowed to write packages and attestations for the candidate job and
 write release contents for the publish job. Protect `v*` tags from deletion and replacement. The
-workflow also refuses to point an existing stable image tag at a different digest.
+workflow also refuses to point an existing stable image tag at a different digest. Enable GitHub
+release immutability for the repository. GitHub applies that policy to future releases only, so the
+workflow uploads every asset to a draft before publishing and locking it.
 
 ## Release assets
 
