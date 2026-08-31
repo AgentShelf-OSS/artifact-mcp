@@ -7,9 +7,9 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use askama::{Template, filters::HtmlSafe};
+use askama::{filters::HtmlSafe, Template};
 use serde::Serialize;
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use url::{Position, Url};
 
 use crate::{
@@ -316,6 +316,7 @@ struct ShellTemplate<'a> {
     bundle_raw_prefix_literal: String,
     version_query_literal: String,
     viewer_email_literal: String,
+    viewer_email: String,
     viewer_is_admin: bool,
     can_delete: bool,
     feedback_literal: String,
@@ -350,6 +351,12 @@ struct ViewerTemplate {
 struct FeedbackScriptRow<'a> {
     id: &'a str,
     parent_id: Option<&'a str>,
+    viewer_email: &'a str,
+    author_source: Option<&'a str>,
+    external_author_display: Option<&'a str>,
+    body: &'a str,
+    created_at: &'a str,
+    resolved_at: Option<&'a str>,
     anchor_path: Option<&'a str>,
     anchor_x: Option<f64>,
     anchor_y: Option<f64>,
@@ -358,6 +365,10 @@ struct FeedbackScriptRow<'a> {
     anchor_approx: bool,
     anchor_page: Option<&'a str>,
     anchor_page_stale: bool,
+    anchor_kind: Option<&'a str>,
+    anchor_node_id: Option<&'a str>,
+    anchor_quote: Option<&'a str>,
+    anchor_version: u8,
     artifact_revision: u64,
 }
 
@@ -415,19 +426,38 @@ fn shell_template<'a>(
         &view
             .feedback
             .iter()
-            .map(|feedback| FeedbackScriptRow {
-                id: &feedback.id.0,
-                parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
-                anchor_path: feedback.anchor_path.as_deref(),
-                anchor_x: feedback.anchor_x,
-                anchor_y: feedback.anchor_y,
-                anchor_w: feedback.anchor_w,
-                anchor_h: feedback.anchor_h,
-                anchor_approx: feedback.anchor_approx,
-                anchor_page: feedback.anchor_page.as_deref(),
-                // The frozen Feedback model does not expose Node's projection-only stale flag.
-                anchor_page_stale: false,
-                artifact_revision: feedback.artifact_revision,
+            .map(|feedback| {
+                let (author_source, external_author_display) = match &feedback.author {
+                    crate::model::FeedbackAuthor::Artifact { .. } => (None, None),
+                    crate::model::FeedbackAuthor::Discord {
+                        external_author_display,
+                        ..
+                    } => (Some("discord"), Some(external_author_display.as_str())),
+                };
+                FeedbackScriptRow {
+                    id: &feedback.id.0,
+                    parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
+                    viewer_email: feedback_author_label(&feedback.author),
+                    author_source,
+                    external_author_display,
+                    body: &feedback.body,
+                    created_at: &feedback.created_at.0,
+                    resolved_at: feedback.resolved_at.as_ref().map(|value| value.0.as_str()),
+                    anchor_path: feedback.anchor_path.as_deref(),
+                    anchor_x: feedback.anchor_x,
+                    anchor_y: feedback.anchor_y,
+                    anchor_w: feedback.anchor_w,
+                    anchor_h: feedback.anchor_h,
+                    anchor_approx: feedback.anchor_approx,
+                    anchor_page: feedback.anchor_page.as_deref(),
+                    // The frozen Feedback model does not expose Node's projection-only stale flag.
+                    anchor_page_stale: false,
+                    anchor_kind: feedback.anchor_kind.as_deref(),
+                    anchor_node_id: feedback.anchor_node_id.as_deref(),
+                    anchor_quote: feedback.anchor_quote.as_deref(),
+                    anchor_version: feedback.anchor_version,
+                    artifact_revision: feedback.artifact_revision,
+                }
             })
             .collect::<Vec<_>>(),
     )
@@ -506,12 +536,23 @@ fn shell_template<'a>(
         bundle_raw_prefix_literal: js_literal(&format!("/raw/{}/", meta.id.0)),
         version_query_literal: js_literal(&version_query),
         viewer_email_literal: js_literal(viewer_email),
+        viewer_email: viewer_email.to_owned(),
         viewer_is_admin: view.viewer.is_admin,
         can_delete: AccessPolicy::viewer_can_manage_artifact(&view.viewer, meta),
         feedback_literal: js_literal(&feedback_json),
         title_literal: js_literal(&meta.title),
         bytes: meta.bytes,
     })
+}
+
+fn feedback_author_label(author: &crate::model::FeedbackAuthor) -> &str {
+    match author {
+        crate::model::FeedbackAuthor::Artifact { viewer_email } => &viewer_email.0,
+        crate::model::FeedbackAuthor::Discord {
+            external_author_display,
+            ..
+        } => external_author_display,
+    }
 }
 
 fn feedback_template(

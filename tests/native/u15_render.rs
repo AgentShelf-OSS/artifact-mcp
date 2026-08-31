@@ -384,6 +384,8 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             "artifact_revision": 3, "anchor_path": attack, "anchor_x": 0.1,
             "anchor_y": 0.2, "anchor_w": 0.3, "anchor_h": 0.4,
             "anchor_approx": false, "anchor_page": attack,
+            "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null,
+            "anchor_version": 1,
             "created_at": "1970-01-01 00:00:00", "resolved_at": null
         }],
         "analytics": { "counts": { "views": 5, "unique_viewers": 2 }, "viewers": null },

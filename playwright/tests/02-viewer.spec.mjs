@@ -73,6 +73,62 @@ test.describe("artifact viewer", () => {
     expect(consoleErrors).toEqual([]);
   });
 
+  test("anchored comment composer keeps a v2 draft separate from prompt copy", async ({ page, request, publisherKey, org }) => {
+    const artifact = await publish(request, publisherKey, { title: `PW Anchor ${org}`, html: "<!doctype html><main><p>anchor target</p></main>" });
+    const consoleErrors = [];
+    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/${artifact.id}`);
+    const frame = page.frameLocator("#vframe");
+    await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:ready" }, "*"));
+    await page.getByRole("button", { name: "Comment on a place" }).click();
+    await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:picked", version: 2, kind: "point", path: "main > p", nodeId: "target", quote: "anchor target", x: 0.2, y: 0.3, approx: false }, "*"));
+    const composer = page.locator("#vanchor-composer");
+    await expect(composer).toBeVisible();
+    await composer.getByLabel("Anchored feedback").fill("Please revise the target copy.");
+    await expect(composer.getByRole("button", { name: "Copy prompt" })).toBeVisible();
+    for (const target of [composer.getByRole("button", { name: "Copy prompt" }), composer.getByRole("button", { name: "Add comment" }), composer.getByRole("button", { name: "Cancel anchored comment" })]) {
+      const box = await target.boundingBox();
+      expect(box?.width).toBeGreaterThanOrEqual(44);
+      expect(box?.height).toBeGreaterThanOrEqual(44);
+    }
+    await composer.getByRole("button", { name: "Copy prompt" }).click();
+    await expect(composer).toBeVisible();
+    await expect(composer.getByLabel("Anchored feedback")).toHaveValue("Please revise the target copy.");
+    await composer.getByRole("button", { name: "Add comment" }).click();
+    await expect(composer.getByText(/Saved feedback/)).toBeVisible();
+    await expect(composer.getByRole("button", { name: "Saved" })).toBeDisabled();
+    await expect(composer.getByLabel("Anchored feedback")).toHaveValue("Please revise the target copy.");
+    await page.keyboard.press("Escape");
+    await expect(composer).toBeHidden();
+    await expect(page.getByRole("button", { name: "Comment on a place" })).toBeFocused();
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(390);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test("anchored composer uses bridge pixels and stays clamped at desktop, tablet, and mobile sizes", async ({ page, request, publisherKey, org }) => {
+    const artifact = await publish(request, publisherKey, { title: `PW Anchor placement ${org}`, html: "<!doctype html><main><p>anchor target</p></main>" });
+    const consoleErrors = [];
+    page.on("console", (message) => { if (message.type() === "error") consoleErrors.push(message.text()); });
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
+      await page.setViewportSize(viewport);
+      await page.goto(`/${artifact.id}`);
+      const frame = page.frameLocator("#vframe");
+      await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:ready" }, "*"));
+      await page.getByRole("button", { name: "Comment on a place" }).click();
+      await frame.locator("body").evaluate(() => parent.postMessage({ type: "anchor:picked", version: 2, kind: "region", path: "main", nodeId: "near-edge", quote: "anchor target", x: 0.94, y: 0.82, w: 0.04, h: 0.05 }, "*"));
+      const composer = page.locator("#vanchor-composer");
+      await expect(composer).toBeVisible();
+      const box = await composer.boundingBox();
+      expect(box?.x).toBeGreaterThanOrEqual(0);
+      expect((box?.x || 0) + (box?.width || 0)).toBeLessThanOrEqual(viewport.width);
+      expect((box?.y || 0) + (box?.height || 0)).toBeLessThanOrEqual(viewport.height);
+      if (viewport.width <= 760) expect((box?.y || 0) + (box?.height || 0)).toBeGreaterThan(viewport.height - 6);
+      await page.keyboard.press("Escape");
+    }
+    expect(consoleErrors).toEqual([]);
+  });
+
   test("raw delivery carries the CSP sandbox and never allow-same-origin", async ({ request, publisherKey, org }) => {
     const a = await publish(request, publisherKey, { title: `PW Raw ${org}`, html: "<!doctype html><h1>raw</h1>" });
     const res = await request.get(`/raw/${a.id}`);
