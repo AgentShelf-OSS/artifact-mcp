@@ -85,9 +85,50 @@
   var count = document.getElementById("count");
   var empty = document.getElementById("empty");
   var grid = document.getElementById("artifact-grid");
+  var sort = document.getElementById("sort");
+  var sortLabel = document.getElementById("sort-label");
   var activeView = "all";
   var activeOrg = "all";
   var activeCategory = "all";
+
+  function visibleCards() {
+    return cards.filter(function (card) { return card.isConnected; });
+  }
+
+  function viewCount(card) {
+    var badge = card.querySelector(".view-badge");
+    return badge ? Number(String(badge.textContent || "").replace(/[^0-9]/g, "")) || 0 : 0;
+  }
+
+  function applySort() {
+    if (!grid || !sort) return;
+    var mode = sort.value;
+    visibleCards().sort(function (left, right) {
+      if (mode === "title") return (left.querySelector(".card-title").textContent || "").localeCompare(right.querySelector(".card-title").textContent || "");
+      if (mode === "views") return viewCount(right) - viewCount(left);
+      return String(right.dataset.updated || "").localeCompare(String(left.dataset.updated || ""));
+    }).forEach(function (card) { grid.appendChild(card); });
+    if (sortLabel && sort.selectedOptions[0]) sortLabel.textContent = sort.selectedOptions[0].textContent;
+  }
+
+  function saveLibraryState() {
+    var state = {
+      q: search && search.value || "",
+      view: activeView,
+      org: activeOrg,
+      category: activeCategory,
+      sort: sort && sort.value || "recent"
+    };
+    try { sessionStorage.setItem("artifact-library-state", JSON.stringify(state)); } catch (_error) {}
+    try {
+      var url = new URL(location.href);
+      ["q", "view", "org", "category", "sort"].forEach(function (key) {
+        if (state[key] && state[key] !== "all" && state[key] !== "recent") url.searchParams.set(key, state[key]);
+        else url.searchParams.delete(key);
+      });
+      history.replaceState(null, "", url.pathname + url.search + url.hash);
+    } catch (_error) {}
+  }
 
   function pressOnly(selector, active) {
     document.querySelectorAll(selector).forEach(function (button) {
@@ -98,13 +139,15 @@
   function applyFilters() {
     var term = (search && search.value || "").trim().toLowerCase();
     var shown = 0;
-    cards.forEach(function (card) {
+    applySort();
+    visibleCards().forEach(function (card) {
       if (!card.isConnected) return;
       card.classList.add("settled");
       var viewMatch =
         activeView === "all" ||
         (activeView === "favorites" && card.dataset.fav === "1") ||
-        (activeView === "review" && card.dataset.needsReview === "1");
+        (activeView === "review" && card.dataset.needsReview === "1") ||
+        (activeView === "hidden" && card.dataset.hidden === "1");
       var orgMatch = activeOrg === "all" || card.dataset.org === activeOrg;
       var categoryMatch = activeCategory === "all" || card.dataset.category === activeCategory;
       var termMatch = !term || card.dataset.q.indexOf(term) !== -1;
@@ -113,7 +156,8 @@
       if (visible) shown += 1;
     });
     if (empty) empty.hidden = shown !== 0;
-    if (count) count.textContent = "Showing " + shown + " of " + cards.filter(function (card) { return card.isConnected; }).length;
+    if (count) count.textContent = "Showing " + shown + " of " + visibleCards().length;
+    saveLibraryState();
   }
 
   document.addEventListener("click", function (event) {
@@ -136,20 +180,25 @@
       activeCategory = categoryFilter.dataset.filterCategory;
       pressOnly("[data-filter-category]", categoryFilter);
       applyFilters();
+      return;
+    }
+    var resetFilters = event.target.closest("[data-reset-filters]");
+    if (resetFilters) {
+      activeView = "all";
+      activeOrg = "all";
+      activeCategory = "all";
+      if (search) search.value = "";
+      if (sort) sort.value = "recent";
+      ["[data-filter-view]", "[data-filter-org]", "[data-filter-category]"].forEach(function (selector) {
+        var all = document.querySelector(selector.slice(0, -1) + '="all"]');
+        if (all) pressOnly(selector, all);
+      });
+      applyFilters();
     }
   });
 
   if (search) search.addEventListener("input", applyFilters);
-
-  var filterToggle = document.getElementById("filter-toggle");
-  var filterRail = document.getElementById("filter-rail");
-  if (filterToggle && filterRail) {
-    filterToggle.addEventListener("click", function () {
-      var open = !filterRail.classList.contains("open");
-      filterRail.classList.toggle("open", open);
-      filterToggle.setAttribute("aria-expanded", open ? "true" : "false");
-    });
-  }
+  if (sort) sort.addEventListener("change", applyFilters);
 
   document.querySelectorAll("[data-layout]").forEach(function (button) {
     if (!button.closest(".layout-toggle")) return;
@@ -174,6 +223,32 @@
     } catch (_error) {
       // Layout persistence is optional.
     }
+  }
+
+  function restoreLibraryState() {
+    var state = null;
+    try {
+      var url = new URL(location.href);
+      if (["q", "view", "org", "category", "sort"].some(function (key) { return url.searchParams.has(key); })) {
+        state = Object.fromEntries(url.searchParams.entries());
+      } else {
+        state = JSON.parse(sessionStorage.getItem("artifact-library-state") || "null");
+      }
+    } catch (_error) {}
+    if (!state) return;
+    if (search && state.q) search.value = state.q;
+    if (sort && state.sort && Array.prototype.some.call(sort.options, function (option) { return option.value === state.sort; })) sort.value = state.sort;
+    [["view", "activeView", "[data-filter-view]"], ["org", "activeOrg", "[data-filter-org]"], ["category", "activeCategory", "[data-filter-category]"]].forEach(function (entry) {
+      var value = state[entry[0]] || "all";
+      var button = Array.prototype.find.call(document.querySelectorAll(entry[2]), function (candidate) {
+        return candidate.getAttribute(entry[2].slice(1, -1)) === value;
+      });
+      if (!button) return;
+      if (entry[1] === "activeView") activeView = value;
+      if (entry[1] === "activeOrg") activeOrg = value;
+      if (entry[1] === "activeCategory") activeCategory = value;
+      pressOnly(entry[2], button);
+    });
   }
 
   document.addEventListener("keydown", function (event) {
@@ -576,5 +651,6 @@
     // The success message is optional when URL APIs are unavailable.
   }
 
+  restoreLibraryState();
   applyFilters();
 }());
