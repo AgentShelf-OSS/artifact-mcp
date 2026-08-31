@@ -31,7 +31,9 @@ test.describe("gallery", () => {
     const dimensions = await page.evaluate(() => ({
       clientWidth: document.documentElement.clientWidth,
       scrollWidth: document.documentElement.scrollWidth,
-      targetHeights: Array.from(document.querySelectorAll(".filter-choice, .reset-filters, .layout-toggle button, .sort-control select"), (node) => node.getBoundingClientRect().height),
+      targetHeights: Array.from(document.querySelectorAll(".filter-choice, .reset-filters, .layout-toggle button, .select-control select"), (node) => node.getBoundingClientRect())
+        .filter((rect) => rect.width > 0 && rect.height > 0)
+        .map((rect) => rect.height),
     }));
     expect(dimensions.scrollWidth).toBeLessThanOrEqual(dimensions.clientWidth + 1);
     expect(Math.min(...dimensions.targetHeights)).toBeGreaterThanOrEqual(44);
@@ -43,9 +45,11 @@ test.describe("gallery", () => {
     const toolbar = page.locator(".collection-tools");
     await expect(toolbar.getByRole("searchbox", { name: "Search artifacts" })).toBeVisible();
     await expect(toolbar.locator("[data-filter-view='all']")).toBeVisible();
+    await expect(toolbar.getByLabel("Filter by organization")).toBeVisible();
+    await expect(toolbar.getByLabel("Filter by category")).toBeVisible();
     await expect(toolbar.getByLabel("Sort artifacts")).toBeVisible();
     await expect(toolbar.getByLabel("Collection layout")).toBeVisible();
-    await expect(toolbar.getByRole("button", { name: "Reset", exact: true })).toBeVisible();
+    await expect(toolbar.locator("[data-reset-filters]")).toBeHidden();
     await expect(page.locator(".filter-rail")).toHaveCount(0);
   });
 
@@ -62,17 +66,20 @@ test.describe("gallery", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/");
 
-    await page.locator(`[data-filter-org="${org}"]`).click();
-    await page.locator('[data-filter-category="Reports"]').click();
+    await page.getByLabel("Filter by organization").selectOption(org);
+    await page.getByLabel("Filter by category").selectOption("Reports");
     await page.getByRole("searchbox", { name: "Search artifacts" }).fill("PW Reset");
     await page.getByLabel("Sort artifacts").selectOption("title");
-    await page.locator("[data-reset-filters]").click();
+    const clear = page.locator("[data-reset-filters]");
+    await expect(clear).toBeVisible();
+    await clear.click();
 
     await expect(page.getByRole("searchbox", { name: "Search artifacts" })).toHaveValue("");
+    await expect(page.getByLabel("Filter by organization")).toHaveValue("all");
+    await expect(page.getByLabel("Filter by category")).toHaveValue("all");
     await expect(page.getByLabel("Sort artifacts")).toHaveValue("recent");
     await expect(page.locator('[data-filter-view="all"]')).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-filter-org="all"]')).toHaveAttribute("aria-pressed", "true");
-    await expect(page.locator('[data-filter-category="all"]')).toHaveAttribute("aria-pressed", "true");
+    await expect(clear).toBeHidden();
     expect(errors).toEqual([]);
   });
 
@@ -87,15 +94,14 @@ test.describe("gallery", () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto("/");
 
-    for (const filter of [
-      page.locator('[data-filter-org="all"]'),
-      page.locator(`[data-filter-org="${org}"]`),
-      page.locator('[data-filter-category="all"]'),
-      page.locator('[data-filter-category="Reports"]'),
-    ]) {
-      await filter.scrollIntoViewIfNeeded();
-      await expect(filter).toBeVisible();
-    }
+    const organization = page.getByLabel("Filter by organization");
+    const category = page.getByLabel("Filter by category");
+    await expect(organization).toBeVisible();
+    await expect(category).toBeVisible();
+    await organization.selectOption(org);
+    await category.selectOption("Reports");
+    await expect(organization).toHaveValue(org);
+    await expect(category).toHaveValue("Reports");
   });
 
   test("viewer Back link restores the library scroll snapshot", async ({ page, request, publisherKey, org }) => {
