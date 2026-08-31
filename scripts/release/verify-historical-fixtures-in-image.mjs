@@ -119,6 +119,7 @@ async function expectConcealedRead(base, token, artifactId, id) {
 }
 
 const report = { schemaVersion: 1, image, command: process.argv.slice(1), fixtures: [] };
+const runtimeUser = `${process.getuid()}:${process.getgid()}`;
 try {
   for (const name of names) {
     const source = join(fixtureRoot, name);
@@ -131,7 +132,8 @@ try {
       execFileSync("chmod", ["-R", "a+rwX", data]);
       // The distroless image runs as nonroot. This temporary, synthetic copy is deliberately
       // writable while the committed source fixture remains untouched.
-      docker(["run", "--detach", "--name", container, "--publish", "127.0.0.1::3480",
+      docker(["run", "--detach", "--name", container, "--user", runtimeUser,
+        "--publish", "127.0.0.1::3480",
         "--volume", `${data}:/data-rust`,
         "--env", `ARTIFACT_API_KEYS=fixture-key:fixture:${manifest.authentication.token}`,
         "--env", "AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",

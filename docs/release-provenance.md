@@ -29,8 +29,8 @@ include deployment credentials, private hostnames, backup paths, or production d
 Create an annotated tag after the release commit has passed CI:
 
 ```sh
-git tag -a v1.7.1 -m "Artifact MCP 1.7.1"
-git push origin v1.7.1
+git tag -a v1.7.2 -m "Artifact MCP 1.7.2"
+git push origin v1.7.2
 ```
 
 Repository Actions must be allowed to write packages and attestations for the candidate job and

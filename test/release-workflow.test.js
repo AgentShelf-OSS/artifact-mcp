@@ -35,6 +35,8 @@ test("public release workflow stays independent of homelab deployment", async ()
   assert.match(workflow, /verify-historical-fixtures-in-image\.mjs/);
   assert.match(fixtureVerifier, /AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=/);
   assert.doesNotMatch(fixtureVerifier, /"--detach", "--rm"/);
+  assert.match(fixtureVerifier, /const runtimeUser = `\$\{process\.getuid\(\)\}:\$\{process\.getgid\(\)\}`/);
+  assert.match(fixtureVerifier, /"--user", runtimeUser/);
   assert.match(fixtureVerifier, /\["rm", "--force", container\]/);
   assert.match(workflow, /anchore\/sbom-action/);
   assert.match(workflow, /anchore\/scan-action/);

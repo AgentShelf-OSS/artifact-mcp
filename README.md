@@ -33,7 +33,7 @@ reference for release testing.
 - **Role-aware by construction.** Administrators can operate across organizations. Members see one
   organization, and Hide/Show or Delete appears only on files attributed to that verified uploader.
 
-### New in v1.7.1
+### New in v1.7.2
 
 - **A rebuilt artifact library.** The left filter rail is gone. Search, quick views, organization
   and category dropdowns, sorting, and the grid/list switch now share one toolbar above equal-height
@@ -50,7 +50,7 @@ reference for release testing.
 
 ## Screenshots
 
-*Screenshots are from an isolated Rust v1.7.1 release-candidate server at schema 32, seeded with 12
+*Screenshots are from an isolated Rust v1.7.2 release-candidate server at schema 32, seeded with 12
 fictional artifacts across acme, globex, initech, and umbrella. The optional preview renderer is
 enabled. Both light and dark themes ship; light is shown here.*
 
