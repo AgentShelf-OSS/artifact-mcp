@@ -64,6 +64,7 @@
         <label class="select-control"><span class="sr-only">Category</span><select id="category-filter" aria-label="Filter by category">
           <option value="all">All categories</option>
           {% for category in categories %}<option value="{{ category.key }}">{{ category.label }} ({{ category.count }})</option>{% endfor %}
+          {% if viewer_is_admin %}<option value="__create_category__">+ Category</option>{% endif %}
         </select></label>
         <label class="select-control sort-control"><span class="sr-only">Sort artifacts</span><select id="sort" aria-label="Sort artifacts"><option value="recent">Updated recently</option><option value="views">Most viewed</option><option value="title">Title A-Z</option></select></label>
         <button class="reset-filters" type="button" data-reset-filters hidden>Clear</button>
@@ -75,6 +76,7 @@
     </section>
 
     <section class="collection-results" aria-label="Artifact results">
+      <span id="org-category-data" hidden data-json="{{ org_category_json }}" data-can-create="{% if viewer_is_admin %}1{% else %}0{% endif %}"></span>
         <div class="result-summary">
           <span>{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %} · <span id="sort-label">Updated recently</span></span>
           <span class="count" id="count" aria-live="polite">Showing {{ total }} of {{ total }}</span>
@@ -118,7 +120,7 @@
                 {% if card.show_visibility %}<button class="act icon-act visibility" data-action="visibility" type="button" aria-label="{% if card.hidden %}Show{% else %}Hide{% endif %} {{ card.title }} in the gallery" title="{% if card.hidden %}Show in gallery{% else %}Hide from gallery{% endif %}">{% if card.hidden %}{{ icons.eye_off }}{% else %}{{ icons.eye }}{% endif %}</button>{% endif %}
                 <button class="act icon-act more" data-action="more" type="button" aria-label="More actions for {{ card.title }}" aria-expanded="false" aria-controls="card-menu-{{ card.id }}">{{ icons.more }}</button>
                 <div class="card-menu" id="card-menu-{{ card.id }}" data-ui="card-menu" hidden>
-                  <label>Category<select class="category-menu" data-action="category" aria-label="Change category for {{ card.title }}"><option value="">{{ card.category_label }}</option>{% for option in card.category_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>
+                  <label>Category<select class="category-menu" data-action="category" data-can-create="{% if card.show_visibility %}1{% else %}0{% endif %}" aria-label="Change category for {{ card.title }}"><option value=""{% if !card.has_category %} selected{% endif %}>Uncategorized</option>{% for option in card.category_options %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}{% if card.show_visibility %}<option value="__create_category__">+ Category</option>{% endif %}</select></label>
                   {% if viewer_is_admin && !card.org_options.is_empty() %}<label>Organization<select class="org-menu" data-action="move-org" aria-label="Move {{ card.title }} to another organization"><option value="">{{ card.org }}</option>{% for option in card.org_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>{% endif %}
                   {% if card.show_delete %}<button class="menu-action del" data-action="delete" type="button">Delete artifact</button>{% endif %}
                   <div class="move-confirm" role="group" aria-label="Confirm organization move" hidden><span class="move-question"></span><button class="move-yes" type="button">Move</button><button class="move-no" type="button">Cancel</button></div>
@@ -131,6 +133,13 @@
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
     <div class="empty" id="empty" hidden><p class="empty-kicker">No matches</p><h2>Nothing in the collection fits those filters.</h2><p>Try another title, publisher, category, or organization.</p></div>
+    <dialog class="category-dialog" id="category-dialog" aria-labelledby="category-dialog-title">
+      <form class="category-panel" id="category-form">
+        <div class="dialog-head"><div><p class="eyebrow">Organization taxonomy</p><h2 id="category-dialog-title">Add category</h2></div><button class="dialog-close category-close" type="button" aria-label="Close category dialog">×</button></div>
+        <div class="category-body"><p id="category-copy">Create a category for this organization.</p><label id="category-org-label">Organization<select id="category-org">{% for chip in chips %}<option value="{{ chip.org }}">{{ chip.org }}</option>{% endfor %}</select></label><label>Category name<input id="category-name" name="name" maxlength="60" autocomplete="off" required></label><p class="category-error" id="category-error" role="status" aria-live="polite"></p></div>
+        <div class="category-actions"><button class="category-cancel" type="button">Cancel</button><button class="category-submit" type="submit">Create category</button></div>
+      </form>
+    </dialog>
     <dialog class="share-dialog" id="share-dialog" aria-labelledby="share-title">
       <form method="dialog" class="dialog-head"><div><p class="eyebrow">Public access</p><h2 id="share-title">Share artifact</h2></div><button class="dialog-close" value="cancel" aria-label="Close share dialog">×</button></form>
       <p class="share-copy" id="share-copy">Create and revoke public links. Hiding an artifact from Gallery does not revoke these links.</p>

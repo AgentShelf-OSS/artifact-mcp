@@ -2,6 +2,7 @@
 
 use std::{
     cmp::Ordering,
+    collections::BTreeMap,
     fmt,
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -214,6 +215,7 @@ struct GalleryTemplate<'a> {
     cards: Vec<CardTemplate>,
     chips: Vec<GalleryChipTemplate>,
     categories: Vec<CategoryFilterTemplate>,
+    org_category_json: String,
     notifications: Vec<NotificationTemplate>,
     unread_notifications: u64,
 }
@@ -238,6 +240,12 @@ struct CategoryFilterTemplate {
     count: usize,
 }
 
+#[derive(Clone, Serialize)]
+struct OrgCategoryTemplate {
+    name: String,
+    count: usize,
+}
+
 struct CardTemplate {
     id: String,
     org: String,
@@ -254,6 +262,7 @@ struct CardTemplate {
     show_visibility: bool,
     show_delete: bool,
     category: String,
+    has_category: bool,
     category_label: String,
     color: String,
     thumbnail_src: String,
@@ -276,6 +285,7 @@ struct CardTemplate {
 struct MoveOptionTemplate {
     value: String,
     label: String,
+    selected: bool,
 }
 
 const SHELL_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/shell.css"));
@@ -657,20 +667,48 @@ fn gallery_template<'a>(
             count: section.items.len(),
         })
         .collect();
+    let mut org_category_index = BTreeMap::<String, Vec<OrgCategoryTemplate>>::new();
+    for section in &view.sections {
+        let mut counts = BTreeMap::<String, usize>::new();
+        for artifact in &section.items {
+            let category = js_trim(&artifact.category).to_owned();
+            *counts.entry(category).or_default() += 1;
+        }
+        let mut names = view
+            .org_categories
+            .get(&section.org)
+            .cloned()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|name| js_trim(&name).to_owned())
+            .filter(|name| !name.is_empty())
+            .collect::<Vec<_>>();
+        names.extend(counts.keys().cloned());
+        names.sort_by(|left, right| category_cmp(left, right));
+        names.dedup();
+        org_category_index.insert(
+            section.org.0.clone(),
+            names
+                .into_iter()
+                .map(|name| OrgCategoryTemplate {
+                    count: counts.get(&name).copied().unwrap_or(0),
+                    name,
+                })
+                .collect(),
+        );
+    }
     let mut category_counts: Vec<(String, usize)> = Vec::new();
-    for artifact in &artifacts {
-        let key = js_trim(&artifact.category).to_owned();
-        if let Some((_, count)) = category_counts.iter_mut().find(|(name, _)| name == &key) {
-            *count += 1;
+    for category in org_category_index.values().flatten() {
+        if let Some((_, count)) = category_counts
+            .iter_mut()
+            .find(|(name, _)| name == &category.name)
+        {
+            *count += category.count;
         } else {
-            category_counts.push((key, 1));
+            category_counts.push((category.name.clone(), category.count));
         }
     }
     category_counts.sort_by(|(left, _), (right, _)| category_cmp(left, right));
-    let category_names: Vec<String> = category_counts
-        .iter()
-        .map(|(name, _)| name.clone())
-        .collect();
     let categories = category_counts
         .into_iter()
         .map(|(key, count)| CategoryFilterTemplate {
@@ -686,7 +724,18 @@ fn gallery_template<'a>(
     let now = (renderer.clock)();
     let cards: Vec<CardTemplate> = artifacts
         .into_iter()
-        .map(|artifact| card_template(artifact, view, &org_names, &category_names, is_admin, now))
+        .map(|artifact| {
+            let category_names = org_category_index
+                .get(&artifact.org.0)
+                .map(|categories| {
+                    categories
+                        .iter()
+                        .map(|category| category.name.clone())
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            card_template(artifact, view, &org_names, &category_names, is_admin, now)
+        })
         .collect();
     let has_delete_actions = cards.iter().any(|card| card.show_delete);
     let notifications = view
@@ -724,6 +773,8 @@ fn gallery_template<'a>(
         .org_colors
         .get(&OrgId::from(identity_org))
         .and_then(Option::as_deref);
+    let org_category_json =
+        serde_json::to_string(&org_category_index).unwrap_or_else(|_| "{}".to_owned());
     GalleryTemplate {
         favicon: FAVICON,
         theme_boot: THEME_BOOT,
@@ -761,6 +812,7 @@ fn gallery_template<'a>(
         cards,
         chips,
         categories,
+        org_category_json,
         notifications,
         unread_notifications: view.unread_notifications,
     }
@@ -829,6 +881,7 @@ fn card_template(
         show_visibility: can_manage,
         show_delete: can_manage,
         category: category.clone(),
+        has_category: !category.is_empty(),
         category_label,
         color: color_for(&artifact.org, &view.org_colors),
         thumbnail_src,
@@ -846,14 +899,11 @@ fn card_template(
         unique_viewers_plural: views.is_none_or(|counts| counts.unique_viewers != 1),
         category_options: category_names
             .iter()
-            .filter(|candidate| candidate.as_str() != category)
-            .map(|category| MoveOptionTemplate {
-                value: category.clone(),
-                label: if category.is_empty() {
-                    "Uncategorized".to_owned()
-                } else {
-                    category.clone()
-                },
+            .filter(|candidate| !candidate.is_empty())
+            .map(|candidate| MoveOptionTemplate {
+                value: candidate.clone(),
+                label: candidate.clone(),
+                selected: candidate.as_str() == category.as_str(),
             })
             .collect(),
         org_options: org_names
@@ -862,6 +912,7 @@ fn card_template(
             .map(|org| MoveOptionTemplate {
                 value: org.clone(),
                 label: org.clone(),
+                selected: false,
             })
             .collect(),
     }
@@ -1055,6 +1106,8 @@ struct NotFoundTemplate<'a> {
     favicon: TrustedStatic,
     theme_boot: TrustedStatic,
     app_name: &'a str,
+    app_brand: &'a str,
+    site_host: &'a str,
     message: &'a str,
     css: TrustedStatic,
 }
@@ -1076,6 +1129,8 @@ struct AccessRetryTemplate<'a> {
     favicon: TrustedStatic,
     theme_boot: TrustedStatic,
     app_name: &'a str,
+    app_brand: &'a str,
+    site_host: &'a str,
     target: &'a str,
     css: TrustedStatic,
 }
@@ -1102,6 +1157,8 @@ impl PageRenderer for AskamaPageRenderer {
             favicon: FAVICON,
             theme_boot: THEME_BOOT,
             app_name: &self.app_name,
+            app_brand: &self.app_brand,
+            site_host: &self.site_host,
             message: message
                 .filter(|message| !message.is_empty())
                 .unwrap_or("It may have been deleted, or the link is no longer valid."),
@@ -1125,6 +1182,8 @@ impl PageRenderer for AskamaPageRenderer {
             favicon: FAVICON,
             theme_boot: THEME_BOOT,
             app_name: &self.app_name,
+            app_brand: &self.app_brand,
+            site_host: &self.site_host,
             target: if target.is_empty() {
                 "/?cf_access_retry=1"
             } else {

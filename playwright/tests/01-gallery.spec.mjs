@@ -104,6 +104,49 @@ test.describe("gallery", () => {
     await expect(category).toHaveValue("Reports");
   });
 
+  test("organization changes scope both category pickers and allow inline category creation", async ({ page, request, publisherKey, org }) => {
+    const destination = org.replace(/^pwtest-/, "pwcat-");
+    const title = `PW Category move ${org}`;
+    const created = await api(request, "post", "/settings/orgs", { name: destination, label: "Playwright category destination" });
+    expect([200, 201]).toContain(created.status());
+    await api(request, "post", `/settings/orgs/${org}/categories`, { name: "Source only" });
+    await api(request, "post", `/settings/orgs/${destination}/categories`, { name: "Destination only" });
+    await publish(request, publisherKey, { title, category: "Source only", html: "<!doctype html><h1>move</h1>" });
+    await page.goto("/");
+
+    const organization = page.getByLabel("Filter by organization");
+    const filterCategory = page.getByLabel("Filter by category");
+    await organization.selectOption(destination);
+    await expect(filterCategory.locator("option")).toHaveText([
+      "All categories",
+      "Destination only (0)",
+      "+ Category",
+    ]);
+    await filterCategory.selectOption("__create_category__");
+    await page.getByLabel("Category name").fill("Filter created");
+    await page.getByRole("button", { name: "Create category" }).click();
+    await expect(filterCategory.locator('option[value="Filter created"]')).toHaveText("Filter created (0)");
+
+    await organization.selectOption(org);
+    const card = page.locator(".card", { hasText: title });
+    await card.getByRole("button", { name: `More actions for ${title}` }).click();
+    await card.getByLabel(`Move ${title} to another organization`).selectOption(destination);
+    const cardCategory = card.getByLabel(`Change category for ${title}`);
+    await expect(cardCategory.locator("option")).toHaveText([
+      "Uncategorized",
+      "Destination only",
+      "Filter created",
+      "+ Category",
+    ]);
+    await cardCategory.selectOption("__create_category__");
+    await page.getByLabel("Category name").fill("Move created");
+    await page.getByRole("button", { name: "Create category" }).click();
+    await expect(cardCategory).toHaveValue("Move created");
+    await expect(card.locator(".move-question")).toContainText(`to ${destination} in Move created`);
+    await card.getByRole("button", { name: "Move", exact: true }).click();
+    await expect(page.locator(`.card[data-org="${destination}"]`, { hasText: title })).toContainText("Move created");
+  });
+
   test("viewer Back link restores the library scroll snapshot", async ({ page, request, publisherKey, org }) => {
     const title = `PW Return ${org}`;
     await Promise.all(Array.from({ length: 4 }, (_, index) =>

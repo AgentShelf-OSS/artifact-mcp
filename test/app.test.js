@@ -71,6 +71,7 @@ function dependencies(overrides = {}) {
       removeEmailMember: () => true,
       addCategory: () => ({}),
       removeCategory: () => true,
+      categoriesFor: () => [],
       setColor: () => ({}),
       colorMap: () => ({})
     },
@@ -92,6 +93,37 @@ function dependencies(overrides = {}) {
     ...overrides
   };
 }
+
+test("gallery projects the registered category catalogue for each visible organization", async () => {
+  let galleryArgs;
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
+    artifacts: {
+      ...dependencies().artifacts,
+      listAllGroupedByOrg: () => new Map([
+        ["agentshelf", [{ id: "a1", org: "agentshelf", title: "A", client_id: "publisher", is_bundle: 0, category: "UI/UX" }]],
+        ["homelab", [{ id: "h1", org: "homelab", title: "H", client_id: "publisher", is_bundle: 0, category: "Dashboards" }]],
+      ]),
+    },
+    orgs: {
+      ...dependencies().orgs,
+      names: () => ["agentshelf", "homelab"],
+      categoriesFor: (org) => org === "agentshelf" ? ["Specs", "UI/UX"] : ["Dashboards", "Runbooks"],
+    },
+    pages: {
+      ...dependencies().pages,
+      gallery: (...args) => { galleryArgs = args; return "gallery"; },
+    },
+  }));
+
+  const response = await invokeRoute(app, "get", "/");
+  assert.equal(response.status, 200);
+  assert.equal(response.body, "gallery");
+  assert.deepEqual(galleryArgs[8], {
+    agentshelf: ["Specs", "UI/UX"],
+    homelab: ["Dashboards", "Runbooks"],
+  });
+});
 
 async function serve(app, fn) {
   const server = app.listen(0, "127.0.0.1");

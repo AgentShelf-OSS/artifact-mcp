@@ -31,6 +31,7 @@ struct SettingsTemplate<'a> {
     admin_color: String,
     organization_count: usize,
     active_count: usize,
+    webhook_count: usize,
     revoked_count: usize,
     keys: Vec<KeyTemplate>,
     organizations: Vec<OrganizationTemplate>,
@@ -182,6 +183,11 @@ pub(super) fn render_settings(
         })
         .collect();
     let organization_count = view.organizations.len();
+    let webhook_count = view
+        .organizations
+        .iter()
+        .map(|organization| organization.webhooks.len())
+        .sum();
     let revoked_count = view.keys.len().saturating_sub(active_count);
     let template = SettingsTemplate {
         favicon: FAVICON,
@@ -200,6 +206,7 @@ pub(super) fn render_settings(
         admin_color: org_color("admin", None),
         organization_count,
         active_count,
+        webhook_count,
         revoked_count,
         keys,
         organizations,

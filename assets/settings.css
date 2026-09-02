@@ -11,3 +11,10 @@
 @media(forced-colors:active){.org-directory,.org-detail,.key-issue,.key-registry,.notification-panel,.discussion-panel,.owner-registry,.empty-detail{border:2px solid CanvasText}.org-detail,.notification-panel,.discussion-panel,.empty-detail{border-left-width:4px}.admin-tab[aria-selected="true"]{outline:2px solid Highlight;outline-offset:-2px}.pill span{border:1px solid currentColor}}@media(prefers-reduced-motion:reduce){.admin-tabs{backdrop-filter:none;-webkit-backdrop-filter:none}.new-org-trigger,.secondary-button,.primary-button,.revoke,.wh-test,.wh-remove,.chip-add button{transition:none}}
 .settings-main,.settings-hero,.workspace,.organizations-workspace,.org-directory,.org-detail,.detail-head,.detail-head>div,.settings-group,.settings-group>div,.routing-fields,.org-row,.chips,.org-list-button>span{min-width:0}.org-list-button strong,.org-list-button small,.detail-head code{overflow-wrap:anywhere;word-break:break-word}.chip{min-width:0;max-width:100%;overflow-wrap:anywhere;word-break:break-word}.chip-x{flex:0 0 auto}
 .chip{display:inline-grid;grid-template-columns:minmax(0,1fr) auto;overflow:hidden}.chip-value{min-width:0;overflow:hidden;overflow-wrap:anywhere;word-break:break-all}
+
+/* Approved-revamp fidelity: keep the admin overview dense and the two delivery systems adjacent. */
+.settings-hero h1 em{color:inherit}
+.key-owner{max-width:13rem;overflow-wrap:anywhere;word-break:break-word}
+#notification-panels{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(22rem,.85fr);gap:.8rem;align-items:start}
+#notification-panels>.notification-panel,#notification-panels>.discussion-panel{min-width:0;margin-top:0}
+@media(max-width:980px){#notification-panels{grid-template-columns:1fr}}

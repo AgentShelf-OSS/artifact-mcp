@@ -37,7 +37,8 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     maps(input.viewCounts),
     maps(input.topViewed),
     input.orgColors,
-    input.notifications
+    input.notifications,
+    input.orgCategories
   );
   const shell = portal.renderArtifactShell(
     input.meta,
@@ -112,6 +113,8 @@ fn standalone_pages_keep_the_saved_theme_and_access_contracts() {
         assert!(page.contains(":root[data-theme=\"dark\"]"));
         assert!(page.contains("min-height:100dvh"));
         assert!(page.contains("@media(forced-colors:active)"));
+        assert!(page.contains("class=\"brand\""));
+        assert!(page.contains("class=\"mark\""));
     }
     assert!(pages[2].contains("content=\"0;url=/artifact?cf_access_retry=1\""));
     assert!(pages[2].contains("href=\"/artifact?cf_access_retry=1\""));
@@ -169,6 +172,10 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
         view_counts: BTreeMap::new(),
         top_viewed: BTreeMap::new(),
         org_colors: BTreeMap::new(),
+        org_categories: BTreeMap::from([(
+            OrgId::from("acme🎉"),
+            vec!["Reports".to_owned(), "Runbooks".to_owned()],
+        )]),
         notifications: vec![notification],
         unread_notifications: 1,
     };
@@ -180,6 +187,8 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
     assert!(html.contains("Just now"));
     assert!(html.contains("/thumbnails/artifact1234?v=deadbeefcafebabe"));
     assert!(html.contains("markNotificationsSeen"));
+    assert!(html.contains("<option value=\"Runbooks\">Runbooks (0)</option>"));
+    assert!(html.contains("<option value=\"Reports\" selected>Reports</option>"));
 }
 
 #[test]
@@ -239,6 +248,12 @@ fn settings_renders_management_surfaces_without_trusting_runtime_values() {
     assert!(html.contains("aria-current=\"page\""));
     assert!(html.contains("class=\"key-edit\""));
     assert!(html.contains("data-owner=\"\""));
+    assert!(html.contains("<span>Webhooks</span>"));
+    assert!(html.contains("id=\"webhook-total\">1</strong>"));
+    assert!(html.contains("function adjustWebhookTotal"));
+    assert!(html.contains("data-label=\"Owner\" class=\"key-owner\""));
+    assert!(html.contains("Not assigned"));
+    assert!(html.contains("#notification-panels{display:grid;grid-template-columns:"));
     assert!(html.contains("Save changes"));
     assert!(!html.contains("<span>Gallery</span>"));
 }
@@ -411,6 +426,7 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         ]}],
         "reactions": [], "sentiment": [], "viewCounts": [], "topViewed": [],
         "orgColors": { "acme🎉": null },
+        "orgCategories": { "empty": [], "acme🎉": ["Reports"] },
         "notifications": { "unread": 1, "items": [{
             "id": "feedback-1", "artifact_id": "artifact1234", "artifact_title": attack,
             "viewer_email": attack, "body": attack, "created_at": "1970-01-01 00:00:00", "unread": 1
@@ -547,6 +563,7 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             view_counts: BTreeMap::new(),
             top_viewed: BTreeMap::new(),
             org_colors: BTreeMap::new(),
+            org_categories: BTreeMap::new(),
             notifications: vec![ViewerNotification {
                 id: FeedbackId::from("feedback-1"),
                 artifact_id: ArtifactId::from("artifact1234"),
@@ -588,6 +605,21 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         html_attribute_after(&gallery, "<a class=\"notif-row", "href"),
         node["notificationHref"]
     );
+}
+
+#[test]
+fn shared_gallery_css_preserves_brand_and_organization_accents() {
+    let css = include_str!("../../assets/portal.css");
+
+    assert!(css.contains(".brand-mark{width:2.15rem;height:2.15rem;display:grid;place-items:center;border:1px solid var(--ink);font:600 1.25rem/1 var(--font-display);position:relative;background:var(--card)}"));
+    assert!(css.contains(".brand-mark::after{content:\"\";position:absolute;inset:4px -5px -5px 4px;z-index:-1;border-radius:7px;background:var(--brass);pointer-events:none}"));
+    assert!(css.contains(".card::before{content:\"\";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--org-k,var(--brass));z-index:3}"));
+    assert!(!css.contains(".card::before{width:2px;background:var(--brass)}"));
+    assert!(!css.contains(".nav-link.active{border-bottom-color:var(--brass)"));
+    assert!(css.contains(".nav-link.active::after{background:var(--brass)}"));
+    assert!(css.contains(
+        "@media(forced-colors:active){.card::before,.nav-link.active::after{background:CanvasText}"
+    ));
 }
 
 fn parity_meta(attack: &str) -> ArtifactMeta {
