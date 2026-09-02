@@ -15,7 +15,7 @@ const requiredFiles = [
   "src/mcp/resources.rs",
   "src/mcp/tasks.rs",
   "src/security/oauth.rs",
-  "README.md",
+  "docs/mcp-api.md",
   "Cargo.toml",
   "package.json",
   "tests/native/main.rs",
@@ -56,7 +56,7 @@ test("an unsynchronized modern declaration fails the derived surface gate", asyn
         const stderr = error.stderr.toString();
         return stderr.includes("regenerate_artifact_preview_extra has no typed output schema") &&
           stderr.includes("regenerate_artifact_preview_extra is advertised but missing from tools/call dispatch") &&
-          stderr.includes("regenerate_artifact_preview_extra is advertised but absent from README MCP documentation");
+          stderr.includes("regenerate_artifact_preview_extra is advertised but absent from MCP documentation");
       },
     );
   } finally {
