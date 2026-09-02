@@ -210,6 +210,7 @@ const app = createApp({
     removeEmailMember: orgs.removeEmailMember,
     addCategory: orgs.addCategory,
     removeCategory: orgs.removeCategory,
+    categoriesFor: orgs.categoriesFor,
     setColor: orgs.setColor,
     colorMap: orgs.colorMap
   },

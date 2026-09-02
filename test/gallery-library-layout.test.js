@@ -44,6 +44,23 @@ test("gallery foundation keeps three, two, then one responsive columns and state
   assert.match(script, /x-artifact-mutation/);
 });
 
+test("gallery keeps the approved brand block and organization-colored card stripe", async () => {
+  const css = await readFile(new URL("assets/portal.css", root), "utf8");
+
+  assert.match(css, /\.brand-mark::after\{[^}]*inset:4px -5px -5px 4px;[^}]*z-index:-1;[^}]*background:var\(--brass\)[^}]*\}/);
+  assert.doesNotMatch(css, /\.brand-mark::after\{[^}]*border-(?:right|bottom):/);
+  assert.match(css, /\.card::before\{[^}]*width:4px;[^}]*background:var\(--org-k,var\(--brass\)\)[^}]*\}/);
+  assert.doesNotMatch(css, /\.card::before\{[^}]*background:var\(--brass\)[^}]*\}/);
+  assert.match(css, /@media\(forced-colors:active\)\{\.card::before,[^}]*background:CanvasText/);
+});
+
+test("active primary navigation paints one short accent indicator", async () => {
+  const css = await readFile(new URL("assets/portal.css", root), "utf8");
+
+  assert.doesNotMatch(css, /\.nav-link\.active\{[^}]*border-bottom-color:var\(--brass\)/);
+  assert.match(css, /\.nav-link\.active::after\{background:var\(--brass\)\}/);
+});
+
 test("Node gallery renderer mirrors the no-rail toolbar contract", () => {
   const html = renderGallery(
     { email: "admin@example.test", org: "admin", isAdmin: true },
@@ -59,4 +76,43 @@ test("Node gallery renderer mirrors the no-rail toolbar contract", () => {
   assert.match(html, /data-reset-filters/);
   assert.doesNotMatch(html, /<aside[^>]*filter-rail/);
   assert.doesNotMatch(html, /<aside/);
+});
+
+test("Node gallery cards expose configured organization colors to the shared stripe", () => {
+  const html = renderGallery(
+    { email: "admin@example.test", org: "admin", isAdmin: true },
+    [{ org: "acme", items: [{ id: "artifact-1", org: "acme", title: "Library test", client_id: "test", is_bundle: 0, bytes: 1 }] }],
+    new Map(),
+    new Map(),
+    new Map(),
+    new Map(),
+    { acme: "#397b6f" },
+  );
+
+  assert.match(html, /<article class="card[^"]*"[^>]*style="--org-k:#397b6f;/);
+});
+
+test("gallery category controls carry organization-scoped options and creation actions", () => {
+  const html = renderGallery(
+    { email: "admin@example.test", org: "admin", isAdmin: true },
+    [
+      { org: "agentshelf", items: [{ id: "artifact-1", org: "agentshelf", title: "Arty", client_id: "test", is_bundle: 0, bytes: 1, category: "UI/UX" }] },
+      { org: "homelab", items: [{ id: "artifact-2", org: "homelab", title: "Dashboard", client_id: "test", is_bundle: 0, bytes: 1, category: "Dashboards" }] },
+    ],
+    new Map(),
+    new Map(),
+    new Map(),
+    new Map(),
+    {},
+    {},
+    { agentshelf: ["Specs", "UI/UX"], homelab: ["Dashboards", "Runbooks"] },
+  );
+
+  const artyCategory = html.match(/<select class="category-menu"[^>]*aria-label="Change category for Arty"[^>]*>([\s\S]*?)<\/select>/)?.[1] || "";
+  assert.match(artyCategory, /<option value="UI\/UX" selected>UI\/UX<\/option>/);
+  assert.match(artyCategory, /<option value="Specs">Specs<\/option>/);
+  assert.doesNotMatch(artyCategory, /Dashboards|Runbooks/);
+  assert.match(artyCategory, /<option value="__create_category__">\+ Category<\/option>/);
+  assert.match(html, /id="category-filter"[^>]*>[\s\S]*?<option value="__create_category__">\+ Category<\/option>/);
+  assert.match(html, /id="org-category-data"[^>]*data-json="[^"]*&quot;agentshelf&quot;[^"]*&quot;homelab&quot;/);
 });

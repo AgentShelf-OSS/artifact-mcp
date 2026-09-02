@@ -583,7 +583,6 @@ async fn delete_cascades_every_subordinate_table_and_removes_the_bodies() {
         .expect("update")
         .meta;
     seed_engagement(&fixture, &meta.id);
-
     assert_eq!(fixture.count("SELECT COUNT(*) FROM reactions"), 1);
     assert_eq!(fixture.count("SELECT COUNT(*) FROM feedback"), 1);
     assert_eq!(fixture.count("SELECT COUNT(*) FROM artifact_views"), 1);
@@ -664,6 +663,27 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
         .expect("update")
         .meta;
     seed_engagement(&fixture, &meta.id);
+    fixture.execute(&format!(
+        "INSERT INTO org_discord_discussion_connections (id, org, url, label) \
+           VALUES ('move-connection', '{TEST_ORG}', 'https://discord.invalid/api/webhooks/1/token', 'Move fixture');
+         INSERT INTO artifact_discussions \
+           (artifact_id, org, provider, mode, connection_org, connection_id, state, generation) \
+           VALUES ('{id}', '{TEST_ORG}', 'discord', 'discord_mirror', '{TEST_ORG}', \
+                   'move-connection', 'connected', 1);
+         INSERT INTO provider_delivery_outbox \
+           (id, provider, event_id, tenant, event_type, target_key, bucket_id, secret_ref, payload, \
+            payload_sha256, state, next_attempt_at, created_at, updated_at, delivery_kind, ordering_key) \
+           VALUES ('move-outbox', 'discord', 'move-event', '{TEST_ORG}', 'feedback', \
+                   'move-connection', 'move-connection', 'webhook:move-connection', x'7b7d', \
+                   '44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a', \
+                   'accepted', 0, 0, 0, 'discussion_message', 'artifact:{id}');
+         INSERT INTO discussion_message_links \
+           (provider, artifact_id, org, connection_id, feedback_id, delivery_event_id, outbox_id, \
+            external_thread_id, external_message_id, generation, state) \
+           VALUES ('discord', '{id}', '{TEST_ORG}', 'move-connection', 'fb0000000000000a', \
+                   'move-event', 'move-outbox', 'move-thread', 'move-message', 1, 'posted');",
+        id = meta.id.0,
+    ));
 
     let moved = fixture
         .store
@@ -695,9 +715,19 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
         "public shares are revoked, never carried into the new tenant"
     );
     assert_eq!(
-        fixture.foreign_key_violations(),
+        fixture.count("SELECT COUNT(*) FROM artifact_discussions"),
         0,
-        "the deferred composite FKs hold at commit"
+        "the source organization's discussion binding is revoked"
+    );
+    assert_eq!(
+        fixture.count("SELECT COUNT(*) FROM discussion_message_links"),
+        0,
+        "source-org Discord message mappings are revoked"
+    );
+    assert_eq!(
+        fixture.count("SELECT COUNT(*) FROM provider_delivery_outbox WHERE id='move-outbox'"),
+        1,
+        "immutable delivery history remains available"
     );
     assert_eq!(
         fixture.scalar::<String>(
@@ -706,6 +736,28 @@ async fn move_to_org_carries_composite_fk_rows_and_revokes_shares() {
         ),
         "acme:artifact.org.move:shares_revoked_1",
         "an admin-initiated cross-org move is filed under the affected source tenant without a share token"
+    );
+    fixture.execute(&format!(
+        "INSERT INTO artifact_discussions \
+           (artifact_id, org, provider, mode, state, generation) \
+         VALUES ('{id}', 'other', 'discord', 'artifact_only', 'local', 0);",
+        id = moved.id.0,
+    ));
+    let same_org = fixture
+        .store
+        .move_to_org_for(&moved, "other", Some("same org"), mutation_audit())
+        .await
+        .expect("same-org category update succeeds");
+    assert_eq!(same_org.category, "same org");
+    assert_eq!(
+        fixture.count("SELECT COUNT(*) FROM artifact_discussions"),
+        1,
+        "same-org category update retains discussion state"
+    );
+    assert_eq!(
+        fixture.foreign_key_violations(),
+        0,
+        "the deferred composite FKs hold at commit"
     );
 }
 

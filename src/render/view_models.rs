@@ -19,6 +19,7 @@ pub struct GalleryView {
     pub view_counts: BTreeMap<ArtifactId, ViewCounts>,
     pub top_viewed: BTreeMap<OrgId, Vec<TopViewedArtifact>>,
     pub org_colors: BTreeMap<OrgId, Option<String>>,
+    pub org_categories: BTreeMap<OrgId, Vec<String>>,
     pub notifications: Vec<ViewerNotification>,
     pub unread_notifications: u64,
 }

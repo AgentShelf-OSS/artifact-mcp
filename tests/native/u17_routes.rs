@@ -45,6 +45,7 @@ struct FakeState {
     grouped: Vec<OrgArtifacts>,
     org_ids: Vec<ArtifactId>,
     org_names: Vec<OrgId>,
+    categories: BTreeMap<OrgId, Vec<String>>,
     colors: BTreeMap<OrgId, Option<String>>,
     reaction: Reaction,
     reactions: BTreeMap<ArtifactId, Reaction>,
@@ -580,8 +581,11 @@ impl AdminService for Fake {
         unused()
     }
 
-    fn categories<'a>(&'a self, _org: &'a OrgId) -> BoxFuture<'a, Result<Vec<String>, AppError>> {
-        unused()
+    fn categories<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<Vec<String>, AppError>> {
+        Box::pin(async move {
+            let categories = self.lock().categories.get(org).cloned().unwrap_or_default();
+            self.operation("admin.categories", categories)
+        })
     }
 
     fn add_category<'a>(
@@ -1581,6 +1585,9 @@ async fn gallery_preserves_admin_registry_union_order_and_unsigned_cache_policy(
         shadow.id = ArtifactId::from("def456abc123");
         shadow.org = OrgId::from("shadow");
         state.org_names = vec![OrgId::from("empty"), OrgId::from("acme")];
+        state
+            .categories
+            .insert(OrgId::from("acme"), vec!["Reports".to_owned()]);
         state.grouped.push(OrgArtifacts {
             org: OrgId::from("shadow"),
             items: vec![shadow],
@@ -1615,6 +1622,10 @@ async fn gallery_preserves_admin_registry_union_order_and_unsigned_cache_policy(
     assert_eq!(view.view_counts[&ArtifactId::from(ID)].views, 7);
     assert_eq!(view.top_viewed.keys().count(), 3);
     assert_eq!(view.sentiment.len(), 1);
+    assert_eq!(
+        view.org_categories[&OrgId::from("acme")],
+        ["Reports".to_owned()]
+    );
     assert_eq!(view.unread_notifications, 4);
 
     let unsigned = Fake::standard();

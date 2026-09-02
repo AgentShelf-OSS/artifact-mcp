@@ -172,6 +172,13 @@ async fn gallery_result(deps: &AppDeps, viewer: Viewer) -> Result<Response, AppE
         std::collections::BTreeMap::new()
     };
     let org_colors = deps.admin.color_map().await?;
+    let mut org_categories = std::collections::BTreeMap::new();
+    for section in &sections {
+        org_categories.insert(
+            section.org.clone(),
+            deps.admin.categories(&section.org).await?,
+        );
+    }
 
     let body = deps.pages.gallery(&GalleryView {
         viewer,
@@ -181,6 +188,7 @@ async fn gallery_result(deps: &AppDeps, viewer: Viewer) -> Result<Response, AppE
         view_counts,
         top_viewed,
         org_colors,
+        org_categories,
         notifications,
         unread_notifications,
     })?;

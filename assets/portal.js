@@ -90,9 +90,59 @@
   var categoryFilter = document.getElementById("category-filter");
   var resetFilters = document.querySelector("[data-reset-filters]");
   var sortLabel = document.getElementById("sort-label");
+  var categoryDataNode = document.getElementById("org-category-data");
+  var createCategoryValue = "__create_category__";
+  var canCreateCategories = categoryDataNode && categoryDataNode.dataset.canCreate === "1";
+  var orgCategoryIndex = {};
+  try {
+    orgCategoryIndex = JSON.parse(categoryDataNode && categoryDataNode.dataset.json || "{}");
+  } catch (_error) {
+    orgCategoryIndex = {};
+  }
   var activeView = "all";
   var activeOrg = "all";
   var activeCategory = "all";
+
+  function categoryRows(org) {
+    if (org !== "all") return Array.isArray(orgCategoryIndex[org]) ? orgCategoryIndex[org].slice() : [];
+    var totals = new Map();
+    Object.keys(orgCategoryIndex).forEach(function (name) {
+      (orgCategoryIndex[name] || []).forEach(function (row) {
+        totals.set(row.name, (totals.get(row.name) || 0) + Number(row.count || 0));
+      });
+    });
+    return Array.from(totals, function (entry) { return { name: entry[0], count: entry[1] }; });
+  }
+
+  function sortCategoryRows(rows) {
+    return rows.sort(function (left, right) {
+      if (!left.name) return 1;
+      if (!right.name) return -1;
+      return String(left.name).toLowerCase().localeCompare(String(right.name).toLowerCase());
+    });
+  }
+
+  function appendOption(select, value, label, selected) {
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    option.selected = !!selected;
+    select.appendChild(option);
+  }
+
+  function rebuildCategoryFilter(preferred) {
+    if (!categoryFilter) return;
+    var rows = sortCategoryRows(categoryRows(activeOrg));
+    categoryFilter.replaceChildren();
+    appendOption(categoryFilter, "all", "All categories", preferred === "all");
+    rows.forEach(function (row) {
+      appendOption(categoryFilter, row.name, (row.name || "Uncategorized") + " (" + Number(row.count || 0) + ")", preferred === row.name);
+    });
+    if (canCreateCategories) appendOption(categoryFilter, createCategoryValue, "+ Category", false);
+    var valid = preferred && preferred !== createCategoryValue && Array.prototype.some.call(categoryFilter.options, function (option) { return option.value === preferred; });
+    activeCategory = valid ? preferred : "all";
+    categoryFilter.value = activeCategory;
+  }
 
   function visibleCards() {
     return cards.filter(function (card) { return card.isConnected; });
@@ -183,7 +233,7 @@
       if (search) search.value = "";
       if (sort) sort.value = "recent";
       if (orgFilter) orgFilter.value = "all";
-      if (categoryFilter) categoryFilter.value = "all";
+      rebuildCategoryFilter("all");
       var all = document.querySelector('[data-filter-view="all"]');
       if (all) pressOnly("[data-filter-view]", all);
       applyFilters();
@@ -194,9 +244,15 @@
   if (sort) sort.addEventListener("change", applyFilters);
   if (orgFilter) orgFilter.addEventListener("change", function () {
     activeOrg = orgFilter.value;
+    rebuildCategoryFilter(activeCategory);
     applyFilters();
   });
   if (categoryFilter) categoryFilter.addEventListener("change", function () {
+    if (categoryFilter.value === createCategoryValue) {
+      categoryFilter.value = activeCategory;
+      openCategoryDialog({ mode: "filter", org: activeOrg, restoreFocus: categoryFilter });
+      return;
+    }
     activeCategory = categoryFilter.value;
     applyFilters();
   });
@@ -268,6 +324,7 @@
       activeOrg = state.org;
       orgFilter.value = state.org;
     }
+    rebuildCategoryFilter(state.category || "all");
     if (categoryFilter && state.category && Array.prototype.some.call(categoryFilter.options, function (option) { return option.value === state.category; })) {
       activeCategory = state.category;
       categoryFilter.value = state.category;
@@ -277,6 +334,10 @@
 
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape") {
+      if (categoryDialog && categoryDialog.open) {
+        closeCategoryDialog();
+        return;
+      }
       if (notifPanel && !notifPanel.hidden) {
         openNotifications(false);
         notifToggle.focus();
@@ -316,6 +377,151 @@
       return response.json().catch(function () { return {}; }).then(function (body) {
         if (!response.ok) throw new Error(body.error || "Request failed");
         return body;
+      });
+    });
+  }
+
+  function registerCategoryLocally(org, name) {
+    var rows = Array.isArray(orgCategoryIndex[org]) ? orgCategoryIndex[org] : [];
+    if (!rows.some(function (row) { return row.name === name; })) rows.push({ name: name, count: 0 });
+    orgCategoryIndex[org] = sortCategoryRows(rows);
+    if (categoryDataNode) categoryDataNode.dataset.json = JSON.stringify(orgCategoryIndex);
+  }
+
+  function rebuildCardCategory(card, org, preferred) {
+    var select = card && card.querySelector(".category-menu");
+    if (!select) return "";
+    var rows = sortCategoryRows(categoryRows(org));
+    select.replaceChildren();
+    appendOption(select, "", "Uncategorized", preferred === "");
+    rows.forEach(function (row) {
+      if (row.name) appendOption(select, row.name, row.name, preferred === row.name);
+    });
+    if (select.dataset.canCreate === "1") appendOption(select, createCategoryValue, "+ Category", false);
+    var valid = preferred !== createCategoryValue && Array.prototype.some.call(select.options, function (option) { return option.value === preferred; });
+    select.value = valid ? preferred : "";
+    select.dataset.stagedCategory = select.value;
+    return select.value;
+  }
+
+  function stageMove(card, destination) {
+    var confirm = card.querySelector(".move-confirm");
+    var category = card.querySelector(".category-menu");
+    if (!confirm || !category) return;
+    var label = category.value || "Uncategorized";
+    confirm.dataset.destination = destination;
+    confirm.dataset.category = category.value;
+    confirm.querySelector(".move-question").textContent =
+      "Move from " + card.dataset.org + " to " + destination + " in " + label + "? Active public share links will be revoked.";
+    confirm.hidden = false;
+  }
+
+  var categoryDialog = document.getElementById("category-dialog");
+  var categoryForm = document.getElementById("category-form");
+  var categoryName = document.getElementById("category-name");
+  var categoryOrg = document.getElementById("category-org");
+  var categoryOrgLabel = document.getElementById("category-org-label");
+  var categoryCopy = document.getElementById("category-copy");
+  var categoryError = document.getElementById("category-error");
+  var categorySubmit = categoryForm && categoryForm.querySelector(".category-submit");
+  var categoryContext = null;
+
+  function openCategoryDialog(context) {
+    if (!categoryDialog || !categoryForm || !categoryName || !categoryOrg) return;
+    categoryContext = context;
+    categoryError.textContent = "";
+    categoryName.value = "";
+    categoryOrg.replaceChildren();
+    Object.keys(orgCategoryIndex).sort().forEach(function (org) {
+      appendOption(categoryOrg, org, org, false);
+    });
+    var chooseOrg = context.org === "all";
+    categoryOrgLabel.hidden = !chooseOrg;
+    categoryOrg.disabled = !chooseOrg;
+    if (!chooseOrg) {
+      if (!Array.prototype.some.call(categoryOrg.options, function (option) { return option.value === context.org; })) {
+        appendOption(categoryOrg, context.org, context.org, false);
+      }
+      categoryOrg.value = context.org;
+    }
+    var target = chooseOrg ? "the selected organization" : context.org;
+    categoryCopy.textContent = context.mode === "card"
+      ? "Create a category for " + target + ". It will be selected for this artifact."
+      : "Create a category for " + target + ".";
+    categoryDialog.showModal();
+    categoryName.focus();
+  }
+
+  function closeCategoryDialog() {
+    if (categoryDialog && categoryDialog.open) categoryDialog.close("cancel");
+  }
+
+  if (categoryDialog) {
+    categoryDialog.querySelectorAll(".category-close,.category-cancel").forEach(function (button) {
+      button.addEventListener("click", closeCategoryDialog);
+    });
+    categoryDialog.addEventListener("close", function () {
+      var restore = categoryContext && categoryContext.restoreFocus;
+      categoryContext = null;
+      categoryOrg.disabled = false;
+      categoryForm.reset();
+      categoryError.textContent = "";
+      if (restore && restore.isConnected) restore.focus();
+    });
+  }
+
+  if (categoryForm) {
+    categoryForm.addEventListener("submit", function (event) {
+      event.preventDefault();
+      if (!categoryContext) return;
+      var name = String(categoryName.value || "").trim().replace(/\s+/g, " ").slice(0, 60);
+      var org = categoryContext.org === "all" ? categoryOrg.value : categoryContext.org;
+      if (!name || !org) {
+        categoryError.textContent = !name ? "Enter a category name." : "Choose an organization.";
+        return;
+      }
+      categorySubmit.disabled = true;
+      categoryError.textContent = "";
+      var context = categoryContext;
+      var create = canCreateCategories
+        ? jsonRequest("/settings/orgs/" + encodeURIComponent(org) + "/categories", {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ name: name }),
+          })
+        : Promise.resolve({ org: org, name: name });
+      create.then(function (body) {
+        var created = String(body.name || name);
+        registerCategoryLocally(org, created);
+        if (context.mode === "filter") {
+          if (activeOrg === "all") {
+            activeOrg = org;
+            if (orgFilter) orgFilter.value = org;
+          }
+          rebuildCategoryFilter("all");
+          applyFilters();
+          categoryDialog.close("created");
+          toast("Category created for " + org);
+          return;
+        }
+        var card = context.card;
+        var selected = rebuildCardCategory(card, org, created);
+        categoryDialog.close("created");
+        if (org === card.dataset.org) {
+          var select = card.querySelector(".category-menu");
+          select.disabled = true;
+          requestCategory(card, selected).catch(function (error) {
+            select.disabled = false;
+            toast(error.message || "Could not change category");
+          });
+        } else {
+          stageMove(card, org);
+          toast("Category created for " + org);
+        }
+      }).catch(function (error) {
+        categoryError.textContent = error.message || "Could not create category.";
+      }).finally(function () {
+        categorySubmit.disabled = false;
       });
     });
   }
@@ -575,11 +781,11 @@
     });
   }
 
-  function requestMove(card, org) {
+  function requestMove(card, org, category) {
     return jsonRequest("/" + card.dataset.id + "/move", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ org: org }),
+      body: JSON.stringify({ org: org, category: category }),
     }).then(function () {
       toast("Artifact moved to " + org);
       setTimeout(function () { location.reload(); }, 250);
@@ -594,7 +800,7 @@
       openMenu(more);
       return;
     }
-    if (!event.target.closest(".card-menu") && !event.target.closest('[data-action="more"]')) {
+    if (!event.target.closest(".card-menu") && !event.target.closest('[data-action="more"]') && !event.target.closest(".category-dialog")) {
       document.querySelectorAll(".card-menu:not([hidden])").forEach(function (menu) {
         closeMenu(menu, false);
       });
@@ -626,14 +832,18 @@
     if (moveNo) {
       var moveConfirm = moveNo.closest(".move-confirm");
       moveConfirm.hidden = true;
-      card.querySelector(".org-menu").focus();
+      var orgMenu = card.querySelector(".org-menu");
+      orgMenu.value = "";
+      rebuildCardCategory(card, card.dataset.org, card.dataset.category || "");
+      orgMenu.focus();
       return;
     }
     var moveYes = event.target.closest(".move-yes");
     if (moveYes) {
       var destination = moveYes.closest(".move-confirm").dataset.destination;
+      var destinationCategory = card.querySelector(".category-menu").value;
       moveYes.disabled = true;
-      requestMove(card, destination).catch(function (error) {
+      requestMove(card, destination, destinationCategory).catch(function (error) {
         moveYes.disabled = false;
         toast(error.message || "Could not move artifact");
       });
@@ -646,6 +856,18 @@
     var category = event.target.closest('[data-action="category"]');
     if (category) {
       var nextCategory = category.value;
+      var orgMenu = card.querySelector(".org-menu");
+      var targetOrg = orgMenu && orgMenu.value || card.dataset.org;
+      if (nextCategory === createCategoryValue) {
+        category.value = category.dataset.stagedCategory || "";
+        openCategoryDialog({ mode: "card", org: targetOrg, card: card, restoreFocus: category });
+        return;
+      }
+      category.dataset.stagedCategory = nextCategory;
+      if (targetOrg !== card.dataset.org) {
+        stageMove(card, targetOrg);
+        return;
+      }
       category.disabled = true;
       requestCategory(card, nextCategory).catch(function (error) {
         category.disabled = false;
@@ -654,13 +876,19 @@
       return;
     }
     var org = event.target.closest('[data-action="move-org"]');
-    if (org && org.value) {
+    if (org) {
+      var destination = org.value || card.dataset.org;
       var confirm = card.querySelector(".move-confirm");
-      confirm.dataset.destination = org.value;
-      confirm.querySelector(".move-question").textContent =
-        "Move from " + card.dataset.org + " to " + org.value + "? Active public share links will be revoked.";
-      confirm.hidden = false;
-      confirm.querySelector(".move-no").focus();
+      if (destination === card.dataset.org) {
+        confirm.hidden = true;
+        rebuildCardCategory(card, card.dataset.org, card.dataset.category || "");
+        return;
+      }
+      var available = categoryRows(destination).some(function (row) { return row.name === card.dataset.category; });
+      var selected = rebuildCardCategory(card, destination, available ? card.dataset.category : "");
+      stageMove(card, destination);
+      card.querySelector(".category-menu").value = selected;
+      card.querySelector(".category-menu").focus();
     }
   });
 

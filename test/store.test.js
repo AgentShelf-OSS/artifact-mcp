@@ -90,6 +90,42 @@ test("moving an artifact re-tenants every composite-FK child atomically", () => 
       .run("moved1", "acme", "viewer@acme.test");
     runtime.db.prepare("INSERT INTO artifact_shares (token, artifact_id, org, created_by) VALUES (?, ?, ?, ?)")
       .run("tok_move", "moved1", "acme", "viewer@acme.test");
+    runtime.db.prepare("INSERT OR IGNORE INTO orgs (name) VALUES (?), (?)")
+      .run("acme", "beta");
+    runtime.db.prepare("INSERT INTO org_discord_discussion_connections (id, org, url, label) VALUES (?, ?, ?, ?)")
+      .run("move-connection", "acme", "https://discord.invalid/api/webhooks/1/token", "Move fixture");
+    runtime.db.prepare("INSERT INTO artifact_discussions (artifact_id, org, provider, mode, connection_org, connection_id, state, generation) VALUES (?, ?, 'discord', 'discord_mirror', ?, ?, 'connected', 1)")
+      .run("moved1", "acme", "acme", "move-connection");
+    runtime.db.prepare(`INSERT INTO provider_delivery_outbox
+      (id, provider, event_id, tenant, event_type, target_key, bucket_id, secret_ref, payload,
+       payload_sha256, state, next_attempt_at, created_at, updated_at, delivery_kind, ordering_key)
+      VALUES (?, 'discord', ?, ?, 'feedback', ?, ?, ?, ?, ?, 'accepted', 0, 0, 0,
+              'discussion_message', ?)`)
+      .run(
+        "move-outbox",
+        "move-event",
+        "acme",
+        "move-connection",
+        "move-connection",
+        "webhook:move-connection",
+        Buffer.from("{}"),
+        sha256("{}"),
+        "artifact:moved1"
+      );
+    runtime.db.prepare(`INSERT INTO discussion_message_links
+      (provider, artifact_id, org, connection_id, feedback_id, delivery_event_id, outbox_id,
+       external_thread_id, external_message_id, generation, state)
+      VALUES ('discord', ?, ?, ?, ?, ?, ?, ?, ?, 1, 'posted')`)
+      .run(
+        "moved1",
+        "acme",
+        "move-connection",
+        "feedback1",
+        "move-event",
+        "move-outbox",
+        "move-thread",
+        "move-message"
+      );
 
     assert.deepEqual(store.moveArtifactToOrg("moved1", "beta"), { ok: true, id: "moved1", org: "beta", category: "Reports" });
     for (const table of ["artifacts", "feedback", "artifact_revisions", "artifact_views"]) {
@@ -99,6 +135,13 @@ test("moving an artifact re-tenants every composite-FK child atomically", () => 
     }
     // An org move revokes existing public share links rather than carrying them over.
     assert.equal(runtime.db.prepare("SELECT COUNT(*) AS n FROM artifact_shares WHERE artifact_id = 'moved1'").get().n, 0, "shares dropped on move");
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) AS n FROM artifact_discussions WHERE artifact_id = 'moved1'").get().n, 0, "source-org discussion binding dropped on move");
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) AS n FROM discussion_message_links WHERE artifact_id = 'moved1'").get().n, 0, "source-org Discord message mappings dropped on move");
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) AS n FROM provider_delivery_outbox WHERE id = 'move-outbox'").get().n, 1, "immutable delivery history retained");
+    runtime.db.prepare("INSERT INTO artifact_discussions (artifact_id, org, provider, mode, state, generation) VALUES (?, ?, 'discord', 'artifact_only', 'local', 0)")
+      .run("moved1", "beta");
+    assert.deepEqual(store.moveArtifactToOrg("moved1", "beta", "Same org"), { ok: true, id: "moved1", org: "beta", category: "Same org" });
+    assert.equal(runtime.db.prepare("SELECT COUNT(*) AS n FROM artifact_discussions WHERE artifact_id = 'moved1'").get().n, 1, "same-org category update keeps discussion state");
     assert.equal(runtime.db.pragma("foreign_key_check").length, 0);
     assert.throws(() => store.moveArtifactToOrg("moved1", "ghost"), /Unknown organization/);
   } finally {

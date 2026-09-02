@@ -2678,6 +2678,41 @@ impl StoreContext {
         transaction
             .execute_batch("PRAGMA defer_foreign_keys = ON")
             .map_err(|error| sql_error("defer foreign keys", &error))?;
+        if org != meta.org.0 {
+            // A Discord connection, external thread, and inbound policy belong to the source
+            // organization. Preserve the artifact's local feedback, but revoke those bindings
+            // before re-tenanting it. Immutable provider outbox rows remain as delivery history.
+            for (table, operation) in [
+                (
+                    "discord_inbound_message_state",
+                    "revoke Discord inbound message state on move",
+                ),
+                (
+                    "artifact_discord_inbound_policies",
+                    "revoke Discord inbound policy on move",
+                ),
+                (
+                    "discussion_message_links",
+                    "revoke Discord message links on move",
+                ),
+                (
+                    "discord_notification_anchor_recoveries",
+                    "revoke Discord notification recovery on move",
+                ),
+                (
+                    "artifact_discussion_overrides",
+                    "revoke Discord discussion override on move",
+                ),
+                (
+                    "artifact_discussions",
+                    "revoke Discord discussion binding on move",
+                ),
+            ] {
+                transaction
+                    .execute(&format!("DELETE FROM {table} WHERE artifact_id = ?1"), [id])
+                    .map_err(|error| sql_error(operation, &error))?;
+            }
+        }
         transaction
             .execute(
                 "UPDATE artifacts SET org = ?1, category = ?2, updated_at = datetime('now') \
