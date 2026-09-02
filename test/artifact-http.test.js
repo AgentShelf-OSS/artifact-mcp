@@ -139,6 +139,25 @@ test("anchor bridge brokers an external HTTPS link through its trusted parent", 
   });
 });
 
+test("anchor bridge leaves same-document fragment links inside a single-file artifact", () => {
+  const bridge = anchorBridgeHarness({
+    querySelector: () => null,
+    location: {
+      pathname: "/raw/artifact",
+      href: "https://artifact.example.test/raw/artifact?anchor=1&v=abc123",
+      origin: "https://artifact.example.test"
+    }
+  });
+  const link = {
+    href: "https://artifact.example.test/raw/artifact?anchor=1&v=abc123#details",
+    target: "",
+    hasAttribute: () => false
+  };
+
+  assert.equal(bridge.click(link), false);
+  assert.equal(bridge.messages.some((message) => message.type === "anchor:navigate"), false);
+});
+
 test("anchor bridge retains its in-bundle anchor rewrite", () => {
   const bridge = anchorBridgeHarness({
     querySelector: () => null,
