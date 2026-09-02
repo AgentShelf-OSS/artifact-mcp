@@ -117,7 +117,7 @@ const dispatch = read("src/mcp/dispatch.rs");
 const resources = read("src/mcp/resources.rs");
 const tasks = read("src/mcp/tasks.rs");
 const oauth = read("src/security/oauth.rs");
-const readme = read("README.md");
+const mcpDocs = read("docs/mcp-api.md");
 const cargo = read("Cargo.toml");
 const packageJson = JSON.parse(read("package.json"));
 const nativeTests = read("tests/native/main.rs");
@@ -160,7 +160,7 @@ for (const name of modernTools) {
   check(schema?.type === "object", `${name} output schema is not an object`);
   check(dispatchTools.includes(name), `${name} is advertised but missing from tools/call dispatch`);
   check(oauth.includes(`"${name}"`), `${name} is advertised but absent from OAuth scope mapping`);
-  check(readme.includes(`\`${name}`), `${name} is advertised but absent from README MCP documentation`);
+  check(mcpDocs.includes(`\`${name}`), `${name} is advertised but absent from MCP documentation`);
 }
 for (const name of Object.keys(outputSchemas)) {
   check(modernTools.includes(name), `output schema exists for non-advertised tool ${name}`);
@@ -181,17 +181,17 @@ for (const method of resourceMethods) {
   check(dispatch.includes(`"${method}"`), `${method} is missing from modern protocol dispatch`);
   check(resources.includes(`"${method}"`), `${method} is missing from resource dispatch`);
   check(oauth.includes(`"${method}"`), `${method} is missing OAuth scope coverage`);
-  check(readme.includes(`\`${method}\``), `${method} is missing from README MCP documentation`);
+  check(mcpDocs.includes(`\`${method}\``), `${method} is missing from MCP documentation`);
 }
 for (const method of taskMethods) {
   check(dispatch.includes(`"${method}"`), `${method} is missing from modern protocol dispatch`);
   check(tasks.includes(`"${method}"`), `${method} is missing from task dispatch`);
   check(oauth.includes(`"${method}"`), `${method} is missing OAuth scope coverage`);
-  check(readme.includes(`\`${method}\``), `${method} is missing from README MCP documentation`);
+  check(mcpDocs.includes(`\`${method}\``), `${method} is missing from MCP documentation`);
 }
 check(
-  dispatch.includes('"server/discover"') && readme.includes("`server/discover`"),
-  "server/discover implementation and README documentation are not aligned",
+  dispatch.includes('"server/discover"') && mcpDocs.includes("`server/discover`"),
+  "server/discover implementation and MCP documentation are not aligned",
 );
 check(
   declaredModernTools.length > 0 && appOnlyTools.length > 0,
@@ -203,12 +203,12 @@ check(cargoVersion === packageJson.version, `Cargo.toml (${cargoVersion}) and pa
 check(dispatch.includes('pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION")'), "MCP serverInfo is not derived from Cargo package version");
 for (const version of protocolVersions) {
   check(dispatch.includes(`"${version}"`), `${version} is missing from Rust protocol declarations`);
-  check(readme.includes(`\`${version}\``), `${version} is missing from README protocol documentation`);
+  check(mcpDocs.includes(`\`${version}\``), `${version} is missing from MCP protocol documentation`);
 }
 check(
-  readme.includes(`The legacy catalog contains ${legacyTools.length} tools`) &&
-    readme.includes(`for ${legacyTools.length + modernBaseTools.length}`),
-  "README MCP tool-count statement is stale or missing",
+  mcpDocs.includes(`The legacy catalog contains ${legacyTools.length} tools`) &&
+    mcpDocs.includes(`for ${legacyTools.length + modernBaseTools.length}`),
+  "MCP tool-count statement is stale or missing",
 );
 
 const requiredContractPaths = [
