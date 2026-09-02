@@ -7,6 +7,8 @@
 ![CI](https://img.shields.io/badge/CI-Rust%20%2B%20Node-2088FF.svg)
 ![MCP 2026](https://img.shields.io/badge/MCP-2025--06--18%20%2B%202026--07--28-6E56CF.svg)
 
+[Website](https://artifact-mcp.neilblackman.dev) | [Latest release](https://github.com/AgentShelf-OSS/artifact-mcp/releases/latest)
+
 Your agents already generate HTML — dashboards, reports, one-pagers, whole mini-sites.
 **artifact-mcp is where that output lives.** An agent calls an MCP tool, gets back a real URL on
 **your** domain, and the page is served from **your** infrastructure at `https://your-domain/<id>`.
