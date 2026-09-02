@@ -11,6 +11,21 @@ test.describe("artifact viewer", () => {
     expect(sandbox).not.toContain("allow-same-origin");
   });
 
+  test("same-document artifact links do not show the external-link confirmation", async ({ page, request, publisherKey, org }) => {
+    const artifact = await publish(request, publisherKey, {
+      title: `PW Internal Link ${org}`,
+      html: '<!doctype html><a href="#details">Jump to details</a><div id="details">Details</div>'
+    });
+    await page.goto(`/${artifact.id}`);
+    const artifactFrame = page.frames().find((frame) => frame !== page.mainFrame());
+    expect(artifactFrame).toBeTruthy();
+
+    await page.frameLocator("#vframe").getByRole("link", { name: "Jump to details" }).click();
+
+    await expect.poll(() => artifactFrame.url()).toContain("#details");
+    await expect(page.getByRole("dialog", { name: "Confirm external link" })).toHaveCount(0);
+  });
+
   test("viewer chrome keeps menus, focus, and mobile targets predictable", async ({ page, request, publisherKey, org }) => {
     const artifact = await publish(request, publisherKey, { title: `PW Chrome ${org}`, html: "<!doctype html><h1>chrome</h1>" });
     const consoleErrors = [];
