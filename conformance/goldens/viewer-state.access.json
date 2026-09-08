@@ -1,0 +1,382 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "private",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\"",
+          "vary": "Sec-Fetch-Site, Origin"
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"forbidden\",\"code\":\"same_origin_required\"}"
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"forbidden\",\"code\":\"same_origin_required\"}"
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"forbidden\",\"code\":\"same_origin_required\"}"
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"token\":\"${share_token_1}\",\"expires_at\":null,\"url\":\"http://conformance.test/s/${share_token_1}\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "expires_at": null,
+              "id": "${artifact_id_1}",
+              "token": "${share_token_1}",
+              "url": "http://conformance.test/s/${share_token_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "private",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": "org only"
+        }
+      }
+    }
+  ],
+  "postState": {}
+}

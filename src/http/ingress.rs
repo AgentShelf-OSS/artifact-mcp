@@ -807,6 +807,7 @@ enum RequestClass {
     Read,
     Mutation,
     Feedback,
+    State,
     Mcp,
     Admin,
 }
@@ -819,12 +820,16 @@ impl RequestClass {
             Self::Read => "read",
             Self::Mutation => "mutation",
             Self::Feedback => "feedback",
+            Self::State => "state",
             Self::Mcp => "mcp",
             Self::Admin => "admin",
         }
     }
     const fn is_mutation(self) -> bool {
-        matches!(self, Self::Mutation | Self::Feedback | Self::Admin)
+        matches!(
+            self,
+            Self::Mutation | Self::Feedback | Self::State | Self::Admin
+        )
     }
 }
 
@@ -851,6 +856,9 @@ fn classify(method: &Method, path: &str) -> RequestClass {
     if path.contains("/feedback") {
         return RequestClass::Feedback;
     }
+    if path.split('/').nth(2) == Some("state") && matches!(path.split('/').count(), 3 | 4) {
+        return RequestClass::State;
+    }
     if matches!(
         *method,
         Method::POST | Method::PUT | Method::PATCH | Method::DELETE
@@ -873,6 +881,7 @@ fn body_limit(config: &BodyLimits, class: RequestClass) -> u64 {
             .category_json
             .max(config.feedback_json)
             .max(config.reaction_json),
+        RequestClass::State => config.state_json,
         _ => 0,
     }
 }
@@ -883,6 +892,7 @@ fn rate_limit(config: &IngressConfig, class: RequestClass) -> u64 {
         RequestClass::Share => config.shares_per_window,
         RequestClass::Mutation => config.mutations_per_window,
         RequestClass::Feedback => config.feedback_per_window,
+        RequestClass::State => config.state_per_window,
         RequestClass::Mcp => config.mcp_per_window,
         RequestClass::Admin => config.admin_per_window,
         RequestClass::Read => config.reads_per_window,

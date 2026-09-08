@@ -1,0 +1,261 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": []
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": {
+            "chapter": 1,
+            "notes": [
+              "first"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "reading.notes",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 2,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "conflict",
+          "revision": 2,
+          "value": {
+            "chapter": 2,
+            "notes": [
+              "first",
+              "second"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 2,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": {
+            "chapter": 2,
+            "notes": [
+              "first",
+              "second"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 2,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": {
+            "chapter": 2,
+            "notes": [
+              "first",
+              "second"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 3,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"revision\":2,\"bytes\":25,\"entry\":\"\",\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 25,
+              "category": "",
+              "entry": "",
+              "id": "${artifact_id_1}",
+              "revision": 2,
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "reading.notes",
+          "revision": 3,
+          "updated_at": "<volatile>",
+          "updated_by": "admin@corp.test",
+          "value": null
+        }
+      }
+    },
+    {
+      "status": 204,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 204,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "cascade",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"deleted\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "deleted": true,
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "state_cascades_with_artifact": []
+    }
+  }
+}

@@ -36,4 +36,27 @@ test.describe("sharing", () => {
     const res = await api(request, "post", `/${a.id}/share`, { expires: "not-a-date" });
     expect(res.status()).toBe(400);
   });
+
+  test("public shares preserve HTML and do not enable state for unsigned or signed-in visitors", async ({ page, browser, request, baseURL, publisherKey, org }) => {
+    const html = '<!doctype html><h1>share</h1>';
+    const a = await publish(request, publisherKey, { title: `PW Share State ${org}`, html });
+    const created = await api(request, "post", `/${a.id}/share`, { expires: "never" });
+    expect(created.status()).toBe(200); const token = (await created.json()).token;
+    const anon = await browser.newContext({ extraHTTPHeaders: {} });
+    try {
+      for (const visitor of [page, await anon.newPage()]) {
+        const response = await visitor.goto(`${baseURL}/s/${token}`);
+        expect(response.status()).toBe(200);
+        expect(await response.text()).toBe(html);
+        // If public delivery ever gains a shell, it must keep state disabled.
+        await expect(visitor.locator('#shell-config[data-state-enabled="1"]')).toHaveCount(0);
+      }
+      expect((await anon.request.get(`${baseURL}/${a.id}/state/private`)).status()).toBe(404);
+      const updated = await request.post('/mcp', { headers: { authorization: `Bearer ${publisherKey}` }, data: { jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'update_artifact',arguments:{id:a.id,html:'<h1>updated</h1>'}} } });
+      expect((await updated.json()).result.isError).not.toBe(true);
+      const history = await page.goto(`${baseURL}/raw/${a.id}/rev/1`);
+      expect(history.status()).toBe(200);
+      expect(await history.text()).toBe(html);
+    } finally { await anon.close(); }
+  });
 });

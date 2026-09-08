@@ -32,6 +32,7 @@ pub struct AppDeps {
     /// outside their scope so routes never silently disappear at runtime.
     pub discussions: Arc<dyn DiscussionService>,
     pub engagement: Arc<dyn EngagementService>,
+    pub viewer_state: Arc<dyn crate::ports::state::ViewerStateService>,
     pub shares: Arc<dyn ShareService>,
     pub pages: Arc<dyn PageRenderer>,
     pub previews: Arc<dyn PreviewService>,

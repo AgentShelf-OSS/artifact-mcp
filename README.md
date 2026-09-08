@@ -22,6 +22,7 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 
 - Publish a self-contained HTML page or a multi-file bundle through MCP.
 - Update an artifact without changing its URL, with retained revision history and restore.
+- Persist org-shared notes and other JSON through the [viewer state bridge](GETTING_STARTED.md#persisting-state-from-an-artifact).
 - Search and organize artifacts by organization, category, owner, review state, and visibility.
 - Attach threaded feedback to a point or region and copy the exact revision context back to an
   agent.

@@ -6,7 +6,7 @@ never mounted read-write by tests or release checks.
 ## Historical migration and recovery corpus
 
 `historical/` contains immutable, synthetic SQLite-aware snapshots for every legitimate migration
-boundary `v00` through `v23`, plus populated snapshots matching the distinct public release
+boundary `v00` through `v33`, plus populated snapshots matching the distinct public release
 terminals: v1.2/v1.3 (16), v1.4 (20), v1.5 (21), and v1.6 (23). Boundary snapshots are created by
 running the real migration ledger through that version; they are never manufactured by deleting
 rows from a newer database. `v00` is a populated pre-ledger layout.

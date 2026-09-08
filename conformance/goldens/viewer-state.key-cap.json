@@ -1,0 +1,1111 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-00",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-01",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-02",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-03",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-04",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-05",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-06",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-07",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-08",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-09",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-10",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-11",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-12",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-13",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-14",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-15",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-16",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-17",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-18",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-19",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-20",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-21",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-22",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-23",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-24",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-25",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-26",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-27",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-28",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-29",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-30",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-31",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-32",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-33",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-34",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-35",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-36",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-37",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-38",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-39",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-40",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-41",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-42",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-43",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-44",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-45",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-46",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-47",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-48",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-49",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-50",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-51",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-52",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-53",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-54",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-55",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-56",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-57",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-58",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-59",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-60",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-61",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-62",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-63",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "too_many_keys"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "key-00",
+          "revision": 2,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 204,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "replacement",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "key-00",
+              "revision": 2,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-02",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-03",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-04",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-05",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-06",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-07",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-08",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-09",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-10",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-11",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-12",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-13",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-14",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-15",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-16",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-17",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-18",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-19",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-20",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-21",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-22",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-23",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-24",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-25",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-26",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-27",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-28",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-29",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-30",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-31",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-32",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-33",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-34",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-35",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-36",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-37",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-38",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-39",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-40",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-41",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-42",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-43",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-44",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-45",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-46",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-47",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-48",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-49",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-50",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-51",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-52",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-53",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-54",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-55",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-56",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-57",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-58",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-59",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-60",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-61",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-62",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "key-63",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            },
+            {
+              "key": "replacement",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "key_count": [
+        {
+          "count": 64
+        }
+      ]
+    }
+  }
+}

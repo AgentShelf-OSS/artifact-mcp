@@ -175,6 +175,11 @@ pub const DEFAULT_KEY_JSON_LIMIT: u64 = 64 * 1024;
 pub const DEFAULT_REACTION_JSON_LIMIT: u64 = 8 * 1024;
 /// `express.json({ limit: limits.feedbackJson || "16kb" })` — [lib/app.js:563]
 pub const DEFAULT_FEEDBACK_JSON_LIMIT: u64 = 16 * 1024;
+/// Viewer-state mutation envelope limit. Values have a separate 256 KiB serialized cap.
+pub const DEFAULT_STATE_JSON_LIMIT: u64 = 256 * 1024 + 1024;
+pub const STATE_MAX_KEY_BYTES: usize = 64;
+pub const STATE_MAX_VALUE_BYTES: usize = 256 * 1024;
+pub const STATE_MAX_KEYS: i64 = 64;
 /// `express.json({ limit: limits.categoryJson || "8kb" })` — [lib/app.js:634]
 pub const DEFAULT_CATEGORY_JSON_LIMIT: u64 = 8 * 1024;
 /// The `|| "8mb"` fallback `/mcp` uses when the composition root supplies no limit.
@@ -205,6 +210,7 @@ pub const DEFAULT_INGRESS_MUTATIONS_PER_WINDOW: u64 = 30;
 pub const DEFAULT_INGRESS_MCP_PER_WINDOW: u64 = 60;
 pub const DEFAULT_INGRESS_UPLOADS_PER_WINDOW: u64 = 10;
 pub const DEFAULT_INGRESS_FEEDBACK_PER_WINDOW: u64 = 30;
+pub const DEFAULT_INGRESS_STATE_PER_WINDOW: u64 = 30;
 pub const DEFAULT_INGRESS_ADMIN_PER_WINDOW: u64 = 20;
 pub const DEFAULT_INGRESS_VERIFIED_VIEWERS_PER_WINDOW: u64 = 120;
 pub const DEFAULT_INGRESS_SHARES_PER_WINDOW: u64 = 60;
@@ -484,6 +490,8 @@ pub struct BodyLimits {
     pub reaction_json: u64,
     /// `POST /:id/feedback` — [lib/app.js:563]
     pub feedback_json: u64,
+    /// `PUT /:id/state/:key` — serialized value cap plus envelope overhead.
+    pub state_json: u64,
     /// `POST /:id/{category,share,visibility,move,restore}` — [lib/app.js:634,643,669,679,708]
     pub category_json: u64,
 }
@@ -495,6 +503,7 @@ impl Default for BodyLimits {
             key_json: DEFAULT_KEY_JSON_LIMIT,
             reaction_json: DEFAULT_REACTION_JSON_LIMIT,
             feedback_json: DEFAULT_FEEDBACK_JSON_LIMIT,
+            state_json: DEFAULT_STATE_JSON_LIMIT,
             category_json: DEFAULT_CATEGORY_JSON_LIMIT,
         }
     }
@@ -564,6 +573,8 @@ pub struct IngressConfig {
     pub uploads_per_window: u64,
     /// Viewer feedback mutations per source window.
     pub feedback_per_window: u64,
+    /// Viewer state mutations per source window.
+    pub state_per_window: u64,
     /// Administrative requests per source window.
     pub admin_per_window: u64,
     /// Requests per verified Access viewer/source window.
@@ -601,6 +612,7 @@ impl Default for IngressConfig {
             mcp_per_window: DEFAULT_INGRESS_MCP_PER_WINDOW,
             uploads_per_window: DEFAULT_INGRESS_UPLOADS_PER_WINDOW,
             feedback_per_window: DEFAULT_INGRESS_FEEDBACK_PER_WINDOW,
+            state_per_window: DEFAULT_INGRESS_STATE_PER_WINDOW,
             admin_per_window: DEFAULT_INGRESS_ADMIN_PER_WINDOW,
             verified_viewers_per_window: DEFAULT_INGRESS_VERIFIED_VIEWERS_PER_WINDOW,
             shares_per_window: DEFAULT_INGRESS_SHARES_PER_WINDOW,
@@ -735,6 +747,11 @@ impl IngressConfig {
                 env,
                 "INGRESS_FEEDBACK_PER_WINDOW",
                 DEFAULT_INGRESS_FEEDBACK_PER_WINDOW,
+            )?,
+            state_per_window: positive_integer(
+                env,
+                "INGRESS_STATE_PER_WINDOW",
+                DEFAULT_INGRESS_STATE_PER_WINDOW,
             )?,
             admin_per_window: positive_integer(
                 env,

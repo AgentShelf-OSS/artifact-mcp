@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 32;
+pub const LATEST_SCHEMA_VERSION: i64 = 33;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -251,6 +251,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 32,
         name: "feedback-anchor-v2",
         up: m32_feedback_anchor_v2,
+    },
+    Migration {
+        version: 33,
+        name: "viewer-state",
+        up: m033_artifact_state,
     },
 ];
 
@@ -1598,6 +1603,21 @@ fn m32_feedback_anchor_v2(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusq
     ensure_column(tx, "feedback", "anchor_node_id", "TEXT")?;
     ensure_column(tx, "feedback", "anchor_quote", "TEXT")?;
     Ok(())
+}
+
+/// Organization-scoped viewer state, keyed by artifact id and user-supplied key.
+fn m033_artifact_state(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE artifact_state (
+  artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+  key         TEXT NOT NULL,
+  value       TEXT NOT NULL,
+  revision    INTEGER NOT NULL DEFAULT 1,
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT NOT NULL,
+  PRIMARY KEY (artifact_id, key)
+);",
+    )
 }
 
 /// Encrypted webhook URL record produced by U04's cipher.

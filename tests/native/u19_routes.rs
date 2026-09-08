@@ -955,6 +955,7 @@ fn deps(harness: Arc<RouteHarness>) -> AppDeps {
         admin: harness.clone(),
         discussions: Arc::new(artifact_mcp::ports::InertDiscussionService),
         engagement: harness.clone(),
+        viewer_state: std::sync::Arc::new(artifact_mcp::ports::state::InertViewerState),
         shares: harness.clone(),
         pages: harness.clone(),
         previews: harness.clone(),

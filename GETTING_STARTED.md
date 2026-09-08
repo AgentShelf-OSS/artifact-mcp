@@ -246,6 +246,67 @@ ratio); set `PREVIEW_VIEWPORT=1200x750` if you want thumbnails that fill the car
 
 ---
 
+## Persisting state from an artifact
+
+Viewer state stores JSON shared by everyone in the artifact's organization. It survives reloads
+and artifact updates. An artifact sends `state:hello` as it loads, then waits about one second
+for `state:ready`. If no shell answers, state stays disabled. That is the expected path for
+public shares, historical views, and direct `/raw` navigation. Artifact code uses
+`window.parent.postMessage(message, "*")`; the trusted shell handles authenticated requests.
+No fetch or browser storage access is needed inside the artifact.
+
+| Direction | Message | Fields |
+|---|---|---|
+| Artifact to shell | `state:hello` | None |
+| Shell to artifact | `state:ready` | `enabled`, `scope: "org"`, `keys: [{key, revision}]` |
+| Artifact to shell | `state:get` | `key` |
+| Shell to artifact | `state:value` | `key`, `value`, `revision`, optional `conflict: true` |
+| Artifact to shell | `state:set` | `key`, `value`, optional `ifRevision` |
+| Shell to artifact | `state:saved` | `key`, `revision` |
+| Shell to artifact | `state:error` | `key`, `reason` |
+| Artifact to shell | `state:delete` | `key` |
+
+Error reasons are `disabled`, `too_large`, `bad_key`, `conflict`, `network`, and `forbidden`.
+`too_large` covers both value size and the per-artifact key capacity.
+Missing values arrive as `null` with revision `0`. Keys use 1 to 64 ASCII letters, digits,
+periods, underscores, or hyphens. Each artifact supports 64 keys, each holding up to 256 KiB
+of serialized JSON. The last writer's email stays in the server response and never enters
+the artifact bridge.
+
+This example keeps a note in memory when persistence is disabled or the page is opened without
+a shell. The text is org-shared when persistence is enabled.
+
+```html
+<textarea id="note" aria-label="Shared note"></textarea>
+<p id="status">Notes are temporary on this page.</p>
+<script>
+const note = document.querySelector('#note'), status = document.querySelector('#status');
+let enabled = false, ready = false, timedOut = false, revision = 0;
+const send = message => parent.postMessage(message, '*');
+addEventListener('message', event => {
+  if (event.source !== parent || !event.data) return;
+  const m = event.data;
+  if (m.type === 'state:ready' && !timedOut) {
+    ready = true; enabled = m.enabled;
+    if (enabled) send({type: 'state:get', key: 'note'});
+  }
+  if (m.type === 'state:value' && m.key === 'note') { note.value = m.value ?? ''; revision = m.revision; }
+  if (m.type === 'state:saved' && m.key === 'note') { revision = m.revision; status.textContent = 'Saved for the organization.'; }
+  if (m.type === 'state:error') status.textContent = 'Save unavailable: ' + m.reason;
+});
+note.oninput = () => { if (enabled) send({type: 'state:set', key: 'note', value: note.value, ifRevision: revision}); };
+send({type: 'state:hello'});
+setTimeout(() => { if (!ready) { timedOut = true; enabled = false; status.textContent = 'Notes are temporary on this page.'; } }, 1000);</script>
+```
+
+Sets coalesce per key for 500 ms. Only `state:saved` confirms a server save. Reads can return a
+cached value followed by a fresh value with a different revision. On a stale `ifRevision`, the
+shell sends the current value with `conflict:true`, followed by `state:error` with reason
+`conflict`. The example accepts the server's version; an editor can instead show a merge prompt.
+See [ADR-0007](docs/adr/0007-viewer-state-via-shell-broker.md) for the storage and trust boundaries.
+If `state:ready` arrives after the one-second timeout, the example keeps state disabled for that
+page. The artifact bytes remain unchanged in public shares and historical views.
+
 ## Identity modes (quick reference)
 
 | Mode | When | Behavior |

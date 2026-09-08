@@ -18,6 +18,7 @@ import { getReaction, setReaction, reactionsFor, sentimentMap } from "./lib/reac
 import * as views from "./lib/views.js";
 import * as shares from "./lib/shares.js";
 import { addFeedback, listForArtifact as feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer } from "./lib/feedback.js";
+import { createStateStore } from "./lib/state.js";
 import * as webhooks from "./lib/webhooks.js";
 import * as discussions from "./lib/discussions.js";
 import * as notify from "./lib/notify.js";
@@ -159,6 +160,7 @@ try {
 }
 
 const artifactNotifier = createArtifactPreviewNotifier({ artifacts: artifactStore, notify, thumbnails, thumbnailQueue });
+const state = createStateStore({ db });
 
 // Queue existing single-file artifacts at low priority. The serial worker starts on a
 // microtask and mutation events are always selected before remaining backfill jobs.
@@ -221,6 +223,7 @@ const app = createApp({
   reactions: { get: getReaction, set: setReaction, forViewer: reactionsFor, sentiment: sentimentMap },
   views,
   feedback: { add: addFeedback, listForArtifact: feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer },
+  state,
   pages: { gallery: renderGallery, shell: renderArtifactShell, notFound: notFoundPage, notSignedIn: notSignedInPage, settings: renderSettings },
   publicBase: PUBLIC_BASE,
   oauth: oauthConfig,

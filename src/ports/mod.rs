@@ -9,6 +9,7 @@ pub mod engagement;
 pub mod identity;
 pub mod integrations;
 pub mod rendering;
+pub mod state;
 
 pub use admin::AdminService;
 pub use artifacts::ArtifactService;

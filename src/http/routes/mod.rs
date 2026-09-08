@@ -9,4 +9,5 @@ pub mod health;
 pub mod mcp;
 pub mod public_share;
 pub mod raw;
+pub mod state;
 pub mod thumbnails;

@@ -1001,6 +1001,7 @@ fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
         admin: fake.clone(),
         discussions: fake.clone(),
         engagement: fake.clone(),
+        viewer_state: std::sync::Arc::new(artifact_mcp::ports::state::InertViewerState),
         shares: fake.clone(),
         pages: fake.clone(),
         previews: fake.clone(),
@@ -1473,6 +1474,10 @@ async fn raw_current_bundle_history_and_public_share_delivery_use_the_u14_policy
     );
     let revision = snapshot(&bundle, Method::GET, &format!("/raw/{ID}/rev/1/")).await;
     assert_eq!(revision.2, b"<h1>Old entry</h1>");
+    assert_eq!(
+        revision.1[header::CONTENT_SECURITY_POLICY],
+        DOCUMENT_SANDBOX
+    );
 
     let shared = Fake::standard();
     shared.fail("viewer.resolve");
@@ -1481,6 +1486,7 @@ async fn raw_current_bundle_history_and_public_share_delivery_use_the_u14_policy
     assert_eq!(public.1[header::CACHE_CONTROL], "no-store");
     assert_eq!(public.1["x-robots-tag"], "noindex");
     assert_eq!(public.1[header::CONTENT_SECURITY_POLICY], DOCUMENT_SANDBOX);
+    assert_eq!(public.2, b"<h1>Artifact</h1>");
     assert!(!shared.calls().contains(&"viewer.resolve".to_owned()));
 }
 

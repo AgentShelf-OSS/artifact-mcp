@@ -676,6 +676,7 @@ mod tests {
             admin: fake.clone(),
             discussions: Arc::new(crate::ports::InertDiscussionService),
             engagement: fake.clone(),
+            viewer_state: std::sync::Arc::new(crate::ports::state::InertViewerState),
             shares: fake.clone(),
             pages: fake.clone(),
             previews: fake.clone(),

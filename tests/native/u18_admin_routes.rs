@@ -122,6 +122,7 @@ impl Harness {
             admin: self.clone(),
             discussions: Arc::new(artifact_mcp::ports::InertDiscussionService),
             engagement: self.clone(),
+            viewer_state: std::sync::Arc::new(artifact_mcp::ports::state::InertViewerState),
             shares: self.clone(),
             pages: self.clone(),
             previews: self.clone(),

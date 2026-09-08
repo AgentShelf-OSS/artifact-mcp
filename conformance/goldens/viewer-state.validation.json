@@ -1,0 +1,174 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_key"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_key"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_key"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_body"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_revision"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_revision"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_revision"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_body"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_body"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_body"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "limit",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 413,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "too_large"
+        }
+      }
+    },
+    {
+      "status": 413,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "too_large"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "limit",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "serialized_byte_limit": [
+        {
+          "bytes": 262144,
+          "key": "limit",
+          "revision": 1
+        }
+      ]
+    }
+  }
+}

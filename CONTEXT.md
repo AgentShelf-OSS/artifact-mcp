@@ -6,7 +6,7 @@ This document is the domain and architecture source of truth for maintainers and
 
 artifact-mcp is a private, multi-tenant publishing gallery. Authorized AI agents publish HTML through MCP, and authenticated people browse only the artifacts belonging to their organization. An administrator can browse all organizations and manage publisher keys.
 
-The application is a dependency-light modular monolith: one Node process, one SQLite database, one artifact directory, and server-rendered HTML/CSS/JavaScript.
+The application is a dependency-light modular monolith: one server process, one SQLite database, one artifact directory, and server-rendered HTML/CSS/JavaScript. Rust serves production; Node is the reference implementation.
 
 ## Domain language
 
@@ -23,6 +23,7 @@ The application is a dependency-light modular monolith: one Node process, one SQ
 - **Reaction** — a viewer’s favorite flag and sentiment vote (`-1`, `0`, or `1`) for an artifact.
 - **Gallery** — the organization-scoped artifact index.
 - **Viewer shell** — trusted application chrome around a sandboxed raw artifact.
+- **Viewer state**: JSON values belonging to an artifact and shared by viewers in its organization. State survives artifact revisions; it is not personal storage. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
 - **Raw delivery** — artifact bytes served from `/raw/:id` or `/raw/:id/*`.
 - **Storage reconciliation** — inspection and recovery of interrupted staging/trash operations, plus reporting of missing or orphan bodies.
 
@@ -37,6 +38,7 @@ The application is a dependency-light modular monolith: one Node process, one SQ
 7. SQLite schema changes are ordered, transactional migrations recorded in `schema_migrations`.
 8. MCP tool schemas are runtime contracts, not documentation only. Unknown, missing, or wrongly typed arguments produce JSON-RPC invalid-params errors.
 9. Persistent data, secrets, repository metadata, and local planning files are excluded from Docker build contexts.
+10. Artifact code never receives a network capability; viewer state crosses the sandbox only through the shell bridge.
 
 ## Trust model
 
@@ -58,7 +60,10 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 - `lib/store.js` — artifact lifecycle module: publication, reads, deletion, and storage reconciliation.
 - `lib/db.js` / `lib/migrations.js` — SQLite opening, runtime database adapter, and ordered schema evolution.
 - `lib/keys.js` / `lib/reactions.js` — publisher-key and reaction persistence.
-- `lib/artifact-http.js` — raw-delivery response policy, including HTML sandbox headers.
+- `lib/state.js` / `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
+- `lib/app.js` / `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. `assets/shell.js` brokers state messages, caches reads, and debounces writes.
+- `src/ports/state.rs` / `src/persistence/viewer_state_service.rs`: the authorization-gated viewer-state interface and its shared-pool SQLite adapter.
+- `lib/artifact-http.js` — raw-delivery response policy, including HTML sandbox headers. Viewer state does not alter raw, historical, or public-share response bodies. Those views have no shell; artifacts treat state as disabled if no `state:ready` arrives within about one second of `state:hello`.
 - `lib/portal.js` / `lib/settings.js` — server-rendered gallery, viewer shell, not-found, and key-management pages.
 
 The main real seam is `createApp()`: production adapters are assembled in `server.js`, while HTTP tests provide in-memory adapters. Storage also exposes `createArtifactStore()` so lifecycle tests can use temporary SQLite/filesystem adapters.

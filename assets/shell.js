@@ -6,6 +6,97 @@
   var shellConfig=document.getElementById('shell-config').dataset;
   function configLiteral(name){return JSON.parse(shellConfig[name]);}
   var artifactId=configLiteral('artifactId'),prevId=configLiteral('prevId'),nextId=configLiteral('nextId'),bundleRawPrefix=configLiteral('bundleRawPrefix'),versionQuery=configLiteral('versionQuery');
+  // The broker owns all state I/O. Its adapters also let tests execute the real queue.
+  function createViewerStateBroker(options) {
+    var prefix='artifact-state:'+options.artifactId+':',lanes=new Map();
+    var keyPattern=/^[A-Za-z0-9._-]{1,64}(?![\s\S])/;
+    function send(type,fields){options.post(Object.assign({type:type},fields));}
+    function error(key,reason){send('state:error',{key:typeof key==='string'?key:'',reason:reason});}
+    function read(key){try{var entry=JSON.parse(options.storage.getItem(prefix+key));return entry&&Number.isSafeInteger(entry.revision)&&entry.revision>=0&&Object.prototype.hasOwnProperty.call(entry,'value')?entry:null;}catch(_){return null;}}
+    function write(key,entry){try{if(entry)options.storage.setItem(prefix+key,JSON.stringify(entry));else options.storage.removeItem(prefix+key);}catch(_){}}
+    function lane(key){if(!lanes.has(key))lanes.set(key,{epoch:0,timer:null,busy:false,queued:null});return lanes.get(key);}
+    function path(key){return '/'+encodeURIComponent(options.artifactId)+'/state'+(key===undefined?'':'/'+encodeURIComponent(key));}
+    async function request(key,init){
+      var response=await options.fetch(path(key),init);
+      var body=response.status===204?{}:await response.json().catch(function(){return {};});
+      if(!response.ok){var failure=new Error('state request failed');failure.status=response.status;failure.body=body;throw failure;}
+      return body;
+    }
+    function validValue(body){return body&&Object.prototype.hasOwnProperty.call(body,'value')&&Number.isSafeInteger(body.revision)&&body.revision>=0;}
+    function reason(failure){if(failure.status===403||failure.status===401)return 'forbidden';if(failure.status===413||failure.body&&failure.body.error==='too_many_keys')return 'too_large';if(failure.status===400)return 'bad_key';return 'network';}
+    function emitValue(key,entry,conflict){var fields={key:key,value:entry.value,revision:entry.revision};if(conflict)fields.conflict=true;send('state:value',fields);}
+    function remember(key,value,revision){var entry={value:value,revision:revision},pending=lane(key).queued;if(pending&&!pending.remove)entry.draft={value:pending.value,ifRevision:pending.ifRevision};write(key,entry);}
+    function schedule(key,job){
+      var current=lane(key);current.epoch++;options.clearTimer(current.timer);current.timer=null;current.queued=job;
+      if(job.remove){drain(key);return;}
+      var entry=read(key)||{value:null,revision:0};entry.draft={value:job.value,ifRevision:job.ifRevision};write(key,entry);
+      current.timer=options.setTimer(function(){current.timer=null;drain(key);},500);
+    }
+    async function drain(key){
+      var current=lane(key);
+      if(current.busy||current.timer!==null||!current.queued)return;
+      var job=current.queued;current.queued=null;current.busy=true;current.epoch++;
+      try {
+        var body=await request(key,job.remove?{method:'DELETE'}:{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify({value:job.value,if_revision:job.ifRevision})});
+        if(job.remove){
+          var pending=current.queued;
+          write(key,pending&&!pending.remove?{value:null,revision:0,draft:{value:pending.value,ifRevision:pending.ifRevision}}:null);
+          send('state:saved',{key:key,revision:0});
+        }else{
+          if(!Number.isSafeInteger(body.revision)||body.revision<1)throw new Error('invalid acknowledgement');
+          remember(key,job.value,body.revision);send('state:saved',{key:key,revision:body.revision});
+        }
+      }catch(failure){
+        if(failure.status===409&&failure.body&&failure.body.error==='conflict'&&validValue(failure.body)){
+          remember(key,failure.body.value,failure.body.revision);emitValue(key,failure.body,true);error(key,'conflict');
+        }else{
+          // A failed set remains a local draft until a retry or an explicit delete.
+          if(!job.remove&&failure.status&&failure.status!==429&&failure.status<500&&!current.queued){var cached=read(key);if(cached){delete cached.draft;write(key,cached);}}
+          error(key,reason(failure));
+        }
+      }finally{current.busy=false;current.epoch++;drain(key);}
+    }
+    function retryDraft(key,entry){var current=lane(key);if(entry&&entry.draft&&!current.busy&&!current.queued)schedule(key,{value:entry.draft.value,ifRevision:entry.draft.ifRevision});}
+    async function get(key){
+      var cached=read(key),current=lane(key);
+      if(cached){emitValue(key,{value:cached.draft?cached.draft.value:cached.value,revision:cached.revision});retryDraft(key,cached);}
+      var epoch=current.epoch;
+      try{
+        var body;
+        try{body=await request(key);}catch(failure){if(failure.status!==404)throw failure;body={value:null,revision:0};}
+        if(!validValue(body))throw new Error('invalid state value');
+        if(current.epoch!==epoch||current.busy)return;
+        var latest=read(key),entry={value:body.value,revision:body.revision};if(latest&&latest.draft)entry.draft=latest.draft;
+        write(key,body.revision===0&&!entry.draft?null:entry);
+        if(!cached||cached.revision!==body.revision)emitValue(key,body);
+      }catch(failure){error(key,reason(failure));}
+    }
+    async function hello(){
+      try{
+        var body=await request(),keys=Array.isArray(body.keys)?body.keys:[];
+        send('state:ready',{enabled:true,scope:'org',keys:keys.filter(function(row){return row&&keyPattern.test(row.key)&&Number.isSafeInteger(row.revision);}).map(function(row){return {key:row.key,revision:row.revision};})});
+      }catch(failure){send('state:ready',{enabled:true,scope:'org',keys:[]});error('',reason(failure));}
+    }
+    return {handle:function(event){
+      if(event.source!==options.frame())return false;
+      var data=event.data;
+      if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string'||!data.type.startsWith('state:'))return false;
+      var type=data.type,key=data.key;
+      if(!options.enabled){if(type==='state:hello')send('state:ready',{enabled:false,scope:'org',keys:[]});else error(key,'disabled');return true;}
+      if(type==='state:hello'){hello();return true;}
+      if(type!=='state:get'&&type!=='state:set'&&type!=='state:delete')return true;
+      if(typeof key!=='string'||!keyPattern.test(key)){error(key,'bad_key');return true;}
+      if(type==='state:get'){get(key);return true;}
+      if(type==='state:delete'){schedule(key,{remove:true});return true;}
+      if(Object.prototype.hasOwnProperty.call(data,'ifRevision')&&(!Number.isSafeInteger(data.ifRevision)||data.ifRevision<0)){error(key,'bad_key');return true;}
+      var serialized;
+      try{serialized=JSON.stringify(data.value);if(serialized===undefined)throw new Error('missing value');}catch(_){error(key,'bad_key');return true;}
+      if(new TextEncoder().encode(serialized).length>256*1024){error(key,'too_large');return true;}
+      schedule(key,{value:JSON.parse(serialized),ifRevision:data.ifRevision});return true;
+    }};
+  }
+  // End viewer state broker.
+  var stateBroker=createViewerStateBroker({enabled:shellConfig.stateEnabled==='1',artifactId:artifactId,storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},fetch:function(url,init){return window.fetch(url,init);},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},setTimer:function(callback,ms){return window.setTimeout(callback,ms);},clearTimer:function(id){window.clearTimeout(id);}});
   var theme=document.getElementById('vtheme');
   if(theme) theme.addEventListener('click',function(){
     var current=document.documentElement.dataset.theme;
@@ -207,6 +298,7 @@
   function showOutbound(url){ensureOutboundPanel();outboundUrl=url;outboundHost.textContent=url.host;outboundPanel.removeAttribute('inert');outboundPanel.classList.add('open');outboundPanel.setAttribute('aria-hidden','false');outboundConfirm.focus();}
   window.addEventListener('message',function(event){
     if(!frame||event.source!==frame.contentWindow)return;var data=event.data;if(!data||typeof data!=='object')return;
+    if(stateBroker.handle(event))return;
     if(data.type!=='anchor:ready'&&data.type!=='anchor:picked'&&data.type!=='anchor:positions'&&data.type!=='anchor:navigate')return;
     if(data.type==='anchor:navigate'){var url=parseOutboundHref(data.href);if(url)showOutbound(url);return;}
     if(data.type==='anchor:ready'){var nextPage=isBundle&&typeof data.page==='string'?data.page:null;if(draftAnchor&&composerBody&&composerBody.value.trim()&&draftAnchor.page!==nextPage&&!window.confirm('Move away from this selected anchor? Your draft comment will remain.')){if(isBundle&&draftAnchor.page)frame.src=bundleRawPrefix+draftAnchor.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1'+versionQuery;return;}currentPage=nextPage;bridgeReady=true;hideAllMarkers();if(commentMode){overlay.classList.remove('fallback');postToFrame('anchor:pick-on');}requestRepaint();return;}

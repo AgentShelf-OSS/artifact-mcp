@@ -1,6 +1,44 @@
 import { test, expect, publish, api } from "../fixtures.mjs";
 
 test.describe("artifact viewer", () => {
+  test("shell saves state across reload and another browser in the same organization", async ({ browser, baseURL, request, publisherKey, org }) => {
+    const emails = [`state-one-${org}@example.test`, `state-two-${org}@example.test`];
+    for (const email of emails) {
+      const added = await api(request, "post", `/settings/orgs/${org}/emails`, { email });
+      expect(added.status(), await added.text()).toBe(200);
+    }
+    const artifact = await publish(request, publisherKey, {
+      title: `PW State ${org}`,
+      html: `<!doctype html><body><button id="save">Save note</button><output id="value"></output><script>
+        addEventListener('message', event => {
+          if (event.source !== parent) return;
+          const m = event.data;
+          if (m?.type === 'state:ready') { document.body.dataset.enabled = String(m.enabled); if (m.enabled) parent.postMessage({type:'state:get',key:'note'},'*'); }
+          if (m?.type === 'state:value') document.querySelector('#value').textContent = m.value ?? '';
+          if (m?.type === 'state:saved') document.body.dataset.saved = String(m.revision);
+        });
+        document.querySelector('#save').onclick = () => parent.postMessage({type:'state:set',key:'note',value:'persisted'},'*');
+        parent.postMessage({type:'state:hello'},'*');
+      </script></body>`
+    });
+    const contexts = [];
+    try {
+      const first = await browser.newContext({ extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": emails[0] } }); contexts.push(first);
+      const page = await first.newPage();
+      await page.goto(`${baseURL}/${artifact.id}`);
+      await expect(page.frameLocator('#vframe').locator('body')).toHaveAttribute('data-enabled', 'true');
+      await page.frameLocator('#vframe').getByRole('button', { name: 'Save note' }).click();
+      await expect(page.frameLocator('#vframe').locator('body')).toHaveAttribute('data-saved', '1');
+      await page.reload();
+      await expect(page.frameLocator('#vframe').locator('#value')).toHaveText('persisted');
+      const second = await browser.newContext({ extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": emails[1] } }); contexts.push(second);
+      const other = await second.newPage();
+      await other.goto(`${baseURL}/${artifact.id}`);
+      await expect(other.frameLocator('#vframe').locator('#value')).toHaveText('persisted');
+      expect((await (await request.get(`/${artifact.id}/state/note`)).json()).revision).toBe(1);
+    } finally { for (const context of contexts) await context.close(); }
+  });
+
   test("shell renders, iframe is sandboxed without allow-same-origin", async ({ page, request, publisherKey, org }) => {
     const a = await publish(request, publisherKey, { title: `PW Shell ${org}`, html: "<!doctype html><h1>shell</h1>" });
     await page.goto(`/${a.id}`);

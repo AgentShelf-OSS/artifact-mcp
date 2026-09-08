@@ -83,6 +83,7 @@ mod u79_discussion_persistence;
 mod u79_outbox_bridge;
 mod u80_discord_inbound;
 mod u81_organization_discord;
+mod viewer_state;
 
 /// Fails loudly if a file in `tests/native/` is not declared above.
 ///

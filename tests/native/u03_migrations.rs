@@ -525,6 +525,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (30, "discord-organization-threading-policy".to_owned()),
         (31, "discord-two-way-inbound-sync".to_owned()),
         (32, "feedback-anchor-v2".to_owned()),
+        (33, "viewer-state".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert!(

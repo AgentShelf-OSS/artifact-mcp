@@ -191,6 +191,9 @@ function buildRequest(reqSpec, symbols) {
 }
 
 function generateBody(gen) {
+  if (gen.kind === "state-value") {
+    return Buffer.from(JSON.stringify({ value: (gen.character || "x").repeat(gen.length) }));
+  }
   if (gen.kind === "oversize-json") {
     // A syntactically-valid JSON object whose size exceeds the MCP json limit, to trip 413
     // AFTER auth but at the body-buffering boundary.

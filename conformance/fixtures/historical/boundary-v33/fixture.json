@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "synthetic": true,
+  "origin": {
+    "releaseTag": null,
+    "schemaVersion": 33,
+    "kind": "migration-boundary",
+    "sourceRef": {
+      "ref": "current append-only migration ledger",
+      "migrationLedgerSha256": "5c2cbe0e60e39470b64ec74f33cd090aff4544884a8a91e2ee6f59fe7f56825c"
+    }
+  },
+  "expectedTargetSchema": 33,
+  "generation": "node scripts/generate-historical-fixtures.mjs",
+  "webhookEncryption": null,
+  "authentication": {
+    "clientId": "fixture-key",
+    "token": "fixture-public-token-v1",
+    "classification": "public synthetic test material"
+  },
+  "expectedRecovery": {
+    "recoveredPaths": [],
+    "divergentBodies": [],
+    "orphanBodies": [],
+    "missingBodies": [],
+    "preservedTransientPaths": [],
+    "remainingIntentIds": []
+  },
+  "database": {
+    "path": "artifacts.db",
+    "sha256": "7c27b947c487f0cc44173aa7e1130af35eebf865cc10854d3d08369624dc9537"
+  },
+  "bodies": [
+    {
+      "path": "singleb33.html",
+      "bytes": 30,
+      "sha256": "fb9e88ad26f491c2d10a52f98b491684c1493dafdeb5aafa6f5ae76284d71645"
+    }
+  ]
+}

@@ -14,5 +14,7 @@ pub mod outbox;
 pub mod outbox_fanout;
 pub mod reactions;
 pub mod shares;
+pub mod state;
+pub mod viewer_state_service;
 pub mod views;
 pub mod webhooks;

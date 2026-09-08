@@ -1,0 +1,1697 @@
+{
+  "id": "viewer-state.key-cap",
+  "env": { "INGRESS_STATE_PER_WINDOW": "200" },
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Viewer state</h1></body></html>",
+              "title": "Viewer state"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "create key 1 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-00",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 2 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-01",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 1
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 3 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-02",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 2
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 4 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-03",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 3
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 5 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-04",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 4
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 6 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-05",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 5
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 7 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-06",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 6
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 8 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-07",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 7
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 9 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-08",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 8
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 10 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-09",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 9
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 11 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-10",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 10
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 12 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-11",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 11
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 13 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-12",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 12
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 14 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-13",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 13
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 15 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-14",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 14
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 16 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-15",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 15
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 17 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-16",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 16
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 18 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-17",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 17
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 19 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-18",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 18
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 20 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-19",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 19
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 21 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-20",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 20
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 22 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-21",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 21
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 23 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-22",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 22
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 24 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-23",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 23
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 25 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-24",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 24
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 26 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-25",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 25
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 27 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-26",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 26
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 28 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-27",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 27
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 29 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-28",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 28
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 30 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-29",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 29
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 31 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-30",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 30
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 32 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-31",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 31
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 33 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-32",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 32
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 34 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-33",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 33
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 35 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-34",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 34
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 36 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-35",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 35
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 37 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-36",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 36
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 38 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-37",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 37
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 39 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-38",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 38
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 40 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-39",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 39
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 41 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-40",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 40
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 42 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-41",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 41
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 43 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-42",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 42
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 44 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-43",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 43
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 45 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-44",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 44
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 46 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-45",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 45
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 47 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-46",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 46
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 48 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-47",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 47
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 49 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-48",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 48
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 50 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-49",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 49
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 51 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-50",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 50
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 52 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-51",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 51
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 53 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-52",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 52
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 54 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-53",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 53
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 55 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-54",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 54
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 56 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-55",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 55
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 57 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-56",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 56
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 58 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-57",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 57
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 59 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-58",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 58
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 60 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-59",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 59
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 61 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-60",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 60
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 62 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-61",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 61
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 63 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-62",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 62
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "create key 64 of 64",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-63",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 63
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "65th new key is rejected",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/overflow",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": 65
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "existing key can update at the cap",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/key-00",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "updated",
+          "if_revision": 1
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "deletion frees a key slot",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/state/key-01",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 204,
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "freed slot can be filled",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/replacement",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": false
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "list contains 64 keys",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "key_count",
+        "query": "SELECT count(*) AS count FROM artifact_state"
+      }
+    ]
+  },
+  "tags": [
+    "viewer-state",
+    "issue-38"
+  ],
+  "fixture": "empty-v21"
+}

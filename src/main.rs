@@ -2138,6 +2138,17 @@ async fn bootstrap(
     });
     let health: Arc<dyn HealthProbe> =
         Arc::new(ProductionHealth::new(pool.clone(), config.artifact_dir()));
+    let viewer_state_key = config
+        .audit_ledger_hmac_key
+        .as_ref()
+        .map(|encoded| parse_hmac_key(encoded.expose()))
+        .transpose()?;
+    let viewer_state = Arc::new(
+        artifact_mcp::persistence::viewer_state_service::SqliteViewerState::new(
+            pool.clone(),
+            viewer_state_key,
+        ),
+    );
     let audit_access = config
         .audit_ledger_hmac_key
         .as_ref()
@@ -2154,6 +2165,7 @@ async fn bootstrap(
         admin,
         discussions: discussion_service,
         engagement,
+        viewer_state,
         shares,
         pages: Arc::new(AskamaPageRenderer::from_config(&config)),
         previews,
