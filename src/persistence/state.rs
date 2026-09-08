@@ -1,6 +1,7 @@
-//! Organization-scoped viewer state persistence.
+//! Organization and per-viewer state persistence.
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     error::AppError,
@@ -22,6 +23,24 @@ pub struct StateValue {
     pub revision: u64,
     pub updated_at: Timestamp,
     pub updated_by: EmailAddress,
+    pub scope: StateScope,
+}
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum StateScope {
+    #[default]
+    Org,
+    Viewer,
+}
+
+impl StateScope {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Org => "org",
+            Self::Viewer => "viewer",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -59,7 +78,11 @@ fn revision(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
         .map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
 }
 
-fn decode(row: &rusqlite::Row<'_>, artifact_id: &ArtifactId) -> rusqlite::Result<StateValue> {
+fn decode(
+    row: &rusqlite::Row<'_>,
+    artifact_id: &ArtifactId,
+    scope: StateScope,
+) -> rusqlite::Result<StateValue> {
     let raw: String = row.get(2)?;
     Ok(StateValue {
         artifact_id: artifact_id.clone(),
@@ -74,20 +97,37 @@ fn decode(row: &rusqlite::Row<'_>, artifact_id: &ArtifactId) -> rusqlite::Result
         revision: revision(row, 3)?,
         updated_at: Timestamp(row.get(4)?),
         updated_by: EmailAddress(row.get(5)?),
+        scope,
     })
 }
 
-pub fn list(conn: &Connection, artifact_id: &ArtifactId) -> Result<Vec<StateKey>, AppError> {
-    let mut stmt = conn.prepare("SELECT key, revision, updated_at FROM artifact_state WHERE artifact_id = ? ORDER BY key")
+fn state_owner(scope: StateScope, viewer: Option<&str>) -> String {
+    if scope == StateScope::Viewer {
+        viewer.unwrap_or("").to_lowercase()
+    } else {
+        String::new()
+    }
+}
+
+pub fn list(
+    conn: &Connection,
+    artifact_id: &ArtifactId,
+    scope: StateScope,
+    viewer: Option<&str>,
+) -> Result<Vec<StateKey>, AppError> {
+    let mut stmt = conn.prepare("SELECT key, revision, updated_at FROM artifact_state WHERE artifact_id = ? AND scope = ? AND viewer = ? ORDER BY key")
         .map_err(|_| AppError::Internal)?;
     let rows = stmt
-        .query_map([&artifact_id.0], |row| {
-            Ok(StateKey {
-                key: row.get(0)?,
-                revision: revision(row, 1)?,
-                updated_at: Timestamp(row.get(2)?),
-            })
-        })
+        .query_map(
+            params![&artifact_id.0, scope.as_str(), state_owner(scope, viewer)],
+            |row| {
+                Ok(StateKey {
+                    key: row.get(0)?,
+                    revision: revision(row, 1)?,
+                    updated_at: Timestamp(row.get(2)?),
+                })
+            },
+        )
         .map_err(|_| AppError::Internal)?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
         .map_err(|_| AppError::Internal)
@@ -97,8 +137,10 @@ pub fn get(
     conn: &Connection,
     artifact_id: &ArtifactId,
     key: &str,
+    scope: StateScope,
+    viewer: Option<&str>,
 ) -> Result<Option<StateValue>, AppError> {
-    conn.query_row("SELECT artifact_id,key,value,revision,updated_at,updated_by FROM artifact_state WHERE artifact_id=? AND key=?", params![artifact_id.0, key], |row| decode(row, artifact_id))
+    conn.query_row("SELECT artifact_id,key,value,revision,updated_at,updated_by FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=? AND key=?", params![artifact_id.0, scope.as_str(), state_owner(scope, viewer), key], |row| decode(row, artifact_id, scope))
         .optional().map_err(|_| AppError::Internal)
 }
 
@@ -109,6 +151,7 @@ pub fn set(
     value: &OrderedJson,
     if_revision: Option<u64>,
     updated_by: &EmailAddress,
+    scope: StateScope,
 ) -> Result<StateValue, StateError> {
     if !valid_key(key) {
         return Err(StateError::App(AppError::Validation("bad key".into())));
@@ -122,10 +165,20 @@ pub fn set(
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| internal("begin state transaction", e))?;
+    let viewer = if scope == StateScope::Viewer {
+        updated_by.0.to_lowercase()
+    } else {
+        String::new()
+    };
+    if scope == StateScope::Viewer && viewer.is_empty() {
+        return Err(StateError::App(AppError::Validation(
+            "viewer identity required".into(),
+        )));
+    }
     let current = tx
         .query_row(
-            "SELECT value,revision FROM artifact_state WHERE artifact_id=? AND key=?",
-            params![artifact_id.0, key],
+            "SELECT value,revision FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=? AND key=?",
+            params![artifact_id.0, scope.as_str(), viewer, key],
             |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
         )
         .optional()
@@ -148,8 +201,8 @@ pub fn set(
     if current.is_none() {
         let count: i64 = tx
             .query_row(
-                "SELECT COUNT(*) FROM artifact_state WHERE artifact_id=?",
-                [&artifact_id.0],
+                "SELECT COUNT(*) FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=?",
+                params![&artifact_id.0, scope.as_str(), viewer],
                 |row| row.get(0),
             )
             .map_err(|e| internal("count state keys", e))?;
@@ -157,16 +210,31 @@ pub fn set(
             return Err(StateError::TooManyKeys);
         }
     }
-    tx.execute("INSERT INTO artifact_state (artifact_id,key,value,revision,updated_at,updated_by) VALUES (?, ?, ?, 1, datetime('now'), ?) ON CONFLICT(artifact_id,key) DO UPDATE SET value=excluded.value, revision=artifact_state.revision+1, updated_at=datetime('now'), updated_by=excluded.updated_by", params![artifact_id.0, key, encoded, updated_by.0]).map_err(|e| internal("write state", e))?;
-    let result = tx.query_row("SELECT artifact_id,key,value,revision,updated_at,updated_by FROM artifact_state WHERE artifact_id=? AND key=?", params![artifact_id.0, key], |row| decode(row, artifact_id)).map_err(|e| internal("read written state", e))?;
+    tx.execute("INSERT INTO artifact_state (artifact_id,scope,viewer,key,value,revision,updated_at,updated_by) VALUES (?, ?, ?, ?, ?, 1, datetime('now'), ?) ON CONFLICT(artifact_id,scope,viewer,key) DO UPDATE SET value=excluded.value, revision=artifact_state.revision+1, updated_at=datetime('now'), updated_by=excluded.updated_by", params![artifact_id.0, scope.as_str(), viewer, key, encoded, updated_by.0]).map_err(|e| internal("write state", e))?;
+    let result = tx.query_row("SELECT artifact_id,key,value,revision,updated_at,updated_by FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=? AND key=?", params![artifact_id.0, scope.as_str(), viewer, key], |row| decode(row, artifact_id, scope)).map_err(|e| internal("read written state", e))?;
     tx.commit().map_err(|e| internal("commit state", e))?;
     Ok(result)
 }
 
-pub fn delete(conn: &Connection, artifact_id: &ArtifactId, key: &str) -> Result<bool, AppError> {
+pub fn delete(
+    conn: &Connection,
+    artifact_id: &ArtifactId,
+    key: &str,
+    scope: StateScope,
+    viewer: Option<&str>,
+) -> Result<bool, AppError> {
     conn.execute(
-        "DELETE FROM artifact_state WHERE artifact_id=? AND key=?",
-        params![artifact_id.0, key],
+        "DELETE FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=? AND key=?",
+        params![
+            artifact_id.0,
+            scope.as_str(),
+            if scope == StateScope::Viewer {
+                viewer.unwrap_or("")
+            } else {
+                ""
+            },
+            key
+        ],
     )
     .map(|n| n != 0)
     .map_err(|_| AppError::Internal)
@@ -180,15 +248,25 @@ pub fn valid_key(key: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
-pub async fn list_pooled(pool: &DbPool, id: ArtifactId) -> Result<Vec<StateKey>, AppError> {
-    db::interact(pool, move |conn| list(conn, &id)).await
+pub async fn list_pooled(
+    pool: &DbPool,
+    id: ArtifactId,
+    scope: StateScope,
+    viewer: Option<String>,
+) -> Result<Vec<StateKey>, AppError> {
+    db::interact(pool, move |conn| list(conn, &id, scope, viewer.as_deref())).await
 }
 pub async fn get_pooled(
     pool: &DbPool,
     id: ArtifactId,
     key: String,
+    scope: StateScope,
+    viewer: Option<String>,
 ) -> Result<Option<StateValue>, AppError> {
-    db::interact(pool, move |conn| get(conn, &id, &key)).await
+    db::interact(pool, move |conn| {
+        get(conn, &id, &key, scope, viewer.as_deref())
+    })
+    .await
 }
 pub async fn set_pooled(
     pool: &DbPool,
@@ -197,17 +275,27 @@ pub async fn set_pooled(
     value: OrderedJson,
     if_revision: Option<u64>,
     writer: EmailAddress,
+    scope: StateScope,
 ) -> Result<StateValue, StateError> {
     let pool = pool.clone();
     tokio::task::spawn_blocking(move || {
         let mut conn = db::checkout(&pool).map_err(StateError::App)?;
-        set(&mut conn, &id, &key, &value, if_revision, &writer)
+        set(&mut conn, &id, &key, &value, if_revision, &writer, scope)
     })
     .await
     .map_err(|_| StateError::App(AppError::Internal))?
 }
-pub async fn delete_pooled(pool: &DbPool, id: ArtifactId, key: String) -> Result<bool, AppError> {
-    db::interact(pool, move |conn| delete(conn, &id, &key)).await
+pub async fn delete_pooled(
+    pool: &DbPool,
+    id: ArtifactId,
+    key: String,
+    scope: StateScope,
+    viewer: Option<String>,
+) -> Result<bool, AppError> {
+    db::interact(pool, move |conn| {
+        delete(conn, &id, &key, scope, viewer.as_deref())
+    })
+    .await
 }
 
 #[cfg(test)]
@@ -227,7 +315,7 @@ mod tests {
     #[test]
     fn crud_increments_revision_and_detects_conflicts() {
         let mut conn = Connection::open_in_memory().expect("sqlite");
-        conn.execute_batch("CREATE TABLE artifacts (id TEXT PRIMARY KEY); CREATE TABLE artifact_state (artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE, key TEXT NOT NULL, value TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL, PRIMARY KEY (artifact_id,key)); INSERT INTO artifacts VALUES ('a'); PRAGMA foreign_keys=ON;").expect("schema");
+        conn.execute_batch("CREATE TABLE artifacts (id TEXT PRIMARY KEY); CREATE TABLE artifact_state (artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE, scope TEXT NOT NULL CHECK(scope IN ('org','viewer')), viewer TEXT NOT NULL DEFAULT '', key TEXT NOT NULL, value TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL, updated_by TEXT NOT NULL, PRIMARY KEY (artifact_id,scope,viewer,key)); INSERT INTO artifacts VALUES ('a'); PRAGMA foreign_keys=ON;").expect("schema");
         let id = ArtifactId("a".into());
         let email = EmailAddress("viewer@example.test".into());
         let first = set(
@@ -237,6 +325,7 @@ mod tests {
             &OrderedJson::string("one"),
             None,
             &email,
+            StateScope::Org,
         )
         .expect("first");
         assert_eq!(first.revision, 1);
@@ -247,6 +336,7 @@ mod tests {
             &OrderedJson::string("two"),
             Some(1),
             &email,
+            StateScope::Org,
         )
         .expect("second");
         assert_eq!(second.revision, 2);
@@ -257,13 +347,18 @@ mod tests {
             &OrderedJson::string("three"),
             Some(1),
             &email,
+            StateScope::Org,
         )
         .expect_err("stale revision") else {
             panic!("expected conflict")
         };
         assert_eq!(conflict.revision, 2);
         assert_eq!(conflict.value, OrderedJson::string("two"));
-        assert!(delete(&conn, &id, "note").expect("delete"));
-        assert!(get(&conn, &id, "note").expect("read").is_none());
+        assert!(delete(&conn, &id, "note", StateScope::Org, None).expect("delete"));
+        assert!(
+            get(&conn, &id, "note", StateScope::Org, None)
+                .expect("read")
+                .is_none()
+        );
     }
 }

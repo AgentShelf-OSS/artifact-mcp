@@ -1,0 +1,437 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": "shared"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": "shared"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": []
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Charlie diary"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "note",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "conflict",
+          "revision": 1,
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "note",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "keys": [
+            {
+              "key": "note",
+              "revision": 1,
+              "updated_at": "<volatile>"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 204,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Alice diary"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "updated_by": "alice@acme.test",
+          "value": "shared"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 204,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "key": "note",
+          "revision": 1,
+          "updated_at": "<volatile>",
+          "value": "Admin diary"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "remaining_scope_buckets": [
+        {
+          "key": "note",
+          "revision": 1,
+          "scope": "org",
+          "value": "\"shared\"",
+          "viewer": ""
+        },
+        {
+          "key": "note",
+          "revision": 1,
+          "scope": "viewer",
+          "value": "\"Admin diary\"",
+          "viewer": "admin@corp.test"
+        }
+      ]
+    }
+  }
+}

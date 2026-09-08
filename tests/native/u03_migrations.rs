@@ -526,6 +526,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (31, "discord-two-way-inbound-sync".to_owned()),
         (32, "feedback-anchor-v2".to_owned()),
         (33, "viewer-state".to_owned()),
+        (34, "viewer-state-scope-and-member-display-name".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert!(

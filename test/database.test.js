@@ -35,7 +35,7 @@ test("fresh databases apply ordered migrations with foreign keys enabled", () =>
     );
     assert.deepEqual(
       runtime.db.prepare("PRAGMA table_info(org_email_members)").all().map((column) => column.name),
-      ["email", "org", "created_at"]
+      ["email", "org", "created_at", "display_name"]
     );
     assert.deepEqual(
       runtime.db.prepare("PRAGMA table_info(api_keys)").all().map((column) => column.name),

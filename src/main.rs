@@ -373,6 +373,29 @@ impl AdminService for ProductionAdmin {
         ))
     }
 
+    fn add_email_member_with_name<'a>(
+        &'a self,
+        org: &'a OrgId,
+        email: &'a EmailAddress,
+        display_name: Option<String>,
+        audit: MutationAudit,
+    ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
+        Box::pin(self.orgs.add_email_member_with_name_audited(
+            org.clone(),
+            email.clone(),
+            display_name,
+            audit,
+            self.audit_key,
+        ))
+    }
+
+    fn email_display_name<'a>(
+        &'a self,
+        email: &'a EmailAddress,
+    ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
+        Box::pin(self.orgs.email_display_name(email))
+    }
+
     fn remove_email_member<'a>(
         &'a self,
         org: &'a OrgId,

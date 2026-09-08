@@ -131,6 +131,7 @@ depend on the random port.
 | `exact-json-text` | MCP `content[0].text` and the `tools/list` golden | As `canonical-json`, plus the embedded JSON string is asserted to be valid JSON. Because `text` is a string leaf, it is compared **exactly**. |
 | `state` | SQLite / filesystem effects | Named SQL queries, directory entries, and sha256 file hashes. |
 | `html-dom` | Large trusted pages | Exact snapshot is the primary gate; DOM/browser assertions are a later, secondary gate. |
+| `viewer-handle` | Viewer shell identity | Decode the JSON literals in `data-viewer-id` and `data-viewer-name` on `#shell-config` and compare both exactly. Reject missing or malformed handles. Other shell markup is outside this comparison. |
 
 Two extra assertions layer on top of any mode:
 

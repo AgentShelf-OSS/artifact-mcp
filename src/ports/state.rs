@@ -5,16 +5,23 @@ use crate::{
     error::AppError,
     mcp::protocol::OrderedJson,
     model::EmailAddress,
-    persistence::state::{StateError, StateKey, StateValue},
+    persistence::state::{StateError, StateKey, StateScope, StateValue},
     security::{access::AuthorizedArtifact, audit::MutationAudit},
 };
 
 pub trait ViewerStateService: Send + Sync {
-    fn list(&self, artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>>;
+    fn list(
+        &self,
+        artifact: AuthorizedArtifact,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
+    ) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>>;
     fn get(
         &self,
         artifact: AuthorizedArtifact,
         key: String,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
     ) -> BoxFuture<'_, Result<Option<StateValue>, AppError>>;
     fn put(
         &self,
@@ -23,11 +30,14 @@ pub trait ViewerStateService: Send + Sync {
         value: OrderedJson,
         if_revision: Option<u64>,
         writer: EmailAddress,
+        scope: StateScope,
     ) -> BoxFuture<'_, Result<StateValue, StateError>>;
     fn delete(
         &self,
         artifact: AuthorizedArtifact,
         key: String,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<(), AppError>>;
 }
@@ -36,13 +46,20 @@ pub trait ViewerStateService: Send + Sync {
 pub struct InertViewerState;
 
 impl ViewerStateService for InertViewerState {
-    fn list(&self, _: AuthorizedArtifact) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>> {
+    fn list(
+        &self,
+        _: AuthorizedArtifact,
+        _: StateScope,
+        _: Option<EmailAddress>,
+    ) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>> {
         Box::pin(async { Err(AppError::Internal) })
     }
     fn get(
         &self,
         _: AuthorizedArtifact,
         _: String,
+        _: StateScope,
+        _: Option<EmailAddress>,
     ) -> BoxFuture<'_, Result<Option<StateValue>, AppError>> {
         Box::pin(async { Err(AppError::Internal) })
     }
@@ -53,6 +70,7 @@ impl ViewerStateService for InertViewerState {
         _: OrderedJson,
         _: Option<u64>,
         _: EmailAddress,
+        _: StateScope,
     ) -> BoxFuture<'_, Result<StateValue, StateError>> {
         Box::pin(async { Err(StateError::App(AppError::Internal)) })
     }
@@ -60,6 +78,8 @@ impl ViewerStateService for InertViewerState {
         &self,
         _: AuthorizedArtifact,
         _: String,
+        _: StateScope,
+        _: Option<EmailAddress>,
         _: MutationAudit,
     ) -> BoxFuture<'_, Result<(), AppError>> {
         Box::pin(async { Err(AppError::Internal) })

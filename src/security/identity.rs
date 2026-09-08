@@ -54,6 +54,8 @@
 //! [`AccessToken`] redacts itself in `Debug`/`Display`. No token, claim set, or signature is ever
 //! placed in an [`AppError`] or a log line; failures are reported as the anonymous viewer.
 
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
 use std::{fmt, sync::Arc};
 
 use axum::http::HeaderMap;
@@ -70,6 +72,44 @@ use crate::{
         jwks::{JwksProvider, StaticJwks},
     },
 };
+
+/// Opaque shell identity shared with the Node runtime.
+pub fn viewer_handle(email: &str, audit_key: &[u8; 32]) -> String {
+    let mut derivation = Hmac::<Sha256>::new_from_slice(audit_key).expect("fixed HMAC key");
+    derivation.update(b"artifact-viewer-id");
+    let derived = derivation.finalize().into_bytes();
+    let mut mac = Hmac::<Sha256>::new_from_slice(&derived).expect("fixed HMAC key");
+    mac.update(b"viewer-id:");
+    mac.update(js_trim(email).to_lowercase().as_bytes());
+    hex::encode(&mac.finalize().into_bytes()[..8])
+}
+
+pub fn viewer_display_name(email: &str) -> String {
+    let local: String = email
+        .split('@')
+        .next()
+        .unwrap_or(email)
+        .chars()
+        .filter(|c| !c.is_control())
+        .collect();
+    let mut result = String::new();
+    for (index, word) in local
+        .split(['.', '_', '+'])
+        .filter(|v| !v.is_empty())
+        .enumerate()
+    {
+        if index > 0 {
+            result.push(' ');
+        }
+        let word = word.to_lowercase();
+        let mut chars = word.chars();
+        if let Some(first) = chars.next() {
+            result.extend(first.to_uppercase());
+            result.push_str(chars.as_str());
+        }
+    }
+    result.chars().take(40).collect()
+}
 
 /// The header Cloudflare Access sets with the signed assertion. [lib/identity.js:117]
 pub const ACCESS_JWT_HEADER: &str = "cf-access-jwt-assertion";
@@ -633,4 +673,42 @@ impl ViewerIdentity for AccessViewerIdentity {
 /// selected on a non-loopback bind without `HEADER_TRUST_ALLOW_INSECURE=1`.
 pub fn assert_ready(config: &AppConfig) -> Result<(), AppError> {
     config.validate_startup()
+}
+
+#[cfg(test)]
+mod viewer_handle_tests {
+    use super::{viewer_display_name, viewer_handle};
+
+    #[test]
+    fn handle_is_stable_case_insensitive_and_opaque() {
+        let key = [7_u8; 32];
+        assert_eq!(
+            viewer_handle("Neil.Example@Test", &key),
+            viewer_handle("neil.example@test", &key)
+        );
+        assert_eq!(viewer_handle("alice@acme.test", &key), "d3d6aa9815b72050");
+        assert_eq!(viewer_handle("Neil.Example@Test", &key).len(), 16);
+        assert!(
+            viewer_handle("Neil.Example@Test", &key)
+                .chars()
+                .all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase())
+        );
+    }
+
+    #[test]
+    fn fallback_name_formats_local_part_without_email() {
+        assert_eq!(
+            viewer_display_name("neil_example+one@test.invalid"),
+            "Neil Example One"
+        );
+        assert_eq!(viewer_display_name("person@test.invalid"), "Person");
+        assert_eq!(viewer_display_name("é._zoe@test.invalid"), "É Zoe");
+        assert_eq!(viewer_display_name("a\0b\t\u{7f}c@test.invalid"), "Abc");
+        assert_eq!(
+            viewer_display_name(&format!("{}@example.test", "😀".repeat(50)))
+                .chars()
+                .count(),
+            40
+        );
+    }
 }

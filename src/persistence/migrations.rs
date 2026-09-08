@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 33;
+pub const LATEST_SCHEMA_VERSION: i64 = 34;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -256,6 +256,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 33,
         name: "viewer-state",
         up: m033_artifact_state,
+    },
+    Migration {
+        version: 34,
+        name: "viewer-state-scope-and-member-display-name",
+        up: m034_viewer_state_scope,
     },
 ];
 
@@ -1617,6 +1622,27 @@ fn m033_artifact_state(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlit
   updated_by  TEXT NOT NULL,
   PRIMARY KEY (artifact_id, key)
 );",
+    )
+}
+
+/// Adds per-viewer state while carrying every v33 row into the explicit org bucket.
+fn m034_viewer_state_scope(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
+    tx.execute_batch(
+        "CREATE TABLE artifact_state_v2 (
+  artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+  scope       TEXT NOT NULL CHECK (scope IN ('org','viewer')),
+  viewer      TEXT NOT NULL DEFAULT '' COLLATE NOCASE,
+  key         TEXT NOT NULL,
+  value       TEXT NOT NULL,
+  revision    INTEGER NOT NULL DEFAULT 1,
+  updated_at  TEXT NOT NULL,
+  updated_by  TEXT NOT NULL,
+  PRIMARY KEY (artifact_id, scope, viewer, key)
+);
+INSERT INTO artifact_state_v2 SELECT artifact_id, 'org', '', key, value, revision, updated_at, updated_by FROM artifact_state;
+DROP TABLE artifact_state;
+ALTER TABLE artifact_state_v2 RENAME TO artifact_state;
+ALTER TABLE org_email_members ADD COLUMN display_name TEXT NOT NULL DEFAULT '';",
     )
 }
 

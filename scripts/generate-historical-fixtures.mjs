@@ -195,7 +195,12 @@ async function buildCase(spec) {
       insert(db, "artifact_shares", { token: "bbbbbbbbbbbbbbbbbbbbbbbb", artifact_id: singleId, org: "fixture", created_by: "fixture-key", expires_at: "2000-01-01 00:00:00" });
       insert(db, "artifact_shares", { token: "cccccccccccccccccccccccc", artifact_id: singleId, org: "fixture", created_by: "fixture-key", revoked_at: "2026-01-01 00:00:00" });
     }
-    if (spec.originSchema >= 21) insert(db, "org_email_members", { email: "member@example.test", org: "fixture" });
+    if (spec.originSchema >= 21) insert(db, "org_email_members", { email: "member@example.test", org: "fixture", display_name: "Fixture Reader" });
+    if (spec.originSchema >= 34) {
+      const state = { artifact_id: singleId, key: "note", updated_at: "2026-01-02 00:00:00", updated_by: "member@example.test" };
+      insert(db, "artifact_state", { ...state, scope: "org", viewer: "", value: '"Shared fixture note"', revision: 4 });
+      insert(db, "artifact_state", { ...state, scope: "viewer", viewer: "member@example.test", value: '"Private fixture note"', revision: 2 });
+    }
     if (spec.webhookMode === "mixed") {
       insert(db, "org_webhooks", {
         id: "plainwh20", org: "fixture", url: "https://discord.com/api/webhooks/1000/synthetic-plaintext-token",

@@ -41,6 +41,7 @@ pub struct ShellView {
     pub view_counts: ViewCounts,
     pub viewers: Option<Vec<ViewerView>>,
     pub viewer: Viewer,
+    pub viewer_display_name: Option<String>,
     pub org_accent: Option<String>,
 }
 

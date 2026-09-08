@@ -1,0 +1,786 @@
+{
+  "id": "viewer-state.scope",
+  "fixture": "empty-v21",
+  "tags": [
+    "viewer-state",
+    "issue-40"
+  ],
+  "env": {
+    "INGRESS_STATE_PER_WINDOW": "200"
+  },
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Viewer state</h1></body></html>",
+              "title": "Viewer state"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "omitted scope creates an org key",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "shared",
+          "if_revision": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "explicit org scope reads the default value",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=org",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "another org viewer sees the default value",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice creates her private note",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "Alice diary",
+          "if_revision": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice reads private state without writer email",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie cannot read Alice private note",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "an admin cannot read Alice private note",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie private list is empty",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie creates his own note at revision one",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "Charlie diary",
+          "if_revision": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie reads his own note",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice private note remains intact",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "email case selects the same owner",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "ALICE@ACME.TEST"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin creates an independent private note",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "Admin diary",
+          "if_revision": 0
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin reads only own private list",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "viewer cannot select another owner with query parameter",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer&viewer=charlie%40acme.test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "private revision conflict returns only current value",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "stale",
+          "if_revision": 0
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice lists her own private keys",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "org list remains independent",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie deletes only his private note",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 204,
+        "body": {
+          "mode": "exact-bytes",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Charlie private note was deleted",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice private note survives Charlie delete",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "shared note survives private delete",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid scope rejected for GET list",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state?scope=team",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid scope rejected for GET",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=team",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid scope rejected for PUT",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=team",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "no"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid scope rejected for DELETE",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/state/note?scope=team",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reject malformed scope scope=",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reject malformed scope scope=VIEWER",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=VIEWER",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reject malformed scope scope=org&scope=viewer",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=org&scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reject malformed scope scope%5B%5D=viewer",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope%5B%5D=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "unsigned private GET list",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state?scope=viewer",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "unsigned private GET",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "unsigned private PUT",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "value": "no"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "unsigned private DELETE",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "foreign org cannot read private state",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Alice deletes private note",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 204,
+        "body": {
+          "mode": "exact-bytes",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "admin note survives Alice deletion",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/state/note?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "remaining_scope_buckets",
+        "query": "SELECT scope, viewer, key, value, revision FROM artifact_state ORDER BY scope, viewer, key"
+      }
+    ]
+  }
+}

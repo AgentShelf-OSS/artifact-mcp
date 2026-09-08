@@ -92,6 +92,24 @@ pub trait AdminService: Send + Sync {
         email: &'a EmailAddress,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>>;
+    fn add_email_member_with_name<'a>(
+        &'a self,
+        org: &'a OrgId,
+        email: &'a EmailAddress,
+        display_name: Option<String>,
+        audit: MutationAudit,
+    ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
+        if display_name.is_some() {
+            return Box::pin(async { Err(AppError::Internal) });
+        }
+        self.add_email_member(org, email, audit)
+    }
+    fn email_display_name<'a>(
+        &'a self,
+        _email: &'a EmailAddress,
+    ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
+        Box::pin(async { Ok(None) })
+    }
     fn remove_email_member<'a>(
         &'a self,
         org: &'a OrgId,

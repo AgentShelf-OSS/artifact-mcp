@@ -387,6 +387,10 @@ async fn shell_result(deps: &AppDeps, headers: &HeaderMap, id: &str) -> Result<R
         feedback,
         view_counts,
         viewers,
+        viewer_display_name: match viewer.email.as_ref() {
+            Some(email) => deps.admin.email_display_name(email).await?,
+            None => None,
+        },
         viewer,
         org_accent,
     })?;

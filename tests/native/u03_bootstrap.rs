@@ -66,7 +66,7 @@ fn fresh_database_matches_the_node_schema_shape() {
     );
     assert_eq!(
         column_names(&conn, "org_email_members"),
-        ["email", "org", "created_at"]
+        ["email", "org", "created_at", "display_name"]
     );
     assert_eq!(
         column_names(&conn, "api_keys"),

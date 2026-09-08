@@ -1,9 +1,9 @@
-//! Organization-scoped viewer state HTTP API.
+//! Organization and per-viewer state HTTP API.
 
 use axum::{
     Extension, Json, Router,
     extract::{Path, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::get,
 };
@@ -14,7 +14,7 @@ use crate::{
     error::AppError,
     http::routes::artifact::{authorize, json_error, parse_json_request},
     mcp::protocol::OrderedJson,
-    persistence::state::{self, StateError, StateValue},
+    persistence::state::{self, StateError, StateScope, StateValue},
     security::audit::{AuditRequestId, MutationAudit},
 };
 
@@ -30,6 +30,25 @@ struct KeyResponse {
     key: String,
     revision: u64,
     updated_at: String,
+}
+
+fn scope_query(uri: &axum::http::Uri) -> Result<StateScope, &'static str> {
+    let mut found = None;
+    for (key, value) in url::form_urlencoded::parse(uri.query().unwrap_or("").as_bytes()) {
+        if key == "scope" {
+            if found.is_some() {
+                return Err("bad_scope");
+            }
+            found = Some(value.into_owned());
+        } else if key.starts_with("scope[") {
+            return Err("bad_scope");
+        }
+    }
+    match found.as_deref().unwrap_or("org") {
+        "org" => Ok(StateScope::Org),
+        "viewer" => Ok(StateScope::Viewer),
+        _ => Err("bad_scope"),
+    }
 }
 
 impl From<StateValue> for KeyResponse {
@@ -48,7 +67,8 @@ struct ValueResponse {
     value: OrderedJson,
     revision: u64,
     updated_at: String,
-    updated_by: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    updated_by: Option<String>,
 }
 
 fn no_store(mut response: Response) -> Response {
@@ -61,13 +81,21 @@ fn no_store(mut response: Response) -> Response {
 async fn list_state(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,
-    headers: HeaderMap,
+    request: Request,
 ) -> Response {
-    let (artifact, _) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, request.headers(), &id).await {
         Ok(value) => value,
         Err(error) => return error.into_response(),
     };
-    match deps.viewer_state.list(artifact).await {
+    let scope = match scope_query(request.uri()) {
+        Ok(s) => s,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    let owner = viewer.email.clone();
+    if scope == StateScope::Viewer && owner.is_none() {
+        return AppError::ConcealedNotFound.into_response();
+    }
+    match deps.viewer_state.list(artifact, scope, owner).await {
         Ok(keys) => no_store(
             Json(
                 serde_json::json!({ "keys": keys.into_iter().map(|key| KeyResponse {
@@ -83,23 +111,31 @@ async fn list_state(
 async fn get_state(
     State(deps): State<AppDeps>,
     Path((id, key)): Path<(String, String)>,
-    headers: HeaderMap,
+    request: Request,
 ) -> Response {
-    let (artifact, _) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, request.headers(), &id).await {
         Ok(value) => value,
         Err(error) => return error.into_response(),
+    };
+    let scope = match scope_query(request.uri()) {
+        Ok(s) => s,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
-    match deps.viewer_state.get(artifact, key).await {
+    let owner = viewer.email.clone();
+    if scope == StateScope::Viewer && owner.is_none() {
+        return AppError::ConcealedNotFound.into_response();
+    }
+    match deps.viewer_state.get(artifact, key, scope, owner).await {
         Ok(Some(value)) => no_store(
             Json(ValueResponse {
                 key: value.key,
                 value: value.value,
                 revision: value.revision,
                 updated_at: value.updated_at.0,
-                updated_by: value.updated_by.0,
+                updated_by: (value.scope == StateScope::Org).then_some(value.updated_by.0),
             })
             .into_response(),
         ),
@@ -117,6 +153,13 @@ async fn put_state(
         Ok(value) => value,
         Err(error) => return error.into_response(),
     };
+    let scope = match scope_query(request.uri()) {
+        Ok(s) => s,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if scope == StateScope::Viewer && viewer.email.is_none() {
+        return AppError::ConcealedNotFound.into_response();
+    }
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
@@ -163,7 +206,7 @@ async fn put_state(
     };
     match deps
         .viewer_state
-        .put(artifact, key, value.clone(), if_revision, writer)
+        .put(artifact, key, value.clone(), if_revision, writer, scope)
         .await
     {
         Ok(value) => Json(KeyResponse::from(value)).into_response(),
@@ -186,12 +229,19 @@ async fn delete_state(
     State(deps): State<AppDeps>,
     Path((id, key)): Path<(String, String)>,
     request_id: Option<Extension<AuditRequestId>>,
-    headers: HeaderMap,
+    request: Request,
 ) -> Response {
-    let (artifact, viewer) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, request.headers(), &id).await {
         Ok(value) => value,
         Err(error) => return error.into_response(),
     };
+    let scope = match scope_query(request.uri()) {
+        Ok(s) => s,
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
+    };
+    if scope == StateScope::Viewer && viewer.email.is_none() {
+        return AppError::ConcealedNotFound.into_response();
+    }
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
@@ -200,7 +250,11 @@ async fn delete_state(
             Ok(value) => value,
             Err(error) => return error.into_response(),
         };
-    match deps.viewer_state.delete(artifact, key, audit).await {
+    match deps
+        .viewer_state
+        .delete(artifact, key, scope, viewer.email, audit)
+        .await
+    {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),
         Err(error) => error.into_response(),
     }

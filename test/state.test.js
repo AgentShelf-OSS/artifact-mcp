@@ -39,6 +39,21 @@ test("state store round trips values, revisions, conflicts, delete, and cascade"
   } finally { database.close(); }
 });
 
+test("state store keeps org and viewer namespaces independent", () => {
+  const database = new Database(":memory:");
+  database.pragma("foreign_keys = ON");
+  migrateDatabase(database);
+  database.prepare("INSERT INTO artifacts (id, client_id, org, title) VALUES ('scoped', 'publisher', 'acme', 'Scoped')").run();
+  const state = createStateStore({ db: database, now: () => "now" });
+  assert.equal(state.put("scoped", "note", "org", "alice@example.test").ok, true);
+  assert.equal(state.put("scoped", "note", "alice", "alice@example.test", null, "viewer", "alice@example.test").ok, true);
+  assert.equal(state.get("scoped", "note").value, "org");
+  assert.equal(state.get("scoped", "note", "viewer", "alice@example.test").value, "alice");
+  assert.equal(state.get("scoped", "note", "viewer", "bob@example.test"), null);
+  assert.equal(state.get("scoped", "note", "viewer", "alice@example.test").updated_by, "alice@example.test");
+  database.close();
+});
+
 test("state store enforces key, value, and key-count limits", () => {
   const database = fixture();
   try {

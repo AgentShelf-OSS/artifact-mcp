@@ -70,6 +70,8 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     favorite: "0",
     vote: "0",
     viewerEmail: JSON.stringify("viewer@acme.test"),
+    viewerId: JSON.stringify("9f2c1e0a4b7d3c55"),
+    viewerName: JSON.stringify("Viewer"),
     viewerIsAdmin: "0",
     isBundle: isBundle ? "1" : "0",
     feedback: JSON.stringify("[]"),

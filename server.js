@@ -209,6 +209,7 @@ const app = createApp({
     addDomain: orgs.addDomain,
     removeDomain: orgs.removeDomain,
     addEmailMember: orgs.addEmailMember,
+    viewerDisplayName: orgs.viewerDisplayName,
     removeEmailMember: orgs.removeEmailMember,
     addCategory: orgs.addCategory,
     removeCategory: orgs.removeCategory,

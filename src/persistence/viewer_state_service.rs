@@ -6,7 +6,7 @@ use crate::{
     model::EmailAddress,
     persistence::{
         db::{self, DbPool},
-        state::{self, StateError, StateKey, StateValue},
+        state::{self, StateError, StateKey, StateScope, StateValue},
     },
     ports::{BoxFuture, state::ViewerStateService},
     security::{
@@ -28,16 +28,34 @@ impl SqliteViewerState {
 }
 
 impl ViewerStateService for SqliteViewerState {
-    fn list(&self, artifact: AuthorizedArtifact) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>> {
-        Box::pin(state::list_pooled(&self.pool, artifact.into_meta().id))
+    fn list(
+        &self,
+        artifact: AuthorizedArtifact,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
+    ) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>> {
+        Box::pin(state::list_pooled(
+            &self.pool,
+            artifact.into_meta().id,
+            scope,
+            viewer.map(|v| v.0),
+        ))
     }
 
     fn get(
         &self,
         artifact: AuthorizedArtifact,
         key: String,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
     ) -> BoxFuture<'_, Result<Option<StateValue>, AppError>> {
-        Box::pin(state::get_pooled(&self.pool, artifact.into_meta().id, key))
+        Box::pin(state::get_pooled(
+            &self.pool,
+            artifact.into_meta().id,
+            key,
+            scope,
+            viewer.map(|v| v.0),
+        ))
     }
 
     fn put(
@@ -47,6 +65,7 @@ impl ViewerStateService for SqliteViewerState {
         value: OrderedJson,
         if_revision: Option<u64>,
         writer: EmailAddress,
+        scope: StateScope,
     ) -> BoxFuture<'_, Result<StateValue, StateError>> {
         Box::pin(state::set_pooled(
             &self.pool,
@@ -55,6 +74,7 @@ impl ViewerStateService for SqliteViewerState {
             value,
             if_revision,
             writer,
+            scope,
         ))
     }
 
@@ -62,6 +82,8 @@ impl ViewerStateService for SqliteViewerState {
         &self,
         artifact: AuthorizedArtifact,
         key: String,
+        scope: StateScope,
+        viewer: Option<EmailAddress>,
         mutation: MutationAudit,
     ) -> BoxFuture<'_, Result<(), AppError>> {
         let meta = artifact.into_meta();
@@ -72,7 +94,13 @@ impl ViewerStateService for SqliteViewerState {
                 let tx = conn
                     .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
                     .map_err(|_| AppError::Internal)?;
-                state::delete(&tx, &meta.id, &key)?;
+                state::delete(
+                    &tx,
+                    &meta.id,
+                    &key,
+                    scope,
+                    viewer.as_ref().map(|v| v.0.as_str()),
+                )?;
                 if let Some(audit_key) = audit_key {
                     audit::append_in_transaction(
                         &tx,

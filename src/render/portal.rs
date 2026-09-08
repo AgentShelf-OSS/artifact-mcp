@@ -20,6 +20,10 @@ use crate::{
     ports::PageRenderer,
     render::view_models::{GalleryView, SettingsView, ShellView},
     security::access::AccessPolicy,
+    security::{
+        audit::parse_hmac_key,
+        identity::{viewer_display_name, viewer_handle},
+    },
 };
 
 /// A checked-in asset that is allowed to bypass Askama's HTML escaping.
@@ -66,16 +70,22 @@ pub struct AskamaPageRenderer {
     app_brand: String,
     site_host: String,
     clock: RenderClock,
+    audit_key: Option<[u8; 32]>,
 }
 
 impl AskamaPageRenderer {
     #[must_use]
     pub fn from_config(config: &AppConfig) -> Self {
-        Self::new(
+        let mut renderer = Self::new(
             config.app_name.clone(),
             config.app_brand.clone(),
             &config.public_base_url,
-        )
+        );
+        renderer.audit_key = config
+            .audit_ledger_hmac_key
+            .as_ref()
+            .and_then(|v| parse_hmac_key(v.expose()).ok());
+        renderer
     }
 
     #[must_use]
@@ -85,6 +95,7 @@ impl AskamaPageRenderer {
             app_brand,
             site_host: site_host(public_base_url),
             clock: Arc::new(system_now_unix_seconds),
+            audit_key: None,
         }
     }
 
@@ -331,6 +342,8 @@ struct ShellTemplate<'a> {
     version_query_literal: String,
     viewer_email_literal: String,
     viewer_email: String,
+    viewer_id_literal: String,
+    viewer_name_literal: String,
     viewer_is_admin: bool,
     state_enabled: bool,
     can_delete: bool,
@@ -416,6 +429,20 @@ fn shell_template<'a>(
         .email
         .as_ref()
         .map_or("", |email| email.0.as_str());
+    let viewer_id = renderer.audit_key.map_or_else(String::new, |key| {
+        if viewer_email.is_empty() {
+            String::new()
+        } else {
+            viewer_handle(viewer_email, &key)
+        }
+    });
+    let viewer_name = view.viewer_display_name.clone().unwrap_or_else(|| {
+        if viewer_email.is_empty() {
+            String::new()
+        } else {
+            viewer_display_name(viewer_email)
+        }
+    });
     let who = if meta.uploader_label.is_empty() {
         meta.client_id.0.clone()
     } else {
@@ -552,6 +579,8 @@ fn shell_template<'a>(
         version_query_literal: js_literal(&version_query),
         viewer_email_literal: js_literal(viewer_email),
         viewer_email: viewer_email.to_owned(),
+        viewer_id_literal: js_literal(&viewer_id),
+        viewer_name_literal: js_literal(&viewer_name),
         viewer_is_admin: view.viewer.is_admin,
         state_enabled: !viewer_email.is_empty(),
         can_delete: AccessPolicy::viewer_can_manage_artifact(&view.viewer, meta),

@@ -248,8 +248,10 @@ ratio); set `PREVIEW_VIEWPORT=1200x750` if you want thumbnails that fill the car
 
 ## Persisting state from an artifact
 
-Viewer state stores JSON shared by everyone in the artifact's organization. It survives reloads
-and artifact updates. An artifact sends `state:hello` as it loads, then waits about one second
+Viewer state stores JSON either shared with the artifact's organization in `org` scope or
+private to the signed-in person in `viewer` scope. Omitting `scope` selects `org`, preserving
+existing artifacts. State survives reloads and artifact updates. An artifact sends `state:hello`
+as it loads, then waits about one second
 for `state:ready`. If no shell answers, state stays disabled. That is the expected path for
 public shares, historical views, and direct `/raw` navigation. Artifact code uses
 `window.parent.postMessage(message, "*")`; the trusted shell handles authenticated requests.
@@ -258,20 +260,29 @@ No fetch or browser storage access is needed inside the artifact.
 | Direction | Message | Fields |
 |---|---|---|
 | Artifact to shell | `state:hello` | None |
-| Shell to artifact | `state:ready` | `enabled`, `scope: "org"`, `keys: [{key, revision}]` |
-| Artifact to shell | `state:get` | `key` |
-| Shell to artifact | `state:value` | `key`, `value`, `revision`, optional `conflict: true` |
-| Artifact to shell | `state:set` | `key`, `value`, optional `ifRevision` |
-| Shell to artifact | `state:saved` | `key`, `revision` |
-| Shell to artifact | `state:error` | `key`, `reason` |
-| Artifact to shell | `state:delete` | `key` |
+| Shell to artifact | `state:ready` | `enabled`, `scope: "org"`, `keys: [{key, revision}]`; when enabled also `scopes: ["org", "viewer"]`, `viewer: {id, name}`, `viewerKeys: [{key, revision}]` |
+| Artifact to shell | `state:get` | `key`, optional `scope` |
+| Shell to artifact | `state:value` | `key`, `scope`, `value`, `revision`, optional `conflict: true` |
+| Artifact to shell | `state:set` | `key`, `value`, optional `scope`, optional `ifRevision` |
+| Shell to artifact | `state:saved` | `key`, `scope`, `revision` |
+| Shell to artifact | `state:error` | `key`, `scope`, `reason` |
+| Artifact to shell | `state:delete` | `key`, optional `scope` |
 
-Error reasons are `disabled`, `too_large`, `bad_key`, `conflict`, `network`, and `forbidden`.
-`too_large` covers both value size and the per-artifact key capacity.
+Error reasons are `disabled`, `too_large`, `bad_key`, `bad_scope`, `conflict`, `network`, and `forbidden`.
+`too_large` covers both value size and the key capacity of the selected scope and owner.
 Missing values arrive as `null` with revision `0`. Keys use 1 to 64 ASCII letters, digits,
-periods, underscores, or hyphens. Each artifact supports 64 keys, each holding up to 256 KiB
-of serialized JSON. The last writer's email stays in the server response and never enters
-the artifact bridge.
+periods, underscores, or hyphens. Each artifact supports 64 org keys and 64 private keys per
+viewer, each holding up to 256 KiB of serialized JSON. A viewer can only read or write their
+own private keys, including when they are an administrator. The bridge never forwards the
+last writer's email. Viewer-scope HTTP responses also omit `updated_by`.
+
+`viewer.id` is a stable, opaque identifier of 16 lowercase hex characters. `viewer.name` is the
+organization email member's display name, or a name derived from the email local part. Names
+have at most 40 characters. Neither field contains the full email. An administrator can set a
+name with `POST /settings/orgs/:name/emails` and JSON
+`{"email":"reader@example.org","display_name":"Alex"}`. The name is trimmed and rejects control
+characters or more than 40 characters; sending an empty name restores the derived name.
+Writing a name again updates that membership rather than creating a duplicate.
 
 This example keeps a note in memory when persistence is disabled or the page is opened without
 a shell. The text is org-shared when persistence is enabled.
@@ -299,13 +310,39 @@ send({type: 'state:hello'});
 setTimeout(() => { if (!ready) { timedOut = true; enabled = false; status.textContent = 'Notes are temporary on this page.'; } }, 1000);</script>
 ```
 
-Sets coalesce per key for 500 ms. Only `state:saved` confirms a server save. Reads can return a
+Sets coalesce per scope and key for 500 ms. Only `state:saved` confirms a server save. Reads can return a
 cached value followed by a fresh value with a different revision. On a stale `ifRevision`, the
 shell sends the current value with `conflict:true`, followed by `state:error` with reason
 `conflict`. The example accepts the server's version; an editor can instead show a merge prompt.
 See [ADR-0007](docs/adr/0007-viewer-state-via-shell-broker.md) for the storage and trust boundaries.
 If `state:ready` arrives after the one-second timeout, the example keeps state disabled for that
 page. The artifact bytes remain unchanged in public shares and historical views.
+
+For a collaborative reader, save a diary privately and publish selected notes with the viewer's
+display name. After an enabled `state:ready`, keep its `viewer` object and send messages such as:
+
+```js
+// These run inside an artifact, after its state:ready handler enables persistence.
+send({type: 'state:set', scope: 'viewer', key: 'diary', value: diaryText});
+send({type: 'state:get', scope: 'viewer', key: 'diary'});
+
+// Run only when the reader chooses to publish this note to the organization.
+send({
+  type: 'state:set', scope: 'org', key: 'note.' + viewer.id,
+  value: {author: viewer.name, text: selectedNote}
+});
+```
+
+Check both `scope` and `key` in response handlers, since the same key can exist in both scopes.
+Attribution stored in an org value is supplied by the artifact; it is not a verified author
+signature. Other readers can update org keys. Private values only become shared when the
+artifact explicitly writes them to an org key. Viewer caches are separated by viewer ID on a
+shared browser. The server remains the source of truth.
+
+The shell uses the existing HTTP state routes with `?scope=viewer` for private operations and
+`?scope=org` or no parameter for shared operations. Other scope values return
+`400 {"error":"bad_scope"}`. Raw, historical, and public-share documents do not gain a shell or
+viewer identity. See [ADR-0008](docs/adr/0008-per-viewer-state-scope-and-opaque-viewer-identity.md).
 
 ## Identity modes (quick reference)
 

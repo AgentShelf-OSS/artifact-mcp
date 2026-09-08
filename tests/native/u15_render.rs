@@ -336,6 +336,7 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         },
         viewers: None,
         viewer,
+        viewer_display_name: None,
         org_accent: Some("#123456".to_owned()),
     };
 
@@ -518,6 +519,7 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             },
             viewers: None,
             viewer: viewer.clone(),
+            viewer_display_name: None,
             org_accent: None,
         })
         .expect("Rust shell parity fixture");

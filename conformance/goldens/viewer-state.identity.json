@@ -1,0 +1,190 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":62,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 62,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "02b2897a62d1431c",
+          "name": "Alex Reader Notes Club"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "display_name": "Alice Reader",
+          "email": "alice@acme.test",
+          "org": "acme"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice Reader"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "display_name": "Ally & Friends",
+          "email": "alice@acme.test",
+          "org": "acme"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Ally & Friends"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Ally & Friends"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "display_name": "",
+          "email": "alice@acme.test",
+          "org": "acme"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "display_name must be a single line of at most 40 characters."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "display_name must be a single line of at most 40 characters."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "display_name must be a single line of at most 40 characters."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "viewer-handle",
+        "viewer": {
+          "id": "d3d6aa9815b72050",
+          "name": "Alice"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "display_name_upsert_has_one_membership": [
+        {
+          "display_name": "",
+          "email": "alice@acme.test",
+          "org": "acme"
+        }
+      ]
+    }
+  }
+}

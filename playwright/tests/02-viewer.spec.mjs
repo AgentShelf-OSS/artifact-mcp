@@ -1,6 +1,74 @@
 import { test, expect, publish, api } from "../fixtures.mjs";
 
 test.describe("artifact viewer", () => {
+  test("viewer identity and private state stay isolated while org state is shared", async ({ browser, baseURL, request, publisherKey, org }) => {
+    const emails = [`scope-one-${org}@example.test`, `scope-two-${org}@example.test`];
+    const names = ["First Reader", "Second Reader"];
+    for (let index = 0; index < emails.length; index += 1) {
+      const added = await api(request, "post", `/settings/orgs/${org}/emails`, { email: emails[index], display_name: names[index] });
+      expect(added.status(), await added.text()).toBe(200);
+    }
+    const artifact = await publish(request, publisherKey, {
+      title: `PW Scoped State ${org}`,
+      html: `<!doctype html><body>
+        <output id="ready"></output><output id="private">Loading</output><output id="shared">Loading</output>
+        <input id="note" aria-label="Note"><button id="save-private">Save private note</button><button id="save-shared">Share note</button>
+        <script>
+          addEventListener('message', event => {
+            if (event.source !== parent) return;
+            const m = event.data;
+            if (m?.type === 'state:ready' && m.enabled) {
+              document.querySelector('#ready').textContent = JSON.stringify(m);
+              for (const scope of ['viewer','org']) parent.postMessage({type:'state:get',scope,key:'note'},'*');
+            }
+            if (m?.type === 'state:value') document.querySelector(m.scope === 'viewer' ? '#private' : '#shared').textContent = m.value ?? 'Empty';
+            if (m?.type === 'state:saved') document.body.setAttribute('data-saved-' + m.scope, String(m.revision));
+            if (m?.type === 'state:error') document.body.setAttribute('data-state-error', m.reason);
+          });
+          document.querySelector('#save-private').onclick = () => parent.postMessage({type:'state:set',scope:'viewer',key:'note',value:document.querySelector('#note').value},'*');
+          document.querySelector('#save-shared').onclick = () => parent.postMessage({type:'state:set',scope:'org',key:'note',value:document.querySelector('#note').value},'*');
+          parent.postMessage({type:'state:hello'},'*');
+        </script></body>`
+    });
+    const contexts = [], pages = [], handles = [];
+    try {
+      for (let index = 0; index < emails.length; index += 1) {
+        const context = await browser.newContext({ extraHTTPHeaders: { "Cf-Access-Authenticated-User-Email": emails[index] } });
+        contexts.push(context);
+        const page = await context.newPage(); pages.push(page);
+        await page.goto(`${baseURL}/${artifact.id}`);
+        const frame = page.frameLocator('#vframe');
+        await expect(frame.locator('#ready')).toContainText(names[index]);
+        const ready = JSON.parse(await frame.locator('#ready').textContent());
+        expect(ready.scopes).toEqual(['org', 'viewer']);
+        expect(ready.viewer.id).toMatch(/^[a-f0-9]{16}$/);
+        expect(ready.viewer.name).toBe(names[index]);
+        handles.push(ready.viewer.id);
+        await expect(frame.locator('#private')).toHaveText('Empty');
+        await frame.getByRole('textbox', { name: 'Note', exact: true }).fill(`Diary ${index}`);
+        await frame.getByRole('button', { name: 'Save private note' }).click();
+        await expect(frame.locator('body')).toHaveAttribute('data-saved-viewer', '1');
+      }
+      expect(handles[0]).not.toBe(handles[1]);
+      const firstFrame = pages[0].frameLocator('#vframe');
+      await firstFrame.getByRole('textbox', { name: 'Note', exact: true }).fill('Shared reading note');
+      await firstFrame.getByRole('button', { name: 'Share note' }).click();
+      await expect(firstFrame.locator('body')).toHaveAttribute('data-saved-org', '1');
+      for (let index = 0; index < pages.length; index += 1) {
+        await pages[index].reload();
+        const frame = pages[index].frameLocator('#vframe');
+        await expect(frame.locator('#private')).toHaveText(`Diary ${index}`);
+        await expect(frame.locator('#shared')).toHaveText('Shared reading note');
+        const ready = JSON.parse(await frame.locator('#ready').textContent());
+        expect(ready.viewer.id).toBe(handles[index]);
+        expect(ready.viewerKeys).toContainEqual({ key: 'note', revision: 1 });
+        const document = await frame.locator('html').evaluate(element => element.outerHTML);
+        for (const email of emails) expect(document).not.toContain(email);
+        await expect(frame.locator('body')).not.toHaveAttribute('data-state-error', /.+/);
+      }
+    } finally { for (const context of contexts) await context.close(); }
+  });
+
   test("shell saves state across reload and another browser in the same organization", async ({ browser, baseURL, request, publisherKey, org }) => {
     const emails = [`state-one-${org}@example.test`, `state-two-${org}@example.test`];
     for (const email of emails) {

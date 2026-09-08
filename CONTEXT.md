@@ -23,7 +23,9 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Reaction** — a viewer’s favorite flag and sentiment vote (`-1`, `0`, or `1`) for an artifact.
 - **Gallery** — the organization-scoped artifact index.
 - **Viewer shell** — trusted application chrome around a sandboxed raw artifact.
-- **Viewer state**: JSON values belonging to an artifact and shared by viewers in its organization. State survives artifact revisions; it is not personal storage. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
+- **Viewer state**: JSON values belonging to an artifact in a chosen viewer state scope. State survives artifact revisions. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
+- **Viewer state scope**: The audience for a state key. `org` shares the value with viewers who can access the artifact and is the default. `viewer` restricts the value to the authenticated person who owns it, including when that person is an administrator.
+- **Viewer handle**: An opaque, stable viewer ID and a display name that an artifact can use for attribution. A handle does not grant access to another viewer's private state.
 - **Raw delivery** — artifact bytes served from `/raw/:id` or `/raw/:id/*`.
 - **Storage reconciliation** — inspection and recovery of interrupted staging/trash operations, plus reporting of missing or orphan bodies.
 
@@ -39,6 +41,7 @@ The application is a dependency-light modular monolith: one server process, one 
 8. MCP tool schemas are runtime contracts, not documentation only. Unknown, missing, or wrongly typed arguments produce JSON-RPC invalid-params errors.
 9. Persistent data, secrets, repository metadata, and local planning files are excluded from Docker build contexts.
 10. Artifact code never receives a network capability; viewer state crosses the sandbox only through the shell bridge.
+11. Viewer-scope rows are readable and writable only by their owner; the bridge exposes a viewer handle, never an email. Administrators have no cross-viewer access to this scope.
 
 ## Trust model
 
@@ -105,4 +108,3 @@ The main real seam is `createApp()`: production adapters are assembled in `serve
 - Every changed JavaScript file must pass `node --check`.
 - Build with `docker compose build`; `.dockerignore` must prevent `.env` and `data/` from entering the image.
 - Deployment is an owner-run operation; repository changes should not deploy automatically.
-

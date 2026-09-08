@@ -1,0 +1,349 @@
+{
+  "id": "viewer-state.identity",
+  "fixture": "empty-v21",
+  "tags": [
+    "viewer-state",
+    "issue-40"
+  ],
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Viewer state</h1></body></html>",
+              "title": "Viewer state"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "default name and deterministic opaque handle",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        }
+      }
+    },
+    {
+      "name": "same viewer in a later request",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "email case does not change handle",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "ALICE@ACME.TEST"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "local part separators become spaces",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "alex.reader_notes+club@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        }
+      }
+    },
+    {
+      "name": "add trimmed member display name",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": "  Alice Reader  "
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "shell uses member display name",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        }
+      }
+    },
+    {
+      "name": "upsert existing member display name",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": "Ally & Friends"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "upsert changes name and retains opaque id",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        }
+      }
+    },
+    {
+      "name": "same name across repeated shell requests",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        },
+        "sameAsStep": 8
+      }
+    },
+    {
+      "name": "empty display name restores derived fallback",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": ""
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "fallback handle matches original",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "control characters are rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": "Alice\nReader"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "long display name is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "mistyped display name is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs/acme/emails",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "email": "${viewer_acme}",
+          "display_name": 42
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "invalid names leave membership intact",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "viewer-handle"
+        },
+        "sameAsStep": 1
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "display_name_upsert_has_one_membership",
+        "query": "SELECT email, org, display_name FROM org_email_members WHERE email='alice@acme.test'"
+      }
+    ]
+  }
+}

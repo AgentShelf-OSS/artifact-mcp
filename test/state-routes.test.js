@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { migrateDatabase } from "../lib/migrations.js";
 import { createApp } from "../lib/app.js";
 import { createAuditLedger } from "../lib/audit.js";
+process.env.AUDIT_LEDGER_HMAC_KEY = Buffer.alloc(32, 7).toString("base64");
 const importDir = mkdtempSync(join(tmpdir(), "artifact-state-routes-"));
 process.env.DATA_DIR = importDir;
 const { createStateStore } = await import("../lib/state.js");
@@ -51,7 +52,7 @@ function fixture({ viewer = { email: "viewer@acme.test", org: "acme", isAdmin: f
     state,
     limits: { statePerWindow: limit ?? 1000 },
     audit,
-    resolveViewer: async (req) => ({ ...viewer, email: req.headers["test-viewer-email"] ?? viewer.email }),
+    resolveViewer: async (req) => ({ ...viewer, email: req.headers["test-viewer-email"] ?? viewer.email, isAdmin: req.headers["test-viewer-admin"] === "1" || viewer.isAdmin }),
     artifacts: { getArtifactMeta: (id) => id === "owned" ? { id, org: "acme" } : id === "foreign" ? { id, org: "beta" } : null },
     feedback: { listForArtifact: () => [] },
     pages: { notFound: () => "not found", notSignedIn: () => "not signed in", gallery: () => "", shell: () => "", settings: () => "" },
@@ -116,6 +117,30 @@ test("state routes support round trip, revision conflict, strict bodies, and del
   }
   result = await invoke(app, "delete", "/:id/state/:key", { params: { id: "owned", key: "note" } });
   assert.equal(result.status, 204);
+});
+
+test("state routes isolate viewer scope and omit writer identity", async () => {
+  const seeded = fixture();
+  let result = await invoke(seeded.app, "put", "/:id/state/:key?scope=viewer", { params: { id: "owned", key: "note" }, body: { value: "alice" } });
+  assert.equal(result.status, 200);
+  result = await invoke(seeded.app, "get", "/:id/state/:key?scope=viewer", { params: { id: "owned", key: "note" } });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.value, "alice");
+  assert.equal(Object.hasOwn(result.body, "updated_by"), false);
+  result = await invoke(seeded.app, "get", "/:id/state/:key?scope=viewer", { params: { id: "owned", key: "note" }, headers: { "test-viewer-email": "other@acme.test" } });
+  assert.equal(result.status, 404);
+  result = await invoke(seeded.app, "get", "/:id/state/:key?scope=viewer&viewer=other%40acme.test", { params: { id: "owned", key: "note" } });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.value, "alice");
+});
+
+test("state routes reject malformed and repeated scope query parameters", async () => {
+  const { app } = fixture();
+  for (const suffix of ["?scope=", "?scope=VIEWER", "?scope=org&scope=viewer", "?scope%5B%5D=viewer"]) {
+    const result = await invoke(app, "get", `/:id/state${suffix}`, { params: { id: "owned" } });
+    assert.equal(result.status, 400);
+    assert.deepEqual(result.body, { error: "bad_scope" });
+  }
 });
 
 test("state routes enforce key validation, key cap, rate class, and audit", async () => {
@@ -191,4 +216,19 @@ test("an audit failure rolls the state deletion back", async () => {
   const result = await invoke(app, "delete", "/:id/state/:key", { params: { id: "owned", key: "keep" } });
   assert.equal(result.status, 500);
   assert.equal(state.get("owned", "keep").value, "important");
+});
+
+
+test("admins read and delete only their own viewer rows", async () => {
+  const { app } = fixture();
+  const path = "/owned/state/note?scope=viewer";
+  assert.equal((await invoke(app, "put", path, { body: { value: "diary" } })).status, 200);
+  const admin = { "test-viewer-email": "admin@beta.test", "test-viewer-admin": "1" };
+  assert.equal((await invoke(app, "get", path, { headers: admin })).status, 404);
+  assert.deepEqual((await invoke(app, "get", "/owned/state?scope=viewer", { headers: admin })).body, { keys: [] });
+  assert.equal((await invoke(app, "delete", path, { headers: admin })).status, 204);
+  assert.equal((await invoke(app, "get", path)).body.value, "diary");
+  assert.equal((await invoke(app, "put", path, { headers: admin, body: { value: "admin diary", if_revision: 0 } })).status, 200);
+  assert.equal((await invoke(app, "get", path, { headers: admin })).body.value, "admin diary");
+  assert.equal((await invoke(app, "get", path)).body.value, "diary");
 });

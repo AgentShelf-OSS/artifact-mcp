@@ -20,7 +20,8 @@ export const BODY_MODES = new Set([
   "exact-bytes",
   "canonical-json",
   "exact-json-text",
-  "html-dom"
+  "html-dom",
+  "viewer-handle"
 ]);
 
 // Transport-only headers are removed before comparison: they vary per-connection/per-run
@@ -105,6 +106,8 @@ export function backsubString(str, captures) {
 // shape error (e.g. body is not JSON when JSON was expected).
 export function normalizeBody(mode, bodyBuf, { captures = {}, volatileFields = [] } = {}) {
   switch (mode) {
+    case "viewer-handle":
+      return { mode, viewer: shellViewerHandle(bodyBuf.toString("utf8")) };
     case "canonical-json":
     case "exact-json-text": {
       const text = bodyBuf.toString("utf8");
@@ -137,6 +140,30 @@ export function normalizeBody(mode, bodyBuf, { captures = {}, volatileFields = [
     default:
       throw new Error(`unknown body mode: ${mode}`);
   }
+}
+
+// Compare the server-rendered identity contract independently of each runtime's chrome.
+// Attributes contain escaped JSON string literals, not raw identity strings.
+function shellViewerHandle(html) {
+  const decode = (value) => value.replace(/&(#x[0-9a-f]+|#\d+|quot|apos|amp|lt|gt);/gi, (_, entity) => {
+    if (entity[0] === "#") return String.fromCodePoint(entity[1].toLowerCase() === "x" ? parseInt(entity.slice(2), 16) : Number(entity.slice(1)));
+    return { quot: '"', apos: "'", amp: "&", lt: "<", gt: ">" }[entity.toLowerCase()];
+  });
+  const configs = [];
+  for (const [tag] of html.matchAll(/<div\b[^>]*>/gi)) {
+    const attributes = {};
+    for (const [, name, double, single] of tag.matchAll(/\s([^\s=/>]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g)) {
+      if (Object.hasOwn(attributes, name)) throw new Error(`duplicate shell attribute: ${name}`);
+      attributes[name] = decode(double ?? single);
+    }
+    if (attributes.id === "shell-config") configs.push(attributes);
+  }
+  if (configs.length !== 1) throw new Error("expected one shell-config element");
+  const id = JSON.parse(configs[0]["data-viewer-id"]);
+  const name = JSON.parse(configs[0]["data-viewer-name"]);
+  if (typeof id !== "string" || !/^[a-f0-9]{16}$/.test(id)) throw new Error("invalid viewer handle id");
+  if (typeof name !== "string" || [...name].length > 40 || /[\u0000-\u001f\u007f-\u009f]/u.test(name)) throw new Error("invalid viewer handle name");
+  return { id, name };
 }
 
 function looksTextual(buf) {

@@ -5,7 +5,7 @@ use std::time::Duration;
 use axum::{
     Json, Router,
     extract::{Extension, Path, Request, State},
-    http::{HeaderMap, header},
+    http::{HeaderMap, StatusCode, header},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, patch, post},
 };
@@ -435,11 +435,24 @@ async fn add_email_member(
         Err(response) => return response,
     };
     let email = EmailAddress(js_or_empty(body.get("email")));
+    let display_name = match body.get("display_name") {
+        Some(value) => {
+            let Some(value) = value.as_str() else {
+                return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"display_name must be a single line of at most 40 characters."}))).into_response();
+            };
+            match crate::persistence::orgs::normalize_display_name(value) {
+                Ok(name) => Some(name),
+                Err(error) => return error.into_response(),
+            }
+        }
+        None => None,
+    };
     let normalized = match deps
         .admin
-        .add_email_member(
+        .add_email_member_with_name(
             &OrgId(name.clone()),
             &email,
+            display_name.clone(),
             match target_audit(audit, &name) {
                 Ok(audit) => audit,
                 Err(error) => return error.into_response(),
@@ -450,7 +463,11 @@ async fn add_email_member(
         Ok(email) => email,
         Err(error) => return error.into_response(),
     };
-    Json(serde_json::json!({ "org": name, "email": normalized })).into_response()
+    let mut response = serde_json::json!({ "org": name, "email": normalized });
+    if let Some(display_name) = display_name {
+        response["display_name"] = display_name.into();
+    }
+    Json(response).into_response()
 }
 
 async fn remove_email_member(

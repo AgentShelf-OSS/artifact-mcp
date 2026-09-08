@@ -696,6 +696,59 @@ pub fn add_email_member(conn: &Connection, org: &str, email: &str) -> Result<Str
     Ok(email)
 }
 
+/// Add a member or update its display name without moving it between organizations.
+pub fn add_email_member_with_name(
+    conn: &Connection,
+    org: &str,
+    email: &str,
+    display_name: Option<&str>,
+) -> Result<String, AppError> {
+    let Some(display_name) = display_name else {
+        return add_email_member(conn, org, email);
+    };
+    let org = norm_org(org);
+    let email = norm_email(email);
+    if !org_exists(conn, &org)? {
+        return Err(unknown_org(&org));
+    }
+    if !is_valid_email(&email) {
+        return Err(AppError::Validation(format!(
+            "\"{email}\" is not a valid email address."
+        )));
+    }
+    let display_name = normalize_display_name(display_name)?;
+    if let Some(owner) = email_owner(conn, &email)?
+        && owner != org
+    {
+        return Err(email_taken(&email, &owner, false));
+    }
+    conn.execute(
+        "INSERT INTO org_email_members (email,org,display_name) VALUES (?,?,?) ON CONFLICT(email) DO UPDATE SET display_name=excluded.display_name WHERE org_email_members.org=excluded.org",
+        rusqlite::params![email, org, display_name],
+    ).map_err(|error| database_failure("upsert email member", &error))?;
+    Ok(email)
+}
+
+pub fn normalize_display_name(value: &str) -> Result<String, AppError> {
+    if value.chars().any(char::is_control) || js_trim(value).chars().count() > 40 {
+        return Err(AppError::Validation(
+            "display_name must be a single line of at most 40 characters.".into(),
+        ));
+    }
+    Ok(js_trim(value).to_owned())
+}
+
+pub fn email_display_name(conn: &Connection, email: &str) -> Result<Option<String>, AppError> {
+    conn.query_row(
+        "SELECT display_name FROM org_email_members WHERE email = ?",
+        [norm_email(email)],
+        |row| row.get::<_, String>(0),
+    )
+    .optional()
+    .map(|v| v.filter(|s| !s.is_empty()))
+    .map_err(|error| database_failure("read email display name", &error))
+}
+
 /// `removeEmailMember(org, email)` — [lib/orgs.js:165-167]
 ///
 /// # Errors
@@ -1077,6 +1130,38 @@ impl OrgStore {
         Ok(EmailAddress(value))
     }
 
+    pub async fn add_email_member_with_name_audited(
+        &self,
+        org: OrgId,
+        email: EmailAddress,
+        display_name: Option<String>,
+        audit: MutationAudit,
+        audit_key: [u8; 32],
+    ) -> Result<EmailAddress, AppError> {
+        let value = self
+            .audited_org_value(
+                org,
+                email.0,
+                audit,
+                audit_key,
+                "org.member.add",
+                "member_added",
+                move |conn, org, email| {
+                    add_email_member_with_name(conn, org, email, display_name.as_deref())
+                },
+            )
+            .await?;
+        Ok(EmailAddress(value))
+    }
+
+    pub async fn email_display_name(
+        &self,
+        email: &EmailAddress,
+    ) -> Result<Option<String>, AppError> {
+        let email = email.0.clone();
+        db::interact(&self.pool, move |conn| email_display_name(conn, &email)).await
+    }
+
     /// See [`remove_email_member`].
     ///
     /// # Errors
@@ -1286,7 +1371,7 @@ impl OrgStore {
         audit_key: [u8; 32],
         operation: &'static str,
         classification: &'static str,
-        mutation: fn(&Connection, &str, &str) -> Result<String, AppError>,
+        mutation: impl FnOnce(&Connection, &str, &str) -> Result<String, AppError> + Send + 'static,
     ) -> Result<String, AppError> {
         let target = org.0.clone();
         let audit = audit.for_target_tenant(&target)?;
