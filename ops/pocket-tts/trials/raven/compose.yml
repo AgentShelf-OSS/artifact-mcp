@@ -1,0 +1,93 @@
+services:
+  prepare:
+    image: homelab/artifact-raven:abd26158-trial-1
+    build: .
+    command: [bash, tools/prepare_models.sh]
+    volumes:
+      - ./models:/raven/models
+    read_only: true
+    tmpfs: ['/tmp:size=1536m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: '2.0'
+    mem_limit: 4g
+    pids_limit: 256
+    restart: 'no'
+  trial:
+    image: homelab/artifact-raven:abd26158-trial-1
+    command: [python, /trial/benchmark.py]
+    volumes:
+      - ./models:/raven/models:ro
+      - ./voices:/voices
+      - ./results:/results
+      - ./benchmark.py:/trial/benchmark.py:ro
+    network_mode: none
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: '2.0'
+    mem_limit: 3g
+    pids_limit: 128
+    restart: 'no'
+  baseline:
+    image: homelab/artifact-pocket:3.1.0-timestamped-1
+    entrypoint: [python, /trial/benchmark.py]
+    environment:
+      ENGINE: pocket
+      HF_HOME: /models/huggingface
+      HF_HUB_OFFLINE: '1'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    volumes:
+      - /opt/docker/artifact-pocket-tts/models:/models:ro
+      - ./results:/results
+      - ./benchmark.py:/trial/benchmark.py:ro
+    network_mode: none
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: '2.0'
+    mem_limit: 3g
+    pids_limit: 128
+    restart: 'no'
+  raven:
+    image: homelab/artifact-raven:abd26158-trial-1
+    command: [python, /trial/server.py]
+    ports:
+      - "${RAVEN_BIND_ADDRESS:-127.0.0.1}:8795:8788"
+    environment:
+      TOKEN_FILE: /run/secrets/tts_token
+      RAVEN_TEMPERATURE: "${RAVEN_TEMPERATURE:-0.3}"
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    secrets: [tts_token]
+    volumes:
+      - ./models:/raven/models:ro
+      - ./voices:/voices
+      - ./server.py:/trial/server.py:ro
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: '2.0'
+    mem_limit: 3g
+    pids_limit: 128
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/health', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 300s
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+networks:
+  default:
+    external: true
+    name: artifact-tts-trial_default
+secrets:
+  tts_token:
+    file: ./tts-token

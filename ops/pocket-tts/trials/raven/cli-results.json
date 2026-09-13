@@ -1,0 +1,20 @@
+[
+  {
+    "variant": "default",
+    "first_audio_including_load_seconds": 0.5881779289338738,
+    "total_including_load_seconds": 2.672548688016832,
+    "audio_seconds": 11.24
+  },
+  {
+    "variant": "low-latency",
+    "first_audio_including_load_seconds": 0.53925753000658,
+    "total_including_load_seconds": 2.3507671559927985,
+    "audio_seconds": 11.225
+  },
+  {
+    "variant": "low-latency-trim",
+    "first_audio_including_load_seconds": 0.5774610219523311,
+    "total_including_load_seconds": 2.114569821045734,
+    "audio_seconds": 10.9
+  }
+]

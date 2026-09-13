@@ -1,0 +1,27 @@
+services:
+  trial:
+    image: homelab/artifact-pocket:3.1.0-stream-2
+    entrypoint: [python, /trial/trial.py]
+    environment:
+      PYTHONPATH: /fork
+      HF_HOME: /models/huggingface
+      HF_HUB_OFFLINE: '1'
+      HF_HUB_DISABLE_TELEMETRY: '1'
+      OMP_NUM_THREADS: '1'
+      OPENBLAS_NUM_THREADS: '1'
+    volumes:
+      - ./fork/pocket_tts_timestamped:/fork/pocket_tts_timestamped:ro
+      - ./trial.py:/trial/trial.py:ro
+      - /opt/docker/artifact-pocket-tts/models:/models:ro
+      - ./results:/results
+    network_mode: none
+    read_only: true
+    tmpfs: ['/tmp:size=128m,mode=1777']
+    cap_drop: [ALL]
+    security_opt: ['no-new-privileges:true']
+    cpus: '2.0'
+    mem_limit: 3g
+    pids_limit: 128
+    restart: 'no'
+    healthcheck:
+      disable: true

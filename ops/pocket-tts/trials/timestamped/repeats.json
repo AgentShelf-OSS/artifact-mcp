@@ -1,0 +1,65 @@
+[
+  {
+    "mode": "baseline-int8",
+    "repeat": 0,
+    "first_audio_seconds": 0.07643119490239769,
+    "generation_seconds": 2.574949486996047,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "baseline-int8",
+    "repeat": 1,
+    "first_audio_seconds": 0.07215705700218678,
+    "generation_seconds": 2.569008549908176,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "baseline-int8",
+    "repeat": 2,
+    "first_audio_seconds": 0.08240863005630672,
+    "generation_seconds": 2.7926830200012773,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-plain-int8",
+    "repeat": 0,
+    "first_audio_seconds": 0.07474610605277121,
+    "generation_seconds": 2.8262934290105477,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-plain-int8",
+    "repeat": 1,
+    "first_audio_seconds": 0.07857257791329175,
+    "generation_seconds": 2.718162632896565,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-plain-int8",
+    "repeat": 2,
+    "first_audio_seconds": 0.0987551009748131,
+    "generation_seconds": 2.903677481925115,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-timestamped-int8",
+    "repeat": 0,
+    "first_audio_seconds": 0.08307603804860264,
+    "generation_seconds": 2.7461956910556182,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-timestamped-int8",
+    "repeat": 1,
+    "first_audio_seconds": 0.08631942397914827,
+    "generation_seconds": 3.176209709024988,
+    "audio_seconds": 10.32
+  },
+  {
+    "mode": "fork-timestamped-int8",
+    "repeat": 2,
+    "first_audio_seconds": 0.07798000192269683,
+    "generation_seconds": 2.8055348430061713,
+    "audio_seconds": 10.32
+  }
+]

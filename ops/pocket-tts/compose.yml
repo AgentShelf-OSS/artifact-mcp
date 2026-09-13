@@ -1,6 +1,6 @@
 services:
   speech:
-    image: homelab/artifact-pocket:3.1.0-stream-1
+    image: homelab/artifact-pocket:3.1.0-timestamped-1
     build: .
     restart: unless-stopped
     ports:
@@ -10,6 +10,7 @@ services:
       HF_HUB_DISABLE_TELEMETRY: "1"
       DO_NOT_TRACK: "1"
       TOKEN_FILE: /run/secrets/tts_token
+      POCKET_TTS_QUANTIZE: "${POCKET_TTS_QUANTIZE:-0}"
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
     secrets: [tts_token]

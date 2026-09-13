@@ -1,0 +1,16 @@
+{
+  "repository": "kyutai/tts-voices",
+  "revision": "323332d33f997de8394f24a193e1a76df720e01a",
+  "voices": {
+    "alba": {
+      "url": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/alba-mackenna/casual.wav",
+      "bytes": 958542,
+      "sha256": "46264e83cb99115c3d210260e029117566d9c64f20266d10daa78107759ede3e"
+    },
+    "marius": {
+      "url": "https://huggingface.co/kyutai/tts-voices/resolve/323332d33f997de8394f24a193e1a76df720e01a/voice-donations/Selfie.wav",
+      "bytes": 480044,
+      "sha256": "076968c3122520f3412eb7090e8c1c3f75fe57be1e24a2f96465583d84c71e16"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+source/
+models/
+voices/
+results/
+*.log
+tts-token
+.env

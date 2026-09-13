@@ -27,6 +27,11 @@ const MAX_JSON_BYTES: usize = 8_192;
 const MAX_AUDIO_BYTES: u64 = 4 * 1024 * 1024;
 const MAX_STREAM_BYTES: u64 = 4_100_000;
 const WORKER_TIMEOUT: Duration = Duration::from_secs(60);
+const SOUNDTOUCH_PROCESSOR: &str = include_str!("../../../assets/vendor/soundtouch-processor.js");
+const SOUNDTOUCH_SOURCE_MAP: &str =
+    include_str!("../../../assets/vendor/soundtouch-processor.js.map");
+const SOUNDTOUCH_LICENSE: &str = include_str!("../../../assets/vendor/soundtouch-LICENSE.txt");
+const READER_PITCH_WORKLET: &str = include_str!("../../../assets/reader-pitch-worklet.js");
 
 const VOICES: &[(&str, &str)] = &[
     ("bm_george", "George · Kokoro (British)"),
@@ -56,6 +61,10 @@ const POCKET_VOICES: &[(&str, &str)] = &[
     ("pocket_stuart_bell", "Stuart Bell · Pocket"),
     ("pocket_vera", "Vera · Pocket"),
 ];
+const RAVEN_VOICES: &[(&str, &str)] = &[
+    ("raven_alba", "Alba · RAVEN (trial)"),
+    ("raven_marius", "Marius · RAVEN (trial)"),
+];
 const QWEN_VOICES: &[(&str, &str)] = &[
     ("qwen_reference", "Reference voice · Qwen"),
     ("qwen_ryan", "Ryan · Qwen"),
@@ -72,6 +81,7 @@ const MOSS_VOICES: &[(&str, &str)] = &[
 struct TtsClient {
     endpoint: String,
     stream_endpoint: String,
+    timed_stream_endpoint: String,
     token: String,
     http: reqwest::Client,
     permits: Semaphore,
@@ -79,6 +89,7 @@ struct TtsClient {
 
 static CLIENT: OnceLock<Option<TtsClient>> = OnceLock::new();
 static POCKET_CLIENT: OnceLock<Option<TtsClient>> = OnceLock::new();
+static RAVEN_CLIENT: OnceLock<Option<TtsClient>> = OnceLock::new();
 static QWEN_CLIENT: OnceLock<Option<TtsClient>> = OnceLock::new();
 static MOSS_CLIENT: OnceLock<Option<TtsClient>> = OnceLock::new();
 static ARTIFACTS: OnceLock<BTreeSet<String>> = OnceLock::new();
@@ -119,6 +130,18 @@ fn qwen_client() -> Option<&'static TtsClient> {
         .as_ref()
 }
 
+fn raven_client() -> Option<&'static TtsClient> {
+    RAVEN_CLIENT
+        .get_or_init(|| {
+            let raw_endpoint = std::env::var("RAVEN_TTS_WORKER_URL").ok()?;
+            let token_path = std::env::var("RAVEN_TTS_WORKER_TOKEN_FILE")
+                .ok()
+                .or_else(|| std::env::var("TTS_WORKER_TOKEN_FILE").ok());
+            build_client(raw_endpoint.trim_end_matches('/'), token_path)
+        })
+        .as_ref()
+}
+
 fn moss_client() -> Option<&'static TtsClient> {
     MOSS_CLIENT
         .get_or_init(|| {
@@ -138,6 +161,7 @@ fn build_client(raw_endpoint: &str, token_path: Option<String>) -> Option<TtsCli
     }
     let endpoint = base.join("speech").ok()?.to_string();
     let stream_endpoint = base.join("speech/stream").ok()?.to_string();
+    let timed_stream_endpoint = base.join("speech/stream-timed").ok()?.to_string();
     let token = std::fs::read_to_string(token_path?).ok()?.trim().to_owned();
     if token.is_empty() {
         return None;
@@ -150,6 +174,7 @@ fn build_client(raw_endpoint: &str, token_path: Option<String>) -> Option<TtsCli
     Some(TtsClient {
         endpoint,
         stream_endpoint,
+        timed_stream_endpoint,
         token,
         http,
         permits: Semaphore::new(1),
@@ -170,6 +195,13 @@ fn voices_for_request() -> Vec<Voice> {
             id,
             name,
             streaming: true,
+        }));
+    }
+    if raven_client().is_some() {
+        voices.extend(RAVEN_VOICES.iter().map(|&(id, name)| Voice {
+            id,
+            name,
+            streaming: false,
         }));
     }
     if qwen_client().is_some() {
@@ -216,9 +248,79 @@ fn speech_enabled_for(id: &str, globally_enabled: bool, ids: &BTreeSet<String>) 
 
 pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
+        .route(
+            "/reader-audio/soundtouch-2.1.1.js",
+            get(soundtouch_processor),
+        )
+        .route(
+            "/reader-audio/soundtouch-2.1.1.js.map",
+            get(soundtouch_source_map),
+        )
+        .route(
+            "/reader-audio/soundtouch-processor.js.map",
+            get(soundtouch_source_map),
+        )
+        .route("/reader-audio/LICENSE", get(soundtouch_license))
+        .route("/reader-audio/pitch-v1.js", get(reader_pitch_worklet))
         .route("/{id}/speech", post(synthesize))
         .route("/{id}/speech/stream", post(stream_synthesize))
+        .route("/{id}/speech/stream-timed", post(stream_timed_synthesize))
         .route("/{id}/speech/voices", get(voices))
+}
+
+fn static_audio_asset(
+    body: impl Into<Body>,
+    content_type: &'static str,
+    cache_control: &'static str,
+) -> Response {
+    let body = body.into();
+    (
+        [
+            (header::CONTENT_TYPE, HeaderValue::from_static(content_type)),
+            (
+                header::CACHE_CONTROL,
+                HeaderValue::from_static(cache_control),
+            ),
+            (
+                header::X_CONTENT_TYPE_OPTIONS,
+                HeaderValue::from_static("nosniff"),
+            ),
+        ],
+        body,
+    )
+        .into_response()
+}
+
+async fn soundtouch_processor() -> Response {
+    static_audio_asset(
+        SOUNDTOUCH_PROCESSOR,
+        "application/javascript; charset=utf-8",
+        "public, max-age=3600",
+    )
+}
+
+async fn soundtouch_source_map() -> Response {
+    static_audio_asset(
+        SOUNDTOUCH_SOURCE_MAP,
+        "application/json; charset=utf-8",
+        "public, max-age=3600",
+    )
+}
+
+async fn soundtouch_license() -> Response {
+    static_audio_asset(
+        SOUNDTOUCH_LICENSE,
+        "text/plain; charset=utf-8",
+        "public, max-age=3600",
+    )
+}
+
+async fn reader_pitch_worklet() -> Response {
+    static_audio_asset(
+        format!("{SOUNDTOUCH_PROCESSOR}\n{READER_PITCH_WORKLET}"),
+        "application/javascript; charset=utf-8",
+        "no-cache",
+    )
 }
 
 #[derive(Serialize)]
@@ -275,6 +377,7 @@ async fn synthesize(
     if !enabled_for(&id)
         || (client().is_none()
             && pocket_client().is_none()
+            && raven_client().is_none()
             && qwen_client().is_none()
             && moss_client().is_none())
     {
@@ -373,11 +476,33 @@ async fn stream_synthesize(
     Path(id): Path<String>,
     request: Request,
 ) -> Response {
+    stream_synthesize_impl(deps, id, request, false).await
+}
+
+async fn stream_timed_synthesize(
+    State(deps): State<AppDeps>,
+    Path(id): Path<String>,
+    request: Request,
+) -> Response {
+    stream_synthesize_impl(deps, id, request, true).await
+}
+
+async fn stream_synthesize_impl(
+    deps: AppDeps,
+    id: String,
+    request: Request,
+    timed: bool,
+) -> Response {
     let (_artifact, _) = match authorize(&deps, request.headers(), &id).await {
         Ok(value) => value,
         Err(error) => return error.into_response(),
     };
-    if !enabled_for(&id) || (qwen_client().is_none() && pocket_client().is_none()) {
+    let stream_unavailable = if timed {
+        pocket_client().is_none()
+    } else {
+        pocket_client().is_none() && raven_client().is_none() && qwen_client().is_none()
+    };
+    if !enabled_for(&id) || stream_unavailable {
         return AppError::Unavailable("speech unavailable".to_owned()).into_response();
     }
     let (_, body) =
@@ -389,7 +514,14 @@ async fn stream_synthesize(
         Ok(value) => value,
         Err(error) => return bad_speech(error),
     };
-    if (!is_qwen_voice(voice) || !qwen_voice_enabled(voice)) && !is_pocket_voice(voice) {
+    if timed && !is_pocket_voice(voice) {
+        return bad_speech("bad_voice");
+    }
+    if !timed
+        && (!is_qwen_voice(voice) || !qwen_voice_enabled(voice))
+        && !is_pocket_voice(voice)
+        && !is_raven_voice(voice)
+    {
         return bad_speech("bad_voice");
     }
     let Some(tts) = stream_client_for_voice(voice) else {
@@ -412,7 +544,11 @@ async fn stream_synthesize(
     }
     let response = match tts
         .http
-        .post(&tts.stream_endpoint)
+        .post(if timed {
+            &tts.timed_stream_endpoint
+        } else {
+            &tts.stream_endpoint
+        })
         .bearer_auth(&tts.token)
         .json(&payload)
         .send()
@@ -429,12 +565,32 @@ async fn stream_synthesize(
         )
             .into_response();
     }
+    if timed
+        && matches!(
+            response.status(),
+            StatusCode::NOT_FOUND | StatusCode::UNSUPPORTED_MEDIA_TYPE
+        )
+    {
+        return (
+            StatusCode::UNSUPPORTED_MEDIA_TYPE,
+            Json(serde_json::json!({"error":"speech timed unavailable"})),
+        )
+            .into_response();
+    }
     if !response.status().is_success()
         || !response
             .headers()
             .get(header::CONTENT_TYPE)
             .and_then(|v| v.to_str().ok())
-            .is_some_and(|v| v.starts_with("application/vnd.artifact.pcm"))
+            .is_some_and(|v| {
+                if timed {
+                    v.split(';')
+                        .next()
+                        .is_some_and(|value| value.trim() == "application/vnd.artifact.pcm-timed")
+                } else {
+                    v.starts_with("application/vnd.artifact.pcm")
+                }
+            })
         || response
             .content_length()
             .is_some_and(|n| n > MAX_STREAM_BYTES)
@@ -460,7 +616,11 @@ async fn stream_synthesize(
     let mut output = Response::new(Body::from_stream(stream));
     output.headers_mut().insert(
         header::CONTENT_TYPE,
-        HeaderValue::from_static("application/vnd.artifact.pcm"),
+        HeaderValue::from_static(if timed {
+            "application/vnd.artifact.pcm-timed"
+        } else {
+            "application/vnd.artifact.pcm"
+        }),
     );
     output.headers_mut().insert(
         header::CACHE_CONTROL,
@@ -497,6 +657,8 @@ fn client_for_voice(voice: &str) -> Option<&'static TtsClient> {
         client()
     } else if is_pocket_voice(voice) {
         pocket_client()
+    } else if is_raven_voice(voice) {
+        raven_client()
     } else if is_qwen_voice(voice) {
         qwen_client()
     } else if is_moss_voice(voice) {
@@ -511,6 +673,8 @@ fn stream_client_for_voice(voice: &str) -> Option<&'static TtsClient> {
         qwen_client()
     } else if is_pocket_voice(voice) {
         pocket_client()
+    } else if is_raven_voice(voice) {
+        raven_client()
     } else {
         None
     }
@@ -522,6 +686,10 @@ fn is_kokoro_voice(voice: &str) -> bool {
 
 fn is_pocket_voice(voice: &str) -> bool {
     POCKET_VOICES.iter().any(|(id, _)| *id == voice)
+}
+
+fn is_raven_voice(voice: &str) -> bool {
+    RAVEN_VOICES.iter().any(|(id, _)| *id == voice)
 }
 
 fn is_qwen_voice(voice: &str) -> bool {
@@ -597,6 +765,7 @@ fn validate_speech_body(body: &OrderedJson) -> Result<(&str, &str, Option<String
     }
     if !is_kokoro_voice(voice)
         && !is_pocket_voice(voice)
+        && !is_raven_voice(voice)
         && !is_moss_voice(voice)
         && (!is_qwen_voice(voice) || !qwen_voice_enabled(voice))
     {
@@ -619,12 +788,14 @@ mod tests {
     fn fixed_voice_contract_is_unique() {
         assert_eq!(VOICES.len(), 3);
         assert_eq!(POCKET_VOICES.len(), 21);
+        assert_eq!(RAVEN_VOICES.len(), 2);
         assert_eq!(QWEN_VOICES.len(), 3);
         assert_eq!(MOSS_VOICES.len(), 5);
         assert!(
             VOICES
                 .iter()
                 .chain(POCKET_VOICES.iter())
+                .chain(RAVEN_VOICES.iter())
                 .chain(QWEN_VOICES.iter())
                 .chain(MOSS_VOICES.iter())
                 .all(|(id, _)| { id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') })
@@ -653,6 +824,8 @@ mod tests {
         );
         assert!(is_pocket_voice("pocket_alba"));
         assert!(!is_pocket_voice("alba"));
+        assert!(is_raven_voice("raven_alba"));
+        assert!(!is_raven_voice("alba"));
         let qwen = OrderedJson::Object(vec![
             ("text".into(), OrderedJson::String("hi".into())),
             ("voice".into(), OrderedJson::String("qwen_reference".into())),

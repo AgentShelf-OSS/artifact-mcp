@@ -1,6 +1,6 @@
 services:
   artifact-mcp:
-    image: ${ARTIFACT_MCP_IMAGE:-artifact-mcp:1.8.0}
+    image: ${ARTIFACT_MCP_IMAGE:-artifact-mcp:1.9.0}
     build:
       context: .
       dockerfile: Dockerfile.rust

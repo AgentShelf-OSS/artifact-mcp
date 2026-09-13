@@ -1,0 +1,40 @@
+{
+  "date": "2026-09-12",
+  "host": "VM310 (192.168.0.110)",
+  "image": "homelab/artifact-pocket:3.1.0-stream-1",
+  "torch": "2.8.0 CPU",
+  "model": "Pocket TTS 3.1.0 english_2026-04",
+  "cpu_quota": "2.0",
+  "memory_limit": "3 GiB",
+  "text_characters": 662,
+  "voices": ["alba", "marius"],
+  "notes": [
+    "Each mode ran in a fresh isolated container with the same read-only model cache and no network.",
+    "Pass 1 is cold generation after model load; pass 2 is a warm generation in the same process.",
+    "Peak RSS is process-level ru_maxrss and does not measure model tensor memory separately.",
+    "The host was not reserved exclusively; concurrent host work can affect wall-clock timings.",
+    "Audio is stochastic, so valid output does not replace human listening for quality comparison."
+  ],
+  "float32": {
+    "load_seconds": 1.1317,
+    "peak_rss_mb": 982.5,
+    "sample_rate": 24000,
+    "results": [
+      {"voice": "alba", "pass": 1, "first_audio_seconds": 0.2368, "generation_seconds": 15.0029, "audio_seconds": 33.44, "rtf": 0.4487, "frames": 418, "valid": true},
+      {"voice": "alba", "pass": 2, "first_audio_seconds": 0.2061, "generation_seconds": 14.9614, "audio_seconds": 33.28, "rtf": 0.4496, "frames": 416, "valid": true},
+      {"voice": "marius", "pass": 1, "first_audio_seconds": 0.198, "generation_seconds": 13.3211, "audio_seconds": 31.6, "rtf": 0.4216, "frames": 395, "valid": true},
+      {"voice": "marius", "pass": 2, "first_audio_seconds": 0.1464, "generation_seconds": 11.7517, "audio_seconds": 33.28, "rtf": 0.3531, "frames": 416, "valid": true}
+    ]
+  },
+  "int8": {
+    "load_seconds": 1.3901,
+    "peak_rss_mb": 982.6,
+    "sample_rate": 24000,
+    "results": [
+      {"voice": "alba", "pass": 1, "first_audio_seconds": 0.1061, "generation_seconds": 8.2457, "audio_seconds": 34.0, "rtf": 0.2425, "frames": 425, "valid": true},
+      {"voice": "alba", "pass": 2, "first_audio_seconds": 0.0857, "generation_seconds": 7.9867, "audio_seconds": 33.2, "rtf": 0.2406, "frames": 415, "valid": true},
+      {"voice": "marius", "pass": 1, "first_audio_seconds": 0.0978, "generation_seconds": 8.3158, "audio_seconds": 34.56, "rtf": 0.2406, "frames": 432, "valid": true},
+      {"voice": "marius", "pass": 2, "first_audio_seconds": 0.0877, "generation_seconds": 8.8737, "audio_seconds": 34.64, "rtf": 0.2562, "frames": 433, "valid": true}
+    ]
+  }
+}

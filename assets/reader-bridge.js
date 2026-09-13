@@ -5,11 +5,12 @@
   const excluded = 'script,style,noscript,template,nav,form,input,button,select,textarea,label,[hidden],[aria-hidden="true"],[data-artifact-readable="false"],[role="navigation"],[role="toolbar"]';
   const blockTags = new Set('H1 H2 H3 H4 H5 H6 P LI DT DD BLOCKQUOTE PRE FIGCAPTION CAPTION TD TH DIV SECTION ARTICLE MAIN BODY HEADER FOOTER'.split(' '));
   const ids = new WeakMap();
-  let snapshot = new Map(), active = null, signature = null, timer, selection = '', point = null, pickMode = false, pickedElement = null, targetFrame = 0;
+  let snapshot = new Map(), active = null, signature = null, timer, selection = '', selectionRange = null, playbackSelectionRange = null, point = null, pickMode = false, pickedElement = null, targetFrame = 0;
   const post = message => window.parent.postMessage(message, '*');
+  const wordSources = new Map();
   const normalize = text => text.replace(/\s+/g, ' ').trim();
   const style = document.createElement('style');
-  style.textContent = '[data-artifact-reader-target]{outline:1px dashed #9b681f!important;outline-offset:4px;background-color:rgba(181,107,44,.18)!important;border-radius:2px} [data-artifact-reader-active]{outline:2px solid #b56b2c!important;outline-offset:3px;background-color:rgba(181,107,44,.12)!important}';
+  style.textContent = '[data-artifact-reader-target]{outline:1px dashed #9b681f!important;outline-offset:4px;background-color:rgba(181,107,44,.18)!important;border-radius:2px} [data-artifact-reader-active]{outline:2px solid #b56b2c!important;outline-offset:3px;background-color:rgba(181,107,44,.12)!important} ::highlight(artifact-reader-passage){background-color:rgba(181,107,44,.24);color:inherit} ::highlight(artifact-reader-word){background-color:rgba(255,194,74,.75);color:inherit;border-radius:2px}';
   (document.head || document.documentElement).appendChild(style);
   function allowed(element) {
     if (!element || element.closest(excluded)) return false;
@@ -19,11 +20,12 @@
     }
     return true;
   }
-  function scanRoot(root, range) {
+  function scanRoot(root, range, mapPositions = false) {
     const groups = []; let current = null, chars = 0, truncated = false;
-    function append(text, owner) {
+    function append(text, owner, node, start) {
       if (current && current.element === owner) current.text += text;
-      else { current = { element: owner, text }; groups.push(current); }
+      else { current = { element: owner, text, positions:[] }; groups.push(current); }
+      if (mapPositions) for (let i = 0; i < text.length; i++) current.positions.push({node, offset:start + i});
       chars += text.length;
     }
     function walk(node, owner) {
@@ -34,18 +36,27 @@
           let end = range && range.endContainer === node ? range.endOffset : node.length;
           const text = node.data.slice(start, end);
           if (text.length > MAX_CHARS - chars) truncated = true;
-          append(text.slice(0, MAX_CHARS - chars), owner);
+          append(text.slice(0, MAX_CHARS - chars), owner, node, start);
         }
       } else if (node.nodeType === Node.ELEMENT_NODE && allowed(node)) {
         const isBlock = blockTags.has(node.tagName) || ['block', 'flex', 'grid', 'table-row'].includes(getComputedStyle(node).display);
         if (isBlock) current = null;
         for (const child of node.childNodes) walk(child, isBlock ? node : owner);
-        if (node.tagName === 'BR' && current) current.text += ' ';
+        if (node.tagName === 'BR' && current) { current.text += ' '; if (mapPositions) current.positions.push(null); }
         if (isBlock) current = null;
       }
     }
     walk(root, root);
-    return { groups: groups.map(g => ({ element: g.element, text: normalize(g.text) })).filter(g => g.text), truncated };
+    return { groups: groups.map(g => {
+      if (!mapPositions) return {element:g.element, text:normalize(g.text)};
+      let text = '', pending = false; const positions = [];
+      for (let i = 0; i < g.text.length; i++) {
+        if (/\s/.test(g.text[i])) { if (text) pending = true; continue; }
+        if (pending) { text += ' '; positions.push(null); pending = false; }
+        text += g.text[i]; positions.push(g.positions[i]);
+      }
+      return {element:g.element, text, positions};
+    }).filter(g => g.text), truncated };
   }
   function scan(range) {
     if (range) return scanRoot(document.body, range);
@@ -102,7 +113,8 @@
     return { start, end, label: isHeading(heading) ? normalize(heading.innerText || heading.textContent || '') : null };
   }
   function content(mode, full) {
-    if (mode === 'selection') { signature = scan().groups.map(g => g.text).join('\n'); return { blocks: selection ? [{ id: 'selection', text: selection }] : [], truncated: selection.length >= MAX_CHARS }; }
+    wordSources.clear();
+    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; signature = scan().groups.map(g => g.text).join('\n'); return { blocks: selection ? [{ id: 'selection', text: selection }] : [], truncated: selection.length >= MAX_CHARS }; }
     const found = scan(); snapshot = new Map();
     let blocks = found.groups.map((group, ordinal) => {
       const id = 'r' + ordinal; snapshot.set(id, group.element);
@@ -136,12 +148,55 @@
   }
   function highlight(id) {
     if (active) active.removeAttribute('data-artifact-reader-active');
+    clearWordHighlight();
+    if (id === null) { clearPassageHighlight(); playbackSelectionRange = null; wordSources.clear(); }
+    else if (id === 'selection' && playbackSelectionRange) cssHighlight('artifact-reader-passage', playbackSelectionRange);
+    else clearPassageHighlight();
     active = snapshot.get(id) || null;
     if (active) {
       active.setAttribute('data-artifact-reader-active', '');
       const box = active.getBoundingClientRect();
       if (box.top < 0 || box.bottom > innerHeight) active.scrollIntoView({ block: 'center' });
     }
+  }
+  function cssHighlight(name, range) {
+    if (typeof CSS === 'undefined' || typeof CSS.highlights?.set !== 'function' || typeof Highlight !== 'function') return false;
+    if (range) CSS.highlights.set(name, new Highlight(range)); else CSS.highlights.delete(name);
+    return true;
+  }
+  function clearWordHighlight() { cssHighlight('artifact-reader-word', null); }
+  function clearPassageHighlight() { cssHighlight('artifact-reader-passage', null); }
+  function mappedSource(id) {
+    if (wordSources.has(id)) return wordSources.get(id);
+    const root = id === 'selection' ? document.body : snapshot.get(id);
+    if (!root || !root.isConnected || id === 'selection' && !playbackSelectionRange) return null;
+    const groups = scanRoot(root, id === 'selection' ? playbackSelectionRange : null, true).groups;
+    const source = {text:'', positions:[]};
+    for (const group of groups) {
+      if (source.text) { source.text += ' '; source.positions.push(null); }
+      source.text += group.text; for (const position of group.positions) source.positions.push(position);
+    }
+    wordSources.set(id, source); return source;
+  }
+  function wordRange(id, text, offset, start, end) {
+    if (typeof text !== 'string' || text.length > 3000 || !Number.isInteger(offset) ||
+        !Number.isInteger(start) || !Number.isInteger(end) || offset < 0 || start < 0 || end <= start || end > text.length) return null;
+    const source = mappedSource(id);
+    if (!source || source.text.slice(offset, offset + text.length) !== text) return null;
+    const first = source.positions[offset + start], last = source.positions[offset + end - 1];
+    if (!first?.node?.isConnected || !last?.node?.isConnected) return null;
+    const range = document.createRange(); range.setStart(first.node, first.offset); range.setEnd(last.node, last.offset + 1); return range;
+  }
+  function highlightWord(data) {
+    let range;
+    try { range = wordRange(data.id, data.text, data.offset, data.start, data.end); } catch (_) {}
+    if (!range) { highlight(data.id); return false; }
+    const applied = cssHighlight('artifact-reader-word', range);
+    if (!applied) return false;
+    if (active) active.removeAttribute('data-artifact-reader-active'); active = null;
+    clearPassageHighlight(); targetResize.disconnect(); clearPicked();
+    if (applied && data.id === 'selection') { const current = getSelection(); if (current) current.removeAllRanges(); }
+    return applied;
   }
   function clearPicked() {
     if (pickedElement) pickedElement.removeAttribute('data-artifact-reader-target');
@@ -165,8 +220,9 @@
   function rememberSelection() {
     const value = getSelection();
     if (value && !value.isCollapsed && value.rangeCount) {
+      selectionRange = value.getRangeAt(0).cloneRange();
       selection = scan(value.getRangeAt(0)).groups.map(g => g.text).join(' ').slice(0, MAX_CHARS);
-    } else if (document.hasFocus()) selection = '';
+    } else if (document.hasFocus()) { selection = ''; selectionRange = null; clearPassageHighlight(); }
   }
   document.addEventListener('selectionchange', rememberSelection);
   document.addEventListener('pointerdown', event => { point = event.target; }, true);
@@ -194,7 +250,8 @@
     const data = event.data;
     if (event.source !== window.parent || !data || typeof data !== 'object' || Array.isArray(data)) return;
     if (data.type === 'reader:hello') { post({ type: 'reader:ready', version: 1 }); return; }
-    if (data.type === 'reader:highlight') { if (data.id === null || typeof data.id === 'string' && data.id.length <= 80) highlight(data.id); return; }
+    if (data.type === 'reader:highlight') { if (data.id === null || typeof data.id === 'string' && data.id.length <= 80) { highlight(data.id); } return; }
+    if (data.type === 'reader:word') { if (typeof data.id === 'string' && data.id.length <= 80) highlightWord(data); return; }
     if (data.type === 'reader:pick-mode') { pickMode = data.enabled === true; if (!pickMode) { targetResize.disconnect(); clearPicked(); } return; }
     if (data.type === 'reader:clear-target') { targetResize.disconnect(); clearPicked(); return; }
     if (data.type === 'reader:outline' && typeof data.requestId === 'string' && data.requestId.length <= 80) { try { post(Object.assign({ type: 'reader:outline', requestId: data.requestId }, outline())); } catch (_) { post({ type: 'reader:error', requestId: data.requestId, message: 'Could not build the reader outline.' }); } return; }
@@ -226,7 +283,7 @@
     timer = setTimeout(() => {
       if (signature === null) return;
       const next = scan().groups.map(g => g.text).join('\n');
-      if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1 }); }
+      if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; selectionRange = null; playbackSelectionRange = null; wordSources.clear(); clearPassageHighlight(); highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1 }); }
     }, 160);
   }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable'] });
   post({ type: 'reader:ready', version: 1 });

@@ -263,6 +263,7 @@
     box.querySelector('#vreader-mini').insertAdjacentHTML('beforeend', '<button id="vreader-mini-resume" type="button" class="vreader-mini-resume" hidden>Resume saved place</button>');
     // Tabler Icons player-play and player-pause, MIT, https://github.com/tabler/tabler-icons.
     box.insertAdjacentHTML('beforeend', '<button id="vreader-inline-read" class="vreader-inline-read" type="button" aria-label="Read from here" title="Read from here" hidden><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13 -8l-13 -8" /></svg><span>Read from here</span></button>');
+    box.querySelector('.vreader-utility-row').insertAdjacentHTML('beforeend', '<button id="vreader-replay" type="button" class="vreader-control" disabled title="Replay the current sentence when word timings are available">Replay sentence</button>');
     const share = document.getElementById('vshare-toggle'); share.parentNode.insertBefore(box, share);
     const get = name => box.querySelector('#vreader-' + name), audio = get('audio');
     let ready = false, enabled = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
@@ -353,7 +354,7 @@
     function mediaOffset() {
       if (!stream) return loaded === position ? audio.currentTime || 0 : pendingSeek;
       let offset = stream.baseOffset;
-      for (const f of stream.frames) offset += f.played ? f.buffer.duration : Math.min(f.buffer.duration, f.offset + (f.source ? Math.max(0, audioContext.currentTime - f.start) * f.rate : 0));
+      for (const f of stream.frames) offset += f.played ? f.buffer.duration : Math.min(f.buffer.duration, f.offset + (f.source ? Math.max(0, audioContext.currentTime - f.start - (stream.latency || 0)) * f.rate : 0));
       return offset;
     }
     function savePlace() {
@@ -375,7 +376,7 @@
       return false;
     }
     setInterval(() => { checkSleep(); savePlace(); }, 2000);
-    window.addEventListener('pagehide', savePlace);
+    window.addEventListener('pagehide', () => stop('Paused', true));
     document.addEventListener('visibilitychange', () => { checkSleep(); savePlace(); });
 
     const readingStyles = {
@@ -430,7 +431,7 @@
       const label = chapter?.label || entry?.sectionLabel || (entry ? 'paragraph ' + (entry.ordinal + 1) : '');
       return (wants ? 'Reading' : 'Paused') + (label ? ' · ' + label : '');
     }
-    function paint() { get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
+    function paint() { get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
       const icon = wants
         ? '<path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" /><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />'
         : '<path d="M7 4v16l13 -8l-13 -8" />';
@@ -447,12 +448,37 @@
       get('target-read').disabled = get('mini-target-read').disabled = get('inline-read').disabled = !canJump;
       placeTargetAction();
     }
+    function replaySentenceStart() {
+      // Reuse only the current stream's decoded audio. No new audio cache,
+      // storage writes, network request, or synthesis is needed for replay.
+      if (!stream?.wordMapping || !stream.words.length || typeof Intl.Segmenter !== 'function') return null;
+      const entry = queue[position];
+      if (!entry || loaded !== position) return null;
+      const time = mediaOffset();
+      const word = stream.words.findLast(w => w.start <= time);
+      if (!word) return null;
+      const sentence = Array.from(new Intl.Segmenter('en', {granularity:'sentence'}).segment(entry.text))
+        .find(s => word.textStart >= s.index && word.textStart < s.index + s.segment.length);
+      if (!sentence) return null;
+      const first = stream.words.find(w => w.textStart >= sentence.index);
+      // A stream resumed partway through a sentence may not retain its start.
+      return first && first.start >= stream.baseOffset ? first.start : null;
+    }
     function clearStream() {
       if (!stream) return;
+      cancelAnimationFrame(stream.highlightFrame);
       if (stream.reader) stream.reader.cancel().catch(() => {});
       stream.sources.forEach(source => { try { source.onended = null; source.stop(); } catch (_) {} });
+      stream.pitch?.disconnect(); if (stream.silence) { stream.silence.stop(); stream.silence.disconnect(); }
       stream.sources.clear(); if (stream.finish) stream.finish.resolve(); stream = null; loaded = -1;
       box.removeAttribute('data-stream-state'); box.removeAttribute('data-played-samples'); box.removeAttribute('data-buffered-samples');
+    }
+    let pitchModule = null, pitchReady = false;
+    function ensurePitchModule(context) {
+      if (!context.audioWorklet || !window.AudioWorkletNode) return Promise.resolve(false);
+      if (!pitchModule) pitchModule = context.audioWorklet.addModule('/reader-audio/pitch-v1.js')
+        .then(() => pitchReady = true).catch(() => false);
+      return pitchModule;
     }
     function ensureAudioContext() {
       if (!window.AudioContext && !window.webkitAudioContext) return null;
@@ -486,7 +512,7 @@
     }
     function chunks(text) {
       const limit = /^moss_/.test(voice) ? 300 : 600;
-      if (!/^pocket_/.test(voice) || typeof Intl.Segmenter !== 'function') return splitLongText(text, limit);
+      if (!/^(pocket_|raven_)/.test(voice) || typeof Intl.Segmenter !== 'function') return splitLongText(text, limit);
       // Keep complete sentences together. Only split within a sentence when it
       // exceeds the worker chunk limit, including text without punctuation.
       const result = []; let pending = '';
@@ -524,13 +550,20 @@
       cache.set(index, work); work.catch(() => { if (cache.get(index) === work) cache.delete(index); });
       return work;
     }
+    // RAVEN trial uses complete paragraph WAVs while its live-stream buzzing is investigated.
     function streamingVoice() { return /^(qwen_|pocket_)/.test(voice); }
     function fetchStream(index) {
       if (streamRequests.has(index)) return streamRequests.get(index);
       const signal = controller.signal, entry = queue[index], chosenVoice = voice;
       const work = (async () => {
         for (let attempt = 0; attempt < 10; attempt++) {
-          const response = await fetch('/' + encodeURIComponent(artifactId) + '/speech/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal });
+          const timed = /^pocket_/.test(chosenVoice);
+          const options = { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal };
+          let response = await fetch('/' + encodeURIComponent(artifactId) + (timed ? '/speech/stream-timed' : '/speech/stream'), options);
+          if (timed && [404, 415].includes(response.status)) {
+            await response.body?.cancel();
+            response = await fetch('/' + encodeURIComponent(artifactId) + '/speech/stream', options);
+          }
           if (response.status !== 429 || attempt === 9) return response;
           await response.body?.cancel(); await delay(500, signal);
         }
@@ -545,28 +578,119 @@
       const context = ensureAudioContext();
       if (!context) return false;
       const token = epoch, signal = controller.signal, entry = queue[index];
+      await ensurePitchModule(context);
+      if (token !== epoch || signal.aborted) return true;
+      // Older/insecure browsers retain native pitch preservation through WAV playback.
+      if (!pitchReady && Number(get('rate').value) !== 1) {
+        const pending = streamRequests.get(index); streamRequests.delete(index);
+        pending?.then(response => response.body?.cancel()).catch(() => {});
+        return false;
+      }
       const startup = streamRequests.has(index) ? 0.01 : 0.2;
       const work = fetchStream(index);
       let response;
       try { response = await work; }
+      catch (error) { error.retryable = true; throw error; }
       finally { if (streamRequests.get(index) === work) streamRequests.delete(index); }
       if (token !== epoch || signal.aborted) { response.body?.cancel().catch(() => {}); return true; }
       if (response.status === 404 || response.status === 415) { await response.body?.cancel(); return false; }
-      if (!response.ok) throw new Error(response.status === 429 ? 'Speech is busy. Press Play to retry.' : 'Speech is unavailable. Press Play to retry.');
+      if (!response.ok) throw Object.assign(new Error(response.status === 429 ? 'Speech is busy. Press Play to resume.' : 'Speech is unavailable. Press Play to resume.'), {retryable:response.status >= 500});
       if (!response.body) return false;
       if (!(response.headers.get('content-type') || '').toLowerCase().startsWith('application/vnd.artifact.pcm')) throw new Error('Invalid streaming audio response.');
       if (token !== epoch || signal.aborted) { response.body.cancel().catch(() => {}); return true; }
+      const timed = (response.headers.get('content-type') || '').toLowerCase().split(';')[0].trim() === 'application/vnd.artifact.pcm-timed';
       const reader = response.body.getReader();
       const seek = pendingSeek; pendingSeek = 0;
-      const state = stream = { baseOffset:seek, received:0, token, index, reader, sources: new Set(), frames: [], pending: new Uint8Array(0), done: false, started: false, bytes: 0, total: 0, played: 0, buffered: 0, cursor: context.currentTime + startup, rate: Number(get('rate').value), finished: null, finish: null };
+      const state = stream = { words:[], wordCursor:0, wordMapping:true, highlightedWord:-1, highlightFrame:0, baseOffset:seek, received:0, token, index, reader, sources: new Set(), frames: [], pending: new Uint8Array(0), done: false, started: false, bytes: 0, total: 0, played: 0, buffered: 0, cursor: context.currentTime + startup, rate: Number(get('rate').value), finished: null, finish: null };
       state.finished = new Promise((resolve, reject) => { state.finish = { resolve, reject }; });
+      state.finished.catch(() => {}); // A processor failure can precede the network terminator.
+      function acceptWord(bytes) {
+        // Timing is optional. A bad text alignment must never interrupt sound.
+        if (!state.wordMapping) return;
+        try {
+          if (bytes.length > 8192) throw new Error('Word event too large');
+          const word = JSON.parse(new TextDecoder('utf-8', {fatal:true}).decode(bytes));
+          if (!word || typeof word.word !== 'string' || !word.word.length || word.word.length > 1500 ||
+              !Number.isInteger(word.index) || word.index < 0 || word.index > 2000 ||
+              !Number.isFinite(word.start) || word.start < 0 || word.start > 90 ||
+              (word.end !== undefined && (!Number.isFinite(word.end) || word.end < word.start || word.end > 90))) throw new Error('Invalid word timing');
+          const previous = state.words[word.index];
+          if (previous) {
+            if (previous.word !== word.word || previous.start !== word.start) throw new Error('Changed word timing');
+            if (word.end !== undefined) previous.end = word.end;
+            paint(); return;
+          }
+          if (word.index !== state.words.length || word.start < (state.words.at(-1)?.start || 0)) throw new Error('Out of order timing');
+          const start = entry.text.indexOf(word.word, state.wordCursor);
+          if (start < 0 || /[\p{L}\p{N}]/u.test(entry.text.slice(state.wordCursor, start))) throw new Error('Unmapped text');
+          state.wordCursor = start + word.word.length;
+          state.words.push({...word, textStart:start, textEnd:state.wordCursor}); paint();
+        } catch (_) {
+          state.wordMapping = false; state.words = [];
+          if (state.highlightedWord !== -1) send('reader:highlight', {id:entry.id});
+          state.highlightedWord = -1;
+        }
+      }
+      function highlightPlayback() {
+        if (stream !== state || token !== epoch) return;
+        // AudioContext time freezes on pause. Wait through initial buffering and
+        // the pitch processor's delay before replacing the passage highlight.
+        if (wants && context.state === 'running' && state.wordMapping &&
+            state.frames.some(f => f.played || f.source && context.currentTime >= f.start + (state.latency || 0))) {
+          const time = mediaOffset();
+          let current = -1;
+          for (let i = 0; i < state.words.length; i++) {
+            const word = state.words[i], end = word.end ?? state.words[i + 1]?.start ?? Infinity;
+            if (word.start <= time && time < end) current = i;
+            if (word.start > time) break;
+          }
+          if (current >= 0 && current !== state.highlightedWord) {
+            const word = state.words[current]; state.highlightedWord = current; get('replay').disabled = replaySentenceStart() === null;
+            send('reader:word', {id:entry.id, text:entry.text, offset:entry.textOffset, start:word.textStart, end:word.textEnd});
+          }
+        }
+        state.highlightFrame = requestAnimationFrame(highlightPlayback);
+      }
+      state.highlightFrame = requestAnimationFrame(highlightPlayback);
+      function resetPitch(rate) {
+        state.pitch?.disconnect();
+        if (state.silence) { state.silence.stop(); state.silence.disconnect(); }
+        state.pitch = null; state.silence = null; state.latency = rate === 1 ? 0 : 0.2;
+        if (rate === 1) return;
+        const node = state.pitch = new AudioWorkletNode(context, 'artifact-pitch', {
+          outputChannelCount: [1], parameterData: {pitch:1, pitchSemitones:0, playbackRate:rate}
+        });
+        const fail = () => {
+          if (stream !== state || state.pitch !== node) return;
+          state.audioError = new Error('Audio playback failed. Press Play to resume.');
+          reader.cancel().catch(() => {}); state.finish.reject(state.audioError);
+        };
+        node.onprocessorerror = fail;
+        node.port.onmessage = event => { if (event.data?.type === 'error') fail(); };
+        node.connect(context.destination);
+        // Keep feeding silence between frames and after EOS to drain the DSP tail.
+        state.silence = context.createConstantSource(); state.silence.offset.value = 0;
+        state.silence.connect(node); state.silence.start();
+      }
+      function stopFrame(frame) {
+        for (const source of [frame.source, frame.marker]) if (source) {
+          source.onended = null; try { source.stop(); } catch (_) {} state.sources.delete(source);
+        }
+        frame.source = null; frame.marker = null;
+      }
       if (!wants && context.state === 'running') context.suspend().catch(() => {});
       function scheduleBuffer(frame, rate, start) {
         const source = context.createBufferSource(); source.buffer = frame.buffer; source.playbackRate.value = rate;
-        source.connect(context.destination); frame.source = source; frame.rate = rate; frame.start = start; state.sources.add(source);
-        source.onended = () => {
+        source.connect(state.pitch || context.destination); frame.source = source; frame.rate = rate; frame.start = start; state.sources.add(source);
+        const marker = state.latency ? context.createBufferSource() : source;
+        if (marker !== source) {
+          marker.buffer = context.createBuffer(1, 1, context.sampleRate);
+          marker.connect(context.destination); frame.marker = marker; state.sources.add(marker);
+          marker.start(start + (frame.buffer.duration - (frame.offset || 0)) / rate + state.latency);
+        }
+        marker.onended = () => {
           if (stream !== state || frame.source !== source) return;
-          frame.source = null; state.sources.delete(source);
+          frame.source = null; frame.marker = null; state.sources.delete(source); state.sources.delete(marker);
           if (!frame.played) { frame.played = true; state.played += frame.samples; state.buffered = Math.max(0, state.buffered - frame.samples); }
           box.dataset.playedSamples = String(state.played); box.dataset.bufferedSamples = String(state.buffered);
           if (state.done && !state.sources.size) state.finish.resolve();
@@ -586,14 +710,15 @@
         const start = Math.max(state.cursor, context.currentTime + (state.started ? 0 : startup)); state.started = true; state.cursor = start + buffer.duration / state.rate;
         state.frames.push(frame); state.total += frame.samples; state.buffered += frame.samples; scheduleBuffer(frame, state.rate, start);
         loaded = index; loading = false; box.dataset.streamState = wants ? 'playing' : 'paused'; box.dataset.bufferedSamples = String(state.buffered); box.dataset.playedSamples = String(state.played);
-        send('reader:highlight', { id: entry.id }); status(readingMessage()); paint();
+        status(readingMessage()); paint();
       }
       state.seekTo = function(target) {
         if (target < state.baseOffset) return false;
+        resetPitch(state.rate);
         let cursor = context.currentTime + 0.01, offset = state.baseOffset;
         state.played = 0; state.buffered = 0;
         for (const frame of state.frames) {
-          if (frame.source) { frame.source.onended = null; try { frame.source.stop(); } catch (_) {} state.sources.delete(frame.source); frame.source = null; }
+          stopFrame(frame);
           frame.offset = Math.min(frame.buffer.duration, Math.max(0, target - offset)); offset += frame.buffer.duration;
           frame.played = frame.offset >= frame.buffer.duration;
           if (frame.played) state.played += frame.samples;
@@ -602,29 +727,31 @@
         state.cursor = cursor; return true;
       };
       state.changeRate = function(rate) {
-        const now = context.currentTime; let cursor = now + 0.01;
-        state.rate = rate;
-        state.frames.forEach(frame => {
-          if (frame.played) return;
-          if (frame.source) {
-            frame.offset += Math.min(frame.buffer.duration - frame.offset, Math.max(0, now - frame.start) * frame.rate);
-            frame.source.onended = null;
-            try { frame.source.stop(); } catch (_) {}
-            state.sources.delete(frame.source); frame.source = null;
-          }
+        const now = context.currentTime;
+        for (const frame of state.frames) {
+          if (frame.played) continue;
+          frame.offset += Math.min(frame.buffer.duration - frame.offset, Math.max(0, now - frame.start - state.latency) * frame.rate);
+          stopFrame(frame);
+        }
+        resetPitch(rate); state.rate = rate;
+        let cursor = now + 0.01;
+        for (const frame of state.frames) {
+          if (frame.played) continue;
           if (frame.offset >= frame.buffer.duration - 0.00001) {
-            frame.played = true; state.played += frame.samples; state.buffered -= frame.samples; return;
+            frame.played = true; state.played += frame.samples; state.buffered -= frame.samples; continue;
           }
-          scheduleBuffer(frame, rate, cursor);
-          cursor += (frame.buffer.duration - frame.offset) / rate;
-        });
+          scheduleBuffer(frame, rate, cursor); cursor += (frame.buffer.duration - frame.offset) / rate;
+        }
         state.cursor = cursor;
         if (state.done && !state.sources.size) state.finish.resolve();
       };
 
       try {
+        resetPitch(state.rate);
         for (;;) {
-          const result = await reader.read();
+          let result;
+          try { result = await reader.read(); }
+          catch (error) { error.retryable = true; throw error; }
           if (result.done) break;
           const incoming = new Uint8Array(result.value), combined = new Uint8Array(state.pending.length + incoming.length);
           combined.set(state.pending); combined.set(incoming, state.pending.length); state.pending = combined;
@@ -635,11 +762,16 @@
             if (length > 192 * 1024) throw new Error('Streaming frame is too large.');
             if (state.bytes + length > 4 * 1024 * 1024) throw new Error('Streaming audio is too large.');
             if (state.pending.length < length + 4) break;
-            const frame = state.pending.slice(4, length + 4); state.pending = state.pending.slice(length + 4); state.bytes += length; schedule(frame);
+            const frame = state.pending.slice(4, length + 4); state.pending = state.pending.slice(length + 4); state.bytes += length;
+            if (!timed) schedule(frame);
+            else if (frame[0] === 1) schedule(frame.slice(1));
+            else if (frame[0] === 2) acceptWord(frame.slice(1));
+            else throw new Error('Invalid timed stream frame.');
           }
           if (state.done) { if (state.pending.length) throw new Error('Trailing data after streaming terminator.'); await reader.cancel(); break; }
         }
-        if (!state.done || state.pending.length || !state.received) throw new Error('Incomplete streaming audio response.');
+        if (state.audioError) throw state.audioError;
+        if (!state.done || state.pending.length || !state.received) throw Object.assign(new Error('Audio was interrupted. Press Play to resume.'), {retryable:true});
         loading = false;
         // Generation is finished, but audio is still playing: give the next
         // paragraph that remaining playback time to prepare its first frames.
@@ -651,8 +783,10 @@
         if (wants) loadCurrent();
         return true;
       } catch (error) {
-        if (token !== epoch || (error && error.name === 'AbortError')) return true;
-        clearStream();
+        if (token !== epoch || signal.aborted) return true;
+        // Capture what was heard, not how much audio arrived over the network.
+        const offset = mediaOffset(); savePlace();
+        clearStream(); pendingSeek = offset;
         throw error;
       }
     }
@@ -660,7 +794,7 @@
       try { await audio.play(); }
       catch (_) { wants = false; status('Press Play to start audio.'); paint(); }
     }
-    async function loadCurrent() {
+    async function loadCurrent(retry = 0) {
       if (loading) return;
       if (checkSleep()) return; armSleep();
       const token = epoch, index = position;
@@ -673,7 +807,7 @@
         const finishedKey = queueKey; stop('Finished'); try { if (finishedKey) localStorage.removeItem(finishedKey); } catch (_) {} refreshSaved(); return;
       }
       playbackConfig = {voice, mode, style:get('style').value, custom:get('custom').value};
-      loading = true; status('Preparing audio…'); paint();
+      loading = true; send('reader:highlight', {id:queue[index].id}); status('Preparing audio…'); paint();
       try {
         if (streamingVoice() && ensureAudioContext()) {
           const streamed = await streamCurrent(index);
@@ -686,7 +820,7 @@
         currentUrl = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
         const seek = pendingSeek; pendingSeek = 0;
         audio.onloadedmetadata = () => { if (token !== epoch) return; durations.set(index, audio.duration); audio.currentTime = Math.min(seek, Math.max(0, audio.duration - 0.01)); };
-        audio.src = currentUrl; audio.playbackRate = Number(get('rate').value); loaded = index;
+        audio.src = currentUrl; audio.preservesPitch = true; audio.playbackRate = Number(get('rate').value); loaded = index;
         audio.onended = () => { if (token !== epoch) return; savePlace(); cache.delete(position); position++; loaded = -1; if (wants) loadCurrent(); };
         send('reader:highlight', { id: queue[index].id });
         status(readingMessage());
@@ -695,7 +829,16 @@
         if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) synth(index + 1).catch(() => {});
       } catch (error) {
         if (token !== epoch) return;
-        loading = false; wants = false; status(error.message || 'Speech is unavailable.'); paint();
+        if (error.retryable && retry < 2 && wants) {
+          loading = true; status('Audio interrupted. Reconnecting…'); paint();
+          try { await delay(750 * (retry + 1), controller.signal); }
+          catch (_) { return; }
+          if (token !== epoch) return;
+          loading = false;
+          if (wants) return loadCurrent(retry + 1);
+          status('Paused. Press Play to resume.'); paint(); return;
+        }
+        loading = false; wants = false; status(error.message || 'Speech is unavailable. Press Play to resume.'); paint();
       }
     }
     function requestContent(nextChapter, preview = false) {
@@ -739,6 +882,15 @@
     };
     get('stop').onclick = () => { stop(); cancelSleep(); };
     get('sleep').onchange = () => { sleepDeadline = 0; sleepBoundary = null; if (wants || loaded >= 0) armSleep(); checkSleep(); };
+    get('replay').onclick = () => {
+      const start = replaySentenceStart();
+      if (start === null || !stream?.seekTo(start)) return;
+      stream.highlightedWord = -1;
+      wants = true;
+      if (audioContext?.state === 'suspended') audioContext.resume().catch(() => {});
+      box.dataset.streamState = 'playing';
+      status(readingMessage()); savePlace(); paint();
+    };
     get('rewind').onclick = () => {
       let target = position, offset = mediaOffset() - 15;
       while (offset < 0 && target > 0 && durations.has(target - 1)) offset += durations.get(--target);
@@ -778,7 +930,9 @@
         stop('Preparing preview…', true); preparePreview(); wants = true; loadCurrent();
       } else { wants = true; requestContent(false, true); }
     };
-    get('rate').onchange = () => { savePreferences(); const value = Number(get('rate').value); audio.playbackRate = value; if (stream && stream.changeRate) stream.changeRate(value); paint(); };
+    get('rate').onchange = () => { savePreferences(); const value = Number(get('rate').value); audio.playbackRate = value; if (stream && !pitchReady && value !== 1) {
+        const offset = mediaOffset(), playing = wants; stop('Preparing audio…', true); pendingSeek = offset; wants = playing; loadCurrent();
+      } else if (stream && stream.changeRate) stream.changeRate(value); paint(); };
     audio.onerror = () => { if (audio.getAttribute('src')) stop('Could not play audio. Press Play to retry.'); };
     frame.addEventListener('load', () => { stop(); clearTarget(); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').replaceChildren(new Option('Loading sections…','')); get('outline').disabled = true; ready = false; send('reader:hello'); paint(); });
     window.addEventListener('message', event => {
@@ -822,7 +976,14 @@
       let total = 0;
       if (!Array.isArray(data.blocks) || data.blocks.length > 5000 || data.blocks.some(b => !b || typeof b.id !== 'string' || b.id.length > 80 || typeof b.text !== 'string' || (total += b.text.length) > 500000)) { stop('This page returned too much text.'); return; }
       const saved = restoring; restoring = null;
-      queue = data.blocks.flatMap((b, index) => chunks(b.text).map((text, chunk) => ({ id:b.id, text, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1 })));
+      queue = data.blocks.flatMap((b, index) => {
+        let cursor = 0;
+        return chunks(b.text).map((text, chunk) => {
+          const textOffset = b.text.indexOf(text, cursor);
+          cursor = textOffset < 0 ? b.text.length : textOffset + text.length;
+          return {id:b.id, text, textOffset, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
+        });
+      });
       contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
       if (saved) {
         if (contentFingerprint !== saved.fingerprint) { stop('Content changed. Start reading again.'); return; }
@@ -843,7 +1004,7 @@
     fetch('/' + encodeURIComponent(artifactId) + '/speech/voices').then(r => r.ok ? r.json() : null).then(data => {
       if (!data || !data.enabled || !Array.isArray(data.voices) || !data.voices.length) return;
       const groups = new Map();
-      for (const item of data.voices) { const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); if (!groups.has(label)) groups.set(label, document.createElement('optgroup')); const option = document.createElement('option'); option.value = item.id; option.textContent = item.name.replace(/ · (Kokoro|Pocket|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, ''); groups.get(label).label = label; groups.get(label).appendChild(option); }
+      for (const item of data.voices) { const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /^raven_/.test(item.id) ? 'RAVEN trial' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); if (!groups.has(label)) groups.set(label, document.createElement('optgroup')); const option = document.createElement('option'); option.value = item.id; option.textContent = item.name.replace(/ · (Kokoro|Pocket|RAVEN|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, ''); groups.get(label).label = label; groups.get(label).appendChild(option); }
       groups.forEach(group => get('voice').appendChild(group));
       if (Array.from(get('voice').options).some(option => option.value === savedVoice)) get('voice').value = savedVoice;
       voice = get('voice').value; enabled = true; box.hidden = false; updateStyle(); send('reader:hello'); paint();

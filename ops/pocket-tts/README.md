@@ -1,7 +1,9 @@
 # Pocket TTS comparison worker
 
-Pocket TTS 3.1.0 runs the `english_2026-04` model on CPU beside Kokoro. The native
-viewer groups voices by engine; Kokoro remains the initial default. Enabled Pocket
+The pinned `pocket-tts-timestamped` fork of Pocket TTS 3.1.0 runs the
+`english_2026-04` model on CPU. It preserves the ordinary Pocket API and adds
+word timing events for the timed stream. The current deployment
+uses Pocket exclusively in the native Listen player. Enabled Pocket
 presets include the original Alba, Marius, Javert, Jean, Cosette, Eponine, Fantine,
 and Azelma, plus Anna, Bill Boerst, Caro Davy, Charles, Eve, George, Jane, Mary,
 Michael, Paul, Peter Yearsley, Stuart Bell, and Vera: 21 English voices in total.
@@ -26,7 +28,7 @@ Set `POCKET_TTS_WORKER_URL=http://192.168.0.110:8790` on artifact-mcp and restar
 The server uses `TTS_WORKER_TOKEN_FILE` unless `POCKET_TTS_WORKER_TOKEN_FILE` is set.
 Do not expose worker ports publicly. Browser requests use the authenticated
 artifact server, which holds worker credentials and enforces artifact access.
-Remove the Pocket URL and restart to remove these voices without affecting Kokoro.
+Remove the Pocket URL and restart to remove these voices.
 
 The worker accepts authenticated `POST /speech` with `{text, voice}`. It also
 supports `POST /speech/stream`, returning the artifact framed PCM protocol so
@@ -37,6 +39,13 @@ include the `pocket_` prefix. Limits: 1,500 characters, 8 KiB body, one concurre
 inference, and 512 MiB audio cache. The viewer prepares at most one upcoming chunk.
 Stream output is mono 24 kHz PCM16, in frames of at most 9,600 bytes, with a terminal zero frame;
 the original complete PCM16 WAV endpoint remains available.
+
+`POST /speech/stream-timed` uses the versioned
+`application/vnd.artifact.pcm-timed;v=1` protocol. Each HTTP chunk is a four-byte
+big-endian length followed by a record whose first byte is `1` for PCM16 audio or
+`2` for compact JSON word events. Word events include `word`, `index`, and
+`start`; completed events also include `end`. A zero-length record terminates the
+stream. Timed responses have a separate cache namespace from ordinary PCM.
 
 ## Measured comparison — September 12, 2026
 
@@ -89,3 +98,79 @@ cached as complete audio. WAV and PCM files share one 512 MiB cache budget.
 
 The player remembers voice and speed in browser local storage. Preview paragraph
 reads one paragraph, then restores the reading position without advancing chapters.
+
+## Int8 quantization
+
+The worker supports dynamic int8 quantization through `POCKET_TTS_QUANTIZE`. It is
+enabled in the live deployment after the Alba listening comparison on September 12,
+2026. The Compose fallback remains float32 for deployments without an explicit setting.
+Set `POCKET_TTS_QUANTIZE=1` in the worker’s `.env` and rebuild/recreate with
+`docker compose up -d --build` to apply it. Accepted values are `1`, `0`, `true`, `false`, `yes`, `no`,
+`on`, and `off`. Invalid values fail startup so a deployment cannot silently use
+an unintended model mode. Quantized and float workers use different model IDs and
+cache namespaces, preventing audio generated in one mode from being reused by the
+other. `/health` reports the active mode as `quantized`.
+
+An isolated comparison on VM310 used the same pinned image, Pocket model, two-core
+quota, 3 GiB memory limit, and 662-character synthetic prose passage for both
+`alba` and `marius`:
+
+| Mode | First audio | Generation RTF | Peak RSS | Valid output |
+|---|---:|---:|---:|---|
+| Float32 | 0.146–0.237 s | 0.353–0.450 | 982.5 MB | 4/4 trials |
+| Dynamic int8 | 0.086–0.106 s | 0.241–0.256 | 982.6 MB | 4/4 trials |
+
+The int8 trial was approximately 27–46% lower generation time per second of audio and started audio sooner. The
+process-level RSS measurement did not show a reduction, so it should not be used
+as a model-memory measurement. The host was shared with other work, and generated
+audio is stochastic. The user found the Alba samples close in sound and approved
+int8 as the live default after listening. See the [raw benchmark](quantization-benchmark.json).
+
+
+The browser uses the vendored SoundTouchJS 2.1.1 AudioWorklet for pitch-preserving
+speed at 0.8×, 1.25×, 1.5×, and 2×. Its 200 ms buffer spans network frames and is
+included in saved-position accounting. Normal 1× playback bypasses this processor.
+Pause suspends the audio clock; seek and speed changes reset processor history.
+Browsers without AudioWorklet support use complete WAV playback at non-1× speeds,
+with the browser's native pitch preservation. This fallback waits for generation.
+See [vendor source and licensing](../../assets/vendor/README.md).
+
+
+### Rollback to float32
+
+Set `POCKET_TTS_QUANTIZE=0` in the worker’s `.env`, then run
+`docker compose up -d --no-build speech`. The original float32 cache namespace is
+preserved. The live rollout also retained the previous image and source/configuration
+backup at `/opt/docker/artifact-pocket-tts/.pre-int8-20260912` on the Docker host.
+
+## Word highlighting deployment
+
+The September 12, 2026 deployment uses
+`homelab/artifact-pocket:3.1.0-timestamped-1`, with fork commit
+`65037e84c1885e7faa3e482b89fe3c304e2dada2` and int8 enabled. The deployed image was
+built incrementally from the verified prior CPU image, copying the pinned fork
+and worker files. The Dockerfile here supports rebuilding from the pinned source
+archive. Every audio cache namespace includes the fork revision.
+
+The viewer requests `/speech/stream-timed` for Pocket, with legacy streaming
+fallback when that endpoint is unavailable. The selected passage remains marked
+while audio prepares. Word events are mapped to normalized source-text offsets
+and rendered through the CSS Highlight API, preserving the artifact DOM. Word
+highlighting follows the played audio position, including speed changes and the
+pitch processor's latency. Pause holds the current word; Stop and completion
+clear it. Unsupported browsers and failed text mapping retain passage highlighting.
+Complete WAV fallback does not supply word timings.
+
+Validation covered real streamed audio, exact cache replay, legacy PCM/WAV,
+disconnect recovery, nested formatting, paragraph boundaries, line breaks,
+selection offsets beyond the first chunk, and clearing highlights on mutation.
+The browser mapping regression is `playwright/tests/reader-word-highlights.cjs`.
+See [the initial trial](trials/timestamped/README.md) and [the next RAVEN trial](trials/raven/README.md).
+
+The worker backup is `/opt/docker/artifact-pocket-tts/.pre-timestamped-20260912`.
+To restore the previous worker, restore its `compose.yml`, `Dockerfile`,
+`server.py`, and `stream_control.py` from that directory, then recreate `speech`
+with `docker compose up -d --no-build speech`. The updated viewer falls back to
+ordinary streaming if the old worker does not expose the timed endpoint.
+The native Artifact MCP binary backup is
+`/usr/local/bin/artifact-mcp.pre-pocket-word-highlights-20260912` on CT220.

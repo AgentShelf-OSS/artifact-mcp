@@ -197,6 +197,69 @@ test("Pocket stream routes preset voices through its own worker lane", async () 
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("RAVEN exposes trial voices and routes WAV and PCM streaming through its worker", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artifact-speech-raven-"));
+  const tokenPath = join(dir, "token");
+  await writeFile(tokenPath, "shared-token\n");
+  const calls = [];
+  const service = createSpeechService({
+    env: { POCKET_TTS_WORKER_URL: "http://pocket:8790", RAVEN_TTS_WORKER_URL: "http://raven:8791", TTS_WORKER_TOKEN_FILE: tokenPath },
+    fetchImpl: async (...args) => {
+      calls.push(args);
+      if (args[0].endsWith("/stream")) {
+        return new Response(new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); controller.close(); } }), { headers: { "content-type": "application/vnd.artifact.pcm" } });
+      }
+      return new Response(new Uint8Array([82, 73, 70, 70]), { headers: { "content-type": "audio/wav" } });
+    }
+  });
+  try {
+    assert.deepEqual(service.voices.filter(({ id }) => id.startsWith("raven_")), [
+      { id: "raven_alba", name: "Alba · RAVEN (trial)", streaming: false },
+      { id: "raven_marius", name: "Marius · RAVEN (trial)", streaming: false }
+    ]);
+    assert.equal((await service.synthesize("hello", "raven_alba")).status, 200);
+    assert.equal(JSON.parse(calls[0][1].body).voice, "raven_alba");
+    assert.match(calls[0][0], /^http:\/\/raven:8791\/speech$/);
+    const result = await service.streamSynthesize("hello", "raven_marius");
+    assert.equal(result.status, 200);
+    assert.deepEqual([...((await result.stream.getReader().read()).value)], [1, 2, 3]);
+    result.release();
+    assert.match(calls[1][0], /^http:\/\/raven:8791\/speech\/stream$/);
+    assert.equal(JSON.parse(calls[1][1].body).voice, "raven_marius");
+    assert.equal((await service.streamTimedSynthesize("hello", "raven_alba")).error, "bad_voice");
+    const pocketIndex = service.voices.findIndex(({ id }) => id === "pocket_alba");
+    const ravenIndex = service.voices.findIndex(({ id }) => id === "raven_alba");
+    assert.ok(pocketIndex >= 0 && pocketIndex < ravenIndex);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("Pocket timed stream rejects unknown media type suffixes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artifact-speech-pocket-timed-mime-"));
+  const tokenPath = join(dir, "token");
+  await writeFile(tokenPath, "shared-token\n");
+  const service = createSpeechService({
+    env: { POCKET_TTS_WORKER_URL: "http://pocket:8790", TTS_WORKER_TOKEN_FILE: tokenPath },
+    fetchImpl: async () => new Response(new Uint8Array([1]), { headers: { "content-type": "application/vnd.artifact.pcm-timed-extra" } })
+  });
+  try {
+    assert.equal((await service.streamTimedSynthesize("hello", "pocket_alba")).status, 503);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("Pocket timed stream maps an older worker's missing endpoint to 415", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artifact-speech-pocket-timed-legacy-"));
+  const tokenPath = join(dir, "token");
+  await writeFile(tokenPath, "shared-token\n");
+  const service = createSpeechService({
+    env: { POCKET_TTS_WORKER_URL: "http://pocket:8790", TTS_WORKER_TOKEN_FILE: tokenPath },
+    fetchImpl: async () => new Response(null, { status: 404 })
+  });
+  try {
+    const result = await service.streamTimedSynthesize("hello", "pocket_alba");
+    assert.deepEqual(result, { status: 415, error: "speech timed unavailable" });
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test("speech style instructions are bounded and limited to Qwen custom voices", async () => {
   const dir = await mkdtemp(join(tmpdir(), "artifact-speech-instructions-"));
   const tokenPath = join(dir, "token");

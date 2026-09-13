@@ -10,3 +10,7 @@ ops/anthropic-tunnel/mcp-proxy.yaml
 *.log
 marketing/
 /target
+
+# Local Python trial/test artifacts
+__pycache__/
+*.pyc

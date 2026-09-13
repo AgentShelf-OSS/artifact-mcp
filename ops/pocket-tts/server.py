@@ -17,9 +17,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import logging
 import numpy as np
 from stream_control import GenerationBudget
+from timed_protocol import record as timed_record, records as timed_records
 import torch
 import soundfile as sf
-from pocket_tts import TTSModel
+from pocket_tts_timestamped import AudioChunk, TTSModel, WordEnd, WordStart
 
 PRESETS = ['alba', 'marius', 'javert', 'jean', 'cosette', 'eponine', 'fantine', 'azelma',
            'anna', 'bill_boerst', 'caro_davy', 'charles', 'eve', 'george', 'jane',
@@ -29,21 +30,39 @@ MAX_CHARS = 1500
 MAX_BODY = 8192
 MAX_CACHE_BYTES = 512 * 1024 * 1024
 MAX_AUDIO_BYTES = 4 * 1024 * 1024
+MAX_TIMED_BYTES = 4_100_000
 MAX_STREAM_SECONDS = 55
 CACHE = Path("/cache")
 TOKEN = Path(os.environ.get("TOKEN_FILE", "/run/secrets/tts_token")).read_text().strip()
 if len(TOKEN) < 32:
     raise RuntimeError("Worker token missing or too short")
+
+
+def env_bool(name, default=False):
+    """Parse a deliberately small boolean environment-variable contract."""
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    if normalized in {"1", "true", "yes", "on"}:
+        return True
+    if normalized in {"0", "false", "no", "off"}:
+        return False
+    raise RuntimeError(f"{name} must be one of 1/0, true/false, yes/no, or on/off")
+
+
+QUANTIZE = env_bool("POCKET_TTS_QUANTIZE")
 # Pocket uses a decoder thread in addition to model inference. Keep the same
 # two-core container quota as Kokoro and one PyTorch thread per operation.
 logging.getLogger('pocket_tts').setLevel(logging.WARNING)
+logging.getLogger('pocket_tts_timestamped').setLevel(logging.WARNING)
 torch.set_num_threads(1)
 torch.set_num_interop_threads(1)
 started = time.monotonic()
 os.environ["KPOCKET_TTS_ERROR_WITHOUT_EOS"] = "1"
-model = TTSModel.load_model("english_2026-04")
+model = TTSModel.load_model("english_2026-04", quantize=QUANTIZE)
 voices = {"pocket_" + name: model.get_state_for_audio_prompt(name) for name in PRESETS}
-MODEL_ID = "pocket-tts-3.1.0-english_2026-04"
+MODEL_ID = "pocket-tts-timestamped-65037e84-english_2026-04" + ("-int8" if QUANTIZE else "")
 MODEL_LOAD_SECONDS = time.monotonic() - started
 GATE = threading.BoundedSemaphore(1)
 CACHE.mkdir(exist_ok=True)
@@ -51,20 +70,24 @@ ACTIVE_BUDGET = None
 _original_autoregressive = model._autoregressive_generation
 
 
-def _bounded_autoregressive(model_state, max_gen_len, frames_after_eos, latents_queue):
-    # This private signature is verified against the pinned Pocket 3.1.0 build.
-    # Pocket's producer catches this error and stops/joins the decoder via its
-    # normal result queue, so interruption cannot leave inference running.
+def _bounded_autoregressive(model_state, max_gen_len, frames_after_eos, latents_queue,
+                            attention_capture=None, cancel_event=None):
+    # This private signature is verified against the pinned timestamped fork.
+    # Its capture and cancellation hooks must pass through or word events stop
+    # working and the producer can outlive the request.
     budget = ACTIVE_BUDGET
     budget.check()
-    return _original_autoregressive(model_state, max_gen_len, frames_after_eos, budget.queue(latents_queue))
+    return _original_autoregressive(model_state, max_gen_len, frames_after_eos,
+                                    budget.queue(latents_queue),
+                                    attention_capture=attention_capture,
+                                    cancel_event=cancel_event)
 
 
 model._autoregressive_generation = _bounded_autoregressive
 
 
 def save_cache(path, payload):
-    files = sorted((item for item in CACHE.iterdir() if item.suffix in {".wav", ".pcm"}), key=lambda item: item.stat().st_mtime)
+    files = sorted((item for item in CACHE.iterdir() if item.suffix in {".wav", ".pcm", ".timed"}), key=lambda item: item.stat().st_mtime)
     size = sum(item.stat().st_size for item in files)
     while files and size + len(payload) > MAX_CACHE_BYTES:
         old = files.pop(0); size -= old.stat().st_size; old.unlink()
@@ -151,6 +174,80 @@ def stream_synthesize(handler, text, voice):
         ACTIVE_BUDGET.finish(iterator)
 
 
+def _timed_cache_path(text, voice):
+    key = hashlib.sha256(json.dumps([MODEL_ID, "timed-v1", voice, text], ensure_ascii=False).encode()).hexdigest()
+    return CACHE / (key + ".timed")
+
+
+def stream_timed_synthesize(handler, text, voice):
+    """Stream PCM and completed-word events, caching only complete timed output."""
+    path = _timed_cache_path(text, voice)
+    began = time.monotonic()
+    cached = path.is_file()
+    total = 0
+    collected = bytearray()
+    sent = False
+    iterator = None
+    try:
+        if cached:
+            if path.stat().st_size > MAX_TIMED_BYTES:
+                raise ValueError("cached timed audio exceeds limit")
+            payload = path.read_bytes()
+            # Validate cached framing before sending any response headers.
+            cached_records = list(timed_records(payload))
+            if not cached_records:
+                raise ValueError("empty timed cache")
+            iterator = iter(cached_records)
+        else:
+            iterator = model.generate_audio_with_timestamps_stream(voices[voice], text, copy_state=True)
+        for item in iterator:
+            if time.monotonic() - began > MAX_STREAM_SECONDS:
+                raise TimeoutError("streaming deadline exceeded")
+            if cached:
+                records = [bytes(item)]
+            elif isinstance(item, AudioChunk):
+                samples = item.audio.detach().cpu().numpy().reshape(-1)
+                pcm = (np.clip(samples, -1.0, 1.0) * 32767.0).astype("<i2").tobytes()
+                records = [timed_record(1, pcm[offset:offset + 9600])
+                           for offset in range(0, len(pcm), 9600)]
+            elif isinstance(item, WordStart):
+                records = [timed_record(2, {"word": item.word, "index": item.word_index,
+                                           "start": item.start_time})]
+            elif isinstance(item, WordEnd):
+                records = [timed_record(2, {"word": item.word, "index": item.word_index,
+                                           "start": item.start_time, "end": item.end_time})]
+            else:
+                continue
+            for record in records:
+                total += len(record)
+                if total + 4 > MAX_TIMED_BYTES:
+                    raise ValueError("timed stream exceeds limit")
+                if not sent:
+                    handler.send_response(200)
+                    handler.send_header("Content-Type", "application/vnd.artifact.pcm-timed;v=1")
+                    handler.send_header("Cache-Control", "private, no-store, no-transform")
+                    handler.send_header("X-Accel-Buffering", "no")
+                    handler.send_header("Transfer-Encoding", "chunked")
+                    handler.end_headers(); sent = True
+                handler.write_chunk(record)
+                if not cached:
+                    collected.extend(record)
+        if not sent:
+            raise ValueError("empty timed stream")
+        handler.write_chunk(struct.pack(">I", 0)); handler.wfile.write(b"0\r\n\r\n"); handler.wfile.flush()
+        if not cached:
+            if len(collected) > MAX_TIMED_BYTES:
+                raise ValueError("timed stream exceeds limit")
+            save_cache(path, bytes(collected))
+    except Exception as error:
+        print(json.dumps({"event": "timed_stream_failed", "error_type": type(error).__name__}), flush=True)
+        if not sent:
+            handler.respond(503, {"error": "speech_unavailable"})
+        handler.close_connection = True
+    finally:
+        ACTIVE_BUDGET.finish(iterator)
+
+
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     def log_message(self, *args):
@@ -181,14 +278,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/health":
-            return self.respond(200, {"status": "ok", "engine": "pocket-tts", "voices": list(VOICES), "model_load_seconds": round(MODEL_LOAD_SECONDS, 3), "providers": ["CPU"]})
+            return self.respond(200, {"status": "ok", "engine": "pocket-tts", "voices": list(VOICES), "model_load_seconds": round(MODEL_LOAD_SECONDS, 3), "providers": ["CPU"], "quantized": QUANTIZE})
         self.respond(404, {"error": "not_found"})
 
     def do_POST(self):
         global ACTIVE_BUDGET
         if not hmac.compare_digest(self.headers.get("Authorization", ""), "Bearer " + TOKEN):
             return self.respond(401, {"error": "unauthorized"})
-        if self.path not in {"/speech", "/speech/stream"}:
+        if self.path not in {"/speech", "/speech/stream", "/speech/stream-timed"}:
             return self.respond(404, {"error": "not_found"})
         try:
             length = int(self.headers.get("Content-Length", "0"))
@@ -208,6 +305,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             if self.path == "/speech/stream":
                 return stream_synthesize(self, text.strip(), voice)
+            if self.path == "/speech/stream-timed":
+                return stream_timed_synthesize(self, text.strip(), voice)
             payload, metrics = synthesize(text.strip(), voice)
             print(json.dumps({"event": "speech", "voice": voice, "chars": len(text), **metrics}), flush=True)
             self.respond(200, payload, "audio/wav", {"X-TTS-Seconds": metrics["generation_seconds"], "X-Audio-Seconds": metrics["audio_seconds"], "X-TTS-Cached": str(metrics["cached"]).lower()})
@@ -219,5 +318,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(json.dumps({"event": "ready", "model_load_seconds": MODEL_LOAD_SECONDS, "model_id": MODEL_ID}), flush=True)
+    print(json.dumps({"event": "ready", "model_load_seconds": MODEL_LOAD_SECONDS, "model_id": MODEL_ID, "quantized": QUANTIZE}), flush=True)
     ThreadingHTTPServer(("0.0.0.0", 8788), Handler).serve_forever()

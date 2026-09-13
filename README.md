@@ -36,16 +36,25 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 
 The authenticated viewer can read visible text from HTML artifacts without requiring each artifact
 to embed a player. **Listen** opens a compact player; **Expand** exposes the selected voice,
-playback speed, and reading scope. The reader supports the current page, selected text, a clicked
+playback speed, and reading scope. Speed changes preserve the voice’s pitch. The reader supports the current page, selected text, a clicked
 reading position, and the current semantic section. A clicked paragraph or heading is highlighted
 and gets an inline play action, so reading can begin exactly where attention is focused.
+The selected passage stays highlighted while audio prepares, then follows the spoken word during
+Pocket playback. Pausing keeps the current word marked; stopping clears it. Passage highlighting
+remains the fallback when word timings or browser support are unavailable.
+
+The expanded player also offers Replay sentence when Pocket word timings are available. It reuses
+the current paragraph audio without another synthesis request or an additional persistent cache.
+The existing streamed-audio limit bounds decoded samples to 8 MiB per chunk; stopping, leaving the
+page, or moving to the next chunk releases those samples.
 
 Playback includes pause/resume, 15-second rewind, paragraph navigation, sleep timers, saved-place
-resume, and chapter continuation where the artifact exposes a supported ereader structure. The
-default server installation does not require a speech worker. Deployments that want local CPU
+resume, and chapter continuation where the artifact exposes a supported ereader structure.
+Interrupted streams retry twice from the last played position; Pause and Stop cancel automatic
+recovery, and Play can resume after a longer outage. The default server installation does not require a speech worker. Deployments that want local CPU
 narration can use the [Pocket TTS worker](ops/pocket-tts/README.md), which provides 21 preset
 English voices and streamed audio; the [TTS operations guide](ops/tts/README.md) documents worker
-configuration, authorization, limits, and rollback.
+configuration, authorization, limits, and rollback. An optional [RAVEN trial](ops/pocket-tts/trials/raven/README.md) adds two CPU voices to the same player with passage highlighting. Pocket remains the default when both are configured.
 
 The reader currently follows authored HTML structure and visible text. Charts, diagrams, metric
 cards, tables, and interactive mockups are treated as artifact content, but semantic summaries

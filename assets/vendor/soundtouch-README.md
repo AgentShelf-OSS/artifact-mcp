@@ -1,0 +1,381 @@
+# @soundtouchjs/audio-worklet
+
+An [AudioWorklet](https://developer.mozilla.org/en-US/docs/Web/API/AudioWorklet) implementation of the SoundTouchJS audio processing library. Provides real-time pitch shifting, tempo adjustment, and rate transposition on the audio rendering thread — replacing the deprecated `ScriptProcessorNode` approach.
+
+[I accept cash](https://paypal.me/cutterbl?locale.x=en_US) if you like what's been done.
+
+Part of the [SoundTouchJS](https://github.com/cutterbl/SoundTouchJS) monorepo — for more information and so much more.
+
+## Installation
+
+```sh
+npm install @soundtouchjs/audio-worklet
+```
+
+## API docs
+
+Detailed developer documentation for public exports is available in Storybook: [https://cutterscrossing.com/SoundTouchJS/?path=/docs/audio-worklet-soundtouchnode--docs](https://cutterscrossing.com/SoundTouchJS/?path=/docs/audio-worklet-soundtouchnode--docs).
+
+- `SoundTouchNode` reference: [https://cutterscrossing.com/SoundTouchJS/?path=/docs/audio-worklet-soundtouchnode--docs](https://cutterscrossing.com/SoundTouchJS/?path=/docs/audio-worklet-soundtouchnode--docs)
+- AudioWorklet getting started guide: [https://cutterscrossing.com/SoundTouchJS/?path=/docs/getting-started--docs](https://cutterscrossing.com/SoundTouchJS/?path=/docs/getting-started--docs)
+
+This package depends on [`@soundtouchjs/core`](../core/README.md), which will be installed automatically.
+
+## Usage
+
+### 1. Register the processor
+
+The package ships a pre-bundled processor file at `@soundtouchjs/audio-worklet/processor`. You need to serve this file and register it with the `AudioContext` before creating a node.
+
+```ts
+import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
+
+const audioCtx = new AudioContext();
+
+// Register the worklet processor (do this once)
+await SoundTouchNode.register(audioCtx, '/soundtouch-processor.js');
+```
+
+How you resolve the processor URL depends on your build tool:
+
+- **Vite**: Use the `?url` import — Vite resolves it to the correct public URL automatically:
+  ```ts
+  import processorUrl from '@soundtouchjs/audio-worklet/processor?url';
+  await SoundTouchNode.register(audioCtx, processorUrl);
+  ```
+- **Webpack 5**: Use `new URL` with `import.meta.url` so webpack emits the file as a separate asset:
+  ```ts
+  const processorUrl = new URL('@soundtouchjs/audio-worklet/processor', import.meta.url).href;
+  await SoundTouchNode.register(audioCtx, processorUrl);
+  ```
+- **Static hosting**: Copy `.dist/soundtouch-processor.js` to your public directory and pass the path directly:
+  ```ts
+  await SoundTouchNode.register(audioCtx, '/soundtouch-processor.js');
+  ```
+
+See the [Getting Started guide](https://cutterscrossing.com/SoundTouchJS/?path=/docs/audio-worklet-getting-started--docs) for CORS requirements and common setup mistakes.
+
+### 2. Create a node and connect it
+
+`SoundTouchNode` works with any Web Audio source node. The recommended approach for tempo control is to drive playback speed via the source's `playbackRate` and set the matching value on `stNode.playbackRate` — the processor automatically compensates pitch so you never need to calculate the ratio yourself.
+
+#### With AudioBufferSourceNode
+
+```ts
+const stNode = new SoundTouchNode({ context: audioCtx });
+stNode.connect(audioCtx.destination);
+
+// Optional FIFO override
+const stNodeFifo = new SoundTouchNode({
+  context: audioCtx,
+  sampleBufferType: 'fifo',
+});
+
+// Optional interpolation override (requires registering the linear strategy module)
+const stNodeLinear = new SoundTouchNode({
+  context: audioCtx,
+  interpolationStrategy: 'linear',
+});
+
+// Mono output (e.g. connecting to a mono destination)
+const stNodeMono = new SoundTouchNode({
+  context: audioCtx,
+  outputChannelCount: 1,
+});
+
+const source = audioCtx.createBufferSource();
+source.buffer = audioBuffer;
+source.playbackRate.value = tempo; // tempo via playback rate
+source.connect(stNode);
+
+stNode.playbackRate.value = tempo; // tell processor the source rate
+stNode.pitch.value = pitch; // desired pitch (auto-compensated)
+source.start();
+```
+
+#### With an HTML audio element
+
+```ts
+const audioEl = document.querySelector('audio')!;
+const stNode = new SoundTouchNode({ context: audioCtx });
+stNode.connect(audioCtx.destination);
+
+const source = audioCtx.createMediaElementSource(audioEl);
+source.connect(stNode);
+
+audioEl.preservesPitch = false; // let SoundTouch handle pitch, not the browser
+audioEl.playbackRate = tempo; // tempo via element playback rate
+stNode.playbackRate.value = tempo; // tell processor the source rate
+stNode.pitch.value = pitch; // desired pitch (auto-compensated)
+```
+
+> **Why `playbackRate` for tempo?** SoundTouch's internal time-stretcher operates on small 128-sample blocks in the AudioWorklet. At higher tempos, it can't produce enough output samples per block, causing audible gaps. Using the source's `playbackRate` feeds samples faster, keeping the processing pipe balanced. SoundTouch then only needs to correct pitch, which it handles cleanly.
+>
+> When using an `<audio>` element, set `preservesPitch = false` so the browser doesn't apply its own pitch correction on top of SoundTouch's.
+
+### 3. Control parameters
+
+All parameters are exposed as [`AudioParam`](https://developer.mozilla.org/en-US/docs/Web/API/AudioParam) objects, supporting both direct value setting and automation.
+
+```ts
+// Direct value
+stNode.pitch.value = 1.2;
+stNode.pitchSemitones.value = -3;
+stNode.playbackRate.value = 1.2; // mirrors source.playbackRate for tempo
+
+// Automation
+stNode.pitch.linearRampToValueAtTime(2.0, audioCtx.currentTime + 5);
+```
+
+| Parameter        | Default | Range     | Description                                                          |
+| ---------------- | ------- | --------- | -------------------------------------------------------------------- |
+| `pitch`          | 1.0     | 0.1 – 8.0 | Pitch multiplier (1.0 = original)                                    |
+| `pitchSemitones` | 0       | -24 – 24  | Pitch shift in semitones (combined with `pitch`)                     |
+| `playbackRate`   | 1.0     | 0.1 – 8.0 | Source playback rate mirror — processor divides pitch by this value  |
+
+These ranges are intentionally broader than the typical musical sweet spot, but still bounded for real-time stability. Values outside this window tend to produce more audible artifacts, less predictable output, and higher risk of buffer starvation or unnatural sounding results, especially in the AudioWorklet's small render blocks. For most material, settings closer to `1.0` will sound cleaner.
+
+### Interpolation strategy
+
+AudioWorklet processing defaults to `lanczos`. You can pass a strategy id at node construction:
+
+```ts
+const stNode = new SoundTouchNode({
+  context: audioCtx,
+  interpolationStrategy: 'linear',
+});
+```
+
+If you want to use non-default strategies like `linear`, `hann`, `blackman`, or `kaiser`, register the strategy module in the worklet first:
+
+```ts
+await SoundTouchNode.registerStrategyModule(audioCtx, strategyModuleUrl);
+```
+
+If an unknown strategy id is provided, the processor logs an info message and falls back to `lanczos`.
+
+You can also switch strategy and update params at runtime:
+
+```ts
+stNode.setInterpolationStrategy('linear');
+
+stNode.setInterpolationStrategyParams({ edgeHoldFrames: 4 });
+```
+
+These updates are applied by the processor at render-block boundaries for stable transitions.
+
+### WSOLA timing parameters
+
+Use `setStretchParameters()` to tune the time-stretch algorithm. Updates are queued and applied at the next render-block boundary.
+
+```ts
+stNode.setStretchParameters({ overlapMs: 12 });            // overlap only
+stNode.setStretchParameters({ quickSeek: false });         // exhaustive search
+stNode.setStretchParameters({ sequenceMs: 80, seekWindowMs: 20 }); // manual windows
+stNode.setStretchParameters({ sequenceMs: 0 });            // back to auto
+```
+
+| Param | Default | Description |
+|-------|---------|-------------|
+| `sequenceMs` | auto (50–125 ms) | Processing window in ms; `0` = auto |
+| `seekWindowMs` | auto (15–25 ms) | Seek window in ms; `0` = auto |
+| `overlapMs` | 8 ms | Crossfade overlap in ms |
+| `quickSeek` | `true` | Fast seek; `false` = exhaustive |
+
+### Full example — AudioBuffer
+
+```ts
+import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
+
+const audioCtx = new AudioContext();
+const gainNode = audioCtx.createGain();
+gainNode.connect(audioCtx.destination);
+
+await SoundTouchNode.register(audioCtx, '/soundtouch-processor.js');
+const stNode = new SoundTouchNode({ context: audioCtx });
+stNode.connect(gainNode);
+
+const response = await fetch('/audio.mp3');
+const buffer = await response.arrayBuffer();
+const audioBuffer = await audioCtx.decodeAudioData(buffer);
+
+const source = audioCtx.createBufferSource();
+source.buffer = audioBuffer;
+source.playbackRate.value = 1.2; // 1.2x tempo
+source.connect(stNode);
+
+stNode.playbackRate.value = 1.2; // tell processor the source rate
+stNode.pitch.value = 0.9; // desired pitch (auto-compensated)
+stNode.pitchSemitones.value = -2;
+gainNode.gain.value = 0.8;
+
+source.start();
+```
+
+### Full example — Audio element
+
+```ts
+import { SoundTouchNode } from '@soundtouchjs/audio-worklet';
+
+const audioEl = document.querySelector('audio')!;
+const audioCtx = new AudioContext();
+const gainNode = audioCtx.createGain();
+gainNode.connect(audioCtx.destination);
+
+await SoundTouchNode.register(audioCtx, '/soundtouch-processor.js');
+const stNode = new SoundTouchNode({ context: audioCtx });
+stNode.connect(gainNode);
+
+const source = audioCtx.createMediaElementSource(audioEl);
+source.connect(stNode);
+
+audioEl.preservesPitch = false;
+audioEl.playbackRate = 1.2; // 1.2x tempo
+stNode.playbackRate.value = 1.2; // tell processor the source rate
+stNode.pitch.value = 0.9; // desired pitch (auto-compensated)
+stNode.pitchSemitones.value = -2;
+gainNode.gain.value = 0.8;
+```
+
+## Key switching and pitch control
+
+Changing the musical key of playback is handled by the `pitchSemitones` parameter. Each integer step corresponds to one semitone (half-step) on the chromatic scale. For example:
+
+- `stNode.pitchSemitones.value = 2` shifts the key up a whole step
+- `stNode.pitchSemitones.value = -3` shifts down a minor third
+
+The processor combines this with the `pitch` multiplier:
+
+    effectivePitch = pitch * 2^(pitchSemitones / 12)
+
+This lets you combine continuous pitch control (`pitch`) with discrete key changes (`pitchSemitones`).
+
+For most musical applications, set `pitchSemitones` to the desired interval and leave `pitch` at 1.0 unless you want fine-tuning within a semitone.
+
+## Package exports
+
+| Export                                  | Description                                                                 |
+| --------------------------------------- | --------------------------------------------------------------------------- |
+| `@soundtouchjs/audio-worklet`           | Main-thread API: `SoundTouchNode` class, types                              |
+| `@soundtouchjs/audio-worklet/processor` | Pre-bundled processor script (self-contained, `@soundtouchjs/core` inlined) |
+
+## Sample buffer type
+
+`SoundTouchNode` uses circular sample buffers by default. To override that behavior:
+
+```ts
+const stNode = new SoundTouchNode({
+  context: audioCtx,
+  sampleBufferType: 'fifo',
+});
+```
+
+For advanced use cases, the lower-level core library also exposes a `sampleBufferFactory` option.
+
+For interpolation strategy registration and custom kernels, see [@soundtouchjs/core](../core/README.md) and strategy package docs.
+
+## Constructor API (breaking)
+
+`SoundTouchNode` now uses a named options object constructor:
+
+```ts
+new SoundTouchNode({ context: audioCtx });
+new SoundTouchNode({ context: audioCtx, sampleBufferType: 'fifo' });
+```
+
+## Architecture
+
+- **Processor thread**: `SoundTouchProcessor` extends `AudioWorkletProcessor`, runs on the audio rendering thread. It interleaves stereo input, feeds it through the `SoundTouch` processing pipe, and deinterleaves the output. The `@soundtouchjs/core` library is bundled directly into the processor file so there are no import dependencies at runtime.
+- **Main thread**: `SoundTouchNode` extends `AudioWorkletNode`, providing typed `AudioParam` accessors for `pitch`, `pitchSemitones`, and `playbackRate`. A static `register()` method handles `audioWorklet.addModule()`. When `playbackRate` is set to the same value as the source node's `playbackRate`, the processor automatically divides the desired pitch by that value, so developers never need to manually compensate for rate-induced pitch shift.
+
+## Offline processing
+
+Use `processOffline()` to render an entire `AudioBuffer` through SoundTouch without a live audio device:
+
+```ts
+import { processOffline } from '@soundtouchjs/audio-worklet';
+
+const processed = await processOffline({
+  input: audioBuffer,
+  processorUrl: '/soundtouch-processor.js',
+  pitchSemitones: -3,
+  playbackRate: 1.2,
+  stretchParameters: { overlapMs: 12 },
+});
+```
+
+The output `AudioBuffer` has the same channel count and sample rate as the input. Output length is estimated as `ceil(input.length / playbackRate)`.
+
+## Processor observability
+
+`SoundTouchNode` exposes a `metrics` getter and a `metrics` CustomEvent for monitoring processor health. The processor sends a snapshot to the main thread every 100 render blocks.
+
+```ts
+// Poll the latest snapshot
+const m = stNode.metrics;
+if (m) {
+  console.log(`underruns: ${m.underrunCount} / ${m.blockCount} blocks`);
+}
+
+// Or listen for every update
+stNode.addEventListener('metrics', (e) => {
+  const { framesBuffered, underrunCount, blockCount, outputRms, outputPeak, timestamp } =
+    (e as CustomEvent<ProcessorMetrics>).detail;
+  console.log(`[${timestamp.toFixed(0)}ms] buffered=${framesBuffered} underruns=${underrunCount}/${blockCount} rms=${outputRms.toFixed(4)} peak=${outputPeak.toFixed(4)}`);
+});
+```
+
+`ProcessorMetrics` is exported from `@soundtouchjs/audio-worklet`:
+
+```ts
+import type { ProcessorMetrics } from '@soundtouchjs/audio-worklet';
+```
+
+| Field | Description |
+|-------|-------------|
+| `framesBuffered` | Frames available in the output buffer at the last render block |
+| `underrunCount` | Cumulative render blocks where the output buffer was short |
+| `blockCount` | Total render blocks processed since the processor started |
+| `outputRms` | RMS of the last output block (both channels averaged) |
+| `outputPeak` | Peak absolute value of the last output block (both channels) |
+| `timestamp` | `performance.now()` on the main thread when metrics arrived |
+
+## Mono input and output
+
+The processor supports both mono input and mono output without extra configuration.
+
+**Mono input**: When a source provides only one channel, the processor duplicates it to both sides of the stereo processing pipeline. No configuration is needed.
+
+**Mono output**: If the downstream destination only accepts a single channel, pass `outputChannelCount: 1` to the constructor. The Web Audio graph will mix the stereo output to mono on the output side.
+
+```ts
+// Mono output
+const stNode = new SoundTouchNode({
+  context: audioCtx,
+  outputChannelCount: 1,
+});
+```
+
+## What's changed
+
+Latest additions since the v0.4 rewrite:
+
+- **Offline rendering**: `processOffline()` renders an entire `AudioBuffer` through SoundTouch without a live audio device.
+- **Processor observability**: `SoundTouchNode.metrics` getter and `metrics` CustomEvent expose per-block health snapshots (buffered frames, underrun count, RMS, peak).
+- **Runtime WSOLA tuning**: `setStretchParameters()` queues updates to sequencing, seek-window, overlap, and quick-seek settings at render-block boundaries.
+- **Runtime interpolation control**: `setInterpolationStrategy()` and `setInterpolationStrategyParams()` switch strategy mid-playback without a constructor change.
+- **Worklet-base architecture**: `SoundTouchProcessor` now extends `SoundTouchProcessorBase` from `@soundtouchjs/worklet-base`, sharing the DSP pipeline with other worklet packages.
+- **Licensing**: Moved from LGPL to MPL-2.0.
+
+### v0.4 (initial rewrite)
+
+- Complete rewrite in TypeScript (strict mode, full type exports)
+- ESM only, targeting ES2024
+- `AudioParam`-based parameter control (supports Web Audio automation)
+- Pre-bundled processor file with `@soundtouchjs/core` inlined (~23 KB)
+- NaN protection on audio output
+- Stereo processing (mono input is duplicated to both channels; mono output supported via `outputChannelCount: 1`)
+
+## License
+
+MPL-2.0 — see [LICENSE](../../LICENSE) for details.
