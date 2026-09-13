@@ -1,0 +1,128 @@
+[
+  {
+    "voice": "pocket_alba",
+    "generation_seconds": 0.928,
+    "audio_seconds": 2.32,
+    "valid": true
+  },
+  {
+    "voice": "pocket_marius",
+    "generation_seconds": 0.89,
+    "audio_seconds": 2.08,
+    "valid": true
+  },
+  {
+    "voice": "pocket_javert",
+    "generation_seconds": 1.441,
+    "audio_seconds": 3.76,
+    "valid": true
+  },
+  {
+    "voice": "pocket_jean",
+    "generation_seconds": 1.002,
+    "audio_seconds": 2.56,
+    "valid": true
+  },
+  {
+    "voice": "pocket_cosette",
+    "generation_seconds": 1.058,
+    "audio_seconds": 2.56,
+    "valid": true
+  },
+  {
+    "voice": "pocket_eponine",
+    "generation_seconds": 1.097,
+    "audio_seconds": 3.04,
+    "valid": true
+  },
+  {
+    "voice": "pocket_fantine",
+    "generation_seconds": 0.922,
+    "audio_seconds": 2.64,
+    "valid": true
+  },
+  {
+    "voice": "pocket_azelma",
+    "generation_seconds": 1.084,
+    "audio_seconds": 3.12,
+    "valid": true
+  },
+  {
+    "voice": "pocket_anna",
+    "generation_seconds": 0.997,
+    "audio_seconds": 2.88,
+    "valid": true
+  },
+  {
+    "voice": "pocket_bill_boerst",
+    "generation_seconds": 0.921,
+    "audio_seconds": 2.64,
+    "valid": true
+  },
+  {
+    "voice": "pocket_caro_davy",
+    "generation_seconds": 1.127,
+    "audio_seconds": 2.96,
+    "valid": true
+  },
+  {
+    "voice": "pocket_charles",
+    "generation_seconds": 1.079,
+    "audio_seconds": 3.12,
+    "valid": true
+  },
+  {
+    "voice": "pocket_eve",
+    "generation_seconds": 0.896,
+    "audio_seconds": 2.88,
+    "valid": true
+  },
+  {
+    "voice": "pocket_george",
+    "generation_seconds": 0.82,
+    "audio_seconds": 2.64,
+    "valid": true
+  },
+  {
+    "voice": "pocket_jane",
+    "generation_seconds": 0.836,
+    "audio_seconds": 2.72,
+    "valid": true
+  },
+  {
+    "voice": "pocket_mary",
+    "generation_seconds": 0.861,
+    "audio_seconds": 2.72,
+    "valid": true
+  },
+  {
+    "voice": "pocket_michael",
+    "generation_seconds": 0.795,
+    "audio_seconds": 2.4,
+    "valid": true
+  },
+  {
+    "voice": "pocket_paul",
+    "generation_seconds": 0.903,
+    "audio_seconds": 2.8,
+    "valid": true
+  },
+  {
+    "voice": "pocket_peter_yearsley",
+    "generation_seconds": 0.771,
+    "audio_seconds": 2.56,
+    "valid": true
+  },
+  {
+    "voice": "pocket_stuart_bell",
+    "generation_seconds": 0.887,
+    "audio_seconds": 3.04,
+    "valid": true
+  },
+  {
+    "voice": "pocket_vera",
+    "generation_seconds": 0.878,
+    "audio_seconds": 2.88,
+    "valid": true
+  }
+]

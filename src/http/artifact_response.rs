@@ -19,6 +19,12 @@ pub const DOCUMENT_SANDBOX: &str = "sandbox allow-scripts allow-popups allow-for
 
 /// Stable marker used to prove that anchor mode adds exactly one server-owned bridge.
 pub const ANCHOR_BRIDGE_MARKER: &str = "artifact-anchor-bridge";
+pub const READER_BRIDGE_MARKER: &str = "artifact-reader-bridge";
+pub const READER_BRIDGE: &str = concat!(
+    include_str!("../../assets/reader-ereader.js"),
+    "\n",
+    include_str!("../../assets/reader-bridge.js")
+);
 
 /// Server-owned anchor bridge copied byte-for-byte from `lib/artifact-http.js`.
 ///
@@ -82,6 +88,8 @@ pub enum RawCachePolicy {
 pub struct ArtifactResponseOptions<'a> {
     /// Add the anchor bridge to HTML unless this is also a download representation.
     pub anchor: bool,
+    /// Add the native reader bridge to the explicit viewer representation.
+    pub reader: bool,
     /// Strip script blocks from HTML preview representations.
     pub preview: bool,
     /// Sanitized bundle page path supplied by U07/the raw route.
@@ -139,6 +147,18 @@ pub fn inject_anchor_bridge(content: &[u8], page_path: Option<&str>) -> Vec<u8> 
             js_replace_first(ANCHOR_BRIDGE, PAGE_INITIALIZER, &replacement)
         },
     );
+    let insertion = last_closing_tag(&html, "body").unwrap_or(html.len());
+    let mut output = String::with_capacity(html.len() + bridge.len());
+    output.push_str(&html[..insertion]);
+    output.push_str(&bridge);
+    output.push_str(&html[insertion..]);
+    output.into_bytes()
+}
+
+#[must_use]
+pub fn inject_reader_bridge(content: &[u8], _page_path: Option<&str>) -> Vec<u8> {
+    let html = String::from_utf8_lossy(content);
+    let bridge = format!("<script id=\"{READER_BRIDGE_MARKER}\">{READER_BRIDGE}</script>");
     let insertion = last_closing_tag(&html, "body").unwrap_or(html.len());
     let mut output = String::with_capacity(html.len() + bridge.len());
     output.push_str(&html[..insertion]);
@@ -211,6 +231,9 @@ pub fn artifact_response(
     let mut content = file.content;
     if options.anchor && attachment_name.is_none() && html {
         content = inject_anchor_bridge(&content, options.page_path);
+    }
+    if options.reader && attachment_name.is_none() && html {
+        content = inject_reader_bridge(&content, options.page_path);
     }
     if options.preview && html {
         content = strip_scripts(&content);

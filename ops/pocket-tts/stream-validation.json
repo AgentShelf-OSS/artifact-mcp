@@ -1,0 +1,88 @@
+{
+  "date": "2026-09-12",
+  "model": "pocket-tts-3.1.0-english_2026-04",
+  "cpu_limit": 2,
+  "worker_image": "homelab/artifact-pocket:3.1.0-stream-1",
+  "measurements": [
+    {
+      "voice": "pocket_alba",
+      "attempt": 0,
+      "chars": 259,
+      "first_audio_seconds": 0.418,
+      "total_seconds": 6.952,
+      "audio_seconds": 13.92,
+      "frames": 174,
+      "valid": true
+    },
+    {
+      "voice": "pocket_alba",
+      "attempt": 1,
+      "chars": 259,
+      "first_audio_seconds": 0.002,
+      "total_seconds": 0.004,
+      "audio_seconds": 13.92,
+      "frames": 70,
+      "valid": true
+    },
+    {
+      "voice": "pocket_marius",
+      "attempt": 0,
+      "chars": 259,
+      "first_audio_seconds": 0.212,
+      "total_seconds": 6.689,
+      "audio_seconds": 13.44,
+      "frames": 168,
+      "valid": true
+    },
+    {
+      "voice": "pocket_marius",
+      "attempt": 1,
+      "chars": 259,
+      "first_audio_seconds": 0.002,
+      "total_seconds": 0.006,
+      "audio_seconds": 13.44,
+      "frames": 68,
+      "valid": true
+    },
+    {
+      "voice": "pocket_bill_boerst",
+      "attempt": 0,
+      "chars": 259,
+      "first_audio_seconds": 0.254,
+      "total_seconds": 7.15,
+      "audio_seconds": 15.68,
+      "frames": 196,
+      "valid": true
+    },
+    {
+      "voice": "pocket_bill_boerst",
+      "attempt": 1,
+      "chars": 259,
+      "first_audio_seconds": 0.002,
+      "total_seconds": 0.004,
+      "audio_seconds": 15.68,
+      "frames": 79,
+      "valid": true
+    }
+  ],
+  "cancellation": {
+    "next_wav_success": true,
+    "seconds_including_next_wav_generation": 1.093,
+    "partial_cached": false
+  },
+  "browser": {
+    "first_audio_ms": 2179,
+    "audio_before_generation_complete": true,
+    "preview_voices": [
+      "pocket_alba",
+      "pocket_marius",
+      "pocket_bill_boerst"
+    ],
+    "preferences_restored": true,
+    "chapter_continuation": true,
+    "manual_navigation_cancels": true,
+    "desktop_mobile": true,
+    "page_errors": []
+  },
+  "deployed_artifact_mcp_sha256": "bb69c65ba41e5e4a2b05a15fffd5d22f18c0c0fd4f2b8b4bca7f9fd32c89272f"
+}

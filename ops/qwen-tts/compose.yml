@@ -1,0 +1,39 @@
+services:
+  speech:
+    image: homelab/artifact-qwen-adapter:3
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${TTS_BIND_HOST:?Set the private bind address}:8791:8788"
+    environment:
+      QWEN_URL: http://qwen3-tts:8000
+      QWEN_CUSTOM_URL: ${QWEN_CUSTOM_URL:-}
+      QWEN_REFERENCE_ENABLED: ${QWEN_REFERENCE_ENABLED:-1}
+      REFERENCE_SHA256: ${REFERENCE_SHA256:?Set reference audio checksum}
+      TOKEN_FILE: /run/secrets/tts_token
+    secrets: [tts_token]
+    volumes:
+      - ./cache:/cache
+    read_only: true
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: "0.5"
+    mem_limit: 128m
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/health', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 300s
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+networks:
+  default:
+    external: true
+    name: navi_voice
+secrets:
+  tts_token:
+    file: ./tts-token

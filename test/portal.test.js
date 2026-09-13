@@ -473,7 +473,7 @@ test("gallery cards use static digest-addressed images while the viewer iframe s
 
   // digest, not revision, drives the token when body_sha256 is present
   const shell = renderArtifactShell({ ...item }, nav, {}, []);
-  assert.match(shell, /\/raw\/abc123\?anchor=1&v=deadbeefcafe/);
+  assert.match(shell, /\/raw\/abc123\?anchor=1&reader=1&v=deadbeefcafe/);
 
   // a changed body digest changes the token (cache is actually busted)
   const nextSha = "000000000000111122223333444455556666777788889999aaaabbbbccccdddd";

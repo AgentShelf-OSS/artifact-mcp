@@ -1,0 +1,70 @@
+{
+  "date": "2026-09-12",
+  "host": "VM310",
+  "cpu_limit": 2,
+  "memory_limit_gib": 4,
+  "engine": "MOSS-TTS-Nano ONNX CPU",
+  "idle_thread_spinning": false,
+  "short_samples": [
+    {
+      "voice": "moss_trump",
+      "generation_seconds": 2.439,
+      "audio_seconds": 2.88,
+      "valid": true
+    },
+    {
+      "voice": "moss_ava",
+      "generation_seconds": 3.182,
+      "audio_seconds": 4.0,
+      "valid": true
+    },
+    {
+      "voice": "moss_bella",
+      "generation_seconds": 2.489,
+      "audio_seconds": 2.96,
+      "valid": true
+    },
+    {
+      "voice": "moss_adam",
+      "generation_seconds": 2.265,
+      "audio_seconds": 2.96,
+      "valid": true
+    },
+    {
+      "voice": "moss_nathan",
+      "generation_seconds": 3.693,
+      "audio_seconds": 4.0,
+      "valid": true
+    }
+  ],
+  "long_sample": [
+    {
+      "voice": "moss_ava",
+      "generation_seconds": 46.923,
+      "audio_seconds": 40.56,
+      "valid": true
+    }
+  ],
+  "player_chunk_sample": [
+    {
+      "voice": "moss_ava",
+      "generation_seconds": 24.924,
+      "audio_seconds": 19.12,
+      "valid": true
+    }
+  ],
+  "notes": [
+    "Uncached synthesis measurements; speed varies by voice, text and host load.",
+    "Listen limits MOSS text chunks to 300 Unicode characters.",
+    "Audio verified as non-silent mono 24 kHz PCM16 WAV.",
+    "Seven authentication and malformed-request checks passed."
+  ],
+  "browser": {
+    "all_five_voices": true,
+    "pause_stop": true,
+    "chapter_continuation_1984": true,
+    "desktop_mobile": true,
+    "page_errors": []
+  },
+  "deployed_artifact_mcp_sha256": "a56f6d3a6d0a917932d5c9659eadeb964969376e815f6a13e192fec3fc01de14"
+}

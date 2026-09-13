@@ -1,0 +1,31 @@
+{
+  "date": "2026-09-12",
+  "artifact_id": "y7f50a773w08",
+  "artifact_revision": 8,
+  "artifact_sha256": "646b922545de4702442b96a194ec0a042716351d5c49ac86437d95fd4200a736",
+  "native_binary_sha256": "fd8ab563eb30f0b8863843c4dbce3b722f76ab85924ab5a86cc0bda632f773a0",
+  "deployment": "CT220 native Artifact MCP; existing VM310 Kokoro CPU worker",
+  "browser": "headless Chromium, 1440x900 and 390x844 viewport emulation",
+  "verification_scope": "Isolated authenticated viewer using exact published HTML and deployed binary, connected to live CPU worker. Production service health and published file hash checked. Cloudflare-authenticated production browser session unavailable.",
+  "checks": [
+    "ordinary HTML narration",
+    "exact selected text",
+    "from current paragraph",
+    "play/pause including loading",
+    "resume same audio position",
+    "speed changes",
+    "automatic chunk continuation",
+    "automatic Chapter 1 to Chapter 2 continuation",
+    "manual chapter navigation cancels",
+    "bundle navigation preserves helper",
+    "cross-org access denied",
+    "mutation header required",
+    "oversize input denied",
+    "hidden and interface text excluded",
+    "stable highlighting after unrelated DOM changes",
+    "desktop and mobile visual review"
+  ],
+  "browser_page_errors": [],
+  "rust_speech_tests": 4,
+  "rust_raw_response_tests": 6
+}

@@ -150,3 +150,42 @@ eligible single-file artifacts at low priority. Bundles use the placeholder in t
 If the sidecar is unavailable, publishing continues and notifications fall back to text.
 
 [Return to the documentation index](README.md).
+
+## Local narration
+
+Narration adds a Listen player to authenticated artifact viewers. It is disabled
+by default and requires a private speech worker. See the [worker setup and
+ereader format](../ops/tts/README.md). Restart the service after changing these values.
+
+| Variable | Purpose |
+|---|---|
+| `TTS_ENABLED` | Set to `1` to enable narration for authorized artifacts. |
+| `TTS_ARTIFACT_IDS` | Optional comma-separated allowlist. A nonempty list also preserves legacy trial enablement when `TTS_ENABLED` is unset. Clear this list as well as setting `TTS_ENABLED=0` to disable narration. |
+| `TTS_WORKER_URL` | Private HTTP(S) base URL for the Kokoro worker. Never sent to the artifact. |
+| `TTS_WORKER_TOKEN_FILE` | Path to the worker bearer token, readable by the artifact service account. Never include the token itself in HTML or environment settings. |
+| `POCKET_TTS_WORKER_URL` | Optional private Pocket TTS worker URL. Adds 21 preset English Pocket voices. It can be the only configured worker. |
+| `POCKET_TTS_WORKER_TOKEN_FILE` | Optional separate Pocket token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
+| `MOSS_TTS_WORKER_URL` | Optional private MOSS-TTS Nano ONNX worker URL. Adds its configured English voices alongside the other engines. |
+| `MOSS_TTS_WORKER_TOKEN_FILE` | Optional separate MOSS worker token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
+
+See [Pocket deployment and comparison](../ops/pocket-tts/README.md).
+
+Qwen3-TTS can be added with `QWEN_TTS_WORKER_URL` pointing to the
+[authenticated adapter](../ops/qwen-tts/README.md). `QWEN_TTS_WORKER_TOKEN_FILE`
+defaults to `TTS_WORKER_TOKEN_FILE`. Restart artifact-mcp after configuration changes.
+
+Set `QWEN_TTS_CUSTOM_VOICES_ENABLED=1` only after the adapter’s CustomVoice model
+is available. Set `QWEN_TTS_REFERENCE_VOICE_ENABLED=0` for preset-only deployments.
+Qwen and Pocket use progressive PCM playback through `/speech/stream`; Kokoro and MOSS retain WAV playback.
+
+MOSS-TTS Nano is an optional CPU-oriented WAV worker. Configure `MOSS_TTS_WORKER_URL`
+only after its authenticated worker is running; the artifact server exposes the
+worker's fixed English voice IDs when the URL and token are valid. MOSS does not
+accept Qwen style instructions, and narration requests for its voices remain
+bounded by the same 1,500-character and 4 MiB limits.
+
+The viewer remembers the selected voice and playback speed locally in the browser.
+E-reader paragraphs are split at sentence boundaries where supported, with a
+bounded one-paragraph prefetch to reduce gaps between paragraphs. The player’s
+Preview paragraph control uses the same current paragraph for quick voice and
+style comparisons.

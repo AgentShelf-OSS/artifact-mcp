@@ -1,0 +1,60 @@
+services:
+  qwen3-tts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: navi-tts-runtime:cuda12
+    container_name: qwen3-tts
+    runtime: nvidia
+    ipc: host
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      HF_HOME: /models
+      HUGGINGFACE_HUB_CACHE: /models/hub
+      PYTHONDONTWRITEBYTECODE: "1"
+      VLLM_CACHE_ROOT: /models/.cache/vllm
+      XDG_CACHE_HOME: /models/.cache
+      TRITON_CACHE_DIR: /models/.cache/triton
+      TORCHINDUCTOR_CACHE_DIR: /models/.cache/torchinductor
+    working_dir: /runtime
+    command:
+      - /runtime/venv/bin/vllm-omni
+      - serve
+      - Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice
+      - --omni
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+      - --trust-remote-code
+      - --enforce-eager
+      - --allowed-local-media-path
+      - /voices
+    volumes:
+      - /mnt/ai-data/vllm-omni-0.18:/runtime:ro
+      - /mnt/ai-data/huggingface:/models
+      - /root/voxcpm-tts/voices:/voices:ro
+    networks:
+      - navi-voice
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "/runtime/venv/bin/python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 600s
+    pids_limit: 2048
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  navi-voice:
+    name: navi_voice
+    external: true

@@ -1,0 +1,42 @@
+services:
+  speech:
+    image: homelab/artifact-kokoro:1984-trial-1
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${TTS_BIND_HOST:?Set the private worker bind address}:8788:8788"
+    environment:
+      OMP_NUM_THREADS: "2"
+      OPENBLAS_NUM_THREADS: "1"
+      TOKEN_FILE: /run/secrets/tts_token
+    secrets:
+      - tts_token
+    volumes:
+      - ./models:/models:ro
+      - ./cache:/cache
+    read_only: true
+    tmpfs:
+      # Phonemizer copies its native eSpeak library here before loading it.
+      - /tmp:size=64m,mode=1777,exec
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: "2.0"
+    mem_limit: 2g
+    pids_limit: 96
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/health', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+      start_period: 90s
+    logging:
+      driver: json-file
+      options: {max-size: "5m", max-file: "2"}
+secrets:
+  tts_token:
+    file: ./tts-token
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: "${TTS_SUBNET:?Set an unused Docker subnet}"

@@ -354,12 +354,13 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
     assert!(html.contains("url.protocol==='http:'||url.protocol==='https:'"));
     assert!(html.contains("outboundHost.textContent=url.host"));
     assert!(html.contains("window.open(url.href,'_blank','noopener')"));
-    let outbound_broker = &html[html
+    let broker_start = html
         .find("function parseOutboundHref")
-        .expect("shell contains outbound-link broker")
-        ..html
-            .find("window.addEventListener('message'")
-            .expect("broker runs before iframe message handler")];
+        .expect("shell contains outbound-link broker");
+    let broker_tail = &html[broker_start..];
+    let outbound_broker = &broker_tail[..broker_tail
+        .find("window.addEventListener('message'")
+        .expect("broker runs before its iframe message handler")];
     assert!(!outbound_broker.contains("innerHTML"));
     assert!(html.contains("data-thread-id=\"feedback-1\""));
     assert!(html.contains("id=\"vdelete-trigger\""));

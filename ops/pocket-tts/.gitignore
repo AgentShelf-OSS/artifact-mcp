@@ -1,0 +1,5 @@
+.env
+tts-token
+models/
+cache/
+__pycache__/

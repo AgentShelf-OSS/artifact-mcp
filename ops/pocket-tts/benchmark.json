@@ -1,0 +1,68 @@
+[
+  {
+    "engine": "kokoro",
+    "voice": "bm_george",
+    "sample": "Opening paragraph",
+    "characters": 306,
+    "request_seconds": 7.224,
+    "generation_seconds": 7.22,
+    "audio_seconds": 18.411,
+    "cached": false,
+    "realtime_factor": 0.392
+  },
+  {
+    "engine": "kokoro",
+    "voice": "bm_george",
+    "sample": "Newspeak terms",
+    "characters": 574,
+    "request_seconds": 13.94,
+    "generation_seconds": 13.936,
+    "audio_seconds": 35.535,
+    "cached": false,
+    "realtime_factor": 0.392
+  },
+  {
+    "engine": "pocket",
+    "voice": "pocket_alba",
+    "sample": "Opening paragraph",
+    "characters": 306,
+    "request_seconds": 5.384,
+    "generation_seconds": 5.381,
+    "audio_seconds": 15.2,
+    "cached": false,
+    "realtime_factor": 0.354
+  },
+  {
+    "engine": "pocket",
+    "voice": "pocket_alba",
+    "sample": "Newspeak terms",
+    "characters": 574,
+    "request_seconds": 10.611,
+    "generation_seconds": 10.608,
+    "audio_seconds": 28.96,
+    "cached": false,
+    "realtime_factor": 0.366
+  },
+  {
+    "engine": "pocket",
+    "voice": "pocket_marius",
+    "sample": "Opening paragraph",
+    "characters": 306,
+    "request_seconds": 5.476,
+    "generation_seconds": 5.474,
+    "audio_seconds": 15.28,
+    "cached": false,
+    "realtime_factor": 0.358
+  },
+  {
+    "engine": "pocket",
+    "voice": "pocket_marius",
+    "sample": "Newspeak terms",
+    "characters": 574,
+    "request_seconds": 10.563,
+    "generation_seconds": 10.558,
+    "audio_seconds": 26.48,
+    "cached": false,
+    "realtime_factor": 0.399
+  }
+]

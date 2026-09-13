@@ -1,0 +1,121 @@
+{
+  "artifact_url": "https://artifact.neilblackman.dev/y7f50a773w08",
+  "artifact_revision": 7,
+  "artifact_sha256": "3956c0c53811ebe9760cc59689ae8aa1a4d5a042b0b8e24302c7092aba456ddc",
+  "worker_host": "VM310",
+  "artifact_host": "CT220",
+  "cpu": "AMD Ryzen 7 5700X, VM with 8 vCPUs",
+  "worker_cpu_quota": 2,
+  "worker_memory_limit_gib": 2,
+  "observed_worker_memory_gib": 1.171,
+  "worker_image_id": "sha256:2931da1cd14073c8d95dd492d0b7fc987beead7cec7ddd0dc4978b33eaf671df",
+  "artifact_binary_sha256": "9ca4f1c361b9f7b55f39d7703869eae0dab0a5ebd75e21f2b5bbf18e4ccfe9e1",
+  "int8_benchmark": [
+    {
+      "voice": "bm_george",
+      "title": "Opening paragraph",
+      "audio_file": "kokoro-bm_george-0.wav",
+      "audio_seconds": 18.709,
+      "wall_seconds": 20.752,
+      "generation_seconds": 20.75,
+      "cached": "false"
+    },
+    {
+      "voice": "bf_emma",
+      "title": "Opening paragraph",
+      "audio_file": "kokoro-bf_emma-0.wav",
+      "audio_seconds": 16.341,
+      "wall_seconds": 18.341,
+      "generation_seconds": 18.338,
+      "cached": "false"
+    },
+    {
+      "voice": "bm_george",
+      "title": "Newspeak terms",
+      "audio_file": "kokoro-bm_george-1.wav",
+      "audio_seconds": 47.29,
+      "wall_seconds": 52.171,
+      "generation_seconds": 52.166,
+      "cached": "false"
+    },
+    {
+      "voice": "bf_emma",
+      "title": "Newspeak terms",
+      "audio_file": "kokoro-bf_emma-1.wav",
+      "audio_seconds": 43.365,
+      "wall_seconds": 65.176,
+      "generation_seconds": 65.17,
+      "cached": "false"
+    }
+  ],
+  "fp32_benchmark": [
+    {
+      "voice": "bm_george",
+      "title": "Opening paragraph",
+      "audio_file": "kokoro-bm_george-0.wav",
+      "audio_seconds": 18.539,
+      "wall_seconds": 11.64,
+      "generation_seconds": 11.635,
+      "cached": "false"
+    },
+    {
+      "voice": "bf_emma",
+      "title": "Opening paragraph",
+      "audio_file": "kokoro-bf_emma-0.wav",
+      "audio_seconds": 16.341,
+      "wall_seconds": 7.584,
+      "generation_seconds": 7.581,
+      "cached": "false"
+    },
+    {
+      "voice": "bm_george",
+      "title": "Newspeak terms",
+      "audio_file": "kokoro-bm_george-1.wav",
+      "audio_seconds": 47.631,
+      "wall_seconds": 21.324,
+      "generation_seconds": 21.317,
+      "cached": "false"
+    },
+    {
+      "voice": "bf_emma",
+      "title": "Newspeak terms",
+      "audio_file": "kokoro-bf_emma-1.wav",
+      "audio_seconds": 43.279,
+      "wall_seconds": 21.778,
+      "generation_seconds": 21.772,
+      "cached": "false"
+    }
+  ],
+  "browser_verification": {
+    "ok": true,
+    "sourceRevision": 7,
+    "firstAudio": {
+      "duration": 4.714667,
+      "time": 0.215357,
+      "para": 0
+    },
+    "speechStatuses": [
+      200,
+      200,
+      200,
+      200
+    ],
+    "checks": [
+      "authenticated bridge and CPU WAV playback",
+      "pause during loading",
+      "pause/resume position",
+      "automatic chunk and paragraph continuation",
+      "speed control",
+      "stop",
+      "next paragraph",
+      "cross-org denied",
+      "missing mutation header denied",
+      "oversize denied",
+      "mobile no horizontal overflow"
+    ],
+    "pageErrors": []
+  },
+  "verification_scope": "Exact published revision in isolated local Rust viewer using real VM310 worker; CT220 service-account worker authentication also passed. Production browser session requires Cloudflare sign-in. Mobile viewport is Chromium emulation, not iOS background-audio qualification.",
+  "rollback_binary": "/usr/local/bin/artifact-mcp.pre-tts-20260911",
+  "rollback_artifact_revision": 6
+}

@@ -23,12 +23,34 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 - Publish a self-contained HTML page or a multi-file bundle through MCP.
 - Update an artifact without changing its URL, with retained revision history and restore.
 - Persist org-shared notes and other JSON through the [viewer state bridge](GETTING_STARTED.md#persisting-state-from-an-artifact).
+- Read HTML aloud from the viewer with optional [local narration](ops/tts/README.md), including
+  a mini player, saved positions, and automatic chapter continuation for supported ereaders.
 - Search and organize artifacts by organization, category, owner, review state, and visibility.
 - Attach threaded feedback to a point or region and copy the exact revision context back to an
   agent.
 - Keep organizations isolated with scoped publisher keys and verified viewer identity.
 - Run optional Discord notifications, persistent thumbnails, OAuth credentials, and Prometheus
   metrics without making them requirements for the core server.
+
+## Listen to artifacts
+
+The authenticated viewer can read visible text from HTML artifacts without requiring each artifact
+to embed a player. **Listen** opens a compact player; **Expand** exposes the selected voice,
+playback speed, and reading scope. The reader supports the current page, selected text, a clicked
+reading position, and the current semantic section. A clicked paragraph or heading is highlighted
+and gets an inline play action, so reading can begin exactly where attention is focused.
+
+Playback includes pause/resume, 15-second rewind, paragraph navigation, sleep timers, saved-place
+resume, and chapter continuation where the artifact exposes a supported ereader structure. The
+default server installation does not require a speech worker. Deployments that want local CPU
+narration can use the [Pocket TTS worker](ops/pocket-tts/README.md), which provides 21 preset
+English voices and streamed audio; the [TTS operations guide](ops/tts/README.md) documents worker
+configuration, authorization, limits, and rollback.
+
+The reader currently follows authored HTML structure and visible text. Charts, diagrams, metric
+cards, tables, and interactive mockups are treated as artifact content, but semantic summaries
+and richer block grouping are tracked in [PBI #41](https://github.com/AgentShelf-OSS/artifact-mcp/issues/41). Authors should provide nearby captions
+or explanations when a visual needs to be narrated.
 
 ## Quick start
 

@@ -1,0 +1,29 @@
+{
+  "date": "2026-09-12",
+  "artifact_id": "y7f50a773w08",
+  "artifact_revision": 8,
+  "artifact_sha256": "646b922545de4702442b96a194ec0a042716351d5c49ac86437d95fd4200a736",
+  "server_binary_sha256": "b2436aaa65ae3fd92ac3b194cd817e9a71532a6fedcf211d9e5ab889c0f37b8e",
+  "worker_image_id": "sha256:02c0955fc6a85fe753efa86f4c2c3063d485395f8ae6943144e5b091e9da5fc6",
+  "pocket_version": "3.1.0",
+  "model": "english_2026-04",
+  "voices_verified": 8,
+  "observed_memory_mib": 718,
+  "node_test_files_passed": 6,
+  "rust_speech_tests_passed": 4,
+  "browser_errors": [],
+  "browser_validation": "Isolated release server with exact published book and actual private workers; production Access authentication unchanged",
+  "checks": [
+    "voice groups",
+    "pause while loading",
+    "resume position",
+    "voice change stops playback",
+    "playback rate",
+    "selection",
+    "chapter continuation",
+    "manual chapter change stops playback",
+    "mobile overflow",
+    "desktop and dark mobile review",
+    "worker authentication"
+  ]
+}

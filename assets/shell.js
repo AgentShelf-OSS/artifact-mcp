@@ -244,6 +244,613 @@
     var pin=pinFromRow(row);if(pin){pins.push(pin);pinById[pin.id]=pin;}
   });
   function postToFrame(type,extra){try{if(frame&&frame.contentWindow)frame.contentWindow.postMessage(Object.assign({type:type},extra||{}),'*');}catch(_){}}
+  // Speech is brokered here because the artifact iframe has an opaque origin and no network capability.
+  var ttsActive=new Map(),ttsMax=2,ttsVoices=[],ttsRequested=false;
+  function ttsError(id,error){postToFrame('tts:error',{requestId:String(id||''),error:error});}
+  function ttsHello(){ttsRequested=true;fetch('/'+encodeURIComponent(artifactId)+'/speech/voices').then(function(r){return r.json().then(function(body){return {ok:r.ok,body:body};});}).then(function(result){ttsVoices=result.ok&&result.body&&Array.isArray(result.body.voices)?result.body.voices:[];postToFrame('tts:ready',{enabled:!!(result.ok&&result.body&&result.body.enabled),voices:ttsVoices,maxChars:result.body&&result.body.maxChars||1500});}).catch(function(){postToFrame('tts:ready',{enabled:false,voices:[],maxChars:1500});});}
+  function ttsRequest(data){var id=typeof data.requestId==='string'?data.requestId:'',text=typeof data.text==='string'?data.text:'',voice=typeof data.voice==='string'?data.voice:'';if(!id||id.length>80){ttsError(id,'bad_request');return;}if(ttsActive.has(id)){ttsError(id,'duplicate_request');return;}if(!text.trim()||text.length>1500){ttsError(id,'bad_text');return;}if(!ttsVoices.some(function(item){return item&&item.id===voice;})){ttsError(id,'bad_voice');return;}if(ttsActive.size>=ttsMax){ttsError(id,'busy');return;}var controller=new AbortController();ttsActive.set(id,controller);fetch('/'+encodeURIComponent(artifactId)+'/speech',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text:text,voice:voice}),signal:controller.signal}).then(function(response){if(!response.ok){var error=new Error(response.status===429?'busy':'unavailable');error.code=error.message;throw error;}return response.arrayBuffer();}).then(function(audio){if(ttsActive.get(id)!==controller)return;try{frame.contentWindow.postMessage({type:'tts:audio',requestId:id,audio:audio,mime:'audio/wav'},'*',[audio]);}catch(_){ttsError(id,'unavailable');}}).catch(function(error){if(error&&error.name==='AbortError')return;if(ttsActive.get(id)===controller)ttsError(id,error&&error.code==='busy'?'busy':'unavailable');}).finally(function(){if(ttsActive.get(id)===controller)ttsActive.delete(id);});}
+  function ttsCancel(data){var id=typeof data.requestId==='string'?data.requestId:'',controller=id.length<=80?ttsActive.get(id):null;if(controller){ttsActive.delete(id);controller.abort();}}
+  function ttsReset(){ttsActive.forEach(function(controller){controller.abort();});ttsActive.clear();ttsVoices=[];if(ttsRequested)ttsHello();}
+  if(frame)frame.addEventListener('load',ttsReset);
+
+  // The trusted shell owns audio; the sandbox supplies bounded text snapshots.
+  function createNativeReader() {
+    if (!frame || !document.getElementById('vshare-toggle')) return;
+    const box = document.createElement('section');
+    box.className = 'vreader'; box.hidden = true;
+    box.setAttribute('aria-label', 'Read aloud');
+    box.innerHTML = '<button id="vreader-toggle" type="button" class="vreader-toggle" aria-expanded="false" aria-controls="vreader-mini vreader-panel">Listen</button><div id="vreader-panel" class="vreader-panel" hidden><div class="vreader-head"><div><span class="vreader-kicker">Audio reader</span><strong>Read aloud</strong></div><button id="vreader-minimize" type="button" class="vreader-control vreader-minimize" aria-label="Minimize audio player">Minimize</button><span id="vreader-status" role="status" aria-live="polite">Ready</span></div><div class="vreader-actions" role="group" aria-label="Playback controls"><button id="vreader-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-prev" type="button" class="vreader-control vreader-skip" aria-label="Previous paragraph">Previous</button><button id="vreader-next" type="button" class="vreader-control vreader-skip" aria-label="Next paragraph">Next</button><button id="vreader-stop" type="button" class="vreader-control vreader-stop">Stop</button></div><div class="vreader-navigator"><label for="vreader-outline">Jump to</label><div class="vreader-navigator-row"><select id="vreader-outline" disabled><option value="">Loading sections…</option></select><button id="vreader-jump" type="button" class="vreader-control" aria-label="Start reading from selected section or chapter" disabled>Read</button></div><p class="vreader-pick-hint">Click text in the artifact to choose where to read.</p><div id="vreader-target" class="vreader-target" hidden><span id="vreader-target-label"></span><button id="vreader-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div></div><div class="vreader-settings"><label>Read <select id="vreader-mode"><option value="page">Page / chapter</option><option value="selection">Selection</option><option value="here">From here</option><option value="section">This section</option></select></label><label>Voice <select id="vreader-voice"></select></label><label>Speed <select id="vreader-rate"><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div><div id="vreader-style-panel" class="vreader-style-panel" hidden><div class="vreader-style-row"><label for="vreader-style">Reading style<select id="vreader-style"><option value="calm">Calm audiobook</option><option value="neutral">Neutral</option><option value="expressive">Expressive</option><option value="default">Model default</option><option value="custom">Custom instructions</option></select></label></div><label id="vreader-custom-label" class="vreader-custom" hidden>Delivery instructions<textarea id="vreader-custom" rows="3" maxlength="500" placeholder="Describe the pacing, tone, and emphasis you want."></textarea></label><p id="vreader-style-hint" class="vreader-style-hint">Steady pacing, restrained emotion, gentle emphasis.</p></div><div class="vreader-utility-row"><button id="vreader-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15 seconds</button><button id="vreader-resume" type="button" class="vreader-control" hidden>Resume saved place</button></div><label class="vreader-sleep">Sleep timer<select id="vreader-sleep"><option value="off">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="section">End of section</option><option value="chapter" hidden disabled>End of chapter</option></select><span id="vreader-sleep-hint"></span></label><div class="vreader-preview-row"><button id="vreader-preview" type="button" class="vreader-control">Preview paragraph</button></div><audio id="vreader-audio" preload="auto"></audio></div><div id="vreader-mini" class="vreader-mini" hidden role="region" aria-label="Compact audio player"><div id="vreader-mini-target" class="vreader-target" hidden><span id="vreader-mini-target-label"></span><button id="vreader-mini-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-mini-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div><div class="vreader-mini-row"><div class="vreader-mini-info"><span id="vreader-mini-meta" class="vreader-kicker">Listen</span><span id="vreader-mini-status" role="status" aria-live="polite">Ready</span></div><button id="vreader-mini-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15</button><button id="vreader-mini-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-mini-next" type="button" class="vreader-control" aria-label="Next paragraph">Next</button><button id="vreader-expand" type="button" class="vreader-control" aria-label="Expand audio player" title="Voice, speed, and reading settings">Expand</button><button id="vreader-mini-close" type="button" class="vreader-control vreader-dismiss" aria-label="Stop and close audio player">×</button></div></div>';
+    box.querySelector('#vreader-mini').insertAdjacentHTML('beforeend', '<button id="vreader-mini-resume" type="button" class="vreader-mini-resume" hidden>Resume saved place</button>');
+    // Tabler Icons player-play and player-pause, MIT, https://github.com/tabler/tabler-icons.
+    box.insertAdjacentHTML('beforeend', '<button id="vreader-inline-read" class="vreader-inline-read" type="button" aria-label="Read from here" title="Read from here" hidden><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13 -8l-13 -8" /></svg><span>Read from here</span></button>');
+    const share = document.getElementById('vshare-toggle'); share.parentNode.insertBefore(box, share);
+    const get = name => box.querySelector('#vreader-' + name), audio = get('audio');
+    let ready = false, enabled = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
+    let queue = [], position = 0, wants = false, loading = false, currentUrl = null, loaded = -1, chapter = null;
+    let controller = new AbortController(), cache = new Map(), voice = '', mode = 'page';
+    let audioContext = null, stream = null;
+    const streamRequests = new Map();
+    let playbackConfig = null;
+    let contentFingerprint = '', queueKey = '', scopeStart = 0, scopeEnd = 0, restoring = null, pendingSeek = 0;
+    const durations = new Map();
+    let sleepDeadline = 0, sleepBoundary = null;
+    let compact = false, outlineRequest = '', outlineTimer, outlineFingerprint = '', clickedTarget = null, targetGeometry = null;
+    function readerVisible() { return !get('panel').hidden || compact; }
+    function pickMode() { send('reader:pick-mode', {enabled:enabled && ready && readerVisible() && !commentMode}); }
+    function refreshOutline() {
+      if (!enabled || !ready || !readerVisible()) return;
+      clearTimeout(outlineTimer); outlineRequest = 'outline-' + (++serial);
+      get('outline').disabled = true; get('jump').disabled = true;
+      send('reader:outline', {requestId:outlineRequest});
+      outlineTimer = setTimeout(() => {
+        if (!outlineRequest) return;
+        outlineRequest = ''; get('outline').replaceChildren(new Option('Sections unavailable', ''));
+      }, 5000);
+    }
+    function clearTarget() {
+      clickedTarget = null; targetGeometry = null;
+      get('target').hidden = get('mini-target').hidden = get('inline-read').hidden = true;
+      send('reader:clear-target');
+    }
+    function placeTargetAction() {
+      const action = get('inline-read'); action.hidden = true;
+      if (!clickedTarget || !targetGeometry || !readerVisible() || commentMode) return;
+      const bounds = frame.getBoundingClientRect(), g = targetGeometry;
+      const sx = bounds.width / g.viewport.width, sy = bounds.height / g.viewport.height;
+      const left = bounds.left + g.rect.left * sx, right = bounds.left + g.rect.right * sx;
+      const top = bounds.top + g.rect.top * sy, bottom = bounds.top + g.rect.bottom * sy;
+      const minY = Math.max(bounds.top, document.querySelector('.vbar').getBoundingClientRect().bottom) + 6;
+      const maxY = Math.min(bounds.bottom, innerHeight) - 50;
+      if (bottom <= minY || top >= maxY + 44 || right <= bounds.left || left >= bounds.right || maxY < minY) return;
+      const y = Math.max(minY, Math.min(top, maxY)), above = Math.max(minY, Math.min(top - 50, maxY));
+      const panel = (compact ? get('mini') : get('panel')).getBoundingClientRect();
+      const candidates = [[right+4,y],[left>=bounds.left+38 ? Math.max(bounds.left,left-44) : -100,y],[Math.min(right-44,innerWidth-50),above],[Math.max(left,6),above]];
+      const candidate = candidates.find(([x,cy]) => x>=Math.max(0,bounds.left) && x+44<=Math.min(innerWidth-6,bounds.right-6) && !(x<panel.right && x+44>panel.left && cy<panel.bottom && cy+44>panel.top));
+      if (!candidate) return;
+      const [x, cy] = candidate;
+      action.querySelector('span').style.left = x < innerWidth / 2 ? '0' : 'auto';
+      action.querySelector('span').style.right = x < innerWidth / 2 ? 'auto' : '0';
+      action.style.left = x + 'px'; action.style.top = cy + 'px'; action.hidden = false;
+    }
+    function setPlayerView(view) {
+      compact = view === 'compact'; get('panel').hidden = view !== 'full'; get('mini').hidden = !compact;
+      get('toggle').setAttribute('aria-expanded', String(view !== 'closed'));
+      if (view === 'closed') clearTarget();
+      placePanel(); pickMode(); placeTargetAction();
+      if (view !== 'closed') refreshOutline();
+    }
+    function jumpTo(fields) {
+      if (!enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions())) return;
+      stop('Opening reading position…'); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').disabled = true;
+      mode = Number.isInteger(fields.chapterIndex) ? 'page' : 'here'; get('mode').value = mode;
+      sleepBoundary = null; clearTarget(); wants = true;
+      const context = streamingVoice() ? ensureAudioContext() : null;
+      if (context?.state === 'suspended') context.resume().catch(() => {});
+      extraction = 'read-' + (++serial); send('reader:jump', Object.assign({requestId:extraction,mode}, fields));
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not open that position. Choose it again.'); }, 5000); paint();
+    }
+
+    function checkpointKey() { if (isBundle && !currentPage) return ''; return 'artifact-reader-place:' + JSON.stringify([artifactId, configLiteral('viewerId'), isBundle ? currentPage : '']); }
+    function savedPlace() {
+      try {
+        const value = JSON.parse(localStorage.getItem(checkpointKey()) || 'null');
+        if (value && value.version === 1 && (value.chapterIndex === undefined || Number.isInteger(value.chapterIndex) && value.chapterIndex >= 0) && typeof value.fingerprint === 'string' && value.fingerprint.length <= 100 &&
+          ['page','here','section'].includes(value.mode) && Number.isInteger(value.ordinal) && value.ordinal >= 0 &&
+          Number.isInteger(value.chunk) && value.chunk >= 0 && Number.isFinite(value.offset) && value.offset >= 0 && value.offset < 3600 &&
+          Number.isInteger(value.start) && Number.isInteger(value.end) && value.start <= value.ordinal && value.end >= value.ordinal &&
+          typeof value.voice === 'string' && Array.from(get('rate').options).some(o => o.value === value.rate)) {
+          if (!Array.from(get('voice').options).some(o => o.value === value.voice)) {
+            const fallback = Array.from(get('voice').options).find(o => o.value === 'pocket_alba');
+            if (!fallback) return null;
+            // Different voices can use different chunks and timings. Keep the paragraph.
+            value.voice = fallback.value; value.chunk = 0; value.offset = 0;
+          }
+          return value;
+        }
+      } catch (_) {} return null;
+    }
+    function refreshSaved() { get('resume').hidden = !savedPlace(); get('resume').disabled = !ready || !enabled || !!extraction; get('mini-resume').hidden = get('resume').hidden || !!queue.length || !!extraction; get('mini-resume').disabled = get('resume').disabled; }
+    function mediaOffset() {
+      if (!stream) return loaded === position ? audio.currentTime || 0 : pendingSeek;
+      let offset = stream.baseOffset;
+      for (const f of stream.frames) offset += f.played ? f.buffer.duration : Math.min(f.buffer.duration, f.offset + (f.source ? Math.max(0, audioContext.currentTime - f.start) * f.rate : 0));
+      return offset;
+    }
+    function savePlace() {
+      const entry = queue[position];
+      if (!entry || !queueKey || !contentFingerprint || (playbackConfig?.mode || mode) === 'selection' || previewEnd !== null || previewRequested || restoring || loaded !== position) return;
+      try { localStorage.setItem(queueKey, JSON.stringify({version:1, fingerprint:contentFingerprint, ordinal:entry.ordinal, chunk:entry.chunk, offset:mediaOffset(), start:scopeStart, end:scopeEnd, chapterIndex:chapter?.index, voice:playbackConfig?.voice || voice, rate:get('rate').value, mode:playbackConfig?.mode || mode, style:playbackConfig?.style || get('style').value, custom:playbackConfig?.custom ?? get('custom').value})); } catch (_) {}
+      refreshSaved();
+    }
+    function cancelSleep() { sleepDeadline = 0; sleepBoundary = null; get('sleep').value = 'off'; get('sleep-hint').textContent = ''; }
+    function armSleep() {
+      const choice = get('sleep').value;
+      if (/^\d+$/.test(choice) && !sleepDeadline) sleepDeadline = Date.now() + Number(choice) * 60000;
+      if (choice === 'section' && sleepBoundary === null && queue[position]) sleepBoundary = queue[position].sectionEndOrdinal;
+    }
+    function mayContinue(index) { return !(get('sleep').value === 'section' && sleepBoundary !== null && queue[index]?.ordinal > sleepBoundary); }
+    function checkSleep() {
+      if (sleepDeadline && Date.now() >= sleepDeadline) { stop('Sleep timer ended. Your place is saved.'); cancelSleep(); return true; }
+      get('sleep-hint').textContent = sleepDeadline ? Math.ceil((sleepDeadline - Date.now()) / 60000) + ' min remaining' : '';
+      return false;
+    }
+    setInterval(() => { checkSleep(); savePlace(); }, 2000);
+    window.addEventListener('pagehide', savePlace);
+    document.addEventListener('visibilitychange', () => { checkSleep(); savePlace(); });
+
+    const readingStyles = {
+      calm: 'Read as a calm audiobook narrator. Use consistent pacing, restrained emotion, and natural sentence endings. Avoid exaggerated emphasis and dramatic pitch changes.',
+      neutral: 'Read clearly with an even, neutral delivery, consistent pacing, and natural pauses. Keep emotional expression minimal.',
+      expressive: 'Read expressively with natural emotional variation appropriate to the text, clear phrasing, and varied emphasis.'
+    };
+    let previewEnd = null, previewStart = 0, previewRequested = false;
+    function supportsStyle() { return voice === 'qwen_ryan' || voice === 'qwen_aiden'; }
+    function instructions() { return supportsStyle() ? (get('style').value === 'custom' ? get('custom').value.trim() : readingStyles[get('style').value] || '') : ''; }
+    function speechBody(text, chosenVoice) {
+      const body = { text, voice: chosenVoice };
+      if (supportsStyle() && instructions()) body.instructions = instructions();
+      return JSON.stringify(body);
+    }
+    function updateStyle() {
+      get('style-panel').hidden = !supportsStyle();
+      get('custom-label').hidden = get('style').value !== 'custom';
+      get('style-hint').textContent = ({ calm: 'Steady pacing, restrained emotion, gentle emphasis.', neutral: 'Clear, even delivery with minimal emotion.', expressive: 'More variation in tone and emphasis.', default: 'Uses the model’s own delivery, without style instructions.', custom: 'Up to 500 characters. Style guides delivery; results can vary.' })[get('style').value];
+      placePanel(); paint();
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem('artifact-reader-style') || 'null');
+      if (saved && ['calm','neutral','expressive','default','custom'].includes(saved.style)) get('style').value = saved.style;
+      if (saved && typeof saved.custom === 'string') get('custom').value = saved.custom.slice(0,500);
+    } catch (_) {}
+    let savedVoice = '';
+    try {
+      const saved = JSON.parse(localStorage.getItem('artifact-reader-preferences') || 'null');
+      if (saved && typeof saved.voice === 'string') savedVoice = saved.voice;
+      if (saved && Array.from(get('rate').options).some(option => option.value === saved.rate)) get('rate').value = saved.rate;
+    } catch (_) {}
+    function savePreferences() {
+      try { localStorage.setItem('artifact-reader-preferences', JSON.stringify({ voice, rate: get('rate').value })); } catch (_) {}
+    }
+    function styleChanged() {
+      stop('Style changed. Play or preview this paragraph.', true);
+      try { localStorage.setItem('artifact-reader-style', JSON.stringify({ style: get('style').value, custom: get('custom').value })); } catch (_) {}
+      updateStyle();
+    }
+    function preparePreview() {
+      previewStart = position;
+      const block = queue[position]?.block;
+      while (position > 0 && queue[position - 1].block === block) position--;
+      previewEnd = position;
+      while (previewEnd < queue.length && queue[previewEnd].block === block) previewEnd++;
+    }
+    const send = (type, fields) => postToFrame(type, fields);
+    function status(text) { get('status').textContent = text; get('mini-status').textContent = text; get('mini-status').title = text; }
+    function readingMessage() {
+      const entry = queue[position];
+      const label = chapter?.label || entry?.sectionLabel || (entry ? 'paragraph ' + (entry.ordinal + 1) : '');
+      return (wants ? 'Reading' : 'Paused') + (label ? ' · ' + label : '');
+    }
+    function paint() { get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
+      const icon = wants
+        ? '<path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" /><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />'
+        : '<path d="M7 4v16l13 -8l-13 -8" />';
+      get('mini-play').innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
+      const voiceName = get('voice').selectedOptions[0]?.textContent.split(' · ')[0] || 'Listen';
+      get('mini-meta').textContent = voiceName + ' · ' + get('rate').value + '×';
+      get('mini-play').title = get('play').getAttribute('aria-label');
+      get('mini-play').disabled = get('play').disabled;
+      get('mini-play').setAttribute('aria-label', get('play').getAttribute('aria-label'));
+      get('mini-rewind').disabled = get('rewind').disabled;
+      get('mini-next').disabled = !queue.length || !!extraction;
+      const canJump = enabled && ready && !commentMode && !extraction && !(supportsStyle() && get('style').value === 'custom' && !instructions());
+      get('jump').disabled = !canJump || !get('outline').value || get('outline').disabled;
+      get('target-read').disabled = get('mini-target-read').disabled = get('inline-read').disabled = !canJump;
+      placeTargetAction();
+    }
+    function clearStream() {
+      if (!stream) return;
+      if (stream.reader) stream.reader.cancel().catch(() => {});
+      stream.sources.forEach(source => { try { source.onended = null; source.stop(); } catch (_) {} });
+      stream.sources.clear(); if (stream.finish) stream.finish.resolve(); stream = null; loaded = -1;
+      box.removeAttribute('data-stream-state'); box.removeAttribute('data-played-samples'); box.removeAttribute('data-buffered-samples');
+    }
+    function ensureAudioContext() {
+      if (!window.AudioContext && !window.webkitAudioContext) return null;
+      if (!audioContext) { try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; } }
+      return audioContext;
+    }
+    function stop(message, preserve) {
+      savePlace(); pendingSeek = 0; restoring = null;
+      epoch++; wants = false; loading = false; extraction = ''; previewEnd = null; previewRequested = false; clearTimeout(extractionTimer);
+      controller.abort(); controller = new AbortController(); cache.clear();
+      streamRequests.forEach(work => { work.then(response => response.body?.cancel()).catch(() => {}); });
+      streamRequests.clear();
+      clearStream();
+      audio.onended = null; audio.pause(); audio.removeAttribute('src'); audio.load(); loaded = -1;
+      if (currentUrl) URL.revokeObjectURL(currentUrl); currentUrl = null;
+      if (!preserve) { queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
+      send('reader:highlight', { id: null }); status(message || 'Ready'); paint();
+    }
+    function splitLongText(text, limit) {
+      const result = [], chars = Array.from(text); let start = 0;
+      while (start < chars.length) {
+        let end = Math.min(start + limit, chars.length);
+        if (end < chars.length) {
+          for (let i = end; i > start + Math.floor(limit / 2); i--) {
+            if (/\s/.test(chars[i - 1])) { end = i; break; }
+          }
+        }
+        const value = chars.slice(start, end).join('').trim(); if (value) result.push(value); start = end;
+      }
+      return result;
+    }
+    function chunks(text) {
+      const limit = /^moss_/.test(voice) ? 300 : 600;
+      if (!/^pocket_/.test(voice) || typeof Intl.Segmenter !== 'function') return splitLongText(text, limit);
+      // Keep complete sentences together. Only split within a sentence when it
+      // exceeds the worker chunk limit, including text without punctuation.
+      const result = []; let pending = '';
+      for (const { segment } of new Intl.Segmenter('en', { granularity: 'sentence' }).segment(text)) {
+        const sentence = segment.trim();
+        if (!sentence) continue;
+        if (pending && Array.from(pending + ' ' + sentence).length > limit) { result.push(pending); pending = ''; }
+        if (Array.from(sentence).length > limit) {
+          const parts = splitLongText(sentence, limit); result.push(...parts.slice(0, -1)); pending = parts[parts.length - 1] || '';
+        } else pending = pending ? pending + ' ' + sentence : sentence;
+      }
+      if (pending) result.push(pending);
+      return result;
+    }
+    function delay(ms, signal) {
+      return new Promise((resolve, reject) => {
+        if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
+        const cancel = () => { clearTimeout(timer); reject(new DOMException('Cancelled', 'AbortError')); };
+        const timer = setTimeout(() => { signal.removeEventListener('abort', cancel); resolve(); }, ms);
+        signal.addEventListener('abort', cancel, { once: true });
+      });
+    }
+    function synth(index) {
+      if (cache.has(index)) return cache.get(index);
+      const signal = controller.signal, entry = queue[index], chosenVoice = voice;
+      const work = (async () => {
+        for (let attempt = 0; attempt < 5; attempt++) {
+          const response = await fetch('/' + encodeURIComponent(artifactId) + '/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal });
+          if (response.status === 429 && attempt < 4) { await delay(1500, signal); continue; }
+          if (!response.ok) throw new Error(response.status === 429 ? 'Speech is busy. Press Play to retry.' : 'Speech is unavailable. Press Play to retry.');
+          if (!(response.headers.get('content-type') || '').startsWith('audio/wav')) throw new Error('Invalid audio response.');
+          return response.arrayBuffer();
+        }
+      })();
+      cache.set(index, work); work.catch(() => { if (cache.get(index) === work) cache.delete(index); });
+      return work;
+    }
+    function streamingVoice() { return /^(qwen_|pocket_)/.test(voice); }
+    function fetchStream(index) {
+      if (streamRequests.has(index)) return streamRequests.get(index);
+      const signal = controller.signal, entry = queue[index], chosenVoice = voice;
+      const work = (async () => {
+        for (let attempt = 0; attempt < 10; attempt++) {
+          const response = await fetch('/' + encodeURIComponent(artifactId) + '/speech/stream', { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal });
+          if (response.status !== 429 || attempt === 9) return response;
+          await response.body?.cancel(); await delay(500, signal);
+        }
+      })();
+      // Keep at most the current response and one upcoming response. Leaving the
+      // upcoming body unread preserves browser/network backpressure until playback.
+      streamRequests.set(index, work);
+      work.catch(() => {}); // A prefetch failure is reported when this paragraph plays.
+      return work;
+    }
+    async function streamCurrent(index) {
+      const context = ensureAudioContext();
+      if (!context) return false;
+      const token = epoch, signal = controller.signal, entry = queue[index];
+      const startup = streamRequests.has(index) ? 0.01 : 0.2;
+      const work = fetchStream(index);
+      let response;
+      try { response = await work; }
+      finally { if (streamRequests.get(index) === work) streamRequests.delete(index); }
+      if (token !== epoch || signal.aborted) { response.body?.cancel().catch(() => {}); return true; }
+      if (response.status === 404 || response.status === 415) { await response.body?.cancel(); return false; }
+      if (!response.ok) throw new Error(response.status === 429 ? 'Speech is busy. Press Play to retry.' : 'Speech is unavailable. Press Play to retry.');
+      if (!response.body) return false;
+      if (!(response.headers.get('content-type') || '').toLowerCase().startsWith('application/vnd.artifact.pcm')) throw new Error('Invalid streaming audio response.');
+      if (token !== epoch || signal.aborted) { response.body.cancel().catch(() => {}); return true; }
+      const reader = response.body.getReader();
+      const seek = pendingSeek; pendingSeek = 0;
+      const state = stream = { baseOffset:seek, received:0, token, index, reader, sources: new Set(), frames: [], pending: new Uint8Array(0), done: false, started: false, bytes: 0, total: 0, played: 0, buffered: 0, cursor: context.currentTime + startup, rate: Number(get('rate').value), finished: null, finish: null };
+      state.finished = new Promise((resolve, reject) => { state.finish = { resolve, reject }; });
+      if (!wants && context.state === 'running') context.suspend().catch(() => {});
+      function scheduleBuffer(frame, rate, start) {
+        const source = context.createBufferSource(); source.buffer = frame.buffer; source.playbackRate.value = rate;
+        source.connect(context.destination); frame.source = source; frame.rate = rate; frame.start = start; state.sources.add(source);
+        source.onended = () => {
+          if (stream !== state || frame.source !== source) return;
+          frame.source = null; state.sources.delete(source);
+          if (!frame.played) { frame.played = true; state.played += frame.samples; state.buffered = Math.max(0, state.buffered - frame.samples); }
+          box.dataset.playedSamples = String(state.played); box.dataset.bufferedSamples = String(state.buffered);
+          if (state.done && !state.sources.size) state.finish.resolve();
+        };
+        source.start(start, frame.offset || 0);
+      }
+      function schedule(bytes) {
+        if (stream !== state || token !== epoch) return;
+        if (bytes.byteLength > 192 * 1024 || bytes.byteLength % 2) throw new Error('Invalid PCM frame.');
+        const skip = Math.min(bytes.byteLength / 2, Math.max(0, Math.round(seek * 24000) - state.received));
+        state.received += bytes.byteLength / 2;
+        const samples = new Int16Array(bytes.buffer, bytes.byteOffset + skip * 2, bytes.byteLength / 2 - skip);
+        if (!samples.length) return;
+        const buffer = context.createBuffer(1, samples.length, 24000), channel = buffer.getChannelData(0);
+        for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
+        const frame = { buffer, samples: samples.length, source: null, start: 0, rate: state.rate, offset: 0, played: false };
+        const start = Math.max(state.cursor, context.currentTime + (state.started ? 0 : startup)); state.started = true; state.cursor = start + buffer.duration / state.rate;
+        state.frames.push(frame); state.total += frame.samples; state.buffered += frame.samples; scheduleBuffer(frame, state.rate, start);
+        loaded = index; loading = false; box.dataset.streamState = wants ? 'playing' : 'paused'; box.dataset.bufferedSamples = String(state.buffered); box.dataset.playedSamples = String(state.played);
+        send('reader:highlight', { id: entry.id }); status(readingMessage()); paint();
+      }
+      state.seekTo = function(target) {
+        if (target < state.baseOffset) return false;
+        let cursor = context.currentTime + 0.01, offset = state.baseOffset;
+        state.played = 0; state.buffered = 0;
+        for (const frame of state.frames) {
+          if (frame.source) { frame.source.onended = null; try { frame.source.stop(); } catch (_) {} state.sources.delete(frame.source); frame.source = null; }
+          frame.offset = Math.min(frame.buffer.duration, Math.max(0, target - offset)); offset += frame.buffer.duration;
+          frame.played = frame.offset >= frame.buffer.duration;
+          if (frame.played) state.played += frame.samples;
+          else { state.buffered += frame.samples; scheduleBuffer(frame, state.rate, cursor); cursor += (frame.buffer.duration - frame.offset) / state.rate; }
+        }
+        state.cursor = cursor; return true;
+      };
+      state.changeRate = function(rate) {
+        const now = context.currentTime; let cursor = now + 0.01;
+        state.rate = rate;
+        state.frames.forEach(frame => {
+          if (frame.played) return;
+          if (frame.source) {
+            frame.offset += Math.min(frame.buffer.duration - frame.offset, Math.max(0, now - frame.start) * frame.rate);
+            frame.source.onended = null;
+            try { frame.source.stop(); } catch (_) {}
+            state.sources.delete(frame.source); frame.source = null;
+          }
+          if (frame.offset >= frame.buffer.duration - 0.00001) {
+            frame.played = true; state.played += frame.samples; state.buffered -= frame.samples; return;
+          }
+          scheduleBuffer(frame, rate, cursor);
+          cursor += (frame.buffer.duration - frame.offset) / rate;
+        });
+        state.cursor = cursor;
+        if (state.done && !state.sources.size) state.finish.resolve();
+      };
+
+      try {
+        for (;;) {
+          const result = await reader.read();
+          if (result.done) break;
+          const incoming = new Uint8Array(result.value), combined = new Uint8Array(state.pending.length + incoming.length);
+          combined.set(state.pending); combined.set(incoming, state.pending.length); state.pending = combined;
+          if (state.pending.length > 4 * 1024 * 1024) throw new Error('Streaming audio is too large.');
+          while (state.pending.length >= 4) {
+            const length = new DataView(state.pending.buffer, state.pending.byteOffset, 4).getUint32(0);
+            if (length === 0) { state.done = true; state.pending = state.pending.slice(4); break; }
+            if (length > 192 * 1024) throw new Error('Streaming frame is too large.');
+            if (state.bytes + length > 4 * 1024 * 1024) throw new Error('Streaming audio is too large.');
+            if (state.pending.length < length + 4) break;
+            const frame = state.pending.slice(4, length + 4); state.pending = state.pending.slice(length + 4); state.bytes += length; schedule(frame);
+          }
+          if (state.done) { if (state.pending.length) throw new Error('Trailing data after streaming terminator.'); await reader.cancel(); break; }
+        }
+        if (!state.done || state.pending.length || !state.received) throw new Error('Incomplete streaming audio response.');
+        loading = false;
+        // Generation is finished, but audio is still playing: give the next
+        // paragraph that remaining playback time to prepare its first frames.
+        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) fetchStream(index + 1);
+        if (!state.sources.size) state.finish.resolve();
+        await state.finished;
+        if (stream !== state || token !== epoch) return true;
+        savePlace(); durations.set(index, state.received / 24000); cache.delete(index); position++; clearStream();
+        if (wants) loadCurrent();
+        return true;
+      } catch (error) {
+        if (token !== epoch || (error && error.name === 'AbortError')) return true;
+        clearStream();
+        throw error;
+      }
+    }
+    async function playLoaded() {
+      try { await audio.play(); }
+      catch (_) { wants = false; status('Press Play to start audio.'); paint(); }
+    }
+    async function loadCurrent() {
+      if (loading) return;
+      if (checkSleep()) return; armSleep();
+      const token = epoch, index = position;
+      if (previewEnd !== null && index >= previewEnd) {
+        const restart = previewStart; stop('Preview finished. Play to continue reading.', true); position = restart; return;
+      }
+      if (!mayContinue(index) || (index >= queue.length && ['section','chapter'].includes(get('sleep').value))) { stop('Sleep timer ended. Your place is saved.'); cancelSleep(); return; }
+      if (index >= queue.length) {
+        if (chapter && chapter.hasNext && ['page','here'].includes(mode)) { requestContent(true); return; }
+        const finishedKey = queueKey; stop('Finished'); try { if (finishedKey) localStorage.removeItem(finishedKey); } catch (_) {} refreshSaved(); return;
+      }
+      playbackConfig = {voice, mode, style:get('style').value, custom:get('custom').value};
+      loading = true; status('Preparing audio…'); paint();
+      try {
+        if (streamingVoice() && ensureAudioContext()) {
+          const streamed = await streamCurrent(index);
+          if (streamed) return;
+        }
+        const buffer = await synth(index);
+        if (token !== epoch) return;
+        loading = false;
+        if (currentUrl) URL.revokeObjectURL(currentUrl);
+        currentUrl = URL.createObjectURL(new Blob([buffer], { type: 'audio/wav' }));
+        const seek = pendingSeek; pendingSeek = 0;
+        audio.onloadedmetadata = () => { if (token !== epoch) return; durations.set(index, audio.duration); audio.currentTime = Math.min(seek, Math.max(0, audio.duration - 0.01)); };
+        audio.src = currentUrl; audio.playbackRate = Number(get('rate').value); loaded = index;
+        audio.onended = () => { if (token !== epoch) return; savePlace(); cache.delete(position); position++; loaded = -1; if (wants) loadCurrent(); };
+        send('reader:highlight', { id: queue[index].id });
+        status(readingMessage());
+        paint(); if (wants) await playLoaded();
+        // Only begin prefetch after the current synthesis completes.
+        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) synth(index + 1).catch(() => {});
+      } catch (error) {
+        if (token !== epoch) return;
+        loading = false; wants = false; status(error.message || 'Speech is unavailable.'); paint();
+      }
+    }
+    function requestContent(nextChapter, preview = false) {
+      const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview;
+      extraction = 'read-' + (++serial);
+      send(nextChapter ? 'reader:next' : 'reader:extract', { requestId: extraction, mode: nextChapter ? 'page' : mode });
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read this page. Press Play to retry.'); }, 5000); paint();
+    }
+    function placePanel() { get('panel').style.top = innerWidth <= 760 ? (document.querySelector('.vbar').getBoundingClientRect().bottom + 6) + 'px' : ''; }
+    get('toggle').onclick = () => { setPlayerView('compact'); get('mini-play').focus(); };
+    get('minimize').onclick = () => { setPlayerView('compact'); get('expand').focus(); };
+    get('expand').onclick = () => { setPlayerView('full'); get('minimize').focus(); };
+    get('mini-play').onclick = () => get('play').click();
+    get('mini-resume').onclick = () => get('resume').click();
+    get('mini-rewind').onclick = () => get('rewind').click();
+    get('mini-next').onclick = () => get('next').click();
+    get('mini-close').onclick = () => { stop(); cancelSleep(); setPlayerView('closed'); get('toggle').focus(); };
+    get('outline').onchange = paint;
+    get('jump').onclick = () => {
+      const value = get('outline').value, match = /^(section|chapter):(\d+)$/.exec(value);
+      if (!match) return;
+      jumpTo(match[1] === 'chapter' ? {chapterIndex:Number(match[2])} : {ordinal:Number(match[2]),fingerprint:outlineFingerprint});
+    };
+    get('inline-read').onclick = get('target-read').onclick = get('mini-target-read').onclick = event => {
+      if (clickedTarget) { jumpTo({ordinal:clickedTarget.ordinal,fingerprint:clickedTarget.fingerprint}); if (event.currentTarget === get('inline-read')) get(compact ? 'mini-play' : 'play').focus(); }
+    };
+    get('target-dismiss').onclick = get('mini-target-dismiss').onclick = clearTarget;
+    if (commentToggle) new MutationObserver(() => { pickMode(); if (commentMode) clearTarget(); paint(); }).observe(commentToggle, {attributes:true,attributeFilter:['aria-pressed']});
+    new ResizeObserver(() => { placePanel(); placeTargetAction(); }).observe(document.querySelector('.vbar'));
+    window.addEventListener('resize', placeTargetAction);
+    document.addEventListener('keydown', event => { if (event.key === 'Escape' && !get('panel').hidden) { setPlayerView(queue.length || extraction ? 'compact' : 'closed'); get('toggle').focus(); } });
+    get('play').onclick = () => {
+      if (checkSleep()) return; armSleep();
+      if (wants) { savePlace(); wants = false; audio.pause(); if (audioContext && audioContext.state === 'running' && streamingVoice()) audioContext.suspend().catch(() => {}); if (stream) { stream.boxState = 'paused'; box.dataset.streamState = 'paused'; } status(readingMessage()); paint(); return; }
+      wants = true; if (loaded >= 0 || stream) status(readingMessage()); paint();
+      if (streamingVoice()) { const context = ensureAudioContext(); if (context && context.state === 'suspended') context.resume().catch(() => {}); }
+      if (stream && audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
+      if (stream) { stream.boxState = 'playing'; box.dataset.streamState = 'playing'; return; }
+      if (extraction || loading) return;
+      if (!queue.length) requestContent(false); else if (loaded === position) playLoaded(); else loadCurrent();
+    };
+    get('stop').onclick = () => { stop(); cancelSleep(); };
+    get('sleep').onchange = () => { sleepDeadline = 0; sleepBoundary = null; if (wants || loaded >= 0) armSleep(); checkSleep(); };
+    get('rewind').onclick = () => {
+      let target = position, offset = mediaOffset() - 15;
+      while (offset < 0 && target > 0 && durations.has(target - 1)) offset += durations.get(--target);
+      offset = Math.max(0, offset);
+      if (target === position && stream?.seekTo(offset)) { savePlace(); return; }
+      if (target === position && !stream && loaded === position) { audio.currentTime = offset; savePlace(); return; }
+      const playing = wants; stop('Rewinding…', true); position = target; pendingSeek = offset; wants = playing; loadCurrent();
+    };
+    get('resume').onclick = () => {
+      const saved = savedPlace(); if (!saved) return;
+      stop('Restoring saved place…'); restoring = saved;
+      voice = saved.voice; get('voice').value = voice; get('rate').value = saved.rate; mode = saved.mode; get('mode').value = mode;
+      if (['calm','neutral','expressive','default','custom'].includes(saved.style)) get('style').value = saved.style;
+      if (typeof saved.custom === 'string') get('custom').value = saved.custom.slice(0,500);
+      updateStyle(); wants = true;
+      const context = streamingVoice() ? ensureAudioContext() : null; if (context?.state === 'suspended') context.resume().catch(() => {});
+      extraction = 'read-' + (++serial); send('reader:resume', {requestId:extraction, mode, fingerprint:saved.fingerprint, chapterIndex:saved.chapterIndex});
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not restore this place. Start reading again.'); }, 5000); paint();
+    };
+    function skip(direction) {
+      if (streamingVoice()) { const context = ensureAudioContext(); if (context && context.state === 'suspended') context.resume().catch(() => {}); }
+      if (!queue.length) { wants = true; requestContent(false); return; }
+      const block = queue[position] && queue[position].block;
+      let target = position;
+      if (direction > 0) { while (target < queue.length && queue[target].block === block) target++; }
+      else { target = Math.max(0, position - 1); while (target > 0 && queue[target - 1].block === queue[target].block) target--; }
+      stop('Preparing audio…', true); position = target; wants = true; loadCurrent();
+    }
+    get('prev').onclick = () => skip(-1); get('next').onclick = () => skip(1);
+    get('mode').onchange = () => { mode = get('mode').value; stop(); };
+    get('voice').onchange = () => { voice = get('voice').value; savePreferences(); stop('Voice changed'); updateStyle(); };
+    get('style').onchange = styleChanged;
+    get('custom').oninput = styleChanged;
+    get('preview').onclick = () => {
+      const context = streamingVoice() ? ensureAudioContext() : null; if (context && context.state === 'suspended') context.resume().catch(() => {});
+      if (queue.length && position < queue.length) {
+        stop('Preparing preview…', true); preparePreview(); wants = true; loadCurrent();
+      } else { wants = true; requestContent(false, true); }
+    };
+    get('rate').onchange = () => { savePreferences(); const value = Number(get('rate').value); audio.playbackRate = value; if (stream && stream.changeRate) stream.changeRate(value); paint(); };
+    audio.onerror = () => { if (audio.getAttribute('src')) stop('Could not play audio. Press Play to retry.'); };
+    frame.addEventListener('load', () => { stop(); clearTarget(); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').replaceChildren(new Option('Loading sections…','')); get('outline').disabled = true; ready = false; send('reader:hello'); paint(); });
+    window.addEventListener('message', event => {
+      if (event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object') return;
+      const data = event.data;
+      if (data.type === 'anchor:ready') setTimeout(() => { if (queue.length && !queueKey) queueKey = checkpointKey(); refreshSaved(); }, 0);
+      if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); return; }
+      if (data.type === 'reader:changed') { stop('Page changed. Press Play to read it.'); clearTarget(); refreshOutline(); return; }
+      if (data.type === 'reader:error' && outlineRequest && data.requestId === outlineRequest) { clearTimeout(outlineTimer); outlineRequest = ''; get('outline').replaceChildren(new Option('Sections unavailable','')); get('outline').disabled = true; paint(); return; }
+      if (data.type === 'reader:target-position') {
+        const rect = data.rect, viewport = data.viewport;
+        if (!rect) { targetGeometry = null; get('inline-read').hidden = true; return; }
+        if (!clickedTarget || !viewport || ![rect.left,rect.right,rect.top,rect.bottom,viewport.width,viewport.height].every(n=>Number.isFinite(n) && Math.abs(n)<10000000) || viewport.width<=0 || viewport.height<=0 || rect.right<rect.left || rect.bottom<rect.top) return;
+        targetGeometry = {rect,viewport}; placeTargetAction(); return;
+      }
+      if (data.type === 'reader:target') {
+        if (!readerVisible() || commentMode || !Number.isInteger(data.ordinal) || data.ordinal < 0 || data.ordinal >= 5000 || typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || typeof data.label !== 'string') return;
+        targetGeometry = null; clickedTarget = {ordinal:data.ordinal,fingerprint:data.fingerprint};
+        get('target-label').textContent = get('mini-target-label').textContent = data.label.slice(0,160);
+        get('target').hidden = get('mini-target').hidden = false; paint(); return;
+      }
+      if (data.type === 'reader:outline' && outlineRequest && data.requestId === outlineRequest) {
+        clearTimeout(outlineTimer); outlineRequest = '';
+        const valid = (items, key) => Array.isArray(items) && items.length <= 500 && items.every(item => item && Number.isInteger(item[key]) && item[key] >= 0 && typeof item.label === 'string' && item.label.length <= 120);
+        if (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !valid(data.sections,'ordinal') || !valid(data.chapters,'index')) return;
+        outlineFingerprint = data.fingerprint;
+        const select = get('outline'); select.replaceChildren(new Option('Choose a section…',''));
+        for (const [items, prefix, label, key] of [[data.chapters,'chapter','Chapters','index'],[data.sections,'section',data.chapters.length ? 'On this page' : 'Sections','ordinal']]) {
+          if (!items.length) continue;
+          const group = document.createElement('optgroup'); group.label = label;
+          for (const item of items) group.appendChild(new Option(item.label, prefix + ':' + item[key]));
+          select.appendChild(group);
+        }
+        select.disabled = select.options.length < 2;
+        if (select.disabled) select.options[0].textContent = 'No readable sections';
+        paint(); return;
+      }
+      if ((data.type !== 'reader:content' && data.type !== 'reader:error') || !extraction || data.requestId !== extraction) return;
+      extraction = ''; clearTimeout(extractionTimer);
+      if (data.type === 'reader:error') { stop(typeof data.message === 'string' ? data.message.slice(0,200) : 'Could not read this page.'); clearTarget(); refreshOutline(); return; }
+      let total = 0;
+      if (!Array.isArray(data.blocks) || data.blocks.length > 5000 || data.blocks.some(b => !b || typeof b.id !== 'string' || b.id.length > 80 || typeof b.text !== 'string' || (total += b.text.length) > 500000)) { stop('This page returned too much text.'); return; }
+      const saved = restoring; restoring = null;
+      queue = data.blocks.flatMap((b, index) => chunks(b.text).map((text, chunk) => ({ id:b.id, text, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1 })));
+      contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
+      if (saved) {
+        if (contentFingerprint !== saved.fingerprint) { stop('Content changed. Start reading again.'); return; }
+        queue = queue.filter(entry => entry.ordinal >= saved.start && entry.ordinal <= saved.end);
+        position = queue.findIndex(entry => entry.ordinal === saved.ordinal && entry.chunk === saved.chunk);
+        if (position < 0) { stop('Saved place is no longer available. Start reading again.'); return; }
+        pendingSeek = saved.offset;
+      } else position = 0;
+      scopeStart = queue[0]?.ordinal || 0; scopeEnd = queue[queue.length - 1]?.ordinal || 0;
+      chapter = data.chapter && typeof data.chapter.label === 'string' ? { index: Number.isInteger(data.chapter.index) ? data.chapter.index : undefined, label: data.chapter.label.slice(0,120), hasNext: data.chapter.hasNext === true } : null;
+      const chapterOption = get('sleep').querySelector('[value=chapter]'); chapterOption.hidden = chapterOption.disabled = !chapter;
+      if (!chapter && get('sleep').value === 'chapter') cancelSleep();
+      if (!queue.length) { stop(mode === 'selection' ? 'Select text in the artifact first.' : 'No readable text found.'); return; }
+      if (previewRequested) { previewRequested = false; preparePreview(); }
+      status(data.truncated ? 'Long page shortened to the reading limit.' : chapter ? chapter.label + (['page','here'].includes(mode) ? ' · continues across chapters' : ' · this section') : 'Ready'); paint();
+      clearTarget(); refreshOutline(); if (wants) loadCurrent();
+    });
+    fetch('/' + encodeURIComponent(artifactId) + '/speech/voices').then(r => r.ok ? r.json() : null).then(data => {
+      if (!data || !data.enabled || !Array.isArray(data.voices) || !data.voices.length) return;
+      const groups = new Map();
+      for (const item of data.voices) { const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); if (!groups.has(label)) groups.set(label, document.createElement('optgroup')); const option = document.createElement('option'); option.value = item.id; option.textContent = item.name.replace(/ · (Kokoro|Pocket|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, ''); groups.get(label).label = label; groups.get(label).appendChild(option); }
+      groups.forEach(group => get('voice').appendChild(group));
+      if (Array.from(get('voice').options).some(option => option.value === savedVoice)) get('voice').value = savedVoice;
+      voice = get('voice').value; enabled = true; box.hidden = false; updateStyle(); send('reader:hello'); paint();
+    }).catch(() => {});
+    paint();
+  }
+  createNativeReader();
   function pinOnCurrentPage(pin){return !isBundle||pin.page===null||pin.page===currentPage;}
   function hideAllMarkers(){[].slice.call(overlay.querySelectorAll('.vanchor-marker')).forEach(function(marker){marker.hidden=true;});}
   function requestRepaint(){var pagePins=pins.filter(function(pin){return pinOnCurrentPage(pin)&&!pin.stale;});var anchors=pagePins.map(function(pin){return {id:pin.id,path:pin.path,x:pin.x,y:pin.y,w:pin.w,h:pin.h};});if(draftAnchor&&bridgeReady&&(!isBundle||draftAnchor.page===null||draftAnchor.page===currentPage))anchors.push({id:'__draft__',path:draftAnchor.path||null,x:draftAnchor.x,y:draftAnchor.y,w:draftAnchor.w||null,h:draftAnchor.h||null});postToFrame('anchor:repaint',{anchors:anchors});}
@@ -257,7 +864,7 @@
   function focusFeedback(id){
     fbOpen(true);var row=feedbackRows.find(function(entry){return String(entry.id)===id;}),item=feedbackItems[id],thread=row&&row.parent_id?feedbackThreads[row.parent_id]:feedbackThreads[id];
     if(item){item.classList.add('pin-focus');(thread||item).scrollIntoView({block:'center'});setTimeout(function(){item.classList.remove('pin-focus');},2200);}
-    var pin=pinById[id];if(pin&&!pin.stale){var marker=markerFor(pin);marker.classList.add('pin-focus');setTimeout(function(){marker.classList.remove('pin-focus');},2200);if(isBundle&&pin.page){frame.src=bundleRawPrefix+pin.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1'+versionQuery;}}else if(pin&&fbHint){fbHint.textContent='This anchor belongs to an older revision and is available in its feedback thread only.';}
+    var pin=pinById[id];if(pin&&!pin.stale){var marker=markerFor(pin);marker.classList.add('pin-focus');setTimeout(function(){marker.classList.remove('pin-focus');},2200);if(isBundle&&pin.page){frame.src=bundleRawPrefix+pin.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1&reader=1'+versionQuery;}}else if(pin&&fbHint){fbHint.textContent='This anchor belongs to an older revision and is available in its feedback thread only.';}
   }
   var requestedFeedback=new URLSearchParams(window.location.search).get('feedback');
   if(requestedFeedback)setTimeout(function(){focusFeedback(requestedFeedback);},0);
@@ -302,10 +909,13 @@
   function showOutbound(url){ensureOutboundPanel();outboundUrl=url;outboundHost.textContent=url.host;outboundPanel.removeAttribute('inert');outboundPanel.classList.add('open');outboundPanel.setAttribute('aria-hidden','false');outboundConfirm.focus();}
   window.addEventListener('message',function(event){
     if(!frame||event.source!==frame.contentWindow)return;var data=event.data;if(!data||typeof data!=='object')return;
+    if(data.type==='tts:hello'){ttsHello();return;}
+    if(data.type==='tts:request'){ttsRequest(data);return;}
+    if(data.type==='tts:cancel'){ttsCancel(data);return;}
     if(stateBroker.handle(event))return;
     if(data.type!=='anchor:ready'&&data.type!=='anchor:picked'&&data.type!=='anchor:positions'&&data.type!=='anchor:navigate')return;
     if(data.type==='anchor:navigate'){var url=parseOutboundHref(data.href);if(url)showOutbound(url);return;}
-    if(data.type==='anchor:ready'){var nextPage=isBundle&&typeof data.page==='string'?data.page:null;if(draftAnchor&&composerBody&&composerBody.value.trim()&&draftAnchor.page!==nextPage&&!window.confirm('Move away from this selected anchor? Your draft comment will remain.')){if(isBundle&&draftAnchor.page)frame.src=bundleRawPrefix+draftAnchor.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1'+versionQuery;return;}currentPage=nextPage;bridgeReady=true;hideAllMarkers();if(commentMode){overlay.classList.remove('fallback');postToFrame('anchor:pick-on');}requestRepaint();return;}
+    if(data.type==='anchor:ready'){var nextPage=isBundle&&typeof data.page==='string'?data.page:null;if(draftAnchor&&composerBody&&composerBody.value.trim()&&draftAnchor.page!==nextPage&&!window.confirm('Move away from this selected anchor? Your draft comment will remain.')){if(isBundle&&draftAnchor.page)frame.src=bundleRawPrefix+draftAnchor.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1&reader=1'+versionQuery;return;}currentPage=nextPage;bridgeReady=true;hideAllMarkers();if(commentMode){overlay.classList.remove('fallback');postToFrame('anchor:pick-on');}requestRepaint();return;}
     if(data.type==='anchor:picked'){startAnchoredComment(data);return;}if(!Array.isArray(data.anchors))return;
     data.anchors.slice(0,200).forEach(function(pos){if(!pos||typeof pos!=='object'||typeof pos.id!=='string')return;if(pos.id==='__draft__'){if(pos.lost===true){showDraftPosition(0,0,0,0,true);return;}if(typeof pos.x!=='number'||typeof pos.y!=='number'||!Number.isFinite(pos.x)||!Number.isFinite(pos.y))return;if(draftAnchor&&draftAnchor.w!==undefined&&(!Number.isFinite(pos.w)||!Number.isFinite(pos.h)||pos.w<=0||pos.h<=0))return;showDraftPosition(pos.x,pos.y,pos.w||0,pos.h||0,false);return;}var pin=pinById[pos.id];if(!pin||pin.stale||!pinOnCurrentPage(pin))return;if(pos.lost===true){paintPosition(pin,0,0,0,0,true);return;}if(typeof pos.x!=='number'||typeof pos.y!=='number'||!Number.isFinite(pos.x)||!Number.isFinite(pos.y))return;if(pin.w!==null&&pin.h!==null){if(typeof pos.w!=='number'||typeof pos.h!=='number'||!Number.isFinite(pos.w)||!Number.isFinite(pos.h)||pos.w<=0||pos.h<=0)return;paintPosition(pin,pos.x,pos.y,pos.w,pos.h,false);}else paintPosition(pin,pos.x,pos.y,0,0,false);});
   });

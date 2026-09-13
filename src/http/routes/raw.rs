@@ -58,6 +58,7 @@ async fn current_root_result(
         file,
         ArtifactResponseOptions {
             anchor: parsed.single("anchor").as_deref() == Some("1"),
+            reader: parsed.single("reader").as_deref() == Some("1"),
             preview: parsed.has("preview"),
             download_title: parsed
                 .has("download")
@@ -116,6 +117,7 @@ async fn current_file_result(
         file,
         ArtifactResponseOptions {
             anchor: parsed.single("anchor").as_deref() == Some("1") && !parsed.has("download"),
+            reader: parsed.single("reader").as_deref() == Some("1") && !parsed.has("download"),
             preview: parsed.has("preview"),
             page_path: Some(&page_path),
             ..ArtifactResponseOptions::default()

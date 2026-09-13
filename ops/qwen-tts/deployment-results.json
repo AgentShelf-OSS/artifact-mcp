@@ -1,0 +1,34 @@
+{
+  "date": "2026-09-12",
+  "server_sha256": "4ee465af6d65a38adbf00445ed3029677d68c0b397a171b6f3ad7bf9af25ce40",
+  "model": "Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice",
+  "voices": [
+    "qwen_ryan",
+    "qwen_aiden"
+  ],
+  "reference_enabled": false,
+  "streaming_enabled": true,
+  "gpu_memory_mib": 15529,
+  "decoder_runtime_patch": false,
+  "worker_first_audio_seconds": {
+    "ryan": 0.136,
+    "aiden": 0.091
+  },
+  "browser_resume_to_scheduled_audio_ms": 385,
+  "browser_audio_started_before_stream_completed": true,
+  "checks": [
+    "real preset audio",
+    "pause before headers",
+    "pause/resume",
+    "repeated rate changes",
+    "voice switching to CPU WAV",
+    "automatic chapter continuation",
+    "manual navigation cancellation",
+    "desktop/mobile",
+    "malformed stream stops audio",
+    "oversized frame rejected",
+    "paused previous/next resumes clock"
+  ],
+  "browser_errors": [],
+  "qa_scope": "Release server in isolated loopback-bound VM310 container over SSH; worker credentials remained on original host; production authentication unchanged"
+}

@@ -568,7 +568,7 @@ fn shell_template<'a>(
             .count(),
         revision: meta.revision,
         raw_src: raw_src.clone(),
-        anchor_raw_src: format!("{raw_src}?anchor=1{version_query}"),
+        anchor_raw_src: format!("{raw_src}?anchor=1&reader=1{version_query}"),
         threads,
         viewers,
         artifact_id: meta.id.0.clone(),

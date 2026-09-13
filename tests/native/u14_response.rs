@@ -212,3 +212,38 @@ async fn mcp_body_limit_accepts_the_exact_configured_boundary_above_two_megabyte
         .expect("rejection body");
     assert!(!body.is_empty());
 }
+
+#[tokio::test]
+async fn native_reader_is_explicit_html_only_and_keeps_sandbox_policy() {
+    for (reader, preview, download, content_type, expected) in [
+        (false, false, false, "text/html", false),
+        (true, false, false, "text/html", true),
+        (true, true, false, "text/html", false),
+        (true, false, true, "text/html", false),
+        (true, false, false, "image/svg+xml", false),
+    ] {
+        let response = artifact_response(
+            file(content_type, b"<body><p>Readable text</p></body>"),
+            ArtifactResponseOptions {
+                reader,
+                preview,
+                download_title: download.then_some("book"),
+                page_path: Some("chapters/one.html"),
+                ..ArtifactResponseOptions::default()
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            response.headers()[header::CONTENT_SECURITY_POLICY],
+            DOCUMENT_SANDBOX
+        );
+        let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+        let text = String::from_utf8(bytes.to_vec()).unwrap();
+        assert_eq!(text.contains("artifact-reader-bridge"), expected);
+        if expected {
+            assert!(text.contains("reader:next"));
+            assert!(text.contains("__artifactEreader"));
+            assert!(text.ends_with("</script></body>"));
+        }
+    }
+}

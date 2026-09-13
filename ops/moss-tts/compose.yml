@@ -1,0 +1,39 @@
+services:
+  speech:
+    image: homelab/artifact-moss-onnx:0.1.0
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${TTS_BIND_HOST:?Set the private bind address}:8792:8788"
+    environment:
+      TOKEN_FILE: /run/secrets/tts_token
+      CPU_THREADS: "2"
+      OMP_NUM_THREADS: "2"
+      ONNXRUNTIME_INTRA_OP_NUM_THREADS: "2"
+    secrets: [tts_token]
+    volumes:
+      - ./models:/app/vendor/models
+      - ./cache:/cache
+    read_only: true
+    tmpfs: ["/tmp:size=128m,mode=1777"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    cpus: "2.0"
+    mem_limit: 4g
+    pids_limit: 128
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8788/health', timeout=5)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 900s
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}
+networks:
+  default:
+    external: true
+    name: artifact-tts-trial_default
+secrets:
+  tts_token:
+    file: ../artifact-tts-trial/tts-token
