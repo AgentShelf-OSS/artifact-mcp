@@ -4,7 +4,7 @@ RUN pip install --no-cache-dir torch==2.8.0 --index-url https://download.pytorch
 # WordStart/WordEnd events. Pin the trial commit so protocol output is stable.
 RUN pip install --no-cache-dir "pocket-tts-timestamped @ https://github.com/dpm63/pocket-tts-timestamped/archive/65037e84c1885e7faa3e482b89fe3c304e2dada2.tar.gz" soundfile==0.13.1
 WORKDIR /app
-COPY server.py stream_control.py timed_protocol.py /app/
+COPY server.py stream_control.py timed_protocol.py cache_store.py /app/
 USER 65532:65532
 EXPOSE 8788
 CMD ["python", "-u", "/app/server.py"]

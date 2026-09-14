@@ -52,6 +52,15 @@ stream. Timed responses have a separate cache namespace from ordinary PCM.
 Both engines used the same two-core limit on VM310. Two identical passages were
 rendered uncached for each voice. See [raw measurements](benchmark.json).
 
+Completed audio is served directly from the cache before the inference gate is
+checked, so a replay can start while another passage is being generated. Cache
+reads and bounded eviction are serialized and use atomic replacement, preserving
+the shared 512 MiB limit without exposing partial files. Cache misses enter a
+two-request FIFO wait queue for up to eight seconds; excess or expired waiters
+receive the existing authenticated `429 busy` response. The worker emits
+text-free JSON timing events for cache hits, queue wait, first audio, and total
+generation time.
+
 | Voice | 306-character passage | 574-character passage | Generation / audio duration |
 |---|---:|---:|---:|
 | Kokoro George | 7.22 s | 13.94 s | 0.392 / 0.392 |
@@ -174,3 +183,21 @@ with `docker compose up -d --no-build speech`. The updated viewer falls back to
 ordinary streaming if the old worker does not expose the timed endpoint.
 The native Artifact MCP binary backup is
 `/usr/local/bin/artifact-mcp.pre-pocket-word-highlights-20260912` on CT220.
+
+## Queue/cache candidate
+
+The queue and cache changes were built and tested in the isolated image
+`homelab/artifact-pocket:3.1.0-cache-queue-20260913`, digest
+`sha256:4c5c3ea88aa3b2b684839a2f11ccf968503640a7f46f95521290a0c29bf16fa0`.
+The candidate passed health checks and a real VM310 smoke test: timed generation
+returned HTTP 200 with 88,835 bytes, a complete timed cache replay returned HTTP
+200 with 88,835 bytes in 3 ms, and an uncached concurrent stream also completed
+successfully while the replay was served. The candidate container was stopped
+after testing. Production remains on `3.1.0-timestamped-1`, digest
+`sha256:d26ef8020fc5b8c57e91df985c0282d0cbde7cfb8089275711f728597ea45b55`.
+
+The prepared [cutover script](deploy-cache-queue.py) runs on VM310. It checks the
+running production image and tested candidate digest, creates a timestamped compose
+backup, and recreates only `speech`. It restores the compose file and service if
+recreation fails or health does not recover within 180 seconds. Automatic approval
+review blocked the live service change pending explicit operator approval.
