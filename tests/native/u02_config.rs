@@ -35,6 +35,32 @@ fn parse_ok(pairs: &[(&str, &str)]) -> AppConfig {
     parse(pairs).expect("configuration should parse")
 }
 
+#[test]
+fn access_sync_is_opt_in_and_requires_complete_safe_configuration() {
+    assert!(parse_ok(&[]).access_sync.is_none());
+    assert!(parse(&[("ACCESS_SYNC_ENABLED", "1")]).is_err());
+    let mut values = vec![
+        ("ACCESS_SYNC_ENABLED", "1"),
+        ("ACCESS_SYNC_ACCOUNT_ID", "abcdef1234"),
+        ("ACCESS_SYNC_APPLICATION_ID", "abcd-1234"),
+        ("ACCESS_SYNC_POLICY_ID", "abcd-5678"),
+        ("ACCESS_SYNC_API_TOKEN", "test-secret-do-not-print"),
+        ("PUBLIC_BASE_URL", "https://artifact.example.test"),
+    ];
+    let config = parse_ok(&values);
+    let sync = config.access_sync.unwrap();
+    assert_eq!(sync.hostname, "artifact.example.test");
+    assert!(!format!("{sync:?}").contains("test-secret-do-not-print"));
+    values[3].1 = "../../another-policy";
+    let error = parse(&values).unwrap_err().to_string();
+    assert!(error.contains("ACCESS_SYNC_POLICY_ID"));
+    assert!(!error.contains("test-secret-do-not-print"));
+    values[3].1 = "abcd-5678";
+    values[4].1 = "bad\nsecret";
+    let error = parse(&values).unwrap_err().to_string();
+    assert!(!error.contains("bad\nsecret"));
+}
+
 // ---------------------------------------------------------------------------
 // Environment defaults
 // ---------------------------------------------------------------------------

@@ -1275,6 +1275,8 @@ pub struct AppConfig {
     pub preview: PreviewConfig,
     /// Cloudflare Access identity configuration.
     pub access: AccessConfig,
+    /// Optional reconciliation of explicit organization emails to one dedicated Access policy.
+    pub access_sync: Option<crate::integrations::access_sync::AccessSyncConfig>,
     /// Optional OAuth service-credential resource-server configuration.
     pub oauth: OAuthConfig,
     /// `WEBHOOK_ENC_KEY`, validated as canonical 32-byte base64. [lib/crypto.js:9-18]
@@ -1318,6 +1320,7 @@ impl AppConfig {
                 ..AccessConfig::default()
             },
             oauth: OAuthConfig::default(),
+            access_sync: None,
             webhook_enc_key: None,
             discord_bot_token: None,
             discord_inbound_enabled: false,
@@ -1371,6 +1374,7 @@ impl AppConfig {
             ingress: IngressConfig::from_source(env)?,
             preview: PreviewConfig::from_source(env)?,
             access: AccessConfig::from_source(env)?,
+            access_sync: parse_access_sync(env)?,
             oauth: OAuthConfig::from_source(env)?,
             webhook_enc_key: parse_webhook_enc_key(present(env, "WEBHOOK_ENC_KEY").as_deref())?,
             discord_bot_token: parse_discord_bot_token(
@@ -1486,6 +1490,47 @@ fn parse_webhook_enc_key(value: Option<&str>) -> Result<Option<Secret>, AppError
 
 fn webhook_key_error() -> AppError {
     AppError::Validation("WEBHOOK_ENC_KEY must be a 32-byte base64 value.".to_owned())
+}
+
+fn parse_access_sync(
+    env: &dyn EnvSource,
+) -> Result<Option<crate::integrations::access_sync::AccessSyncConfig>, AppError> {
+    if !disabled_unless_one(env, "ACCESS_SYNC_ENABLED")? {
+        return Ok(None);
+    }
+    let identifier = |key: &str| -> Result<String, AppError> {
+        let value = present(env, key).unwrap_or_default();
+        let value = value.trim();
+        if value.is_empty()
+            || value.len() > 64
+            || !value.bytes().all(|b| b.is_ascii_hexdigit() || b == b'-')
+        {
+            return Err(AppError::Validation(format!(
+                "{key} must be a Cloudflare identifier."
+            )));
+        }
+        Ok(value.to_owned())
+    };
+    let token = present(env, "ACCESS_SYNC_API_TOKEN").unwrap_or_default();
+    let token = token.trim();
+    if token.is_empty() || token.len() > 512 || !token.bytes().all(|b| b.is_ascii_graphic()) {
+        return Err(AppError::Validation(
+            "ACCESS_SYNC_API_TOKEN must be a non-empty printable API token up to 512 bytes."
+                .to_owned(),
+        ));
+    }
+    Ok(Some(crate::integrations::access_sync::AccessSyncConfig {
+        account_id: identifier("ACCESS_SYNC_ACCOUNT_ID")?,
+        application_id: identifier("ACCESS_SYNC_APPLICATION_ID")?,
+        policy_id: identifier("ACCESS_SYNC_POLICY_ID")?,
+        api_token: Secret::new(token),
+        hostname: url::Url::parse(&raw_string(env, "PUBLIC_BASE_URL", DEFAULT_PUBLIC_BASE_URL))
+            .ok()
+            .and_then(|url| url.host_str().map(str::to_owned))
+            .ok_or_else(|| {
+                AppError::Validation("PUBLIC_BASE_URL must have a hostname.".to_owned())
+            })?,
+    }))
 }
 
 fn parse_discord_bot_token(value: Option<&str>) -> Result<Option<Secret>, AppError> {

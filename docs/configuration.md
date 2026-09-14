@@ -55,8 +55,54 @@ scope.
 
 Viewer organization resolution checks configured administrators, explicit email mappings,
 registered domains, `ORG_EMAIL_DOMAINS`, and finally the verified email domain. An explicit member
-mapping assigns an already authenticated viewer to an organization. It does not change the
-Cloudflare Access policy or send an invitation.
+mapping assigns an already authenticated viewer to an organization. By default it does not change
+Cloudflare Access or send an invitation. The Rust runtime can optionally synchronize explicit
+members as described below. The Node reference runtime still requires manual Cloudflare updates.
+
+### Automatic explicit-email login access (Rust)
+
+When enabled, adding or removing a specific email, or deleting an organization, wakes a background
+task that synchronizes the union of all organizations' explicit member emails to one dedicated
+Cloudflare Access policy. It also reconciles on startup and every 60 seconds, repairing missed
+updates and retrying failures. SQLite membership is the durable source of truth; local edits commit
+even when Cloudflare is unavailable. Settings displays pending, synced, error, or disabled status.
+The status covers the complete explicit-email list, not just the selected organization.
+
+Cloudflare grants entry to the application. The application's organization checks continue to
+control private artifact access. Domain and administrator policies are independent and untouched.
+Removing an explicit member does not revoke access granted through another policy or through the
+application's existing domain mapping. Cloudflare sessions are not explicitly revoked by this task.
+Membership changes and edge-policy changes are not atomic; allow time for reconciliation and
+Cloudflare propagation. A successful sync confirms the policy contents, not email delivery.
+
+Configure this on the Rust server:
+
+| Variable | Meaning |
+| --- | --- |
+| `ACCESS_SYNC_ENABLED` | `1` enables synchronization; default `0`. |
+| `ACCESS_SYNC_API_TOKEN` | Scoped Cloudflare API token with Access application/policy read and write permission for the selected account. Kept server-side and redacted in diagnostics. |
+| `ACCESS_SYNC_ACCOUNT_ID` | Account containing the application. |
+| `ACCESS_SYNC_APPLICATION_ID` | Access application protecting `PUBLIC_BASE_URL`'s hostname. |
+| `ACCESS_SYNC_POLICY_ID` | Dedicated, non-reusable Allow policy named `Artifact member emails`. Its email list is fully managed by the app. |
+
+Before enabling:
+
+1. Create a dedicated application policy named `Artifact member emails`, action Allow, with exact
+   email Include rules. Do not add domain rules, Require conditions, or unrelated exclusions to it.
+   Do not reuse this policy on another application.
+2. Configure the IDs and scoped token in the server's protected environment file. Do not copy a
+   global Cloudflare API key into the application. Keep one active runtime managing this policy.
+3. Enable sync and restart the Rust service. Verify Settings reports synced before testing a fresh
+   email-code request. No invitation or code is sent automatically.
+4. Remove redundant manual exact-email grants only after verifying synchronization. For example,
+   the earlier `Book Club members` policy would otherwise continue granting those addresses login
+   even after their removal from the managed list. Preserve independent domain and admin grants.
+
+An empty membership list is represented by Include Everyone plus Exclude Everyone in the dedicated
+policy, so it grants nobody access. Unexpected policy structure, target mismatches, or API failures
+are reported as errors and retried without changing other policies. Disabling sync stops updates
+and leaves the last Cloudflare policy in place; it does not revoke its grants. For rollback, disable
+sync and manage that policy manually using a saved policy snapshot.
 
 ## Application and network
 

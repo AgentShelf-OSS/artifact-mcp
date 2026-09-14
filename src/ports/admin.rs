@@ -15,6 +15,9 @@ use crate::{
 };
 
 pub trait AdminService: Send + Sync {
+    fn access_sync_status(&self) -> crate::integrations::access_sync::SyncStatus {
+        crate::integrations::access_sync::SyncStatus::default()
+    }
     fn list_keys(&self) -> BoxFuture<'_, Result<Vec<PublisherKeySummary>, AppError>>;
     fn create_key(
         &self,
