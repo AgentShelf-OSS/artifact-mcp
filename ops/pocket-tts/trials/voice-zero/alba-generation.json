@@ -1,0 +1,9 @@
+{
+  "text": "Winston Smith, alone in the room, listened to the faint mechanical hum.",
+  "model": "kyutai/pocket-tts-without-voice-cloning",
+  "voice": "alba",
+  "sample_rate": 24000,
+  "frames": 97920,
+  "duration_seconds": 4.08,
+  "bytes": 195884
+}
