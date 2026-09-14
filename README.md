@@ -45,6 +45,10 @@ The selected passage stays highlighted while audio prepares, then follows the sp
 Pocket playback. Pausing keeps the current word marked; stopping clears it. Passage highlighting
 remains the fallback when word timings or browser support are unavailable.
 
+Authors can supply short `data-artifact-pronounce` hints for names and abbreviations. Listen speaks
+the replacement while highlighting the original displayed term. See the
+[pronunciation examples](docs/readable-artifacts.md#pronunciation-hints).
+
 The expanded player also offers Replay sentence when Pocket word timings are available. It reuses
 the current paragraph audio without another synthesis request or an additional persistent cache.
 The existing streamed-audio limit bounds decoded samples to 8 MiB per chunk; stopping, leaving the

@@ -203,6 +203,43 @@
     }
     return {groups, truncated};
   }
+  function pronunciationHints(element, text, range = null) {
+    if (!element || !element.querySelector('[data-artifact-pronounce]') && !element.hasAttribute('data-artifact-pronounce')) return [];
+    const groups = scanRoot(element, range, true).groups;
+    const source = {text:'', positions:[]};
+    for (const group of groups) {
+      if (source.text) { source.text += ' '; source.positions.push(null); }
+      source.text += group.text; for (const position of group.positions) source.positions.push(position);
+    }
+    if (source.text !== text) return [];
+    const owners = new Map();
+    source.positions.forEach((position, index) => {
+      const owner = position?.node.parentElement?.closest('[data-artifact-pronounce]');
+      if (!owner || !allowed(owner) || owner.closest('pre,code')) return;
+      if (!owners.has(owner)) owners.set(owner, {start:index, end:index+1});
+      else owners.get(owner).end = index+1;
+    });
+    const hints = [];
+    for (const [owner, span] of owners) {
+      if (hints.length >= 128 || span.end - span.start > 200) continue;
+      const spoken = normalize(owner.getAttribute('data-artifact-pronounce') || '');
+      if (!spoken || spoken.length > 200 || /[\u0000-\u001f]/.test(spoken)) continue;
+      const full = scanRoot(owner, null, true).groups;
+      const positions = full.flatMap(group => group.positions).filter(Boolean);
+      const first = source.positions[span.start], last = source.positions[span.end-1];
+      // A partial selection must never speak the rest of an unselected term.
+      if (!positions.length || first.node !== positions[0].node || first.offset !== positions[0].offset || last.node !== positions.at(-1).node || last.offset !== positions.at(-1).offset) continue;
+      if (source.positions.slice(span.start,span.end).some(p => p && p.node.parentElement.closest('[data-artifact-pronounce]') !== owner)) continue;
+      hints.push({...span, text:spoken});
+    }
+    return hints.sort((a,b)=>a.start-b.start);
+  }
+  function readingSignature(found) {
+    return found.groups.map(group => {
+      if (!group.pronunciations) group.pronunciations = group.blockOnly ? [] : pronunciationHints(group.element, group.text);
+      return group.text + (group.pronunciations.length ? '\u0000' + JSON.stringify(group.pronunciations) : '');
+    }).join('\n');
+  }
   function fingerprintText(value) {
     let hash = 2166136261;
     for (let i = 0; i < value.length; i++) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); }
@@ -210,7 +247,7 @@
   }
   function fingerprint(found) {
     const adapted = window.__artifactEreader && window.__artifactEreader.fingerprint;
-    const visibleText = found.groups.map(g => g.text).join('\n');
+    const visibleText = readingSignature(found);
     if (typeof adapted === 'function') return fingerprintText(adapted() + '|' + visibleText);
     return typeof adapted === 'string' ? fingerprintText(adapted + '|' + visibleText) : fingerprintText(visibleText);
   }
@@ -244,11 +281,11 @@
   }
   function content(mode, full, requestedScope) {
     wordSources.clear();
-    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = scopedScan('selection').groups.map(g => g.text).join('\n'); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection }] : [], truncated: selection.length >= MAX_CHARS }; }
+    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = readingSignature(scopedScan('selection')); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection, pronunciations:pronunciationHints(document.body, selection, playbackSelectionRange) }] : [], truncated: selection.length >= MAX_CHARS }; }
     const found = scopedScan(mode, requestedScope); activeScope = {mode, key:found.scopeKey}; snapshot = new Map(); blockOnly = new Set();
     let blocks = found.groups.map((group, ordinal) => {
       const id = 'r' + ordinal; snapshot.set(id, group.element); if (group.blockOnly) blockOnly.add(id);
-      return { id, ordinal, text: group.text };
+      return { id, ordinal, text: group.text, pronunciations:group.blockOnly ? [] : pronunciationHints(group.element, group.text) };
     });
     blocks = blocks.map((block, ordinal) => { const meta = sectionMeta(blocks, ordinal); return Object.assign(block, { sectionEndOrdinal: meta.end, sectionLabel: meta.label }); });
     if (mode === 'here') {
@@ -256,7 +293,7 @@
       if (index < 0) index = blocks.findIndex(b => { const r = snapshot.get(b.id).getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; });
       blocks = blocks.slice(Math.max(0, index));
     }
-    signature = found.groups.map(g => g.text).join('\n');
+    signature = readingSignature(found);
     return { blocks, scopeKey:found.scopeKey || '', truncated: found.truncated, chapter: found.chapter || null, fingerprint: fingerprint(found), label: found.chapter && found.chapter.label || null };
   }
   function outline() {
@@ -271,7 +308,7 @@
       }
     } finally { snapshot = savedSnapshot; }
     // Observe navigation even when Listen is opened before the first playback.
-    if (signature === null) { activeScope = {mode:'page'}; signature = found.groups.map(group => group.text).join('\n'); }
+    if (signature === null) { activeScope = {mode:'page'}; signature = readingSignature(found); }
     const adapted = window.__artifactEreader;
     const details = [...document.querySelectorAll('table,pre,[data-artifact-reader-detail]')].filter(node => allowed(node) && readingRoots().some(root => root.contains(node))).slice(0,100).map(node => ({scopeKey:scopeKey(node), label:(description(node) || (node.tagName === 'PRE' ? 'Code block' : node.tagName === 'TABLE' ? 'Table' : 'Visual details')).slice(0,120)})).filter(item => item.scopeKey.length <= 500);
     return {details, fingerprint:fingerprint(found),sections:sections.sort((a,b)=>a.ordinal-b.ordinal).slice(0,500),chapters:adapted && adapted.outline ? adapted.outline().chapters.slice(0,500) : [],chapter:found.chapter || null};
@@ -415,9 +452,9 @@
     timer = setTimeout(() => {
       if (signature === null) return;
       let next;
-      try { next = scopedScan(activeScope?.mode || 'page', activeScope?.key).groups.map(g => g.text).join('\n'); } catch (_) { next = null; }
+      try { next = readingSignature(scopedScan(activeScope?.mode || 'page', activeScope?.key)); } catch (_) { next = null; }
       if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; selectionRange = null; playbackSelectionRange = null; wordSources.clear(); clearPassageHighlight(); highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1, scopeKey:activeScope?.key || '' }); }
     }, 160);
-  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable', 'data-artifact-reader-region', 'data-artifact-reader-summary', 'data-artifact-reader-detail', 'data-artifact-reader-block', 'aria-describedby', 'aria-label', 'alt', 'role', 'open'] });
+  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable', 'data-artifact-reader-region', 'data-artifact-pronounce', 'data-artifact-reader-summary', 'data-artifact-reader-detail', 'data-artifact-reader-block', 'aria-describedby', 'aria-label', 'alt', 'role', 'open'] });
   post({ type: 'reader:ready', version: 1 });
 })();

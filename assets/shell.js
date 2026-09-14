@@ -279,6 +279,9 @@
     readerPanel.insertBefore(finishRow,box.querySelector('audio'));
     const share = document.getElementById('vshare-toggle'); share.parentNode.insertBefore(box, share);
     const get = name => box.querySelector('#vreader-' + name), audio = get('audio');
+    const readerMeasurements = [];
+    window.artifactReaderDiagnostics = () => readerMeasurements.map(item => ({...item}));
+    let previousAudioEnd = null;
     let ready = false, enabled = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
     let queue = [], position = 0, wants = false, loading = false, currentUrl = null, loaded = -1, chapter = null;
     let controller = new AbortController(), cache = new Map(), voice = '', mode = 'page';
@@ -527,8 +530,32 @@
       clearStream();
       audio.onended = null; audio.pause(); audio.removeAttribute('src'); audio.load(); loaded = -1;
       if (currentUrl) URL.revokeObjectURL(currentUrl); currentUrl = null;
-      if (!preserve) { queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; readerScopeKey = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
+      if (!preserve) { previousAudioEnd = null; queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; readerScopeKey = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
       send('reader:highlight', { id: null }); status(message || 'Ready'); paint();
+    }
+    function pronunciationPlan(text, hints) {
+      const segments = []; let spoken = '', cursor = 0;
+      if (!Array.isArray(hints) || hints.length > 128) hints = [];
+      const valid = hints.every(h => h && Number.isInteger(h.start) && Number.isInteger(h.end) && h.start >= cursor && h.end > h.start && h.end <= text.length && h.end-h.start <= 200 && typeof h.text === 'string' && h.text.trim().length > 0 && h.text.length <= 200 && !/[\u0000-\u001f]/.test(h.text) && (cursor = h.end));
+      if (!valid) hints = [];
+      cursor = 0;
+      function add(value, start, end, replacement) {
+        if (!value) return;
+        segments.push({start:spoken.length,end:spoken.length+value.length,sourceStart:start,sourceEnd:end,replacement}); spoken += value;
+      }
+      for (const hint of hints) {
+        add(text.slice(cursor,hint.start),cursor,hint.start,false);
+        add(hint.text.replace(/\s+/g,' ').trim(),hint.start,hint.end,true); cursor = hint.end;
+      }
+      add(text.slice(cursor),cursor,text.length,false);
+      return {text:spoken,segments};
+    }
+    function pronunciationRange(plan, start, end) {
+      const first = plan.segments.find(s=>s.start<=start && start<s.end);
+      const last = plan.segments.find(s=>s.start<end && end<=s.end);
+      if (!first || !last) return null;
+      return {start:first.replacement ? first.sourceStart : first.sourceStart+start-first.start,
+        end:last.replacement ? last.sourceEnd : last.sourceStart+end-last.start};
     }
     function splitLongText(text, limit) {
       const result = [], chars = Array.from(text); let start = 0;
@@ -608,6 +635,8 @@
       return work;
     }
     async function streamCurrent(index) {
+      const measurement = {startedAt:performance.now(),prefetched:streamRequests.has(index),firstScheduledAudioMs:null,interChunkGapMs:null,underruns:0,maxUnderrunMs:0,receivedAudioSeconds:0};
+      readerMeasurements.push(measurement); if (readerMeasurements.length > 50) readerMeasurements.shift();
       const context = ensureAudioContext();
       if (!context) return false;
       const token = epoch, signal = controller.signal, entry = queue[index];
@@ -679,7 +708,9 @@
           }
           if (current >= 0 && current !== state.highlightedWord) {
             const word = state.words[current]; state.highlightedWord = current; get('replay').disabled = replaySentenceStart() === null;
-            send('reader:word', {id:entry.id, text:entry.text, offset:entry.textOffset, start:word.textStart, end:word.textEnd});
+            const mapped = pronunciationRange(entry.pronunciation,entry.textOffset+word.textStart,entry.textOffset+word.textEnd);
+            if (mapped && entry.sourceText.length <= 3000) send('reader:word', {id:entry.id, text:entry.sourceText, offset:entry.sourceOffset, start:mapped.start-entry.sourceOffset, end:mapped.end-entry.sourceOffset});
+            else send('reader:highlight',{id:entry.id});
           }
         }
         state.highlightFrame = requestAnimationFrame(highlightPlayback);
@@ -740,7 +771,16 @@
         const buffer = context.createBuffer(1, samples.length, 24000), channel = buffer.getChannelData(0);
         for (let i = 0; i < samples.length; i++) channel[i] = samples[i] / 32768;
         const frame = { buffer, samples: samples.length, source: null, start: 0, rate: state.rate, offset: 0, played: false };
-        const start = Math.max(state.cursor, context.currentTime + (state.started ? 0 : startup)); state.started = true; state.cursor = start + buffer.duration / state.rate;
+        if (state.started && context.state === 'running' && context.currentTime > state.cursor + 0.005) {
+          measurement.underruns++; measurement.maxUnderrunMs = Math.max(measurement.maxUnderrunMs,Math.round((context.currentTime-state.cursor)*1000));
+        }
+        const start = Math.max(state.cursor, context.currentTime + (state.started ? 0 : startup));
+        if (!state.started) {
+          const scheduled = performance.now() + Math.max(0,start-context.currentTime+(state.latency || 0))*1000;
+          measurement.firstScheduledAudioMs = Math.round(scheduled-measurement.startedAt);
+          if (previousAudioEnd !== null) measurement.interChunkGapMs = Math.max(0,Math.round(scheduled-previousAudioEnd));
+        }
+        measurement.receivedAudioSeconds = Math.round(state.received / 24) / 1000; state.started = true; state.cursor = start + buffer.duration / state.rate;
         state.frames.push(frame); state.total += frame.samples; state.buffered += frame.samples; scheduleBuffer(frame, state.rate, start);
         loaded = index; loading = false; box.dataset.streamState = wants ? 'playing' : 'paused'; box.dataset.bufferedSamples = String(state.buffered); box.dataset.playedSamples = String(state.played);
         status(readingMessage()); paint();
@@ -812,6 +852,7 @@
         if (!state.sources.size) state.finish.resolve();
         await state.finished;
         if (stream !== state || token !== epoch) return true;
+        previousAudioEnd = performance.now(); measurement.completed = true;
         savePlace(); durations.set(index, state.received / 24000); cache.delete(index); position++; clearStream();
         if (wants) loadCurrent();
         return true;
@@ -1035,12 +1076,16 @@
       const saved = restoring; restoring = null;
       queue = data.blocks.flatMap((b, index) => {
         let cursor = 0;
-        return chunks(b.text).map((text, chunk) => {
-          const textOffset = b.text.indexOf(text, cursor);
-          cursor = textOffset < 0 ? b.text.length : textOffset + text.length;
-          return {id:b.id, text, textOffset, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
+        const pronunciation = pronunciationPlan(b.text,b.pronunciations);
+        return chunks(pronunciation.text).map((text, chunk) => {
+          const textOffset = pronunciation.text.indexOf(text, cursor);
+          cursor = textOffset < 0 ? pronunciation.text.length : textOffset + text.length;
+          const source = pronunciationRange(pronunciation,textOffset,textOffset+text.length);
+          const sourceOffset = source?.start || 0, sourceText = source ? b.text.slice(source.start,source.end) : '';
+          return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
         });
       });
+      if (queue.reduce((size,entry)=>size+entry.text.length,0) > 500000) { stop('This page returned too much spoken text.'); return; }
       if (typeof data.scopeKey !== 'string' || data.scopeKey.length > 500) { stop('This reading scope is invalid.'); return; }
       readerScopeKey = restartScopeKey = data.scopeKey; contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
       if (saved) {

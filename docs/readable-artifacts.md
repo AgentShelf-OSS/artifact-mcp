@@ -59,6 +59,35 @@ Authored summaries and generated table rows use whole-block highlighting. Matchi
 explicitly selected text retain word highlighting. Clicking a figure, card, or row chooses the
 corresponding semantic block for Read from here.
 
+## Pronunciation hints
+
+Use `data-artifact-pronounce` on a short inline term to provide its spoken form without changing
+the displayed text. For example:
+
+```html
+<p>Ask <span data-artifact-pronounce="Shiv awn">Siobhan</span> about
+  <span data-artifact-pronounce="sequel">SQL</span>.</p>
+```
+
+While the replacement is spoken, word highlighting covers the original term. Sentence replay
+uses the same audio and mapping. Selecting only part of a term reads that selection literally;
+selecting the complete term uses its pronunciation. Hints do not apply to code or synthetic
+figure/table narration. Write the desired spoken form directly into an authored summary instead.
+Changing a hint invalidates the affected reading snapshot and saved position.
+
+Each original term and replacement is limited to 200 UTF-16 code units, with at most 128 hints
+per block. Use plain text, not SSML, phoneme markup, or instructions to a model. Nested or
+ambiguous hints may be ignored. Spellings are suggestions to Pocket, not guaranteed phonetics.
+
+## Playback diagnostics
+
+`window.artifactReaderDiagnostics()` in the viewer's browser console returns the latest 50
+streaming measurements for that page. These include time to first scheduled audio, gaps between
+chunks, late audio frames, and received audio duration. Scheduling times estimate playback;
+they do not measure sound leaving the speakers. Pauses and manual navigation can affect gaps.
+Measurements contain no narration text and are neither persisted nor sent to a telemetry service.
+Reloading the page clears them.
+
 ## Dynamic content and limits
 
 Hidden or aria-hidden content, navigation, form controls, editable content, tab controls, timers,
