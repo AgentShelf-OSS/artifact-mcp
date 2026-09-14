@@ -184,7 +184,7 @@ ordinary streaming if the old worker does not expose the timed endpoint.
 The native Artifact MCP binary backup is
 `/usr/local/bin/artifact-mcp.pre-pocket-word-highlights-20260912` on CT220.
 
-## Queue/cache candidate
+## Queue/cache deployment
 
 The queue and cache changes were built and tested in the isolated image
 `homelab/artifact-pocket:3.1.0-cache-queue-20260913`, digest
@@ -193,11 +193,20 @@ The candidate passed health checks and a real VM310 smoke test: timed generation
 returned HTTP 200 with 88,835 bytes, a complete timed cache replay returned HTTP
 200 with 88,835 bytes in 3 ms, and an uncached concurrent stream also completed
 successfully while the replay was served. The candidate container was stopped
-after testing. Production remains on `3.1.0-timestamped-1`, digest
+after testing. Following explicit approval, production switched to this image on
+2026-09-14 and passed its health check. The previous image was
+`3.1.0-timestamped-1`, digest
 `sha256:d26ef8020fc5b8c57e91df985c0282d0cbde7cfb8089275711f728597ea45b55`.
 
 The prepared [cutover script](deploy-cache-queue.py) runs on VM310. It checks the
 running production image and tested candidate digest, creates a timestamped compose
 backup, and recreates only `speech`. It restores the compose file and service if
-recreation fails or health does not recover within 180 seconds. Automatic approval
-review blocked the live service change pending explicit operator approval.
+recreation fails or health does not recover within 180 seconds. The deployment backup is
+`/opt/docker/artifact-pocket-tts/compose.yml.pre-cache-queue-20260914-000445`.
+Restore that compose file and run `docker compose up -d --no-build speech` from
+the stack directory to roll back.
+
+Production verification returned complete timed audio with word events. A cached
+150,945-byte response matched the initial response exactly and completed in 4 ms
+while another generation was active. That concurrent generation also completed
+successfully. These are worker-local smoke measurements, not browser latency.

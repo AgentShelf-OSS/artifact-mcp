@@ -1,6 +1,6 @@
 services:
   speech:
-    image: homelab/artifact-pocket:3.1.0-timestamped-1
+    image: homelab/artifact-pocket:3.1.0-cache-queue-20260913
     build: .
     restart: unless-stopped
     ports:
