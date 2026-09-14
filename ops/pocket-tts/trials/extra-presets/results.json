@@ -1,0 +1,61 @@
+{
+  "text": "The garden was quiet in the early morning. She opened the book and began to read. Beyond the window, a distant bell marked the beginning of another day. There was no reason to hurry.",
+  "model": "pocket-tts-timestamped-65037e84-english_2026-04-int8",
+  "voice_revision": "e81d79e8194ad4c7ce879c87a4258ef20cbf2487",
+  "results": [
+    {
+      "voice": "alba",
+      "duration_seconds": 9.2,
+      "sample_rate": 24000,
+      "peak": 0.7248147130012512,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 3.005,
+      "sha256": "d0d24ba6e0cb82298b875afab8eae3a2085b1528c76f853d99e7f057df3bb1a0"
+    },
+    {
+      "voice": "estelle",
+      "duration_seconds": 12.16,
+      "sample_rate": 24000,
+      "peak": 0.4961784780025482,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 3.933,
+      "sha256": "e3ba70093edff842acbe3668b801d4ab6b80c2a8589aa1c336bcea3a9ec9187e"
+    },
+    {
+      "voice": "giovanni",
+      "duration_seconds": 13.84,
+      "sample_rate": 24000,
+      "peak": 0.594042181968689,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 4.705,
+      "sha256": "7a261d80fcd631a955c2e847d16a31bf7122cd00e03dfe8076868a6410dc9fce"
+    },
+    {
+      "voice": "juergen",
+      "duration_seconds": 9.76,
+      "sample_rate": 24000,
+      "peak": 0.5934370160102844,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 3.341,
+      "sha256": "e8f5c928f68bf45b8ec663b2e74ef51b3de74327d0fc18d94edc514c8fb070cf"
+    },
+    {
+      "voice": "lola",
+      "duration_seconds": 13.52,
+      "sample_rate": 24000,
+      "peak": 0.5090726613998413,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 4.086,
+      "sha256": "e49295ab15fced29033a779cd4a1a1399ec960171203e636e3e432c3477db6e0"
+    },
+    {
+      "voice": "rafael",
+      "duration_seconds": 9.84,
+      "sample_rate": 24000,
+      "peak": 0.4404432773590088,
+      "clipped_fraction": 0.0,
+      "generation_seconds": 3.197,
+      "sha256": "bbe3a9af0aeca1f1e1bb6d394ed236b448bbe8f398f71729c2f7057e6e855230"
+    }
+  ]
+}
