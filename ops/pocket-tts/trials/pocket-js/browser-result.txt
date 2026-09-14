@@ -1,0 +1,46 @@
+Loading english_2026-04 (quantized=true, cloning=false)...
+crossOriginIsolated = false
+  [loading-runtime]
+  [loading-bundle]
+  tokenizer: 25% (0.1 MB)
+  tokenizer: 50% (0.1 MB)
+  tokenizer: 75% (0.1 MB)
+  tokenizer: 100% (0.1 MB)
+  text_conditioner: 0% (16.4 MB)
+  text_conditioner: 25% (16.4 MB)
+  text_conditioner: 50% (16.4 MB)
+  text_conditioner: 75% (16.4 MB)
+  text_conditioner: 100% (16.4 MB)
+  flow_lm_main: 0% (76.3 MB)
+  flow_lm_main: 25% (76.3 MB)
+  flow_lm_main: 50% (76.3 MB)
+  flow_lm_main: 75% (76.3 MB)
+  flow_lm_main: 100% (76.3 MB)
+  flow_lm_flow: 0% (10.0 MB)
+  flow_lm_flow: 25% (10.0 MB)
+  flow_lm_flow: 50% (10.0 MB)
+  flow_lm_flow: 75% (10.0 MB)
+  flow_lm_flow: 100% (10.0 MB)
+  mimi_decoder: 0% (22.7 MB)
+  mimi_decoder: 25% (22.7 MB)
+  mimi_decoder: 50% (22.7 MB)
+  mimi_decoder: 75% (22.7 MB)
+  mimi_decoder: 100% (22.7 MB)
+Ready in 6.8s. sampleRate=24000
+Built-in voices: alba, azelma, cosette, eponine, fantine, javert, jean, marius
+  voices: 0% (52.4 MB)
+  voices: 25% (52.4 MB)
+  voices: 50% (52.4 MB)
+  voices: 75% (52.4 MB)
+  voices: 100% (52.4 MB)
+
+Generating: "The morning light fell across the table. Outside, the city w"...
+  TTFB: 584 ms
+  ⚠ underrun: gap 627ms (#1)
+  ⚠ underrun: gap 320ms (#2)
+  ⚠ underrun: gap 661ms (#3)
+  ⚠ underrun: gap 405ms (#4)
+  ⚠ underrun: gap 320ms (#5)
+  ⚠ underrun: gap 192ms (#6)
+Done. RTFx=0.71x, audio=7.28s, gen=10.19s
+

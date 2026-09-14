@@ -36,7 +36,9 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 
 The authenticated viewer can read visible text from HTML artifacts without requiring each artifact
 to embed a player. **Listen** opens a compact player; **Expand** exposes the selected voice,
-playback speed, and reading scope. Speed changes preserve the voice’s pitch. The reader supports the current page, selected text, a clicked
+playback speed, and reading scope. The compact player shows the current scope, voice, and speed.
+The expanded player groups playback, reading position, and voice settings, with playback controls
+kept visible while scrolling. Speed changes preserve the voice’s pitch. The reader supports the current page, selected text, a clicked
 reading position, and the current semantic section. A clicked paragraph or heading is highlighted
 and gets an inline play action, so reading can begin exactly where attention is focused.
 The selected passage stays highlighted while audio prepares, then follows the spoken word during
@@ -48,7 +50,7 @@ the current paragraph audio without another synthesis request or an additional p
 The existing streamed-audio limit bounds decoded samples to 8 MiB per chunk; stopping, leaving the
 page, or moving to the next chunk releases those samples.
 
-Playback includes pause/resume, 15-second rewind, paragraph navigation, sleep timers, saved-place
+Playback includes pause/resume, 15-second rewind, block navigation, sleep timers, saved-place
 resume, and chapter continuation where the artifact exposes a supported ereader structure.
 Interrupted streams retry twice from the last played position; Pause and Stop cancel automatic
 recovery, and Play can resume after a longer outage. The default server installation does not require a speech worker. Deployments that want local CPU
@@ -56,10 +58,13 @@ narration can use the [Pocket TTS worker](ops/pocket-tts/README.md), which provi
 English voices and streamed audio; the [TTS operations guide](ops/tts/README.md) documents worker
 configuration, authorization, limits, and rollback. An optional [RAVEN trial](ops/pocket-tts/trials/raven/README.md) adds two CPU voices to the same player with passage highlighting. Pocket remains the default when both are configured.
 
-The reader currently follows authored HTML structure and visible text. Charts, diagrams, metric
-cards, tables, and interactive mockups are treated as artifact content, but semantic summaries
-and richer block grouping are tracked in [PBI #41](https://github.com/AgentShelf-OSS/artifact-mcp/issues/41). Authors should provide nearby captions
-or explanations when a visual needs to be narrated.
+The reader preserves document order around embedded prototypes, groups list items and labelled
+cards, and reads figure descriptions once. Simple tables use column headers when narrating rows;
+large or ambiguous tables use a short description instead. Charts and generated row descriptions
+highlight the complete block. Controls, hidden panels, timers, and live logs are excluded.
+See [authoring readable artifacts](docs/readable-artifacts.md) for optional reading regions,
+block grouping, and visual summaries. The expanded player offers Current view and contextual Read details, with scoped saved positions
+and change detection. Further semantic improvements are tracked in [PBI #41](https://github.com/AgentShelf-OSS/artifact-mcp/issues/41).
 
 ## Quick start
 

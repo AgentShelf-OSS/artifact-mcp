@@ -2,12 +2,15 @@
   'use strict';
   if (window.parent === window) return;
   const MAX_CHARS = 500000, MAX_BLOCKS = 5000;
-  const excluded = 'script,style,noscript,template,nav,form,input,button,select,textarea,label,[hidden],[aria-hidden="true"],[data-artifact-readable="false"],[role="navigation"],[role="toolbar"]';
+  const excluded = 'script,style,noscript,template,nav,form,input,button,select,textarea,label,[hidden],[aria-hidden="true"],[data-artifact-readable="false"],[data-artifact-reader-region="exclude"],[role="navigation"],[role="toolbar"],[role="tablist"],[role="button"],[role="menu"],[role="timer"],[role="log"]:not([data-artifact-reader-block]),[contenteditable="true"]';
   const blockTags = new Set('H1 H2 H3 H4 H5 H6 P LI DT DD BLOCKQUOTE PRE FIGCAPTION CAPTION TD TH DIV SECTION ARTICLE MAIN BODY HEADER FOOTER'.split(' '));
-  const ids = new WeakMap();
+  let activeScope = null;
+  const viewSelector = '[data-artifact-reader-region="view"],[role="tabpanel"],[role="application"]';
+  const detailSelector = 'table,tr,pre,[data-artifact-reader-detail]';
   let snapshot = new Map(), active = null, signature = null, timer, selection = '', selectionRange = null, playbackSelectionRange = null, point = null, pickMode = false, pickedElement = null, targetFrame = 0;
   const post = message => window.parent.postMessage(message, '*');
   const wordSources = new Map();
+  let blockOnly = new Set();
   const normalize = text => text.replace(/\s+/g, ' ').trim();
   const style = document.createElement('style');
   style.textContent = '[data-artifact-reader-target]{outline:1px dashed #9b681f!important;outline-offset:4px;background-color:rgba(181,107,44,.18)!important;border-radius:2px} [data-artifact-reader-active]{outline:2px solid #b56b2c!important;outline-offset:3px;background-color:rgba(181,107,44,.12)!important} ::highlight(artifact-reader-passage){background-color:rgba(181,107,44,.24);color:inherit} ::highlight(artifact-reader-word){background-color:rgba(255,194,74,.75);color:inherit;border-radius:2px}';
@@ -15,20 +18,125 @@
   function allowed(element) {
     if (!element || element.closest(excluded)) return false;
     for (let node = element; node; node = node.parentElement) {
+      if (node.tagName === 'DETAILS' && !node.open && element !== node && !node.querySelector('summary')?.contains(element)) return false;
       const css = getComputedStyle(node);
       if (css.display === 'none' || css.visibility === 'hidden' || css.visibility === 'collapse') return false;
     }
     return true;
   }
-  function scanRoot(root, range, mapPositions = false) {
+  // Authored summaries are plain text. Never derive an interpretation from chart marks.
+  function description(element) {
+    const explicit = normalize(element.getAttribute('data-artifact-reader-summary') || '');
+    if (explicit) return explicit;
+    const references = (element.getAttribute('aria-describedby') || '').split(/\s+/).filter(Boolean)
+      .map(id => document.getElementById(id)).filter(node => node && allowed(node));
+    if (references.length) return references.map(node => scanRoot(node, null, false, true).groups.map(group => group.text).join(' ')).join(' ');
+    const caption = element.querySelector(':scope > figcaption, :scope > caption');
+    if (caption && allowed(caption)) return scanRoot(caption, null, false, true).groups.map(group => group.text).join(' ');
+    return normalize(element.getAttribute('aria-label') || element.getAttribute('alt') || element.querySelector('desc')?.textContent || '');
+  }
+  function readingRoots() {
+    const explicit = [...document.querySelectorAll('[data-artifact-reader-region]:not([data-artifact-reader-region="view"])')].filter(allowed);
+    return explicit.length ? explicit.filter(node => !explicit.some(other => other !== node && other.contains(node))) : [document.body || document.documentElement];
+  }
+  function scopeKey(element) {
+    if (element.id && document.getElementById(element.id) === element) return 'id:' + element.id;
+    const path = [];
+    for (let node = element; node && node !== document.documentElement; node = node.parentElement) {
+      path.unshift([...node.parentElement.children].indexOf(node));
+    }
+    return 'path:' + path.join('.');
+  }
+  function scopeElement(key) {
+    if (!key) return null;
+    if (key.startsWith('id:')) return document.getElementById(key.slice(3));
+    if (!/^path:(\d+\.)*\d+$/.test(key)) return null;
+    let node = document.documentElement;
+    for (const index of key.slice(5).split('.')) node = node?.children[Number(index)];
+    return node || null;
+  }
+  function scopedScan(mode, key) {
+    if (mode === 'selection') return scanRoot(document.body, playbackSelectionRange || selectionRange);
+    if (mode === 'view' || mode === 'detail') {
+      let root = key ? scopeElement(key) : point?.closest(mode === 'view' ? viewSelector : detailSelector);
+      if (!root && !key && mode === 'view') root = [...document.querySelectorAll(viewSelector)].find(allowed) || readingRoots()[0];
+      if (!root || !allowed(root)) throw new Error('This reading view is no longer visible.');
+      if (mode === 'detail' && !root.matches(detailSelector)) throw new Error('Choose a table, code block, or described visual.');
+      const detail = mode === 'detail' && normalize(root.getAttribute('data-artifact-reader-detail') || '');
+      const found = detail ? {groups:[{element:root, text:detail.slice(0,MAX_CHARS), blockOnly:true}], truncated:detail.length > MAX_CHARS} : scanRoot(root, null, false, false, mode === 'detail');
+      return {...found, scopeKey:scopeKey(root)};
+    }
+    const found = scan();
+    if (mode !== 'section' || !found.groups.length) return found;
+    const root = key ? scopeElement(key) : point;
+    if (key && (!root || !allowed(root))) throw new Error('This section is no longer visible.');
+    let index = root ? found.groups.findLastIndex(g => g.element === root || g.element.contains(root)) : -1;
+    if (index < 0 && !key) index = found.groups.findIndex(g => g.element.getBoundingClientRect().bottom > 0);
+    if (index < 0) throw new Error('This section is no longer available.');
+    const section = found.groups[index].element.closest('section');
+    let start = index, end = index + 1;
+    if (section) {
+      while (start > 0 && section.contains(found.groups[start-1].element)) start--;
+      while (end < found.groups.length && section.contains(found.groups[end].element)) end++;
+    } else {
+      while (start > 0 && !isHeading(found.groups[start].element)) start--;
+      end = start + 1;
+      while (end < found.groups.length && !isHeading(found.groups[end].element)) end++;
+    }
+    return {...found, groups:found.groups.slice(start,end), scopeKey:scopeKey(found.groups[start].element)};
+  }
+  function scanRoot(root, range, mapPositions = false, literal = false, details = false) {
     const groups = []; let current = null, chars = 0, truncated = false;
+    const consumed = new Set();
+    if (!range && !literal) for (const visual of root.querySelectorAll('figure,svg,canvas,img,[role="img"],[data-artifact-reader-summary]')) {
+      if (!allowed(visual) || visual.hasAttribute('data-artifact-reader-summary')) continue;
+      for (const id of (visual.getAttribute('aria-describedby') || '').split(/\s+/)) {
+        const node = document.getElementById(id);
+        if (node && node !== visual && !node.contains(visual) && allowed(node)) consumed.add(node);
+      }
+    }
     function append(text, owner, node, start) {
       if (current && current.element === owner) current.text += text;
       else { current = { element: owner, text, positions:[] }; groups.push(current); }
       if (mapPositions) for (let i = 0; i < text.length; i++) current.positions.push({node, offset:start + i});
       chars += text.length;
     }
+    function atomic(element, text, mapped = false) {
+      current = null;
+      const remaining = MAX_CHARS - chars;
+      if (text.length > remaining) truncated = true;
+      const value = text.slice(0, remaining);
+      groups.push({element, text:value, blockOnly: !mapped, positions: mapPositions ? mapped ? scanRoot(element, null, true, true).groups.flatMap((group, index) => index ? [null, ...group.positions] : group.positions).slice(0, value.length) : Array(value.length).fill(null) : []});
+      chars += value.length;
+    }
+    function plain(element) {
+      return scanRoot(element, null, false, true).groups.map(group => group.text).join(' ');
+    }
+    function table(element) {
+      const rows = [...element.rows].filter(allowed), caption = description(element);
+      const simple = (details || rows.length <= 13) && rows.every(row => row.cells.length <= 6 && [...row.cells].every(cell => cell.colSpan === 1 && cell.rowSpan === 1));
+      const header = rows[0], headers = header && [...header.cells];
+      if (!simple || !headers?.length || !headers.every(cell => cell.tagName === 'TH')) {
+        if (details) {
+          if (caption) atomic(element, caption);
+          atomic(element, 'Table details. Header associations are unavailable; reading visible rows in order.');
+          for (const row of rows) { if (chars >= MAX_CHARS || groups.length >= MAX_BLOCKS) { truncated = true; break; } atomic(row, plain(row)); }
+        } else atomic(element, caption || 'Table. Use Read details to hear its rows.');
+        return;
+      }
+      if (caption) atomic(element, caption);
+      for (const row of rows.slice(1)) {
+        if (groups.length >= MAX_BLOCKS || chars >= MAX_CHARS) { truncated = true; break; }
+        const cells = [...row.cells];
+        if (cells.length !== headers.length) { atomic(row, plain(row)); continue; }
+        atomic(row, cells.map((cell, index) => {
+          const label = plain(headers[index]), value = plain(cell);
+          return label ? label + ': ' + value : value;
+        }).filter(Boolean).join('. '));
+      }
+    }
     function walk(node, owner) {
+      if (consumed.has(node)) return;
       if (chars >= MAX_CHARS || groups.length >= MAX_BLOCKS) { truncated = true; return; }
       if (node.nodeType === Node.TEXT_NODE) {
         if (!range || range.intersectsNode(node)) {
@@ -39,6 +147,24 @@
           append(text.slice(0, MAX_CHARS - chars), owner, node, start);
         }
       } else if (node.nodeType === Node.ELEMENT_NODE && allowed(node)) {
+        if (!range && !literal) {
+          const tag = node.tagName.toUpperCase();
+          if (node.hasAttribute('data-artifact-reader-summary') || ['FIGURE','SVG','CANVAS','IMG'].includes(tag) || node.getAttribute('role') === 'img') {
+            if (node.getAttribute('role') === 'presentation' || node.getAttribute('role') === 'none' || tag === 'IMG' && node.getAttribute('alt') === '') return;
+            const summary = description(node);
+            // Unlabelled inline SVGs are usually icons. Standalone visuals get a short fallback.
+            if (summary || tag !== 'SVG' || node.parentElement === root) atomic(node, summary || 'Visual. No description is available.');
+            return;
+          }
+          if (details && tag === 'TR') {
+            const headers = [...(node.closest('table')?.rows[0]?.cells || [])], cells = [...node.cells];
+            const simple = headers.length === cells.length && headers.every(c => c.tagName === 'TH' && c.colSpan === 1 && c.rowSpan === 1) && cells.every(c => c.colSpan === 1 && c.rowSpan === 1);
+            atomic(node, simple ? cells.map((cell, index) => plain(headers[index]) + ': ' + plain(cell)).join('. ') : plain(node)); return;
+          }
+          if (tag === 'TABLE') { table(node); return; }
+          if (tag === 'PRE') { atomic(node, details ? plain(node) : 'Code block. Use Read details for literal reading.', details); return; }
+          if ((tag === 'LI' || tag === 'DL' || node.hasAttribute('data-artifact-reader-block')) && !node.querySelector('figure,svg,canvas,img,table,pre,[role="img"],[data-artifact-reader-summary]')) { atomic(node, plain(node), true); return; }
+        }
         const isBlock = blockTags.has(node.tagName) || ['block', 'flex', 'grid', 'table-row'].includes(getComputedStyle(node).display);
         if (isBlock) current = null;
         for (const child of node.childNodes) walk(child, isBlock ? node : owner);
@@ -48,7 +174,7 @@
     }
     walk(root, root);
     return { groups: groups.map(g => {
-      if (!mapPositions) return {element:g.element, text:normalize(g.text)};
+      if (!mapPositions) return {element:g.element, text:normalize(g.text), blockOnly: g.blockOnly === true};
       let text = '', pending = false; const positions = [];
       for (let i = 0; i < g.text.length; i++) {
         if (/\s/.test(g.text[i])) { if (text) pending = true; continue; }
@@ -66,12 +192,16 @@
       const groups = adapted.groups.slice(0, MAX_BLOCKS).map(g => { const text = g.text.slice(0, Math.max(0, MAX_CHARS - total)); total += text.length; return { element: g.element, text }; }).filter(g => g.text);
       return Object.assign({}, adapted, { groups, truncated: total >= MAX_CHARS });
     }
-    for (const root of document.querySelectorAll('article,main')) {
-      if (!allowed(root)) continue;
-      const found = scanRoot(root);
-      if (found.groups.length) return found;
+    const groups = []; let chars = 0, truncated = false;
+    for (const root of readingRoots()) {
+      const found = scanRoot(root); truncated ||= found.truncated;
+      for (const group of found.groups) {
+        if (chars >= MAX_CHARS || groups.length >= MAX_BLOCKS) { truncated = true; break; }
+        const text = group.text.slice(0, MAX_CHARS - chars); truncated ||= text.length < group.text.length;
+        groups.push({...group, text}); chars += text.length;
+      }
     }
-    return scanRoot(document.body || document.documentElement);
+    return {groups, truncated};
   }
   function fingerprintText(value) {
     let hash = 2166136261;
@@ -89,7 +219,7 @@
   }
   function sectionSlice(blocks) {
     if (!blocks.length) return blocks;
-    let anchor = point ? blocks.findIndex(b => snapshot.get(b.id) === point || snapshot.get(b.id).contains && snapshot.get(b.id).contains(point)) : -1;
+    let anchor = point ? blocks.findLastIndex(b => snapshot.get(b.id) === point || snapshot.get(b.id).contains && snapshot.get(b.id).contains(point)) : -1;
     if (anchor < 0) anchor = blocks.findIndex(b => { const el = snapshot.get(b.id), r = el && el.getBoundingClientRect(); return r && r.bottom > 0 && r.top < innerHeight; });
     if (anchor < 0) anchor = 0;
     const meta = sectionMeta(blocks, anchor);
@@ -112,23 +242,22 @@
     const heading = snapshot.get(blocks[start].id);
     return { start, end, label: isHeading(heading) ? normalize(heading.innerText || heading.textContent || '') : null };
   }
-  function content(mode, full) {
+  function content(mode, full, requestedScope) {
     wordSources.clear();
-    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; signature = scan().groups.map(g => g.text).join('\n'); return { blocks: selection ? [{ id: 'selection', text: selection }] : [], truncated: selection.length >= MAX_CHARS }; }
-    const found = scan(); snapshot = new Map();
+    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = scopedScan('selection').groups.map(g => g.text).join('\n'); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection }] : [], truncated: selection.length >= MAX_CHARS }; }
+    const found = scopedScan(mode, requestedScope); activeScope = {mode, key:found.scopeKey}; snapshot = new Map(); blockOnly = new Set();
     let blocks = found.groups.map((group, ordinal) => {
-      const id = 'r' + ordinal; snapshot.set(id, group.element);
+      const id = 'r' + ordinal; snapshot.set(id, group.element); if (group.blockOnly) blockOnly.add(id);
       return { id, ordinal, text: group.text };
     });
     blocks = blocks.map((block, ordinal) => { const meta = sectionMeta(blocks, ordinal); return Object.assign(block, { sectionEndOrdinal: meta.end, sectionLabel: meta.label }); });
-    if (mode === 'section' && !full) blocks = sectionSlice(blocks);
     if (mode === 'here') {
-      let index = point ? blocks.findIndex(b => { const el = snapshot.get(b.id); return el === point || el.contains(point); }) : -1;
+      let index = point ? blocks.findLastIndex(b => { const el = snapshot.get(b.id); return el === point || el.contains(point); }) : -1;
       if (index < 0) index = blocks.findIndex(b => { const r = snapshot.get(b.id).getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; });
       blocks = blocks.slice(Math.max(0, index));
     }
     signature = found.groups.map(g => g.text).join('\n');
-    return { blocks, truncated: found.truncated, chapter: found.chapter || null, fingerprint: fingerprint(found), label: found.chapter && found.chapter.label || null };
+    return { blocks, scopeKey:found.scopeKey || '', truncated: found.truncated, chapter: found.chapter || null, fingerprint: fingerprint(found), label: found.chapter && found.chapter.label || null };
   }
   function outline() {
     const savedSnapshot = snapshot, found = scan();
@@ -142,9 +271,10 @@
       }
     } finally { snapshot = savedSnapshot; }
     // Observe navigation even when Listen is opened before the first playback.
-    if (signature === null) signature = found.groups.map(group => group.text).join('\n');
+    if (signature === null) { activeScope = {mode:'page'}; signature = found.groups.map(group => group.text).join('\n'); }
     const adapted = window.__artifactEreader;
-    return {fingerprint:fingerprint(found),sections:sections.sort((a,b)=>a.ordinal-b.ordinal).slice(0,500),chapters:adapted && adapted.outline ? adapted.outline().chapters.slice(0,500) : [],chapter:found.chapter || null};
+    const details = [...document.querySelectorAll('table,pre,[data-artifact-reader-detail]')].filter(node => allowed(node) && readingRoots().some(root => root.contains(node))).slice(0,100).map(node => ({scopeKey:scopeKey(node), label:(description(node) || (node.tagName === 'PRE' ? 'Code block' : node.tagName === 'TABLE' ? 'Table' : 'Visual details')).slice(0,120)})).filter(item => item.scopeKey.length <= 500);
+    return {details, fingerprint:fingerprint(found),sections:sections.sort((a,b)=>a.ordinal-b.ordinal).slice(0,500),chapters:adapted && adapted.outline ? adapted.outline().chapters.slice(0,500) : [],chapter:found.chapter || null};
   }
   function highlight(id) {
     if (active) active.removeAttribute('data-artifact-reader-active');
@@ -167,6 +297,7 @@
   function clearWordHighlight() { cssHighlight('artifact-reader-word', null); }
   function clearPassageHighlight() { cssHighlight('artifact-reader-passage', null); }
   function mappedSource(id) {
+    if (blockOnly.has(id)) return null;
     if (wordSources.has(id)) return wordSources.get(id);
     const root = id === 'selection' ? document.body : snapshot.get(id);
     if (!root || !root.isConnected || id === 'selection' && !playbackSelectionRange) return null;
@@ -229,10 +360,10 @@
   document.addEventListener('click', event => {
     if (!pickMode || event.button !== 0 || getSelection() && !getSelection().isCollapsed) return;
     if (event.target.isContentEditable || event.target.closest('a,button,input,select,textarea,label,summary,form,nav,[role=button],[role=link],[role=tab],[role=menuitem]')) return;
-    const target = event.target.closest && event.target.closest('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figcaption,caption,td,dd,dt');
+    const target = event.target.closest && event.target.closest('h1,h2,h3,h4,h5,h6,p,li,blockquote,pre,figure,svg,canvas,img,table,tr,figcaption,caption,td,dd,dt,[data-artifact-reader-block],[data-artifact-reader-summary]');
     if (!target || !allowed(target) || target.closest('a,button,form,nav,[contenteditable="true"]')) return;
-    const found = scan(), ordinal = found.groups.findIndex(group => group.element === target || group.element.contains && group.element.contains(target));
-    if (ordinal >= 0) { post({ type: 'reader:target', ordinal, fingerprint: fingerprint(found), label: normalize(target.innerText || target.textContent || '').slice(0, 160) }); pick(found.groups[ordinal].element); }
+    const found = scan(), ordinal = found.groups.findLastIndex(group => group.element === target || group.element.contains && group.element.contains(target));
+    if (ordinal >= 0) { const detail = target.closest(detailSelector); post({ type: 'reader:target', detailAvailable:!!detail, scopeKey:detail ? scopeKey(detail) : '', ordinal, fingerprint: fingerprint(found), label: found.groups[ordinal].text.slice(0, 160) }); pick(found.groups[ordinal].element); }
   }, true);
   // Retain the viewer helper when the anchor bridge follows an internal bundle link.
   document.addEventListener('click', event => {
@@ -256,7 +387,8 @@
     if (data.type === 'reader:clear-target') { targetResize.disconnect(); clearPicked(); return; }
     if (data.type === 'reader:outline' && typeof data.requestId === 'string' && data.requestId.length <= 80) { try { post(Object.assign({ type: 'reader:outline', requestId: data.requestId }, outline())); } catch (_) { post({ type: 'reader:error', requestId: data.requestId, message: 'Could not build the reader outline.' }); } return; }
     if (!['reader:extract', 'reader:next', 'reader:resume', 'reader:jump'].includes(data.type) || typeof data.requestId !== 'string' || !data.requestId || data.requestId.length > 80) return;
-    if (!['page', 'selection', 'here', 'section'].includes(data.mode)) { post({ type: 'reader:error', requestId: data.requestId, message: 'Invalid reading mode.' }); return; }
+    if (!['page', 'selection', 'here', 'section', 'view', 'detail'].includes(data.mode)) { post({ type: 'reader:error', requestId: data.requestId, message: 'Invalid reading mode.' }); return; }
+    if (data.scopeKey !== undefined && (typeof data.scopeKey !== 'string' || data.scopeKey.length > 500)) return;
     if (data.type === 'reader:resume' && (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || (data.chapterIndex !== undefined && (!Number.isInteger(data.chapterIndex) || data.chapterIndex < 0)))) { post({ type: 'reader:error', requestId: data.requestId, message: 'Invalid resume state.' }); return; }
     if (data.type === 'reader:jump' && (!['here','page'].includes(data.mode) || data.mode === 'here' && (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !Number.isInteger(data.ordinal) || data.ordinal < 0 || data.chapterIndex !== undefined) || data.mode === 'page' && (!Number.isInteger(data.chapterIndex) || data.chapterIndex < 0 || data.fingerprint !== undefined))) { post({ type: 'reader:error', requestId: data.requestId, message: 'Invalid reader jump.' }); return; }
     if (data.type === 'reader:next') {
@@ -267,7 +399,7 @@
     }
     const respond = () => {
       try {
-        const found = content(data.type === 'reader:resume' || data.type === 'reader:jump' ? 'page' : data.mode, data.type === 'reader:resume');
+        const found = content(data.type === 'reader:jump' || data.type === 'reader:resume' && !data.scopeKey ? 'page' : data.mode, data.type === 'reader:resume', data.scopeKey);
         if (data.type === 'reader:jump' && data.mode === 'here') {
           if (found.fingerprint !== data.fingerprint || data.ordinal >= found.blocks.length) { post({ type: 'reader:error', requestId: data.requestId, message: 'The saved reader position is no longer available.' }); return; }
           found.blocks = found.blocks.slice(data.ordinal);
@@ -282,9 +414,10 @@
     clearTimeout(timer);
     timer = setTimeout(() => {
       if (signature === null) return;
-      const next = scan().groups.map(g => g.text).join('\n');
-      if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; selectionRange = null; playbackSelectionRange = null; wordSources.clear(); clearPassageHighlight(); highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1 }); }
+      let next;
+      try { next = scopedScan(activeScope?.mode || 'page', activeScope?.key).groups.map(g => g.text).join('\n'); } catch (_) { next = null; }
+      if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; selectionRange = null; playbackSelectionRange = null; wordSources.clear(); clearPassageHighlight(); highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1, scopeKey:activeScope?.key || '' }); }
     }, 160);
-  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable'] });
+  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable', 'data-artifact-reader-region', 'data-artifact-reader-summary', 'data-artifact-reader-detail', 'data-artifact-reader-block', 'aria-describedby', 'aria-label', 'alt', 'role', 'open'] });
   post({ type: 'reader:ready', version: 1 });
 })();

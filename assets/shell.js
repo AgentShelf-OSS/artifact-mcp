@@ -259,11 +259,24 @@
     const box = document.createElement('section');
     box.className = 'vreader'; box.hidden = true;
     box.setAttribute('aria-label', 'Read aloud');
-    box.innerHTML = '<button id="vreader-toggle" type="button" class="vreader-toggle" aria-expanded="false" aria-controls="vreader-mini vreader-panel">Listen</button><div id="vreader-panel" class="vreader-panel" hidden><div class="vreader-head"><div><span class="vreader-kicker">Audio reader</span><strong>Read aloud</strong></div><button id="vreader-minimize" type="button" class="vreader-control vreader-minimize" aria-label="Minimize audio player">Minimize</button><span id="vreader-status" role="status" aria-live="polite">Ready</span></div><div class="vreader-actions" role="group" aria-label="Playback controls"><button id="vreader-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-prev" type="button" class="vreader-control vreader-skip" aria-label="Previous paragraph">Previous</button><button id="vreader-next" type="button" class="vreader-control vreader-skip" aria-label="Next paragraph">Next</button><button id="vreader-stop" type="button" class="vreader-control vreader-stop">Stop</button></div><div class="vreader-navigator"><label for="vreader-outline">Jump to</label><div class="vreader-navigator-row"><select id="vreader-outline" disabled><option value="">Loading sections…</option></select><button id="vreader-jump" type="button" class="vreader-control" aria-label="Start reading from selected section or chapter" disabled>Read</button></div><p class="vreader-pick-hint">Click text in the artifact to choose where to read.</p><div id="vreader-target" class="vreader-target" hidden><span id="vreader-target-label"></span><button id="vreader-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div></div><div class="vreader-settings"><label>Read <select id="vreader-mode"><option value="page">Page / chapter</option><option value="selection">Selection</option><option value="here">From here</option><option value="section">This section</option></select></label><label>Voice <select id="vreader-voice"></select></label><label>Speed <select id="vreader-rate"><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div><div id="vreader-style-panel" class="vreader-style-panel" hidden><div class="vreader-style-row"><label for="vreader-style">Reading style<select id="vreader-style"><option value="calm">Calm audiobook</option><option value="neutral">Neutral</option><option value="expressive">Expressive</option><option value="default">Model default</option><option value="custom">Custom instructions</option></select></label></div><label id="vreader-custom-label" class="vreader-custom" hidden>Delivery instructions<textarea id="vreader-custom" rows="3" maxlength="500" placeholder="Describe the pacing, tone, and emphasis you want."></textarea></label><p id="vreader-style-hint" class="vreader-style-hint">Steady pacing, restrained emotion, gentle emphasis.</p></div><div class="vreader-utility-row"><button id="vreader-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15 seconds</button><button id="vreader-resume" type="button" class="vreader-control" hidden>Resume saved place</button></div><label class="vreader-sleep">Sleep timer<select id="vreader-sleep"><option value="off">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="section">End of section</option><option value="chapter" hidden disabled>End of chapter</option></select><span id="vreader-sleep-hint"></span></label><div class="vreader-preview-row"><button id="vreader-preview" type="button" class="vreader-control">Preview paragraph</button></div><audio id="vreader-audio" preload="auto"></audio></div><div id="vreader-mini" class="vreader-mini" hidden role="region" aria-label="Compact audio player"><div id="vreader-mini-target" class="vreader-target" hidden><span id="vreader-mini-target-label"></span><button id="vreader-mini-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-mini-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div><div class="vreader-mini-row"><div class="vreader-mini-info"><span id="vreader-mini-meta" class="vreader-kicker">Listen</span><span id="vreader-mini-status" role="status" aria-live="polite">Ready</span></div><button id="vreader-mini-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15</button><button id="vreader-mini-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-mini-next" type="button" class="vreader-control" aria-label="Next paragraph">Next</button><button id="vreader-expand" type="button" class="vreader-control" aria-label="Expand audio player" title="Voice, speed, and reading settings">Expand</button><button id="vreader-mini-close" type="button" class="vreader-control vreader-dismiss" aria-label="Stop and close audio player">×</button></div></div>';
+    box.innerHTML = '<button id="vreader-toggle" type="button" class="vreader-toggle" aria-expanded="false" aria-controls="vreader-mini vreader-panel">Listen</button><div id="vreader-panel" class="vreader-panel" hidden><div class="vreader-head"><div><span class="vreader-kicker">Audio reader</span><strong>Read aloud</strong></div><button id="vreader-minimize" type="button" class="vreader-control vreader-minimize" aria-label="Minimize audio player">Minimize</button><span id="vreader-status" role="status" aria-live="polite">Ready</span></div><div class="vreader-actions" role="group" aria-label="Playback controls"><button id="vreader-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-prev" type="button" class="vreader-control vreader-skip" aria-label="Previous block">Previous</button><button id="vreader-next" type="button" class="vreader-control vreader-skip" aria-label="Next block">Next</button><button id="vreader-stop" type="button" class="vreader-control vreader-stop">Stop</button></div><div class="vreader-navigator"><label for="vreader-outline">Jump to</label><div class="vreader-navigator-row"><select id="vreader-outline" disabled><option value="">Loading sections…</option></select><button id="vreader-jump" type="button" class="vreader-control" aria-label="Start reading from selected section or chapter" disabled>Read</button></div><p class="vreader-pick-hint">Click text in the artifact to choose where to read.</p><div id="vreader-target" class="vreader-target" hidden><span id="vreader-target-label"></span><button id="vreader-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-target-details" type="button" class="vreader-control" hidden>Read details</button><button id="vreader-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div></div><div class="vreader-settings"><label>Read <select id="vreader-mode"><option value="page">Document / chapter</option><option value="view">Current view</option><option value="detail" hidden>Selected details</option><option value="selection">Selection</option><option value="here">From here</option><option value="section">This section</option></select></label><label>Voice <select id="vreader-voice"></select></label><label>Speed <select id="vreader-rate"><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div><div id="vreader-style-panel" class="vreader-style-panel" hidden><div class="vreader-style-row"><label for="vreader-style">Reading style<select id="vreader-style"><option value="calm">Calm audiobook</option><option value="neutral">Neutral</option><option value="expressive">Expressive</option><option value="default">Model default</option><option value="custom">Custom instructions</option></select></label></div><label id="vreader-custom-label" class="vreader-custom" hidden>Delivery instructions<textarea id="vreader-custom" rows="3" maxlength="500" placeholder="Describe the pacing, tone, and emphasis you want."></textarea></label><p id="vreader-style-hint" class="vreader-style-hint">Steady pacing, restrained emotion, gentle emphasis.</p></div><div class="vreader-utility-row"><button id="vreader-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15 seconds</button><button id="vreader-resume" type="button" class="vreader-control" hidden>Resume saved place</button></div><label class="vreader-sleep">Sleep timer<select id="vreader-sleep"><option value="off">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="section">End of section</option><option value="chapter" hidden disabled>End of chapter</option></select><span id="vreader-sleep-hint"></span></label><div class="vreader-preview-row"><button id="vreader-preview" type="button" class="vreader-control">Preview block</button></div><audio id="vreader-audio" preload="auto"></audio></div><div id="vreader-mini" class="vreader-mini" hidden role="region" aria-label="Compact audio player"><div id="vreader-mini-target" class="vreader-target" hidden><span id="vreader-mini-target-label"></span><button id="vreader-mini-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-mini-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div><div class="vreader-mini-row"><div class="vreader-mini-info"><span id="vreader-mini-meta" class="vreader-kicker">Listen</span><span id="vreader-mini-status" role="status" aria-live="polite">Ready</span></div><button id="vreader-mini-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15</button><button id="vreader-mini-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-mini-next" type="button" class="vreader-control" aria-label="Next block">Next</button><button id="vreader-expand" type="button" class="vreader-control" aria-label="Expand audio player" title="Voice, speed, and reading settings">Expand</button><button id="vreader-mini-close" type="button" class="vreader-control vreader-dismiss" aria-label="Stop and close audio player">×</button></div></div>';
     box.querySelector('#vreader-mini').insertAdjacentHTML('beforeend', '<button id="vreader-mini-resume" type="button" class="vreader-mini-resume" hidden>Resume saved place</button>');
     // Tabler Icons player-play and player-pause, MIT, https://github.com/tabler/tabler-icons.
     box.insertAdjacentHTML('beforeend', '<button id="vreader-inline-read" class="vreader-inline-read" type="button" aria-label="Read from here" title="Read from here" hidden><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13 -8l-13 -8" /></svg><span>Read from here</span></button>');
     box.querySelector('.vreader-utility-row').insertAdjacentHTML('beforeend', '<button id="vreader-replay" type="button" class="vreader-control" disabled title="Replay the current sentence when word timings are available">Replay sentence</button>');
+    // Keep playback together, followed by reading position and voice preferences.
+    const readerPanel = box.querySelector('.vreader-panel');
+    const playbackGroup = document.createElement('div'); playbackGroup.className = 'vreader-playback';
+    readerPanel.prepend(playbackGroup);
+    for (const selector of ['.vreader-head','.vreader-actions','.vreader-utility-row']) playbackGroup.appendChild(box.querySelector(selector));
+    const readingGroup = box.querySelector('.vreader-navigator');
+    const scopeLabel = box.querySelector('#vreader-mode').parentElement;
+    scopeLabel.className = 'vreader-scope'; readingGroup.prepend(scopeLabel);
+    const listeningSettings = box.querySelector('.vreader-settings');
+    listeningSettings.setAttribute('role','group'); listeningSettings.setAttribute('aria-label','Voice and speed');
+    const finishRow = document.createElement('div'); finishRow.className = 'vreader-finish-row';
+    finishRow.append(box.querySelector('.vreader-sleep'),box.querySelector('.vreader-preview-row'));
+    readerPanel.insertBefore(finishRow,box.querySelector('audio'));
     const share = document.getElementById('vshare-toggle'); share.parentNode.insertBefore(box, share);
     const get = name => box.querySelector('#vreader-' + name), audio = get('audio');
     let ready = false, enabled = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
@@ -272,10 +285,10 @@
     let audioContext = null, stream = null;
     const streamRequests = new Map();
     let playbackConfig = null;
-    let contentFingerprint = '', queueKey = '', scopeStart = 0, scopeEnd = 0, restoring = null, pendingSeek = 0;
+    let contentFingerprint = '', readerScopeKey = '', restartScopeKey = '', queueKey = '', scopeStart = 0, scopeEnd = 0, restoring = null, pendingSeek = 0;
     const durations = new Map();
     let sleepDeadline = 0, sleepBoundary = null;
-    let compact = false, outlineRequest = '', outlineTimer, outlineFingerprint = '', clickedTarget = null, targetGeometry = null;
+    let compact = false, outlineRequest = '', outlineTimer, outlineFingerprint = '', detailTargets = [], clickedTarget = null, targetGeometry = null;
     function readerVisible() { return !get('panel').hidden || compact; }
     function pickMode() { send('reader:pick-mode', {enabled:enabled && ready && readerVisible() && !commentMode}); }
     function refreshOutline() {
@@ -290,7 +303,7 @@
     }
     function clearTarget() {
       clickedTarget = null; targetGeometry = null;
-      get('target').hidden = get('mini-target').hidden = get('inline-read').hidden = true;
+      get('target').hidden = get('mini-target').hidden = get('inline-read').hidden = get('target-details').hidden = true;
       send('reader:clear-target');
     }
     function placeTargetAction() {
@@ -332,14 +345,25 @@
     }
 
     function checkpointKey() { if (isBundle && !currentPage) return ''; return 'artifact-reader-place:' + JSON.stringify([artifactId, configLiteral('viewerId'), isBundle ? currentPage : '']); }
+    function validCheckpoint(value) {
+      return value && (value.version === 1 || value.version === 2) && (value.chapterIndex === undefined || Number.isInteger(value.chapterIndex) && value.chapterIndex >= 0) && typeof value.fingerprint === 'string' && value.fingerprint.length <= 100 &&
+        ['page','view','selection','here','section','detail'].includes(value.mode) && Number.isInteger(value.ordinal) && value.ordinal >= 0 &&
+        Number.isInteger(value.chunk) && value.chunk >= 0 && Number.isFinite(value.offset) && value.offset >= 0 && value.offset < 3600 &&
+        Number.isInteger(value.start) && Number.isInteger(value.end) && value.start <= value.ordinal && value.end >= value.ordinal &&
+        typeof value.voice === 'string' && Array.from(get('rate').options).some(o => o.value === value.rate) && (value.version === 1 || typeof value.scopeKey === 'string' && value.scopeKey.length <= 500);
+    }
     function savedPlace() {
       try {
-        const value = JSON.parse(localStorage.getItem(checkpointKey()) || 'null');
-        if (value && value.version === 1 && (value.chapterIndex === undefined || Number.isInteger(value.chapterIndex) && value.chapterIndex >= 0) && typeof value.fingerprint === 'string' && value.fingerprint.length <= 100 &&
-          ['page','here','section'].includes(value.mode) && Number.isInteger(value.ordinal) && value.ordinal >= 0 &&
-          Number.isInteger(value.chunk) && value.chunk >= 0 && Number.isFinite(value.offset) && value.offset >= 0 && value.offset < 3600 &&
-          Number.isInteger(value.start) && Number.isInteger(value.end) && value.start <= value.ordinal && value.end >= value.ordinal &&
-          typeof value.voice === 'string' && Array.from(get('rate').options).some(o => o.value === value.rate)) {
+        const stored = JSON.parse(localStorage.getItem(checkpointKey()) || 'null');
+        let value = stored;
+        if (stored && stored.version === 2 && stored.current) {
+          value = stored.current;
+          if (readerScopeKey && stored.scopes) {
+            const scoped = stored.scopes[mode + '\u0000' + readerScopeKey];
+            if (scoped) value = scoped;
+          }
+        }
+        if (validCheckpoint(value)) {
           if (!Array.from(get('voice').options).some(o => o.value === value.voice)) {
             const fallback = Array.from(get('voice').options).find(o => o.value === 'pocket_alba');
             if (!fallback) return null;
@@ -360,7 +384,15 @@
     function savePlace() {
       const entry = queue[position];
       if (!entry || !queueKey || !contentFingerprint || (playbackConfig?.mode || mode) === 'selection' || previewEnd !== null || previewRequested || restoring || loaded !== position) return;
-      try { localStorage.setItem(queueKey, JSON.stringify({version:1, fingerprint:contentFingerprint, ordinal:entry.ordinal, chunk:entry.chunk, offset:mediaOffset(), start:scopeStart, end:scopeEnd, chapterIndex:chapter?.index, voice:playbackConfig?.voice || voice, rate:get('rate').value, mode:playbackConfig?.mode || mode, style:playbackConfig?.style || get('style').value, custom:playbackConfig?.custom ?? get('custom').value})); } catch (_) {}
+      try {
+        const checkpoint = {version:2, fingerprint:contentFingerprint, ordinal:entry.ordinal, chunk:entry.chunk, offset:mediaOffset(), start:scopeStart, end:scopeEnd, chapterIndex:chapter?.index, voice:playbackConfig?.voice || voice, rate:get('rate').value, mode:playbackConfig?.mode || mode, scopeKey:readerScopeKey, style:playbackConfig?.style || get('style').value, custom:playbackConfig?.custom ?? get('custom').value};
+        let stored = null; try { stored = JSON.parse(localStorage.getItem(queueKey) || 'null'); } catch (_) {}
+        if (!stored || stored.version !== 2 || !stored.scopes || typeof stored.scopes !== 'object') stored = {version:2, current:null, scopes:{}};
+        const scopeId = checkpoint.mode + '\u0000' + checkpoint.scopeKey;
+        stored.current = checkpoint; stored.scopes[scopeId] = checkpoint;
+        const keys = Object.keys(stored.scopes); while (keys.length > 12) delete stored.scopes[keys.shift()];
+        localStorage.setItem(queueKey, JSON.stringify(stored));
+      } catch (_) {}
       refreshSaved();
     }
     function cancelSleep() { sleepDeadline = 0; sleepBoundary = null; get('sleep').value = 'off'; get('sleep-hint').textContent = ''; }
@@ -428,7 +460,7 @@
     function status(text) { get('status').textContent = text; get('mini-status').textContent = text; get('mini-status').title = text; }
     function readingMessage() {
       const entry = queue[position];
-      const label = chapter?.label || entry?.sectionLabel || (entry ? 'paragraph ' + (entry.ordinal + 1) : '');
+      const label = chapter?.label || entry?.sectionLabel || (entry ? 'block ' + (entry.ordinal + 1) : '');
       return (wants ? 'Reading' : 'Paused') + (label ? ' · ' + label : '');
     }
     function paint() { get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
@@ -437,7 +469,8 @@
         : '<path d="M7 4v16l13 -8l-13 -8" />';
       get('mini-play').innerHTML = '<svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + icon + '</svg>';
       const voiceName = get('voice').selectedOptions[0]?.textContent.split(' · ')[0] || 'Listen';
-      get('mini-meta').textContent = voiceName + ' · ' + get('rate').value + '×';
+      const scopeName = {page:'Document',view:'Current view',detail:'Details',section:'Section',selection:'Selection',here:'From here'}[mode] || 'Listen';
+      get('mini-meta').textContent = scopeName + ' · ' + voiceName + ' · ' + get('rate').value + '×';
       get('mini-play').title = get('play').getAttribute('aria-label');
       get('mini-play').disabled = get('play').disabled;
       get('mini-play').setAttribute('aria-label', get('play').getAttribute('aria-label'));
@@ -494,7 +527,7 @@
       clearStream();
       audio.onended = null; audio.pause(); audio.removeAttribute('src'); audio.load(); loaded = -1;
       if (currentUrl) URL.revokeObjectURL(currentUrl); currentUrl = null;
-      if (!preserve) { queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
+      if (!preserve) { queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; readerScopeKey = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
       send('reader:highlight', { id: null }); status(message || 'Ready'); paint();
     }
     function splitLongText(text, limit) {
@@ -842,9 +875,10 @@
       }
     }
     function requestContent(nextChapter, preview = false) {
+      const scopeKey = !nextChapter && ['view','detail','section'].includes(mode) ? restartScopeKey : '';
       const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview;
       extraction = 'read-' + (++serial);
-      send(nextChapter ? 'reader:next' : 'reader:extract', { requestId: extraction, mode: nextChapter ? 'page' : mode });
+      send(nextChapter ? 'reader:next' : 'reader:extract', { requestId: extraction, mode: nextChapter ? 'page' : mode, scopeKey });
       extractionTimer = setTimeout(() => { if (extraction) stop('Could not read this page. Press Play to retry.'); }, 5000); paint();
     }
     function placePanel() { get('panel').style.top = innerWidth <= 760 ? (document.querySelector('.vbar').getBoundingClientRect().bottom + 6) + 'px' : ''; }
@@ -858,13 +892,23 @@
     get('mini-close').onclick = () => { stop(); cancelSleep(); setPlayerView('closed'); get('toggle').focus(); };
     get('outline').onchange = paint;
     get('jump').onclick = () => {
-      const value = get('outline').value, match = /^(section|chapter):(\d+)$/.exec(value);
+      const value = get('outline').value, detailMatch = /^detail:(\d+)$/.exec(value), match = /^(section|chapter|detail):(\d+)$/.exec(value);
+      if (detailMatch && detailTargets[Number(detailMatch[1])]) { readDetails(detailTargets[Number(detailMatch[1])]); return; }
       if (!match) return;
       jumpTo(match[1] === 'chapter' ? {chapterIndex:Number(match[2])} : {ordinal:Number(match[2]),fingerprint:outlineFingerprint});
     };
     get('inline-read').onclick = get('target-read').onclick = get('mini-target-read').onclick = event => {
       if (clickedTarget) { jumpTo({ordinal:clickedTarget.ordinal,fingerprint:clickedTarget.fingerprint}); if (event.currentTarget === get('inline-read')) get(compact ? 'mini-play' : 'play').focus(); }
     };
+    function readDetails(target) {
+      if (!target || typeof target.scopeKey !== 'string' || !target.scopeKey || target.scopeKey.length > 500) return;
+      stop('Opening details…'); mode = 'detail'; get('mode').value = mode; wants = true;
+      const context = streamingVoice() ? ensureAudioContext() : null; if (context?.state === 'suspended') context.resume().catch(() => {});
+      extraction = 'read-' + (++serial);
+      send('reader:extract', {requestId:extraction, mode:'detail', scopeKey:target.scopeKey});
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read these details.'); }, 5000); paint();
+    }
+    get('target-details').onclick = () => { if (clickedTarget?.detailAvailable) readDetails(clickedTarget); };
     get('target-dismiss').onclick = get('mini-target-dismiss').onclick = clearTarget;
     if (commentToggle) new MutationObserver(() => { pickMode(); if (commentMode) clearTarget(); paint(); }).observe(commentToggle, {attributes:true,attributeFilter:['aria-pressed']});
     new ResizeObserver(() => { placePanel(); placeTargetAction(); }).observe(document.querySelector('.vbar'));
@@ -907,7 +951,9 @@
       if (typeof saved.custom === 'string') get('custom').value = saved.custom.slice(0,500);
       updateStyle(); wants = true;
       const context = streamingVoice() ? ensureAudioContext() : null; if (context?.state === 'suspended') context.resume().catch(() => {});
-      extraction = 'read-' + (++serial); send('reader:resume', {requestId:extraction, mode, fingerprint:saved.fingerprint, chapterIndex:saved.chapterIndex});
+      extraction = 'read-' + (++serial); const resume = {requestId:extraction, mode, fingerprint:saved.fingerprint, chapterIndex:saved.chapterIndex};
+      if (['view','detail','section'].includes(mode) && saved.scopeKey) resume.scopeKey = saved.scopeKey;
+      send('reader:resume', resume);
       extractionTimer = setTimeout(() => { if (extraction) stop('Could not restore this place. Start reading again.'); }, 5000); paint();
     };
     function skip(direction) {
@@ -920,7 +966,7 @@
       stop('Preparing audio…', true); position = target; wants = true; loadCurrent();
     }
     get('prev').onclick = () => skip(-1); get('next').onclick = () => skip(1);
-    get('mode').onchange = () => { mode = get('mode').value; stop(); };
+    get('mode').onchange = () => { stop(); restartScopeKey = ''; mode = get('mode').value; };
     get('voice').onchange = () => { voice = get('voice').value; savePreferences(); stop('Voice changed'); updateStyle(); };
     get('style').onchange = styleChanged;
     get('custom').oninput = styleChanged;
@@ -934,13 +980,17 @@
         const offset = mediaOffset(), playing = wants; stop('Preparing audio…', true); pendingSeek = offset; wants = playing; loadCurrent();
       } else if (stream && stream.changeRate) stream.changeRate(value); paint(); };
     audio.onerror = () => { if (audio.getAttribute('src')) stop('Could not play audio. Press Play to retry.'); };
-    frame.addEventListener('load', () => { stop(); clearTarget(); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').replaceChildren(new Option('Loading sections…','')); get('outline').disabled = true; ready = false; send('reader:hello'); paint(); });
+    frame.addEventListener('load', () => { stop(); restartScopeKey = ''; clearTarget(); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').replaceChildren(new Option('Loading sections…','')); get('outline').disabled = true; ready = false; send('reader:hello'); paint(); });
     window.addEventListener('message', event => {
       if (event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object') return;
       const data = event.data;
       if (data.type === 'anchor:ready') setTimeout(() => { if (queue.length && !queueKey) queueKey = checkpointKey(); refreshSaved(); }, 0);
       if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); return; }
-      if (data.type === 'reader:changed') { stop('Page changed. Press Play to read it.'); clearTarget(); refreshOutline(); return; }
+      if (data.type === 'reader:changed') {
+        const changedScope = typeof data.scopeKey === 'string' ? data.scopeKey : '';
+        if ((!changedScope && !readerScopeKey) || (changedScope && changedScope === readerScopeKey)) { stop('Page changed. Press Play to read it.'); clearTarget(); refreshOutline(); }
+        return;
+      }
       if (data.type === 'reader:error' && outlineRequest && data.requestId === outlineRequest) { clearTimeout(outlineTimer); outlineRequest = ''; get('outline').replaceChildren(new Option('Sections unavailable','')); get('outline').disabled = true; paint(); return; }
       if (data.type === 'reader:target-position') {
         const rect = data.rect, viewport = data.viewport;
@@ -949,21 +999,28 @@
         targetGeometry = {rect,viewport}; placeTargetAction(); return;
       }
       if (data.type === 'reader:target') {
-        if (!readerVisible() || commentMode || !Number.isInteger(data.ordinal) || data.ordinal < 0 || data.ordinal >= 5000 || typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || typeof data.label !== 'string') return;
-        targetGeometry = null; clickedTarget = {ordinal:data.ordinal,fingerprint:data.fingerprint};
+        if (!readerVisible() || commentMode || !Number.isInteger(data.ordinal) || data.ordinal < 0 || data.ordinal >= 5000 || typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || typeof data.label !== 'string' || typeof data.scopeKey !== 'string' || data.scopeKey.length > 500) return;
+        targetGeometry = null; clickedTarget = {ordinal:data.ordinal,fingerprint:data.fingerprint,scopeKey:data.scopeKey,detailAvailable:data.detailAvailable === true};
         get('target-label').textContent = get('mini-target-label').textContent = data.label.slice(0,160);
-        get('target').hidden = get('mini-target').hidden = false; paint(); return;
+        get('target').hidden = get('mini-target').hidden = false; get('target-details').hidden = !clickedTarget.detailAvailable; paint(); return;
       }
       if (data.type === 'reader:outline' && outlineRequest && data.requestId === outlineRequest) {
         clearTimeout(outlineTimer); outlineRequest = '';
         const valid = (items, key) => Array.isArray(items) && items.length <= 500 && items.every(item => item && Number.isInteger(item[key]) && item[key] >= 0 && typeof item.label === 'string' && item.label.length <= 120);
-        if (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !valid(data.sections,'ordinal') || !valid(data.chapters,'index')) return;
+        const validDetails = items => Array.isArray(items) && items.length <= 100 && items.every(item => item && typeof item.label === 'string' && item.label.length <= 120 && typeof item.scopeKey === 'string' && item.scopeKey.length <= 500);
+        if (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !valid(data.sections,'ordinal') || !valid(data.chapters,'index') || !validDetails(data.details || [])) return;
         outlineFingerprint = data.fingerprint;
+        detailTargets = data.details || [];
         const select = get('outline'); select.replaceChildren(new Option('Choose a section…',''));
         for (const [items, prefix, label, key] of [[data.chapters,'chapter','Chapters','index'],[data.sections,'section',data.chapters.length ? 'On this page' : 'Sections','ordinal']]) {
           if (!items.length) continue;
           const group = document.createElement('optgroup'); group.label = label;
           for (const item of items) group.appendChild(new Option(item.label, prefix + ':' + item[key]));
+          select.appendChild(group);
+        }
+        if (detailTargets.length) {
+          const group = document.createElement('optgroup'); group.label = 'Details';
+          detailTargets.forEach((item, index) => group.appendChild(new Option(item.label, 'detail:' + index)));
           select.appendChild(group);
         }
         select.disabled = select.options.length < 2;
@@ -984,9 +1041,10 @@
           return {id:b.id, text, textOffset, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
         });
       });
-      contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
+      if (typeof data.scopeKey !== 'string' || data.scopeKey.length > 500) { stop('This reading scope is invalid.'); return; }
+      readerScopeKey = restartScopeKey = data.scopeKey; contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
       if (saved) {
-        if (contentFingerprint !== saved.fingerprint) { stop('Content changed. Start reading again.'); return; }
+        if (contentFingerprint !== saved.fingerprint || saved.version === 2 && saved.scopeKey !== readerScopeKey) { stop('Content changed or this place belongs to a different view. Start reading again.'); return; }
         queue = queue.filter(entry => entry.ordinal >= saved.start && entry.ordinal <= saved.end);
         position = queue.findIndex(entry => entry.ordinal === saved.ordinal && entry.chunk === saved.chunk);
         if (position < 0) { stop('Saved place is no longer available. Start reading again.'); return; }
