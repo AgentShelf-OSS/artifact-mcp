@@ -1,5 +1,6 @@
 //! Integration declarations frozen by U01; implementations are owned by U12 and U16.
 
+pub mod access_sync;
 pub mod delivery_envelope;
 pub mod delivery_runtime;
 pub mod delivery_worker;

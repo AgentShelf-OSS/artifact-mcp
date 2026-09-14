@@ -210,6 +210,7 @@ impl OrgDirectory for ProductionDirectories {
 
 #[derive(Clone)]
 struct ProductionAdmin {
+    access_sync: artifact_mcp::integrations::access_sync::AccessSync,
     keys: KeyStore,
     orgs: OrgStore,
     webhooks: WebhookStore,
@@ -217,6 +218,9 @@ struct ProductionAdmin {
 }
 
 impl AdminService for ProductionAdmin {
+    fn access_sync_status(&self) -> artifact_mcp::integrations::access_sync::SyncStatus {
+        self.access_sync.status()
+    }
     fn list_keys(&self) -> BoxFuture<'_, Result<Vec<PublisherKeySummary>, AppError>> {
         Box::pin(self.keys.list_keys())
     }
@@ -325,10 +329,14 @@ impl AdminService for ProductionAdmin {
         org: &'a OrgId,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(
-            self.orgs
-                .delete_org_audited(org.clone(), audit, self.audit_key),
-        )
+        Box::pin(async move {
+            let result = self
+                .orgs
+                .delete_org_audited(org.clone(), audit, self.audit_key)
+                .await?;
+            self.access_sync.wake();
+            Ok(result)
+        })
     }
 
     fn add_domain<'a>(
@@ -365,12 +373,14 @@ impl AdminService for ProductionAdmin {
         email: &'a EmailAddress,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
-        Box::pin(self.orgs.add_email_member_audited(
-            org.clone(),
-            email.clone(),
-            audit,
-            self.audit_key,
-        ))
+        Box::pin(async move {
+            let result = self
+                .orgs
+                .add_email_member_audited(org.clone(), email.clone(), audit, self.audit_key)
+                .await?;
+            self.access_sync.wake();
+            Ok(result)
+        })
     }
 
     fn add_email_member_with_name<'a>(
@@ -380,13 +390,20 @@ impl AdminService for ProductionAdmin {
         display_name: Option<String>,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<EmailAddress, AppError>> {
-        Box::pin(self.orgs.add_email_member_with_name_audited(
-            org.clone(),
-            email.clone(),
-            display_name,
-            audit,
-            self.audit_key,
-        ))
+        Box::pin(async move {
+            let result = self
+                .orgs
+                .add_email_member_with_name_audited(
+                    org.clone(),
+                    email.clone(),
+                    display_name,
+                    audit,
+                    self.audit_key,
+                )
+                .await?;
+            self.access_sync.wake();
+            Ok(result)
+        })
     }
 
     fn email_display_name<'a>(
@@ -402,12 +419,14 @@ impl AdminService for ProductionAdmin {
         email: &'a EmailAddress,
         audit: MutationAudit,
     ) -> BoxFuture<'a, Result<bool, AppError>> {
-        Box::pin(self.orgs.remove_email_member_audited(
-            org.clone(),
-            email.clone(),
-            audit,
-            self.audit_key,
-        ))
+        Box::pin(async move {
+            let result = self
+                .orgs
+                .remove_email_member_audited(org.clone(), email.clone(), audit, self.audit_key)
+                .await?;
+            self.access_sync.wake();
+            Ok(result)
+        })
     }
 
     fn categories<'a>(&'a self, org: &'a OrgId) -> BoxFuture<'a, Result<Vec<String>, AppError>> {
@@ -2140,7 +2159,12 @@ async fn bootstrap(
         Arc::new(organization_discord),
     );
     observer.stage(StartupStage::DeliveryWorkersStarted);
+    let access_sync = artifact_mcp::integrations::access_sync::AccessSync::start(
+        config.access_sync.clone(),
+        pool.clone(),
+    )?;
     let admin: Arc<dyn AdminService> = Arc::new(ProductionAdmin {
+        access_sync,
         keys: key_store,
         orgs: OrgStore::new(pool.clone()),
         webhooks: webhooks.as_ref().clone(),

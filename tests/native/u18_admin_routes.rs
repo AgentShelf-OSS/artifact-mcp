@@ -1018,6 +1018,43 @@ fn sample_webhook() -> WebhookSummary {
 }
 
 #[tokio::test]
+async fn access_sync_status_is_admin_only_and_never_cached() {
+    let harness = Harness::admin();
+    let app = artifact_mcp::build_router(harness.deps());
+    let response = app
+        .clone()
+        .oneshot(
+            Request::get("/settings/access-sync")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::OK);
+    assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+    let body: Value =
+        serde_json::from_slice(&to_bytes(response.into_body(), 4096).await.unwrap()).unwrap();
+    assert_eq!(body["state"], "disabled");
+    for email in [None, Some(EmailAddress::from("member@acme.test"))] {
+        *harness.viewer.lock().unwrap() = Viewer {
+            email,
+            org: Some(OrgId::from("acme")),
+            is_admin: false,
+        };
+        let response = app
+            .clone()
+            .oneshot(
+                Request::get("/settings/access-sync")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::FORBIDDEN);
+    }
+}
+
+#[tokio::test]
 async fn admin_settings_renders_keys_orgs_and_masked_webhooks_without_caching() {
     let harness = Harness::admin();
     harness

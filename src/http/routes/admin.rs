@@ -34,6 +34,7 @@ use crate::{
 pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/settings", get(settings))
+        .route("/settings/access-sync", get(access_sync_status))
         .route("/settings/keys", post(create_key))
         .route("/settings/keys/{id}", patch(update_key))
         .route("/settings/keys/{id}/revoke", post(revoke_key))
@@ -68,6 +69,18 @@ pub(crate) fn router() -> Router<AppDeps> {
             "/settings/orgs/{name}/webhooks/{id}/test",
             post(test_webhook),
         )
+}
+
+async fn access_sync_status(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_admin(&deps, &headers).await {
+        return response;
+    }
+    let mut response = Json(deps.admin.access_sync_status()).into_response();
+    response.headers_mut().insert(
+        axum::http::header::CACHE_CONTROL,
+        axum::http::HeaderValue::from_static("no-store"),
+    );
+    response
 }
 
 async fn settings(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
@@ -464,6 +477,10 @@ async fn add_email_member(
         Err(error) => return error.into_response(),
     };
     let mut response = serde_json::json!({ "org": name, "email": normalized });
+    let sync = deps.admin.access_sync_status();
+    if sync.state != "disabled" {
+        response["access_sync"] = serde_json::json!(sync);
+    }
     if let Some(display_name) = display_name {
         response["display_name"] = display_name.into();
     }
@@ -496,7 +513,12 @@ async fn remove_email_member(
         Ok(removed) => removed,
         Err(error) => return error.into_response(),
     };
-    Json(serde_json::json!({ "org": name, "email": email, "removed": removed })).into_response()
+    let mut response = serde_json::json!({ "org": name, "email": email, "removed": removed });
+    let sync = deps.admin.access_sync_status();
+    if sync.state != "disabled" {
+        response["access_sync"] = serde_json::json!(sync);
+    }
+    Json(response).into_response()
 }
 
 async fn add_category(
