@@ -7,9 +7,9 @@ import vm from 'node:vm';
 const processorSource = readFileSync(new URL('../assets/vendor/soundtouch-processor.js', import.meta.url), 'utf8')
   + '\n' + readFileSync(new URL('../assets/reader-pitch-worklet.js', import.meta.url), 'utf8');
 
-for (const rate of [0.8, 1.25, 1.5, 2]) {
-  test(`streaming ${rate}x preserves pitch, amplitude and the delayed tail`, () => {
-    const registered = {}, errors = [], sampleRate = 24000;
+for (const sampleRate of [24000, 44100, 48000]) for (const rate of [0.8, 1.25, 1.5, 2]) {
+  test(`streaming ${rate}x at ${sampleRate}Hz preserves pitch, amplitude and the 120ms tail`, () => {
+    const registered = {}, errors = [];
     const scope = { sampleRate, console, AudioWorkletProcessor: class {
       constructor() { this.port = { postMessage: message => errors.push(message) }; }
     }, registerProcessor: (name, processor) => { registered[name] = processor; } };
@@ -37,7 +37,7 @@ for (const rate of [0.8, 1.25, 1.5, 2]) {
     assert.ok(Math.sqrt(power / (finish - begin)) > 0.2, 'audio dropped out or cancelled at overlaps');
     assert.ok(peak < 0.4, 'overlaps amplified/clipped audio');
     const tail = output.findLastIndex(value => Math.abs(value) > 0.01) / sampleRate;
-    assert.ok(Math.abs(tail - (end + 0.2)) < 0.06, 'audio tail or timeline drifted');
+    assert.ok(Math.abs(tail - (end + 0.12)) < 0.04, 'audio tail or timeline drifted');
     assert.deepEqual(errors, []);
   });
 }

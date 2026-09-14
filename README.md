@@ -38,7 +38,8 @@ The authenticated viewer can read visible text from HTML artifacts without requi
 to embed a player. **Listen** opens a compact player; **Expand** exposes the selected voice,
 playback speed, and reading scope. The compact player shows the current scope, voice, and speed.
 The expanded player groups playback, reading position, and voice settings, with playback controls
-kept visible while scrolling. Speed changes preserve the voice’s pitch. The reader supports the current page, selected text, a clicked
+kept visible while scrolling. Speed changes preserve the voice’s pitch. Non-default speeds use a 120 ms audio
+buffer to reduce paragraph handoff delays while keeping word timing aligned. The reader supports the current page, selected text, a clicked
 reading position, and the current semantic section. A clicked paragraph or heading is highlighted
 and gets an inline play action, so reading can begin exactly where attention is focused.
 The selected passage stays highlighted while audio prepares, then follows the spoken word during

@@ -719,7 +719,7 @@
       function resetPitch(rate) {
         state.pitch?.disconnect();
         if (state.silence) { state.silence.stop(); state.silence.disconnect(); }
-        state.pitch = null; state.silence = null; state.latency = rate === 1 ? 0 : 0.2;
+        state.pitch = null; state.silence = null; state.latency = rate === 1 ? 0 : 0.12;
         if (rate === 1) return;
         const node = state.pitch = new AudioWorkletNode(context, 'artifact-pitch', {
           outputChannelCount: [1], parameterData: {pitch:1, pitchSemitones:0, playbackRate:rate}

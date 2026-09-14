@@ -1,11 +1,11 @@
 // Appended to the unmodified SoundTouchJS 2.1.1 processor bundle by the server.
 // Keep one processor per paragraph/rate, so WSOLA history spans network frames.
-// A fixed 200ms output reservoir absorbs the algorithm's varying block latency.
+// A fixed 120ms output reservoir absorbs the algorithm's varying block latency.
 // The shell uses this same delay when saving position and draining the final tail.
 class ArtifactPitchProcessor extends SoundTouchProcessor {
   constructor(options) {
     super(options);
-    this.warmup = Math.round(sampleRate * 0.2);
+    this.warmup = Math.round(sampleRate * 0.12);
     this._pipe.setStretchParameters({ sequenceMs: 60, seekWindowMs: 20, overlapMs: 8, quickSeek: false });
     this.failed = false;
   }

@@ -1,0 +1,146 @@
+{
+  "voice": "pocket_alba",
+  "browser": "Chromium headless",
+  "path": "local native viewer to production CPU worker over LAN",
+  "results": [
+    {
+      "name": "initial",
+      "rate": "1",
+      "measurements": [
+        {
+          "startedAt": 431.7999999523163,
+          "prefetched": false,
+          "firstScheduledAudioMs": 1919,
+          "interChunkGapMs": null,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.52,
+          "completed": true
+        },
+        {
+          "startedAt": 9839.799999952316,
+          "prefetched": true,
+          "firstScheduledAudioMs": 12,
+          "interChunkGapMs": 12,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.36,
+          "completed": true
+        },
+        {
+          "startedAt": 17220.899999976158,
+          "prefetched": true,
+          "firstScheduledAudioMs": 11,
+          "interChunkGapMs": 11,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.76,
+          "completed": true
+        },
+        {
+          "startedAt": 25029.199999928474,
+          "prefetched": true,
+          "firstScheduledAudioMs": 11,
+          "interChunkGapMs": 11,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 6.4,
+          "completed": true
+        }
+      ]
+    },
+    {
+      "name": "cached",
+      "rate": "1",
+      "measurements": [
+        {
+          "startedAt": 148.59999990463257,
+          "prefetched": false,
+          "firstScheduledAudioMs": 217,
+          "interChunkGapMs": null,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.52,
+          "completed": true
+        },
+        {
+          "startedAt": 7925.799999952316,
+          "prefetched": true,
+          "firstScheduledAudioMs": 11,
+          "interChunkGapMs": 12,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.36,
+          "completed": true
+        },
+        {
+          "startedAt": 15307.199999928474,
+          "prefetched": true,
+          "firstScheduledAudioMs": 11,
+          "interChunkGapMs": 12,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.76,
+          "completed": true
+        },
+        {
+          "startedAt": 23115.199999928474,
+          "prefetched": true,
+          "firstScheduledAudioMs": 11,
+          "interChunkGapMs": 11,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 6.4,
+          "completed": true
+        }
+      ]
+    },
+    {
+      "name": "cached_fast",
+      "rate": "1.5",
+      "measurements": [
+        {
+          "startedAt": 165.79999995231628,
+          "prefetched": false,
+          "firstScheduledAudioMs": 422,
+          "interChunkGapMs": null,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.52,
+          "completed": true
+        },
+        {
+          "startedAt": 5641.899999976158,
+          "prefetched": true,
+          "firstScheduledAudioMs": 211,
+          "interChunkGapMs": 212,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.36,
+          "completed": true
+        },
+        {
+          "startedAt": 10760.600000023842,
+          "prefetched": true,
+          "firstScheduledAudioMs": 211,
+          "interChunkGapMs": 212,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 7.76,
+          "completed": true
+        },
+        {
+          "startedAt": 16180.399999976158,
+          "prefetched": true,
+          "firstScheduledAudioMs": 211,
+          "interChunkGapMs": 211,
+          "underruns": 0,
+          "maxUnderrunMs": 0,
+          "receivedAudioSeconds": 6.4,
+          "completed": true
+        }
+      ]
+    }
+  ],
+  "errors": []
+}
