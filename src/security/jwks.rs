@@ -369,6 +369,9 @@ impl HttpJwksSource {
     pub fn new(url: impl Into<String>) -> Result<Self, AppError> {
         let client = reqwest::Client::builder()
             .timeout(Duration::from_millis(FETCH_TIMEOUT_MS))
+            // Match jose's fetchJwks behaviour: a JWKS endpoint must not silently follow
+            // redirects, especially an HTTPS endpoint redirecting to plaintext HTTP.
+            .redirect(reqwest::redirect::Policy::none())
             .build()
             .map_err(|_| AppError::Internal)?;
         Ok(Self {

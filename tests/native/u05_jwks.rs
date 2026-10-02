@@ -7,6 +7,8 @@
 //! The source is scripted rather than networked, and the clock is a [`FixedClock`], so cache
 //! boundaries are asserted at the exact millisecond with no sleeping.
 
+use std::io::{Read, Write};
+use std::net::TcpListener;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -14,8 +16,8 @@ use artifact_mcp::config::FixedClock;
 use artifact_mcp::error::AppError;
 use artifact_mcp::ports::BoxFuture;
 use artifact_mcp::security::jwks::{
-    CACHE_MAX_AGE_MS, COOLDOWN_MS, CachingJwks, JWKS_UNAVAILABLE_MESSAGE, JwkDocument,
-    JwksProvider, JwksSource, MULTIPLE_MATCHING_KEYS_MESSAGE, NO_MATCHING_KEY_MESSAGE,
+    CACHE_MAX_AGE_MS, COOLDOWN_MS, CachingJwks, HttpJwksSource, JWKS_UNAVAILABLE_MESSAGE,
+    JwkDocument, JwksProvider, JwksSource, MULTIPLE_MATCHING_KEYS_MESSAGE, NO_MATCHING_KEY_MESSAGE,
     SelectionError, StaticJwks, UNSUPPORTED_ALGORITHM_MESSAGE,
 };
 use serde_json::{Value, json};
@@ -69,6 +71,59 @@ impl JwksSource for ScriptedSource {
 
 fn document(value: &Value) -> JwkDocument {
     JwkDocument::from_json(value).expect("fixture JWKS parses")
+}
+
+#[tokio::test]
+async fn remote_jwks_does_not_follow_redirects() {
+    // A tiny local HTTP server is sufficient to prove the reqwest redirect policy. The same
+    // policy is used for HTTPS endpoints, so an HTTPS JWKS URL cannot be downgraded through a
+    // redirect to plaintext HTTP. No external service or credentials are involved.
+    let listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind redirect fixture");
+    let address = listener.local_addr().expect("redirect fixture address");
+    let target_listener = TcpListener::bind(("127.0.0.1", 0)).expect("bind redirect target");
+    let target_address = target_listener
+        .local_addr()
+        .expect("redirect target address");
+    let target_hits = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let server = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().expect("redirect request");
+        let mut request = [0_u8; 2048];
+        let _ = stream.read(&mut request).expect("read redirect request");
+        let location = format!("http://{target_address}/target");
+        let response = format!(
+            "HTTP/1.1 302 Found\r\nLocation: {location}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+        );
+        stream
+            .write_all(response.as_bytes())
+            .expect("write redirect");
+    });
+
+    let source = HttpJwksSource::new(format!("http://{address}/start")).expect("HTTP source");
+    let error = source.fetch().await.expect_err("redirect is rejected");
+    assert_eq!(
+        error,
+        AppError::Unavailable(JWKS_UNAVAILABLE_MESSAGE.to_owned())
+    );
+    target_listener
+        .set_nonblocking(true)
+        .expect("configure redirect target");
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(250);
+    while std::time::Instant::now() < deadline {
+        match target_listener.accept() {
+            Ok((mut stream, _)) => {
+                target_hits.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                let mut request = [0_u8; 2048];
+                let _ = stream.read(&mut request);
+                break;
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(std::time::Duration::from_millis(5));
+            }
+            Err(error) => panic!("redirect target failed: {error}"),
+        }
+    }
+    assert_eq!(target_hits.load(std::sync::atomic::Ordering::SeqCst), 0);
+    server.join().expect("redirect fixture thread");
 }
 
 // ---------------------------------------------------------------------------

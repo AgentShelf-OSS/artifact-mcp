@@ -19,12 +19,30 @@ the additional values required behind Cloudflare Access.
 
 | Variable | Purpose |
 |---|---|
-| `MCP_OAUTH_ISSUER` | Expected token issuer. Required with the audience and JWKS URL. |
+| `MCP_OAUTH_ISSUER` | Exact expected token issuer, using HTTPS. Required with the audience and JWKS URL. |
 | `MCP_OAUTH_AUDIENCE` | Expected resource audience. |
-| `MCP_OAUTH_JWKS_URL` | JWKS endpoint for asymmetric token verification. |
+| `MCP_OAUTH_JWKS_URL` | HTTPS JSON Web Key Set endpoint for asymmetric token verification. Configure its final URL directly; redirects are rejected. |
+| `MCP_OAUTH_ALLOW_LOOPBACK_HTTP` | Development exception. Defaults to `0`; exactly `1` permits HTTP only on parsed loopback hosts. |
 | `MCP_OAUTH_ALLOWED_ALGS` | Allowed asymmetric JWT algorithms. Defaults to `RS256`. |
 | `MCP_OAUTH_MAX_TOKEN_LIFETIME_S` | Maximum accepted access-token lifetime. Defaults to `3600`. |
 | `MCP_OAUTH_CLOCK_TOLERANCE_S` | Clock tolerance for token checks. Defaults to `30`. |
+
+Node and Rust require HTTPS for both the issuer and verification-key URL. These URLs must not
+contain credentials or fragments. Verification-key retrieval rejects every redirect, including
+HTTPS-to-HTTPS redirects, so a redirect cannot downgrade the connection to HTTP. Direct HTTPS
+retrieval retains the existing key cache and rotation behavior.
+
+For an intentional local HTTP development setup, explicitly set
+`MCP_OAUTH_ALLOW_LOOPBACK_HTTP=1` alongside the complete issuer, audience, and JWKS configuration.
+The exception permits exactly the parsed hostname `localhost`, IPv4 loopback addresses in
+`127.0.0.0/8`, and IPv6 loopback `::1`. It rejects LAN addresses and lookalikes such as
+`localhost.example.com`. Keep the exception disabled in production.
+
+When upgrading an existing HTTP configuration, move both endpoints to HTTPS before restarting.
+Local development may instead opt into the loopback exception. If a JWKS URL redirects, replace
+it with the final HTTPS endpoint. Keep `MCP_OAUTH_ISSUER` equal to the token's exact `iss` claim;
+changing its scheme also requires the authorization server to issue that value. Deployments
+without the OAuth triple continue to use API keys without this setting.
 
 OAuth tokens must contain `sub` or `client_id`, `org`, integer `iat` and `exp` values, and an
 explicit `scope` string or `scp` string or array. Artifact MCP recognizes these scopes:

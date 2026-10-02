@@ -282,3 +282,207 @@ fn oauth_configuration_is_optional_complete_and_fail_closed() {
     .expect("parsing and startup validation are separate");
     assert!(disabled_without_oauth.validate_startup().is_err());
 }
+
+#[test]
+fn oauth_urls_require_https_except_explicit_canonical_loopback_development_mode() {
+    let base = MapEnv::empty()
+        .with("MCP_OAUTH_ISSUER", ISSUER)
+        .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+        .with("MCP_OAUTH_JWKS_URL", "https://auth.example.test/jwks");
+    let insecure = base
+        .clone()
+        .with("MCP_OAUTH_ISSUER", "http://auth.example.test");
+    let error = AppConfig::from_source(&insecure).expect_err("public HTTP issuer rejected");
+    assert!(error.to_string().contains("MCP_OAUTH_ISSUER"));
+    assert!(!error.to_string().contains("auth.example.test"));
+
+    for host in [
+        "localhost",
+        "127.0.0.1",
+        "127.0.0.2",
+        "127.1",
+        "0x7f000001",
+        "[::1]",
+    ] {
+        let env = base
+            .clone()
+            .with("MCP_OAUTH_ISSUER", &format!("http://{host}/issuer"))
+            .with("MCP_OAUTH_JWKS_URL", &format!("http://{host}/jwks"));
+        assert!(
+            AppConfig::from_source(&env).is_err(),
+            "opt-in required for {host}"
+        );
+    }
+
+    let loopback = base
+        .clone()
+        .with("MCP_OAUTH_ISSUER", "http://127.1:3480")
+        .with("MCP_OAUTH_JWKS_URL", "http://[::1]:3481/jwks")
+        .with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", "1");
+    let config = AppConfig::from_source(&loopback).expect("explicit loopback HTTP accepted");
+    assert!(config.oauth.allow_loopback_http);
+
+    for host in [
+        "localhost",
+        "127.0.0.1",
+        "127.0.0.2",
+        "127.1",
+        "0x7f000001",
+        "[::1]",
+    ] {
+        let env = MapEnv::empty()
+            .with("MCP_OAUTH_ISSUER", &format!("http://{host}/issuer"))
+            .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+            .with("MCP_OAUTH_JWKS_URL", &format!("http://{host}/jwks"))
+            .with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", "1");
+        assert!(AppConfig::from_source(&env).is_ok(), "accepted {host}");
+    }
+
+    for host in [
+        "http://192.168.1.10",
+        "http://127.0.0.1.evil.example",
+        "http://localhost.evil.example",
+        "http://[::ffff:127.0.0.1]",
+    ] {
+        let env = loopback.clone().with("MCP_OAUTH_ISSUER", host);
+        assert!(AppConfig::from_source(&env).is_err(), "rejected {host}");
+    }
+
+    let malformed_switch = loopback
+        .clone()
+        .with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", " 1 ");
+    let error = AppConfig::from_source(&malformed_switch).expect_err("whitespace switch rejected");
+    assert!(error.to_string().contains("MCP_OAUTH_ALLOW_LOOPBACK_HTTP"));
+}
+
+#[test]
+fn oauth_url_errors_do_not_echo_credentials_or_fragments() {
+    let env = MapEnv::empty()
+        .with(
+            "MCP_OAUTH_ISSUER",
+            "https://client:super-secret@auth.example.test",
+        )
+        .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+        .with(
+            "MCP_OAUTH_JWKS_URL",
+            "https://auth.example.test/jwks#fragment",
+        );
+    let error = AppConfig::from_source(&env).expect_err("credentials are rejected");
+    let rendered = error.to_string();
+    assert!(rendered.contains("MCP_OAUTH_ISSUER"));
+    assert!(!rendered.contains("super-secret"));
+    assert!(!rendered.contains("client:"));
+    assert!(!rendered.contains("#fragment"));
+
+    let empty_userinfo = MapEnv::empty()
+        .with("MCP_OAUTH_ISSUER", "https://@auth.example.test")
+        .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+        .with("MCP_OAUTH_JWKS_URL", "https://auth.example.test/jwks");
+    assert!(AppConfig::from_source(&empty_userinfo).is_err());
+}
+
+#[test]
+fn loopback_http_switch_is_ignored_when_oauth_is_disabled() {
+    let env = MapEnv::empty().with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", "not-a-flag");
+    let config = AppConfig::from_source(&env).expect("API-key-only defaults remain compatible");
+    assert!(!config.oauth.enabled());
+    assert!(!config.oauth.allow_loopback_http);
+}
+
+#[test]
+fn oauth_url_policy_matches_node_for_both_settings() {
+    use crate::u05_support::{node_reference_available, run_node};
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    if !node_reference_available(root, &["lib/oauth.js"]) {
+        return;
+    }
+    let mut cases = Vec::new();
+    for setting in ["MCP_OAUTH_ISSUER", "MCP_OAUTH_JWKS_URL"] {
+        for (url, loopback_http) in [
+            ("https://auth.example.test/issuer", false),
+            ("http://localhost/issuer", true),
+            ("http://LOCALHOST/issuer", true),
+            ("http://127.0.0.2/issuer", true),
+            ("http://127.1/issuer", true),
+            ("http://0x7f000001/issuer", true),
+            ("http://[::1]/issuer", true),
+            ("http://[0:0:0:0:0:0:0:1]/issuer", true),
+            ("http://localhost./issuer", false),
+            ("http://localhost.example.test/issuer", false),
+            ("http://127.0.0.1.example.test/issuer", false),
+            ("http://192.168.1.10/issuer", false),
+            ("http://auth.example.test/issuer", false),
+            ("http://[::ffff:127.0.0.1]/issuer", false),
+            (
+                "https://user:synthetic-password@auth.example.test/issuer",
+                false,
+            ),
+            ("https://@auth.example.test/issuer", false),
+            ("https://auth.example.test/issuer#", false),
+            ("https://auth.example.test/issuer#fragment", false),
+            ("ftp://auth.example.test/issuer", false),
+            ("invalid?synthetic-query-secret", false),
+        ] {
+            for opt_in in [None, Some("0"), Some("1")] {
+                let expected =
+                    url.starts_with("https://") && !url.contains('@') && !url.contains('#')
+                        || loopback_http && opt_in == Some("1");
+                cases.push(
+                    json!({"setting": setting, "url": url, "optIn": opt_in, "expected": expected}),
+                );
+            }
+        }
+    }
+    for (opt_in, expected) in [("", true), (" ", true), ("yes", false), (" 1 ", false)] {
+        cases.push(json!({"setting": "MCP_OAUTH_ISSUER", "url": ISSUER, "optIn": opt_in, "expected": expected}));
+    }
+    let rust: Vec<bool> = cases
+        .iter()
+        .map(|case| {
+            let mut env = MapEnv::empty()
+                .with("MCP_OAUTH_ISSUER", ISSUER)
+                .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+                .with("MCP_OAUTH_JWKS_URL", "https://auth.example.test/jwks")
+                .with(
+                    case["setting"].as_str().expect("setting"),
+                    case["url"].as_str().expect("url"),
+                );
+            if let Some(opt_in) = case["optIn"].as_str() {
+                env = env.with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", opt_in);
+            }
+            let result = AppConfig::from_source(&env);
+            if let Err(error) = &result {
+                let message = error.to_string();
+                assert!(message.contains("MCP_OAUTH_"));
+                assert!(!message.contains("synthetic-password"));
+                assert!(!message.contains("synthetic-query-secret"));
+            }
+            assert_eq!(
+                result.is_ok(),
+                case["expected"].as_bool().expect("expected"),
+                "{case}"
+            );
+            result.is_ok()
+        })
+        .collect();
+    let node = run_node(
+        root,
+        r#"
+        const { oauthConfigFromEnv } = await import('./lib/oauth.js');
+        const cases = JSON.parse(process.argv[1]);
+        console.log(JSON.stringify(cases.map(row => {
+            const env = {
+                MCP_OAUTH_ISSUER: 'https://auth.example.test',
+                MCP_OAUTH_AUDIENCE: 'https://artifacts.example.test/mcp',
+                MCP_OAUTH_JWKS_URL: 'https://auth.example.test/jwks',
+                [row.setting]: row.url
+            };
+            if (row.optIn !== null) env.MCP_OAUTH_ALLOW_LOOPBACK_HTTP = row.optIn;
+            try { oauthConfigFromEnv(env); return true; } catch { return false; }
+        })));
+    "#,
+        &json!(cases),
+        &[],
+    );
+    assert_eq!(json!(rust), node);
+}

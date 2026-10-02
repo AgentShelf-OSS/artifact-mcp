@@ -17,6 +17,12 @@ and a fix or mitigation will be coordinated before public disclosure.
   closed** — no request can obtain a viewer/admin identity from a header. Header trust is
   an explicit loopback-only dev opt-in (`TRUST_ACCESS_HEADERS=1`) that additionally refuses
   to start on a non-loopback bind. **Set the JWT vars in production.**
+- **Optional MCP OAuth** validates short-lived access tokens against the configured issuer,
+  audience, and asymmetric algorithm allowlist. Issuer and JSON Web Key Set URLs require HTTPS
+  and reject credentials and fragments. Key retrieval rejects all redirects. An explicit
+  `MCP_OAUTH_ALLOW_LOOPBACK_HTTP=1` exception permits HTTP only on parsed `localhost`,
+  `127.0.0.0/8`, or `::1` hosts for local development. It never permits LAN or public HTTP
+  endpoints. See [configuration and migration guidance](docs/configuration.md#oauth).
 - **Untrusted artifact content** is served with a CSP sandbox (no `allow-same-origin`)
   on every raw/download/share response, so it runs in a null origin. In addition, every
   cookie-authenticated portal mutation requires a first-party `X-Artifact-Mutation: 1` header and
