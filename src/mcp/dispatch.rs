@@ -371,15 +371,15 @@ pub fn dispatch_protocol_for_era(
         "initialize" => {
             let requested = message
                 .get("params")
-                .and_then(|params| params.get("protocolVersion"))
-                .filter(|value| javascript_truthy(value))
-                .cloned()
-                .map_or_else(
-                    || Value::String(PROTOCOL_VERSION.to_owned()),
-                    OrderedJson::into_value,
-                );
+                .and_then(|params| params.get("protocolVersion"));
+            if requested.is_some_and(|version| version.as_str().is_none()) {
+                return Some(Err(JsonRpcError::InvalidParams(
+                    "protocolVersion must be a string".to_owned(),
+                )
+                .into()));
+            }
             Ok(json!({
-                "protocolVersion": requested,
+                "protocolVersion": PROTOCOL_VERSION,
                 "capabilities": { "tools": { "listChanged": false } },
                 "serverInfo": { "name": SERVER_NAME, "version": SERVER_VERSION }
             }))
@@ -1782,16 +1782,6 @@ fn optional_number(value: Option<f64>) -> OrderedJson {
 
 fn artifact_url(deps: &AppDeps, id: &ArtifactId) -> String {
     format!("{}/{id}", deps.config.public_base_url)
-}
-
-fn javascript_truthy(value: &OrderedJson) -> bool {
-    match value {
-        OrderedJson::Null => false,
-        OrderedJson::Bool(value) => *value,
-        OrderedJson::Number(value) => value.as_f64().is_some_and(|value| value != 0.0),
-        OrderedJson::String(value) => !value.is_empty(),
-        OrderedJson::Array(_) | OrderedJson::Object(_) => true,
-    }
 }
 
 fn javascript_string(value: &OrderedJson) -> String {

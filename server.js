@@ -6,7 +6,7 @@ import { createApp } from "./lib/app.js";
 import { MCP_JSON_LIMIT } from "./lib/config.js";
 import db, { ARTIFACT_DIR, seedKeysFromEnv } from "./lib/db.js";
 import { sha256Hex, checkKey } from "./lib/auth.js";
-import { executePreviewTask, handleMcp, validateMcpHttpRequest } from "./lib/mcp.js";
+import { executePreviewTask, handleMcp, validateMcpHttpRequest, invalidMcpRequest } from "./lib/mcp.js";
 import * as artifactStore from "./lib/store.js";
 import { ACCESS_IDENTITY_MODE, assertReady, resolveViewer } from "./lib/identity.js";
 import { accessRetryTarget } from "./lib/access-retry.js";
@@ -195,6 +195,7 @@ const app = createApp({
       tasks: previewTasks
     }),
   validateMcpHttpRequest,
+  invalidMcpRequest,
   resolveViewer,
   artifacts: artifactStore,
   thumbnails,
