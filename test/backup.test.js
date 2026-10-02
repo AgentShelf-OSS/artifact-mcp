@@ -34,16 +34,27 @@ else
   exec ${quoteShell(sqlite)} "$@"
 fi
 `, { mode: 0o755 });
+  await fs.writeFile(path.join(bin, "cp"), `#!/usr/bin/env bash
+set -euo pipefail
+if [[ "\${1:-}" == "-a" && "\${2:-}" == */previews && -n "\${BACKUP_TEST_REMOVE_PREVIEWS:-}" ]]; then
+  rm -rf "\${2}"
+  exit 0
+fi
+/usr/bin/cp "$@"
+if [[ "\${1:-}" == "-a" && "\${2:-}" == */previews && -n "\${BACKUP_TEST_CORRUPT_PREVIEW:-}" ]]; then
+  printf 'corrupted-preview' > "\${3}/bundle1.png"
+fi
+`, { mode: 0o755 });
   const db = new Database(path.join(data, "artifacts.db"));
   t.after(() => { if (db.open) db.close(); });
   db.exec("CREATE TABLE artifacts (id TEXT PRIMARY KEY, is_bundle INTEGER NOT NULL, body_sha256 TEXT NOT NULL); CREATE TABLE artifact_revisions (artifact_id TEXT NOT NULL, revision INTEGER NOT NULL, is_bundle INTEGER NOT NULL, body_sha256 TEXT NOT NULL); CREATE TABLE artifact_durability_intents (id TEXT PRIMARY KEY)");
   return { root, data, backups, db };
 }
 
-function startBackup(data, backups, pause, phase = "after", keep = "14") {
+function startBackup(data, backups, pause, phase = "after", keep = "14", extraEnv = {}) {
   const child = spawn("bash", [script, data, backups, keep], {
     env: { ...process.env, PATH: `${path.join(path.dirname(data), "bin")}:${process.env.PATH}`,
-      ...(pause ? { BACKUP_TEST_PAUSE: pause, BACKUP_TEST_PHASE: phase } : {}) },
+      ...(pause ? { BACKUP_TEST_PAUSE: pause, BACKUP_TEST_PHASE: phase } : {}), ...extraEnv },
   });
   const output = [];
   child.stdout.on("data", (chunk) => output.push(chunk));
@@ -117,6 +128,28 @@ test("canonical bundle and retained bundle history are verified; previews remain
   const [name] = await fs.readdir(backups);
   assert.equal(await fs.readFile(path.join(backups, name, "artifacts", "bundle1", "assets", "site.css"), "utf8"), "css");
   assert.equal(hash(await fs.readFile(path.join(backups, name, "previews", "bundle1.png"))), hash(preview));
+});
+
+test("corruption of a copied preview fails closed while preserving the source cache", async (t) => {
+  const { root, data, backups, db } = await fixture(t);
+  const preview = Buffer.from("preview-cache");
+  await fs.mkdir(path.join(data, "previews"), { recursive: true });
+  await fs.writeFile(path.join(data, "previews", "bundle1.png"), preview);
+  db.close();
+  assert.equal(await startBackup(data, backups, undefined, undefined, "14", { BACKUP_TEST_CORRUPT_PREVIEW: "1" }), 1);
+  assert.deepEqual(await fs.readdir(backups), []);
+  assert.deepEqual((await fs.readdir(backups, { withFileTypes: true })).filter((entry) => entry.name.startsWith(".incomplete-")), []);
+  assert.equal(hash(await fs.readFile(path.join(data, "previews", "bundle1.png"))), hash(preview));
+});
+
+test("optional previews may disappear after capture without blocking backup", async (t) => {
+  const { data, backups, db } = await fixture(t);
+  await fs.mkdir(path.join(data, "previews"), { recursive: true });
+  await fs.writeFile(path.join(data, "previews", "bundle1.png"), "preview-cache");
+  db.close();
+  assert.equal(await startBackup(data, backups, undefined, undefined, "14", { BACKUP_TEST_REMOVE_PREVIEWS: "1" }), 0);
+  const [name] = await fs.readdir(backups);
+  await assert.rejects(fs.access(path.join(backups, name, "previews")), { code: "ENOENT" });
 });
 
 test("digest or required-body failure leaves no completed backup; fixing it permits retry", async (t) => {

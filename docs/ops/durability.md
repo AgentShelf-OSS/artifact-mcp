@@ -40,7 +40,10 @@ digest. A concurrent lifecycle mutation can make verification fail; the script r
 incomplete staging directory and returns nonzero so it can be retried after the mutation settles.
 Pending durability intents are treated the same way because they represent concealed, recoverable
 transitions rather than a ready recovery point. Previews are optional caches: their absence does not
-fail the backup, but previews copied into a backup are retained as-is.
+fail the backup. Any regular, non-symlink preview copied into a backup is checked against a SHA-256
+manifest captured before copying; a changed included preview fails that attempt. This verifies file
+bytes only and does not decode or validate image formats. A preview cache disappearing after capture
+is allowed, because preview availability is optional.
 
 The final backup directory is published only after SQLite integrity and body/history coherence checks
 pass. Restore into a fresh data directory and run normal startup reconciliation before relying on the

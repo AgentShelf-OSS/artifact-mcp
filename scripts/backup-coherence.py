@@ -3,7 +3,8 @@
 
 Bundle manifests use JavaScript's UTF-16 path ordering and compact JSON encoding,
 matching both application runtimes. The database defines the required body set;
-previews and unreferenced files do not participate in content verification.
+included regular preview files are checked against hashes captured before their copy.
+Absent previews and opaque symlinks do not become required artifact content.
 """
 
 import argparse
@@ -27,6 +28,55 @@ def sha_file(path):
         for chunk in iter(lambda: f.read(1024 * 1024), b''):
             h.update(chunk)
     return h.hexdigest()
+
+PREVIEW_MANIFEST = 'preview-sha256.json'
+
+def preview_files(directory):
+    if not os.path.lexists(directory) or os.path.islink(directory):
+        return
+    if not os.path.isdir(directory):
+        raise VerificationError('preview cache must be a directory when included')
+    for base, dirs, files in os.walk(directory, followlinks=False):
+        dirs[:] = sorted(name for name in dirs if not os.path.islink(os.path.join(base, name)))
+        for name in sorted(files):
+            full = os.path.join(base, name)
+            if os.path.islink(full) or not os.path.lexists(full):
+                continue
+            if not os.path.isfile(full):
+                raise VerificationError('preview cache contains an unsupported entry')
+            yield os.path.relpath(full, directory).replace(os.sep, '/'), full
+
+def capture_previews(root, source):
+    hashes = {}
+    for relative, full in preview_files(source):
+        try:
+            hashes[relative] = sha_file(full)
+        except FileNotFoundError:
+            # Optional cache entries may disappear while their manifest is being captured.
+            continue
+    with open(os.path.join(root, PREVIEW_MANIFEST), 'x') as manifest:
+        json.dump({'version': 1, 'files': hashes}, manifest, sort_keys=True)
+        manifest.write('\n')
+
+def verify_previews(root, required):
+    manifest_path = os.path.join(root, PREVIEW_MANIFEST)
+    if not os.path.lexists(manifest_path):
+        if required:
+            raise VerificationError('optional preview manifest is missing')
+        return
+    if os.path.islink(manifest_path) or not os.path.isfile(manifest_path):
+        raise VerificationError('optional preview manifest is not a regular file')
+    try:
+        with open(manifest_path) as manifest:
+            captured = json.load(manifest)
+    except (ValueError, UnicodeError) as exc:
+        raise VerificationError('optional preview manifest is invalid') from exc
+    if not isinstance(captured, dict) or captured.get('version') != 1 or not isinstance(captured.get('files'), dict):
+        raise VerificationError('optional preview manifest is invalid')
+    hashes = captured['files']
+    for relative, full in preview_files(os.path.join(root, 'previews')):
+        if hashes.get(relative) != sha_file(full):
+            raise VerificationError(f'optional preview digest mismatch: {relative}')
 
 def digest_body(path, bundle):
     os.lstat(path)
@@ -108,10 +158,16 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('root')
     ap.add_argument('--database-required', action='store_true')
+    ap.add_argument('--capture-previews-from')
+    ap.add_argument('--preview-manifest-required', action='store_true')
     args = ap.parse_args()
     root = os.path.abspath(args.root)
     if os.path.islink(root) or not os.path.isdir(root):
         raise VerificationError('backup root must be exactly one existing directory')
+    if args.capture_previews_from is not None:
+        capture_previews(root, args.capture_previews_from)
+        return
+    verify_previews(root, args.preview_manifest_required)
     dbpath = os.path.join(root, 'artifacts.db')
     if not os.path.exists(dbpath):
         if args.database_required:

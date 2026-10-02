@@ -49,14 +49,18 @@ if [ -f "$DB" ]; then
 fi
 
 # 2. Copy bodies after the database cut. cp -a preserves hidden staging/trash/history evidence.
-for sub in artifacts previews; do
-  [ -e "${DATA_DIR}/${sub}" ] && cp -a "${DATA_DIR}/${sub}" "${STAGE}/${sub}"
-done
+[ -e "${DATA_DIR}/artifacts" ] && cp -a "${DATA_DIR}/artifacts" "${STAGE}/artifacts"
+python3 "$(dirname "$0")/backup-coherence.py" "$STAGE" --capture-previews-from "${DATA_DIR}/previews"
+if [ -e "${DATA_DIR}/previews" ]; then
+  if ! cp -a "${DATA_DIR}/previews" "${STAGE}/previews"; then
+    echo "backup: optional preview copy incomplete; checking files included" >&2
+  fi
+fi
 
 # 3. Verify the snapshot before publishing it. An unverified backup is a guess.
 VERIFY_ARGS=()
 [ -f "$DB" ] && VERIFY_ARGS+=(--database-required)
-python3 "$(dirname "$0")/backup-coherence.py" "$STAGE" "${VERIFY_ARGS[@]}"
+python3 "$(dirname "$0")/backup-coherence.py" "$STAGE" --preview-manifest-required "${VERIFY_ARGS[@]}"
 verify() {
   sqlite3 "$1" "PRAGMA quick_check;" | head -1
   sqlite3 "$1" "SELECT 'artifacts=' || count(*) FROM artifacts;"
