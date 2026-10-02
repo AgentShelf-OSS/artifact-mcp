@@ -4,8 +4,38 @@ Artifact MCP reads configuration from environment variables. Copy `.env.example`
 local Docker installation. Keep production secrets in the secret store used by your deployment,
 not in the repository.
 
+The Node reference process can load a local file through Node's `--env-file-if-exists` startup
+path. The Rust binary does not parse `.env`; provide variables through the service manager or
+Compose `env_file`/`environment` settings. `HOST_BIND` controls the published host-side address
+in the Docker/Compose setup, while Rust's `LISTEN_HOST` controls the address inside the process.
+They are separate settings and must not be confused when testing loopback identity behavior.
+
 The [getting started guide](../GETTING_STARTED.md) identifies the smallest local configuration and
 the additional values required behind Cloudflare Access.
+
+## Required audit key
+
+`AUDIT_LEDGER_HMAC_KEY` is required for both the Rust production server and the Node reference
+runtime. It must be canonical standard base64 for exactly 32 random bytes. Generate it once into
+a protected file, then import it into your deployment secret store without logging its contents:
+
+```bash
+(umask 077; openssl rand -base64 32 > /path/to/private/audit-key)
+```
+
+Store it in a secret manager or a mode-0600 environment file. Local ignored files are covered in
+the getting started guide; production secrets belong outside the checkout. Keep an
+encrypted recovery copy with the deployment credentials, separate from SQLite and backup contents;
+without the original key, restored audit-chain entries cannot be verified. Rotation requires an
+explicit operational migration; replacing the value can fail integrity checks. Do not print it in
+diagnostics or commit it. A missing, malformed, or non-canonical value prevents startup.
+
+For production, configure `PUBLIC_BASE_URL`, bind the origin privately, and require verified
+Cloudflare Access JWT identity with `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`, and
+`REQUIRE_ACCESS_JWT=1`. `TRUST_ACCESS_HEADERS=1` is only for controlled loopback development;
+it trusts spoofable headers and is not a production identity mechanism. An `ARTIFACT_API_KEYS`
+entry is an authenticated publishing credential, not a substitute for the required audit key or
+production viewer identity. `/mcp` publish requests need a valid API key or configured OAuth token.
 
 ## Publishing credentials
 

@@ -14,7 +14,8 @@ Agents already generate dashboards, reports, one-pagers, and small websites. Art
 those pages stable URLs on infrastructure you control. It keeps them searchable, versioned, and
 ready for human review after the chat that created them has ended.
 
-The production server is one Rust and Axum container backed by SQLite and ordinary files. Agents
+The production server is a Rust binary built with Axum, backed by SQLite and ordinary files. The
+default Docker Compose service runs that binary; Node is the reference implementation. Agents
 publish through MCP. People browse an organization-scoped gallery behind Cloudflare Access, leave
 feedback on exact points or regions, inspect older revisions, and create revocable public links.
 
@@ -73,40 +74,72 @@ and change detection. Further semantic improvements are tracked in [PBI #41](htt
 
 ## Quick start
 
-Docker and Docker Compose are required. Start with the full [getting started guide](GETTING_STARTED.md)
-if this is your first installation.
+This disposable local run uses Bash, Git, OpenSSL, C build tools, CMake, and the Rust toolchain pinned in
+[`rust-toolchain.toml`](rust-toolchain.toml). Production uses the Rust image from
+[`Dockerfile.rust`](Dockerfile.rust); follow the [getting started guide](GETTING_STARTED.md) for
+Docker and Cloudflare Access setup.
 
 ```bash
 git clone https://github.com/AgentShelf-OSS/artifact-mcp.git
 cd artifact-mcp
+umask 077
 cp .env.example .env
+mkdir -p .local
 ```
 
-Set a long bootstrap key in `.env`:
-
-```dotenv
-ARTIFACT_API_KEYS=agent1:local:REPLACE_WITH_A_LONG_RANDOM_SECRET
-```
-
-For a loopback-only local gallery, set `TRUST_ACCESS_HEADERS=1`. Never use that setting on a
-reachable origin. Then start the native server:
+`AUDIT_LEDGER_HMAC_KEY` is required for **local and production startup**. Generate exactly 32
+random bytes encoded as base64, plus a separate publishing secret. These commands write the keys
+to protected, Git-ignored files without displaying them. Run them once on a fresh checkout;
+retain an existing audit key when restarting or recovering data.
 
 ```bash
-docker compose up -d --build
+(
+  set -eu
+  test ! -e .local/keys.env
+  umask 077
+  {
+    printf 'ARTIFACT_API_KEYS=agent1:local:%s\n' "$(openssl rand -hex 32)"
+    printf 'AUDIT_LEDGER_HMAC_KEY=%s\n' "$(openssl rand -base64 32)"
+  } > .local/keys.env
+  cat .local/keys.env >> .env
+  chmod 600 .env
+)
 ```
 
-Publish a first artifact:
+Keep production keys in a secret manager with an encrypted recovery copy separate from the data
+backup. Losing the audit key prevents verification of the restored audit ledger.
+
+Start Rust on loopback with temporary data on a local filesystem. Rust reads process environment
+variables, so load the generated key file explicitly. `TRUST_ACCESS_HEADERS=1` is for this local
+run; use verified Cloudflare Access JWT identity in production.
 
 ```bash
-export KEY=REPLACE_WITH_A_LONG_RANDOM_SECRET
-curl -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
+set -a
+. .local/keys.env
+set +a
+export LISTEN_HOST=127.0.0.1 PORT=3480 PUBLIC_BASE_URL=http://127.0.0.1:3480
+export TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS=viewer@example.test
+export DATA_DIR="$(mktemp -d /tmp/artifact-mcp-dev.XXXXXX)"
+cargo run --release --locked
+```
+
+In another terminal in the same checkout, check health and publish:
+
+```bash
+. .local/keys.env
+KEY="${ARTIFACT_API_KEYS##*:}"
+curl -fsS http://127.0.0.1:3480/health
+curl -fsS -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"publish_artifact",
        "arguments":{"html":"<h1>hi</h1>","title":"Demo","description":"first artifact"}}}' \
-  http://localhost:3480/mcp
+  http://127.0.0.1:3480/mcp
 ```
 
-The response includes the artifact ID and URL. The [getting started guide](GETTING_STARTED.md)
-continues through local gallery access, organization setup, and a production Cloudflare deployment.
+The response includes the artifact ID and URL. Check local gallery access with
+`curl -fsS -H 'Cf-Access-Authenticated-User-Email: viewer@example.test' http://127.0.0.1:3480/`.
+Use the same header for the returned viewer URL. Stop with Ctrl-C and remove the temporary
+`DATA_DIR` when finished. This data is disposable; production needs a persistent local volume.
+The [getting started guide](GETTING_STARTED.md) continues through organization setup and deployment.
 
 ## Screenshots
 

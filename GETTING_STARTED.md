@@ -6,8 +6,9 @@ moving on.
 
 > **For AI agents helping a user set this up:** this file is written to be executed. Work one phase
 > at a time, run the verification at the end of each, and stop and report if a check fails rather
-> than continuing. Never invent secrets — ask the user for their domain, Cloudflare team name, and
-> admin email. The only place identity can be trusted without a verified JWT is loopback
+> than continuing. Generate random keys locally and store them privately. Ask for the production
+> domain, Cloudflare team name, and admin email only when configuring production. Unverified
+> identity headers are supported only for loopback
 > development (`TRUST_ACCESS_HEADERS=1`); never set that on a reachable host.
 
 ---
@@ -24,7 +25,11 @@ moving on.
 
 ## Prerequisites
 
-- Docker + Docker Compose.
+- Bash, Git, OpenSSL, and Rust installed through rustup for the local run. The repository pins
+  Rust 1.97.1 in `rust-toolchain.toml`. Linux builds need a C compiler, build tools, and CMake.
+- Docker + Docker Compose for the container deployment. Compose builds `Dockerfile.rust`;
+  the Node implementation is a reference server, not the production image.
+- Node 22+ for the optional Cloudflare setup script and Node reference tests.
 - A domain you control, on Cloudflare (for production). Local testing needs neither.
 - For production SSO: a Cloudflare Zero Trust (Access) account — the free tier is enough.
 
@@ -33,88 +38,139 @@ moving on.
 ## Phase 1 — Get the code
 
 ```bash
-git clone <this-repo-url> artifact-mcp
+git clone https://github.com/AgentShelf-OSS/artifact-mcp.git
 cd artifact-mcp
+umask 077
 cp .env.example .env
+mkdir -p .local
 ```
 
-**Check:** `.env` exists in the repo root.
+**Check:** `.env` exists and is private. Both `.env` and `.local/` are Git-ignored.
 
 ---
 
-## Phase 2 — Configure `.env`
+## Phase 2 — Configure keys and settings
 
-Open `.env`. The only value you must set to boot is a bootstrap publishing key.
+`AUDIT_LEDGER_HMAC_KEY` is required for every startup, including local development, in both the
+Rust server and Node reference. It must be canonical base64 encoding of exactly 32 random bytes.
+A publishing key is also needed for the first authenticated publish; it seeds SQLite rather than
+replacing later key management in Settings.
 
-| Var | Needed | Notes |
+Run this once in a fresh checkout. It writes a separate publishing secret and audit key to protected
+files without printing either value. Keep an existing key file when restarting against the same
+ledger. The final `cat` appends to `.env`, not to the terminal.
+
+```bash
+(
+  set -eu
+  test ! -e .local/keys.env
+  umask 077
+  {
+    printf 'ARTIFACT_API_KEYS=agent1:local:%s\n' "$(openssl rand -hex 32)"
+    printf 'AUDIT_LEDGER_HMAC_KEY=%s\n' "$(openssl rand -base64 32)"
+  } > .local/keys.env
+  cat .local/keys.env >> .env
+  chmod 600 .env
+)
+```
+
+Store production secrets in a secret manager. Keep an encrypted recovery copy of the original
+audit key separate from SQLite and data backups. Restoring the database without that key prevents
+verification of its audit ledger. Do not regenerate it as a startup repair or treat rotation as an
+ordinary environment edit. See the [audit-ledger guide](docs/security-audit-ledger.md).
+
+| Variable | Needed | Notes |
 |---|---|---|
-| `ARTIFACT_API_KEYS` | **yes** | `clientId:org:secret` (comma-separated for several). The DB is authoritative after first boot; this just seeds the first key. Use a long random secret. |
-| `MCP_OAUTH_ISSUER` + `MCP_OAUTH_AUDIENCE` + `MCP_OAUTH_JWKS_URL` | optional | Enables short-lived OAuth machine credentials for `/mcp`. Configure the complete triple; keep API keys enabled during rollout. |
-| `MCP_API_KEYS_ENABLED` | optional | Defaults to `1`. Set to `0` only after OAuth clients are verified; startup refuses to disable the only authentication path. |
-| `WEBHOOK_ENC_KEY` | recommended | A 32-byte base64 key that encrypts Discord webhook URLs in SQLite with AES-256-GCM. If omitted, webhooks remain zero-config but are stored in plaintext and startup warns loudly. |
-| `PREVIEW_RENDERER_URL` | optional | Enables persistent gallery/Discord PNGs for single-file publish/update/restore events. Leave unset for gallery placeholders and text-only Discord. |
-| `PUBLIC_BASE_URL` | prod | Your real `https://artifact.your-domain`. Defaults to `http://localhost:3480`. Used to build share URLs. |
-| `APP_NAME` / `APP_BRAND` | optional | Portal display name and compact mark. Defaults to `Artifact Index` / `A`. |
-| `ADMIN_EMAILS` | prod | Comma-separated emails that see every org (the admin gallery). |
-| `CF_ACCESS_TEAM_DOMAIN` + `CF_ACCESS_AUD` | prod | Turns on Access JWT verification. Set both in Phase 4. |
-| `TRUST_ACCESS_HEADERS` | dev only | `1` trusts an unverified identity header — **loopback development only**, never on a reachable origin. |
-| `REQUIRE_ACCESS_JWT` | optional | `1` makes the server refuse to start unless JWT verification is configured. Good for prod images/CI. |
-| `HOST_BIND` | optional | Host publish address; defaults to loopback `127.0.0.1`. See Phase 4d. |
+| `AUDIT_LEDGER_HMAC_KEY` | **every startup** | Exactly 32 random bytes encoded as canonical base64. Required locally and in production. |
+| `ARTIFACT_API_KEYS` | first API-key publish | `clientId:org:secret`, comma-separated for several keys. SQLite is authoritative after bootstrap. |
+| `MCP_OAUTH_ISSUER` + `MCP_OAUTH_AUDIENCE` + `MCP_OAUTH_JWKS_URL` | optional | Enables OAuth machine credentials for `/mcp`; configure the complete triple. |
+| `MCP_API_KEYS_ENABLED` | optional | Defaults to `1`. Disabling it requires a complete OAuth configuration. |
+| `WEBHOOK_ENC_KEY` | recommended for Discord | Another independent 32-byte base64 key for AES-256-GCM encryption of webhook URLs. Without it, storage is plaintext and startup warns. |
+| `PREVIEW_RENDERER_URL` | optional | Enables persistent thumbnails. Leave unset for placeholders and text-only Discord. |
+| `PUBLIC_BASE_URL` | production | Your public HTTPS origin; also set it to the local port used in development. |
+| `ADMIN_EMAILS` | administrator access | Comma-separated viewer emails allowed to manage all organizations and keys. |
+| `CF_ACCESS_TEAM_DOMAIN` + `CF_ACCESS_AUD` | production viewer identity | Configures verified Access JWT identity. Set both in Phase 4. |
+| `TRUST_ACCESS_HEADERS` | local development only | `1` trusts an unverified viewer email header. Requires a loopback listener for the direct local run. |
+| `REQUIRE_ACCESS_JWT` | production | Set to `1` so startup refuses incomplete JWT configuration. |
+| `LISTEN_HOST` | direct local run | Set to `127.0.0.1` for loopback development. The process default is `0.0.0.0`. |
+| `HOST_BIND` | Compose host port | Defaults to `127.0.0.1`. Controls Docker's host mapping, not the server listener. |
 
-Everything else (size caps, `MAX_HISTORY`, `FEEDBACK_MAX_BODY`) has sane defaults — leave it.
+Other defaults, including size caps and `MAX_HISTORY`, are listed in the
+[configuration reference](docs/configuration.md).
 
-Example minimal bootstrap key:
-```
-ARTIFACT_API_KEYS=agent1:acme:REPLACE_WITH_LONG_RANDOM_SECRET
-```
-
-If you will use Discord notifications, generate the deployment encryption key once and add the
-printed value to `.env`:
+For optional Discord webhook encryption, generate a separate key once and append it privately:
 
 ```bash
-openssl rand -base64 32
-# WEBHOOK_ENC_KEY=<paste the generated value>
+(umask 077; printf 'WEBHOOK_ENC_KEY=%s\n' "$(openssl rand -base64 32)" >> .env)
 ```
 
-Keep this key in the same protected secret store as the deployment and backup credentials. On the
-first boot with a key, any existing plaintext webhook rows are encrypted in place. Losing the key
-means existing encrypted webhook URLs cannot be delivered or recovered by artifact-mcp.
+Keep that key with the deployment secrets and its encrypted recovery copy. The first boot with an
+encryption key encrypts existing plaintext webhook rows. Losing it prevents delivery and recovery
+of encrypted URLs. See [Discord delivery operations](docs/ops/discord-durable-delivery.md).
 
-**Check:** `ARTIFACT_API_KEYS` is set to a value you control.
+**Check:** the generated key file and `.env` are mode 0600. Validate secrets through startup,
+without displaying the files or including their values in diagnostics.
 
 ---
 
-## Phase 3 — Run locally (development)
+## Phase 3 — Run locally with Rust
 
-For a first local run with no Cloudflare, enable loopback header-trust so you can act as a viewer:
+This is a disposable, direct-Rust run on a loopback port with no Cloudflare requirement. The data
+directory is temporary and on the local filesystem; production needs persistent local storage.
+Use an unused port, changing both `PORT` and `PUBLIC_BASE_URL` together if 3480 is already occupied.
+
+The Rust executable reads process environment variables; it does not load `.env` automatically.
+Load only the two generated keys from `.local/keys.env`. Do not source the full example `.env` as a
+shell script, because its display-name values may contain spaces.
 
 ```bash
-echo 'TRUST_ACCESS_HEADERS=1' >> .env      # loopback dev only
-docker compose up -d --build
-docker logs artifact-mcp 2>&1 | grep "viewer identity mode ready"
+set -a
+. .local/keys.env
+set +a
+export LISTEN_HOST=127.0.0.1 PORT=3480 PUBLIC_BASE_URL=http://127.0.0.1:3480
+export TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS=viewer@example.test
+export DATA_DIR="$(mktemp -d /tmp/artifact-mcp-dev.XXXXXX)"
+cargo run --release --locked
 ```
 
-> Need the compatibility twin for development? `npm install && npm run dev` starts the Node
-> reference runtime directly with loopback header-trust already enabled. The shipped Compose
-> service and production image use Rust.
+Rustup selects the pinned toolchain and Cargo builds the native server. Wait for the listener to
+start. The identity log should report `header-trust`. `LISTEN_HOST=127.0.0.1` is required here;
+`HOST_BIND` has no effect outside Docker. Do not enable the insecure header-trust override to work
+around a bind error.
 
-You should see a structured log with `"identity_mode":"header-trust"`. Publish a test artifact:
+In a second terminal in the same checkout, check health and publish a first artifact:
 
 ```bash
-KEY=REPLACE_WITH_LONG_RANDOM_SECRET   # the secret from ARTIFACT_API_KEYS
-curl -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
+. .local/keys.env
+KEY="${ARTIFACT_API_KEYS##*:}"
+curl -fsS http://127.0.0.1:3480/health
+curl -fsS -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"publish_artifact",
        "arguments":{"html":"<h1>hi</h1>","title":"Demo","description":"first artifact"}}}' \
-  http://localhost:3480/mcp
+  http://127.0.0.1:3480/mcp
 ```
 
-Browse the gallery as an admin (header trusted locally):
+The response includes `result.structuredContent.id` and a viewer URL. Check the gallery and that
+viewer with the local identity header, replacing `ARTIFACT_ID` with the returned ID:
+
 ```bash
-curl -H "Cf-Access-Authenticated-User-Email: you@example.com" http://localhost:3480/ | head
+curl -fsS -H 'Cf-Access-Authenticated-User-Email: viewer@example.test' \
+  http://127.0.0.1:3480/ -o /tmp/artifact-gallery.html
+curl -fsS -H 'Cf-Access-Authenticated-User-Email: viewer@example.test' \
+  http://127.0.0.1:3480/ARTIFACT_ID -o /tmp/artifact-viewer.html
 ```
 
-**Check:** the publish call returns a URL, and the gallery HTML renders. When done testing, remove
-`TRUST_ACCESS_HEADERS=1` before exposing the app anywhere — with it gone, identity fails closed.
+Local browser automation can supply that same header on its requests. A regular production browser
+receives its verified identity through Cloudflare Access in Phase 4.
+
+**Check:** health is successful, the publish returns an ID and URL, and the authenticated viewer
+contains the artifact iframe. Stop with Ctrl-C. Remove the exact temporary directory recorded in
+`DATA_DIR` when finished. Local test data can disappear on reboot; keep the keys private and reuse
+the original audit key if retaining the data.
+
+For the Node reference, install its dependencies with `npm ci` and use `npm run dev`. It reads
+`.env`, binds loopback, and uses `.devdata`; the same required audit key applies. Maintainer checks
+for both runtimes are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -134,7 +190,7 @@ IP.
 ### 4b. Bootstrap the catch-all Access application
 
 Do this before enabling strict runtime startup. Cloudflare assigns the Application Audience (AUD)
-only after an app exists, while artifact-mcp reads the AUD when its identity module is imported.
+only after an app exists, while artifact-mcp reads the AUD during startup.
 
 Create a least-privilege API token, then run the setup command from the repo root:
 
@@ -173,8 +229,18 @@ ADMIN_EMAILS=you@your-domain
 REQUIRE_ACCESS_JWT=1
 ```
 
-Fully restart the process: `docker compose up -d --build`. A hot env-file edit is not enough. The
-boot log must now read `Access identity: JWT-verified`.
+For a fresh Docker deployment, the persistent `./data` bind mount must be on a local filesystem
+with working file and directory syncs. Give it to the distroless image's non-root UID/GID 65532:
+
+```bash
+sudo install -d -m 0750 -o 65532 -g 65532 ./data
+docker compose up -d --build
+docker compose logs artifact-mcp
+```
+
+Use the existing volume and preserve its contents on upgrades. Compose injects `.env` through
+`env_file` and runs the Rust binary. Leave `TRUST_ACCESS_HEADERS` and its insecure override unset
+for production. Restart after environment changes; the identity log must report `jwt`.
 
 ### 4d. Don't publish the origin on the LAN
 
@@ -365,7 +431,9 @@ identity.
 | Boot log says `HEADER-TRUST` in production | `TRUST_ACCESS_HEADERS=1` left in `.env` | Remove it; set the JWT vars. |
 | `/mcp` returns 401 | Missing/wrong `Authorization: Bearer <key>` | Use a valid, non-revoked key for that org. |
 | Share link 404s | Expired, revoked, unknown token, or `/s/*` Access app missing/not Bypass | Recreate the link; confirm the `/s/*` Bypass app exists. |
-| Server won't start, logs `REQUIRE_ACCESS_JWT` | Strict mode on without JWT vars | Set both JWT vars, or drop `REQUIRE_ACCESS_JWT`. |
+| Server won't start, logs `REQUIRE_ACCESS_JWT` | Strict mode on without JWT vars | Set both JWT vars before restarting production. |
+| Server won't start, logs `AUDIT_LEDGER_HMAC_KEY` | Audit key absent or malformed | Supply exactly 32 bytes encoded as canonical base64; recover the original key when using an existing ledger. |
+| Local server rejects header trust | `LISTEN_HOST` is not loopback | Set `LISTEN_HOST=127.0.0.1` for the direct local run. `HOST_BIND` only controls Docker host publishing. |
 | Hundreds of blocked `email-decode.min.js` scripts | An old response lacks the origin `no-transform` directive | Confirm `Cache-Control` contains `no-transform`; see the Cloudflare deployment runbook. |
 | Access shows a redundant method picker | Catch-all app has several allowed IdPs or auto-redirect is off | Rerun `cf-access-setup.mjs` and apply the proposed app update. |
 | Site down right after loopback bind | Tunnel still targets a host IP | Point the tunnel origin at `http://artifact-mcp:3480` on the shared network (Phase 4d). |
