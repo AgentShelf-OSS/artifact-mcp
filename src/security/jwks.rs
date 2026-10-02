@@ -362,16 +362,20 @@ pub struct HttpJwksSource {
 }
 
 impl HttpJwksSource {
+    fn client_builder() -> reqwest::ClientBuilder {
+        reqwest::Client::builder()
+            .timeout(Duration::from_millis(FETCH_TIMEOUT_MS))
+            // Match jose's fetchJwks behaviour: a JWKS endpoint must not silently follow
+            // redirects, especially an HTTPS endpoint redirecting to plaintext HTTP.
+            .redirect(reqwest::redirect::Policy::none())
+    }
+
     /// A source reading `url`, with `jose`'s 5-second timeout.
     ///
     /// # Errors
     /// Returns [`AppError::Internal`] when the HTTP client cannot be built.
     pub fn new(url: impl Into<String>) -> Result<Self, AppError> {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_millis(FETCH_TIMEOUT_MS))
-            // Match jose's fetchJwks behaviour: a JWKS endpoint must not silently follow
-            // redirects, especially an HTTPS endpoint redirecting to plaintext HTTP.
-            .redirect(reqwest::redirect::Policy::none())
+        let client = Self::client_builder()
             .build()
             .map_err(|_| AppError::Internal)?;
         Ok(Self {
@@ -579,5 +583,135 @@ impl JwksProvider for StaticJwks {
                 key,
             })
         })
+    }
+}
+
+#[cfg(test)]
+mod transport_tests {
+    use super::*;
+    use std::{
+        io::{BufRead, BufReader},
+        process::{Child, Command, Stdio},
+    };
+
+    struct NodeFixture(Child);
+
+    impl Drop for NodeFixture {
+        fn drop(&mut self) {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+
+    fn fixture() -> Option<(NodeFixture, u16, u16)> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let cert = root.join("test/fixtures/oauth-https/localhost-cert.pem");
+        let key = root.join("test/fixtures/oauth-https/localhost-key.pem");
+        if !cert.is_file() || !key.is_file() {
+            if std::env::var_os("REQUIRE_NODE_REFERENCE").is_some_and(|v| v == "1") {
+                panic!("OAuth HTTPS fixture certificate files are missing");
+            }
+            eprintln!("skipping JWKS HTTPS transport test: fixture certificate files missing");
+            return None;
+        }
+        let script = r#"
+const fs = require('fs'), http = require('http'), https = require('https');
+const cert = fs.readFileSync(process.argv[1]), key = fs.readFileSync(process.argv[2]);
+let targetHits = 0, redirectHits = 0;
+const body = JSON.stringify({keys: []});
+const target = http.createServer((req, res) => { targetHits++; res.writeHead(200, {'content-type':'application/json'}); res.end(body); });
+target.listen(0, '127.0.0.1', () => {
+  const targetPort = target.address().port;
+  const secure = https.createServer({cert, key}, (req, res) => {
+    if (req.url === '/redirect') { redirectHits++; res.writeHead(302, {location: `http://127.0.0.1:${targetPort}/target`}); return res.end(); }
+    if (req.url === '/stats') { res.writeHead(200, {'content-type':'application/json'}); return res.end(JSON.stringify({targetHits, redirectHits})); }
+    res.writeHead(200, {'content-type':'application/json'}); res.end(body);
+  });
+  const watchdog = setTimeout(() => process.exit(1), 30000);
+  secure.listen(0, '127.0.0.1', () => { clearTimeout(watchdog); process.stdout.write(JSON.stringify({https: secure.address().port, target: targetPort}) + '\n'); });
+});
+"#;
+        let child = match Command::new("node")
+            .arg("-e")
+            .arg(script)
+            .arg(&cert)
+            .arg(&key)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::inherit())
+            .spawn()
+        {
+            Ok(child) => child,
+            Err(error) => {
+                if std::env::var_os("REQUIRE_NODE_REFERENCE").is_some_and(|v| v == "1") {
+                    panic!("Node HTTPS fixture could not start: {error}");
+                }
+                eprintln!("skipping JWKS HTTPS transport test: Node unavailable ({error})");
+                return None;
+            }
+        };
+        let mut fixture = NodeFixture(child);
+        let stdout = fixture.0.stdout.take().expect("Node fixture stdout");
+        let mut line = String::new();
+        BufReader::new(stdout)
+            .read_line(&mut line)
+            .expect("read Node HTTPS fixture startup");
+        let ports: serde_json::Value =
+            serde_json::from_str(&line).expect("parse Node HTTPS fixture startup JSON");
+        let https_port = ports
+            .get("https")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|port| u16::try_from(port).ok())
+            .expect("Node HTTPS fixture HTTPS port");
+        let target_port = ports
+            .get("target")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|port| u16::try_from(port).ok())
+            .expect("Node HTTPS fixture target port");
+        Some((fixture, https_port, target_port))
+    }
+
+    #[tokio::test]
+    async fn production_jwks_client_fetches_https_and_rejects_downgrade_redirect() {
+        let Some((fixture, https_port, target_port)) = fixture() else {
+            return;
+        };
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+        let cert = reqwest::Certificate::from_pem(
+            &std::fs::read(root.join("test/fixtures/oauth-https/ca-cert.pem"))
+                .expect("fixture certificate"),
+        )
+        .expect("parse fixture certificate");
+        let client = HttpJwksSource::client_builder()
+            .add_root_certificate(cert)
+            .build()
+            .expect("test HTTPS client");
+        let source = HttpJwksSource {
+            client: client.clone(),
+            url: format!("https://localhost:{https_port}/jwks"),
+        };
+        source.fetch().await.expect("direct HTTPS JWKS fetch");
+
+        let redirect = HttpJwksSource {
+            client: client.clone(),
+            url: format!("https://localhost:{https_port}/redirect"),
+        };
+        assert_eq!(
+            redirect.fetch().await,
+            Err(AppError::Unavailable(JWKS_UNAVAILABLE_MESSAGE.to_owned()))
+        );
+        let stats: serde_json::Value = client
+            .get(format!("https://localhost:{https_port}/stats"))
+            .send()
+            .await
+            .expect("HTTPS stats request")
+            .json()
+            .await
+            .expect("stats JSON");
+        assert_eq!(stats["redirectHits"], 1);
+        assert_eq!(
+            stats["targetHits"], 0,
+            "redirect target {target_port} was contacted"
+        );
+        drop(fixture);
     }
 }

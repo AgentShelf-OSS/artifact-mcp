@@ -256,7 +256,8 @@ test("HTTPS JWKS retrieval never follows a redirect to plaintext HTTP", async ()
   const fixtureDirectory = fileURLToPath(new URL("./fixtures/oauth-https/", import.meta.url));
   const tls = {
     cert: readFileSync(`${fixtureDirectory}localhost-cert.pem`),
-    key: readFileSync(`${fixtureDirectory}localhost-key.pem`)
+    key: readFileSync(`${fixtureDirectory}localhost-key.pem`),
+    ca: readFileSync(`${fixtureDirectory}ca-cert.pem`)
   };
   let targetRequests = 0;
   const target = http.createServer((_request, response) => {
@@ -271,7 +272,7 @@ test("HTTPS JWKS retrieval never follows a redirect to plaintext HTTP", async ()
   await new Promise((resolve) => target.listen(0, "127.0.0.1", resolve));
   await new Promise((resolve) => redirect.listen(0, "127.0.0.1", resolve));
   try {
-    const agent = new https.Agent({ ca: tls.cert });
+    const agent = new https.Agent({ ca: tls.ca });
     const jwks = createRemoteJWKSet(
       new URL(`https://127.0.0.1:${redirect.address().port}/jwks`),
       { agent }
@@ -294,7 +295,8 @@ test("HTTPS JWKS retrieval verifies a token and uses the JOSE cache", async () =
   const fixtureDirectory = fileURLToPath(new URL("./fixtures/oauth-https/", import.meta.url));
   const tls = {
     cert: readFileSync(`${fixtureDirectory}localhost-cert.pem`),
-    key: readFileSync(`${fixtureDirectory}localhost-key.pem`)
+    key: readFileSync(`${fixtureDirectory}localhost-key.pem`),
+    ca: readFileSync(`${fixtureDirectory}ca-cert.pem`)
   };
   const jwk = await exportJWK(publicKey);
   jwk.alg = "RS256";
@@ -306,7 +308,7 @@ test("HTTPS JWKS retrieval verifies a token and uses the JOSE cache", async () =
     response.end(JSON.stringify({ keys: [jwk] }));
   });
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const agent = new https.Agent({ ca: tls.cert });
+  const agent = new https.Agent({ ca: tls.ca });
   try {
     const jwksUrl = `https://127.0.0.1:${server.address().port}/jwks`;
     const secureConfig = oauthConfigFromEnv({
