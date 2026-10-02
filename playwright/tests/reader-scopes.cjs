@@ -1,6 +1,6 @@
 // Synthetic browser contract tests for mixed-content reading scopes.
 // Run with: node playwright/tests/reader-scopes.cjs
-const { chromium } = require('playwright');
+const { launchChromium } = require('../reader-fixture.cjs');
 const fs = require('node:fs');
 const assert = require('node:assert/strict');
 const path = require('node:path');
@@ -8,7 +8,7 @@ const path = require('node:path');
 const bridge = fs.readFileSync(path.resolve(__dirname, '../../assets/reader-bridge.js'), 'utf8');
 
 (async () => {
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
+  const browser = await launchChromium();
   try {
     const page = await browser.newPage();
     const errors = [];

@@ -1,15 +1,15 @@
-const { chromium } = require('playwright');
+const { launchChromium } = require('../reader-fixture.cjs');
 const fs = require('fs');
 const bridge = fs.readFileSync(require('node:path').resolve(__dirname, '../../assets/reader-bridge.js'), 'utf8');
 const ereader = fs.readFileSync(require('node:path').resolve(__dirname, '../../assets/reader-ereader.js'), 'utf8');
 (async () => {
-  const browser = await chromium.launch({headless:true,args:['--no-sandbox']});
+  const browser = await launchChromium();
   try {
-  const page = await browser.newPage(); const messages=[];
+  const page = await browser.newPage(); const messages=[]; const errors=[]; page.on('pageerror', e => errors.push(e.message));
   await page.exposeFunction('captureReaderMessage', m => messages.push(m)); await page.setContent('<iframe id="book"></iframe>'); const frame=page.frames()[1];
   await page.evaluate(() => window.addEventListener('message', e => window.captureReaderMessage(e.data)));
   const book={chapters:[{part:'Part One',title:'Chapter 1',blocks:[{t:'p',s:'First chapter text.'}]},{part:'Part One',title:'Chapter 2',blocks:[{t:'p',s:'Second chapter text.'}]}]};
-  await frame.setContent(`<script id="book" type="application/json">${JSON.stringify(book)}</script><button id="t-contents" data-panel="contents">Contents</button><div class="toc" hidden><a href="#" data-go="0">One</a><a href="#" data-go="1">Two</a></div><main id="cover"><h1>Cover</h1><p>Cover text.</p></main><script>${ereader}</script><script>document.addEventListener('click',function(e){var go=e.target.closest('[data-go]');if(!go)return;e.preventDefault();var i=+go.getAttribute('data-go'),c=CH[i];document.getElementById('cover').outerHTML='<article id="article"><header class="ch-head"><div class="part">'+c.part+'</div><h1>'+c.title+'</h1></header><p data-p="0">'+c.blocks[0].s+'</p></article>';});document.getElementById('t-contents').addEventListener('click',function(){document.querySelector('.toc').hidden=false;});</script><script>${bridge}</script>`);
+  await frame.setContent(`<script id="book" type="application/json">${JSON.stringify(book)}</script><button id="t-contents" data-panel="contents">Contents</button><div class="toc" hidden><a href="#" data-go="0">One</a><a href="#" data-go="1">Two</a></div><main id="cover"><h1>Cover</h1><p>Cover text.</p></main><script>${ereader}</script><script>document.addEventListener('click',function(e){var go=e.target.closest('[data-go]');if(!go)return;e.preventDefault();var i=+go.getAttribute('data-go'),c=CH[i];var cover=document.getElementById('cover');if(!cover)return;cover.outerHTML='<article id="article"><header class="ch-head"><div class="part">'+c.part+'</div><h1>'+c.title+'</h1></header><p data-p="0">'+c.blocks[0].s+'</p></article>';});document.getElementById('t-contents').addEventListener('click',function(){document.querySelector('.toc').hidden=false;});</script><script>${bridge}</script>`);
   await frame.evaluate(chapters => { window.CH = chapters; }, book.chapters);
   await page.evaluate(() => document.getElementById('book').contentWindow.postMessage({type:'reader:resume',requestId:'seek',mode:'page',chapterIndex:1,fingerprint:'wrong'},'*')); await page.waitForTimeout(150);
   if(!messages.some(m=>m.type==='reader:error'&&m.requestId==='seek'))throw new Error('cover seek/change rejection failed'); messages.length=0;
@@ -32,6 +32,6 @@ const ereader = fs.readFileSync(require('node:path').resolve(__dirname, '../../a
   await page.evaluate(() => document.getElementById('book').contentWindow.postMessage({type:'reader:extract',requestId:'headings',mode:'section'},'*'));await page.waitForTimeout(100);
   const headings=messages.find(m=>m.type==='reader:content'&&m.requestId==='headings');
   if(JSON.stringify(headings?.blocks.map(b=>b.text)) !== JSON.stringify(['Two','Second'])) throw new Error('Heading section scope wrong: '+JSON.stringify(headings));
-  console.log('reader bridge browser fixtures passed: TOC seek, fingerprint rejection, section bounds');
+  if (errors.length) throw new Error('reader section page errors: ' + errors.join('; ')); console.log('reader bridge browser fixtures passed: TOC seek, fingerprint rejection, section bounds');
   } finally { await browser.close(); }
 })().catch(e=>{console.error(e);process.exitCode=1});

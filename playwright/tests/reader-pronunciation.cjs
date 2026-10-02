@@ -1,22 +1,43 @@
-// End-to-end reader controls with deterministic simulated audio. TIMED_BINARY selects the native server.
-const {spawn}=require('node:child_process'),fs=require('node:fs/promises'),{randomBytes}=require('node:crypto'),assert=require('node:assert/strict');const {chromium}=require('playwright');
-(async()=>{const dir=await fs.mkdtemp('/tmp/mixed-player-'),key=randomBytes(32).toString('hex'),base='http://127.0.0.1:3529';let browser;await fs.writeFile(dir+'/tts-token',randomBytes(32).toString('hex'));const env={...process.env,PORT:'3529',LISTEN_HOST:'127.0.0.1',PUBLIC_BASE_URL:base,DATA_DIR:dir,TRUST_ACCESS_HEADERS:'1',REQUIRE_ACCESS_JWT:'0',CF_ACCESS_AUD:'',CF_ACCESS_TEAM_DOMAIN:'',AUDIT_LEDGER_HMAC_KEY:randomBytes(32).toString('base64'),ARTIFACT_API_KEYS:`e2e:homelab:${key}`,TTS_ENABLED:'1',TTS_ARTIFACT_IDS:'',POCKET_TTS_WORKER_URL:'http://127.0.0.1:1',POCKET_TTS_WORKER_TOKEN_FILE:dir+'/tts-token'};const child=process.env.TIMED_BINARY?spawn(process.env.TIMED_BINARY,[],{env,stdio:'ignore'}):spawn('node',['server.js'],{env,cwd:require('node:path').resolve(__dirname,'../..'),stdio:'ignore'});
-try{for(let i=0;i<200;i++){try{if((await fetch(base+'/health')).ok)break}catch{}await new Promise(r=>setTimeout(r,100))}
-const html='<main><p id="passage">Talk to <span id="name" data-artifact-pronounce="Shiv awn">Siobhan</span>. She reads <span data-artifact-pronounce="sequel">SQL</span>.</p></main>' ;
-const r=await fetch(base+'/mcp',{method:'POST',headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'publish_artifact',arguments:{title:'Mixed reader QA',html}}})});const rpc=await r.json(),id=(rpc.result.structuredContent||JSON.parse(rpc.result.content[0].text)).id;
-browser=await chromium.launch({args:['--no-sandbox','--autoplay-policy=no-user-gesture-required']});const context=await browser.newContext({viewport:{width:1280,height:900},extraHTTPHeaders:{'cf-access-authenticated-user-email':'test@homelab'}});await context.addInitScript(()=>{window.messages=[];addEventListener('message',e=>messages.push(e.data));if(parent!==window)return;const native=fetch;window.fetch=async(input,options)=>{const url=String(input);if(url.endsWith('/speech/voices'))return new Response(JSON.stringify({enabled:true,maxChars:1500,voices:[{id:'pocket_alba',name:'Alba',provider:'Pocket'}]}),{headers:{'content-type':'application/json'}});
-if(url.endsWith('/speech/stream-timed')){window.spoken=JSON.parse(options.body).text;const parts=[];function record(type,payload){const data=typeof payload==='string'?new TextEncoder().encode(payload):payload;const out=new Uint8Array(data.length+5);new DataView(out.buffer).setUint32(0,data.length+1);out[4]=type;out.set(data,5);parts.push(out)}
-const words=window.spoken.match(/[\p{L}\p{N}]+/gu);words.forEach((word,index)=>record(2,JSON.stringify({word,index,start:index*.3,end:(index+1)*.3})));for(let i=0;i<40;i++)record(1,new Uint8Array(9600));parts.push(new Uint8Array(4));return new Response(new ReadableStream({start(c){parts.forEach(part=>c.enqueue(part));c.close()}}),{headers:{'content-type':'application/vnd.artifact.pcm-timed;v=1'}})}return native(input,options)}});
-const p=await context.newPage(),errors=[];p.on('pageerror',e=>errors.push(e.message));await p.goto(base+'/'+id);const voices=await p.request.get(base+'/'+id+'/speech/voices');assert.equal(voices.status(),200,'Speech route must exist before showing Listen');assert.equal((await voices.json()).enabled,true,'Narration must be enabled');await p.locator('#vreader-toggle').click();await p.locator('#vreader-expand').click();await p.locator('#vreader-rate').selectOption(process.env.READER_TEST_RATE||'1');const frame=p.frames().find(f=>f.url().includes('/raw/'));await p.locator('#vreader-play').click();await p.waitForFunction(()=>window.spoken);
-assert.equal(await p.evaluate(()=>spoken),'Talk to Shiv awn. She reads sequel.');
-await frame.waitForFunction(()=>{const h=CSS.highlights.get('artifact-reader-word');return h&&[...h][0].toString()==='Siobhan'});
-assert.equal(await frame.locator('#passage').innerText(),'Talk to Siobhan. She reads SQL.');
-assert.ok(await p.evaluate(()=>artifactReaderDiagnostics()[0].firstScheduledAudioMs>=0));
-await frame.waitForFunction(()=>{const h=CSS.highlights.get('artifact-reader-word');return h&&[...h][0].toString()==='SQL'});
-await p.locator('#vreader-play').click();assert.equal(await p.locator('#vreader-replay').isEnabled(),true);await p.locator('#vreader-replay').click();await frame.waitForFunction(()=>{const h=CSS.highlights.get('artifact-reader-word');return h&&[...h][0].toString()==='She'});
-await frame.locator('#name').evaluate(n=>n.setAttribute('data-artifact-pronounce','Shiv on'));await p.waitForFunction(()=>messages.some(m=>m.type==='reader:changed'));
-// Partial selection stays literal; a full term may use its author override.
-await frame.locator('#name').evaluate(n=>{const r=document.createRange();r.setStart(n.firstChild,1);r.setEnd(n.firstChild,4);getSelection().removeAllRanges();getSelection().addRange(r)});await p.waitForTimeout(60);await p.locator('#vreader-mode').selectOption('selection');await p.locator('#vreader-play').click();await p.waitForFunction(()=>spoken==='iob');
-await p.locator('#vreader-stop').click();
-await frame.locator('#name').evaluate(n=>{const r=document.createRange();r.selectNodeContents(n);getSelection().removeAllRanges();getSelection().addRange(r)});await p.waitForTimeout(60);await p.locator('#vreader-mode').selectOption('selection');await p.locator('#vreader-play').click();await p.waitForFunction(()=>spoken==='Shiv on');
-await frame.waitForFunction(()=>{const h=CSS.highlights.get('artifact-reader-word');return h&&[...h][0].toString()==='Siobhan'});await p.locator('#vreader-stop').click();assert.deepEqual(errors,[]);console.log('PASS: spoken replacements, source DOM unchanged, multiword-to-term highlighting, SQL mapping, sentence replay, metadata invalidation, partial and whole-term selection, bounded diagnostics');}finally{await browser?.close();child.kill();await fs.rm(dir,{recursive:true,force:true})}})().catch(e=>{console.error(e);process.exitCode=1});
+// End-to-end pronunciation controls with the shared deterministic speech worker.
+const assert = require('node:assert/strict');
+const { createReaderFixture, launchChromium } = require('../reader-fixture.cjs');
+
+(async () => {
+  const fixture = await createReaderFixture({ audio: { durationSeconds: 12, latencyMs: 0 } });
+  let browser;
+  try {
+    async function waitForSpeech(text, start = 0, timeoutMs = 10000) {
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        const record = worker.requests.slice(start).find(request => request.body?.text === text);
+        if (record) return record;
+        await new Promise(resolve => setTimeout(resolve, 20));
+      }
+      assert.fail(`timed out waiting for speech request: ${text}`);
+    }
+    const { base, viewerHeaders, publish, worker, assertSpeechRoutes } = fixture;
+    const { id } = await publish({ title: 'Mixed reader QA', html: '<main><p id="passage">Talk to <span id="name" data-artifact-pronounce="Shiv awn">Siobhan</span>. She reads <span data-artifact-pronounce="sequel">SQL</span>.</p></main>' });
+    await assertSpeechRoutes(id); worker.configure({ durationSeconds: 12 });
+    browser = await launchChromium();
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, extraHTTPHeaders: viewerHeaders });
+    await context.addInitScript(() => { window.messages = []; addEventListener('message', e => messages.push(e.data)); });
+    const p = await context.newPage(); const errors = []; p.on('pageerror', e => errors.push(e.message)); await p.goto(`${base}/${id}`);
+    await p.locator('#vreader-toggle').click(); await p.locator('#vreader-expand').click(); await p.locator('#vreader-voice').selectOption('pocket_alba');
+    const frame = p.frames().find(f => f.url().includes('/raw/')); await p.locator('#vreader-play').click();
+    await p.waitForFunction(() => document.querySelector('#vreader-status')?.textContent?.includes('Reading'));
+    await waitForSpeech('Talk to Shiv awn. She reads sequel.');
+    await frame.waitForFunction(() => { const h = CSS.highlights.get('artifact-reader-word'); return h && [...h][0].toString() === 'Siobhan'; });
+    assert.equal(await frame.locator('#passage').innerText(), 'Talk to Siobhan. She reads SQL.');
+    assert.ok(await p.evaluate(() => artifactReaderDiagnostics()[0].firstScheduledAudioMs >= 0));
+    await frame.waitForFunction(() => { const h = CSS.highlights.get('artifact-reader-word'); return h && [...h][0].toString() === 'SQL'; });
+    await p.locator('#vreader-play').click(); assert.equal(await p.locator('#vreader-replay').isEnabled(), true); await p.locator('#vreader-replay').click();
+    await frame.waitForFunction(() => { const h = CSS.highlights.get('artifact-reader-word'); return h && [...h][0].toString() === 'She'; });
+    await frame.locator('#name').evaluate(n => n.setAttribute('data-artifact-pronounce', 'Shiv on')); await p.waitForFunction(() => messages.some(m => m.type === 'reader:changed'));
+    await frame.locator('#name').evaluate(n => { const r = document.createRange(); r.setStart(n.firstChild, 1); r.setEnd(n.firstChild, 4); getSelection().removeAllRanges(); getSelection().addRange(r); }); await p.waitForTimeout(60); await p.locator('#vreader-mode').selectOption('selection');
+    const partialStart = worker.requests.length; await p.locator('#vreader-play').click(); await waitForSpeech('iob', partialStart); await p.locator('#vreader-stop').click();
+    await frame.locator('#name').evaluate(n => { const r = document.createRange(); r.selectNodeContents(n); getSelection().removeAllRanges(); getSelection().addRange(r); }); await p.waitForTimeout(60); await p.locator('#vreader-mode').selectOption('selection');
+    const wholeStart = worker.requests.length; await p.locator('#vreader-play').click(); await waitForSpeech('Shiv on', wholeStart);
+    await frame.waitForFunction(() => { const h = CSS.highlights.get('artifact-reader-word'); return h && [...h][0].toString() === 'Siobhan'; }); await p.locator('#vreader-stop').click(); assert.deepEqual(errors, []);
+    console.log('PASS: spoken replacements, source DOM unchanged, multiword-to-term highlighting, SQL mapping, sentence replay, metadata invalidation, partial and whole-term selection, bounded diagnostics');
+  } finally { if (browser) await browser.close(); await fixture.close(); }
+})().catch(e => { console.error(e); process.exitCode = 1; });

@@ -1,5 +1,5 @@
 // Run with: node playwright/tests/reader-word-highlights.cjs
-const {chromium}=require('playwright');
+const {launchChromium}=require('../reader-fixture.cjs');
 const fs=require('node:fs'),http=require('node:http'),assert=require('node:assert/strict'),path=require('node:path');
 (async()=>{
  const bridge=fs.readFileSync(path.join(__dirname,'../../assets/reader-bridge.js'),'utf8');
@@ -8,7 +8,7 @@ const fs=require('node:fs'),http=require('node:http'),assert=require('node:asser
  const server=http.createServer((req,res)=>{res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<iframe sandbox="allow-scripts" style="width:95vw;height:90vh"></iframe><script>window.messages=[];addEventListener("message",e=>messages.push(e.data));document.querySelector("iframe").srcdoc='+JSON.stringify(html).replace(/<\//g,'<\\/')+'</script>')});
  await new Promise(r=>server.listen(0,'127.0.0.1',r));let browser;
  try{
-  browser=await chromium.launch({headless:true,args:['--no-sandbox']});const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port);const frame=page.frames().find(f=>f!==page.mainFrame());await frame.waitForFunction(()=>typeof CSS.highlights?.set==='function');
+  browser=await launchChromium();const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));await page.goto('http://127.0.0.1:'+server.address().port);const frame=page.frames().find(f=>f!==page.mainFrame());await frame.waitForFunction(()=>typeof CSS.highlights?.set==='function');
   const send=message=>page.evaluate(m=>document.querySelector('iframe').contentWindow.postMessage(m,'*'),message);
   const marked=name=>frame.evaluate(n=>{const h=CSS.highlights.get(n);return h?[...h].map(r=>r.toString()).join(''):null},name);
   await frame.evaluate(()=>{document.body.focus();const r=document.createRange();r.selectNodeContents(document.querySelector('main'));getSelection().removeAllRanges();getSelection().addRange(r)});await page.waitForTimeout(50);

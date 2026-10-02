@@ -85,6 +85,7 @@ jobs:
     # Real Chromium journeys run against both complete server packages. Each instance has an
     # isolated database, and global teardown removes the synthetic organization and artifacts.
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     needs: [mcp-surface, test, conformance, rust]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -157,3 +158,5 @@ jobs:
             cat "$node_log" "$rust_log"
             exit 1
           fi
+      - name: Run reader regressions in Chromium against Node and Rust
+        run: npm --prefix playwright run test:reader
