@@ -314,11 +314,16 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             return observed(
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(protocol::rpc_error_with_data(
+                    Json(protocol::rpc_error_with_data_for_era(
                         request_id(&payload),
                         error.code,
                         &error.message,
                         error.data,
+                        if modern_transport(&payload, &transport_headers) {
+                            ProtocolEra::Modern
+                        } else {
+                            ProtocolEra::Legacy
+                        },
                     )),
                 )
                     .into_response(),
@@ -344,6 +349,9 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
         // Legacy JSON-RPC retains read-only batches. Mixed or state-changing batches are
         // rejected atomically before dispatch so one cheap outer admission cannot buy writes.
         for message in batch {
+            if protocol::invalid_request(message, era).is_some() {
+                continue;
+            }
             let method = message
                 .get("method")
                 .and_then(OrderedJson::as_str)
@@ -389,6 +397,13 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             );
         }
         return dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await;
+    }
+    if let Some(error) = protocol::invalid_request(&payload, era) {
+        return observed(
+            (StatusCode::OK, Json(error)).into_response(),
+            labels,
+            McpOutcome::ValidationFailure,
+        );
     }
     if let Some(scope) = required_scope(method, name)
         && !auth.has_scope(scope)
@@ -716,13 +731,8 @@ fn validate_transport(
     headers: &HeaderMap,
 ) -> Result<ProtocolEra, TransportValidationError> {
     let header_version = optional_header(headers, "mcp-protocol-version")?;
-    let has_modern_metadata = contains_modern_request_metadata(payload);
     let method = payload.get("method").and_then(OrderedJson::as_str);
-    let modern_intent = header_version
-        .as_deref()
-        .is_some_and(|version| version == MODERN_PROTOCOL_VERSION)
-        || has_modern_metadata
-        || method == Some("server/discover");
+    let modern_intent = modern_transport(payload, headers);
 
     if !modern_intent {
         return Ok(ProtocolEra::Legacy);
@@ -859,11 +869,17 @@ fn decode_header_value(value: &str) -> Option<String> {
     String::from_utf8(decoded).ok()
 }
 
+fn modern_transport(payload: &OrderedJson, headers: &HeaderMap) -> bool {
+    headers
+        .get("mcp-protocol-version")
+        .and_then(|value| value.to_str().ok())
+        == Some(MODERN_PROTOCOL_VERSION)
+        || contains_modern_request_metadata(payload)
+        || payload.get("method").and_then(OrderedJson::as_str) == Some("server/discover")
+}
+
 fn request_id(payload: &OrderedJson) -> Value {
-    payload
-        .get("id")
-        .cloned()
-        .map_or(Value::Null, OrderedJson::into_value)
+    protocol::request_id(payload).unwrap_or(Value::Null)
 }
 
 fn unauthorized_response(config: &crate::config::AppConfig) -> Response {

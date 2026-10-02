@@ -424,10 +424,11 @@ where
     match payload {
         OrderedJson::Array(messages) => {
             if era == ProtocolEra::Modern {
-                return Some(rpc_error(
+                return Some(rpc_error_for_era(
                     Value::Null,
                     -32_600,
                     "Batch requests are not supported by MCP 2026-07-28",
+                    era,
                 ));
             }
             if messages.is_empty() {
@@ -450,30 +451,11 @@ where
     F: Fn(OrderedJson) -> Fut,
     Fut: Future<Output = Result<Value, McpError>>,
 {
-    let valid = message.as_object().is_some()
-        && message.get("jsonrpc").and_then(OrderedJson::as_str) == Some("2.0")
-        && message
-            .get("method")
-            .and_then(OrderedJson::as_str)
-            .is_some();
-    if !valid {
-        let id = if message.as_object().is_some() && message.contains_key("id") {
-            message
-                .get("id")
-                .cloned()
-                .map_or(Value::Null, OrderedJson::into_value)
-        } else {
-            Value::Null
-        };
-        return Some(rpc_error(id, -32_600, "Invalid Request"));
+    if let Some(error) = invalid_request(&message, era) {
+        return Some(error);
     }
-    let expects_response = message
-        .get("id")
-        .is_some_and(|id| !matches!(id, OrderedJson::Null));
-    let id = message
-        .get("id")
-        .cloned()
-        .map_or(Value::Null, OrderedJson::into_value);
+    let expects_response = message.contains_key("id");
+    let id = request_id(&message).unwrap_or(Value::Null);
     let dispatched = dispatch(message).await;
     if !expects_response {
         return None;
@@ -483,6 +465,40 @@ where
         Err(McpError::Protocol(error)) => protocol_error(id, &error),
         Err(McpError::Tool(error)) => tool_error(id, &error.to_string(), era),
     })
+}
+
+/// A readable MCP request ID is a string or an integer, including zero and negative integers.
+#[must_use]
+pub fn request_id(message: &OrderedJson) -> Option<Value> {
+    message
+        .get("id")
+        .filter(|id| match id {
+            OrderedJson::String(_) => true,
+            OrderedJson::Number(number) => {
+                number.is_i64()
+                    || number.is_u64()
+                    || number
+                        .as_f64()
+                        .is_some_and(|value| value.is_finite() && value.fract() == 0.0)
+            }
+            _ => false,
+        })
+        .cloned()
+        .map(OrderedJson::into_value)
+}
+
+/// Validate the envelope before either authorization by method or method dispatch.
+#[must_use]
+pub fn invalid_request(message: &OrderedJson, era: ProtocolEra) -> Option<Value> {
+    let id = request_id(message);
+    let valid = message.as_object().is_some()
+        && message.get("jsonrpc").and_then(OrderedJson::as_str) == Some("2.0")
+        && message
+            .get("method")
+            .and_then(OrderedJson::as_str)
+            .is_some()
+        && (!message.contains_key("id") || id.is_some());
+    (!valid).then(|| rpc_error_for_era(id.unwrap_or(Value::Null), -32_600, "Invalid Request", era))
 }
 
 fn result_for_era(mut result: Value, era: ProtocolEra) -> Value {
@@ -525,6 +541,23 @@ pub fn rpc_error(id: Value, code: i32, message: &str) -> Value {
 
 #[must_use]
 pub fn rpc_error_with_data(id: Value, code: i32, message: &str, data: Option<Value>) -> Value {
+    rpc_error_with_data_for_era(id, code, message, data, ProtocolEra::Legacy)
+}
+
+#[must_use]
+pub fn rpc_error_for_era(id: Value, code: i32, message: &str, era: ProtocolEra) -> Value {
+    rpc_error_with_data_for_era(id, code, message, None, era)
+}
+
+/// Modern errors omit an unreadable ID; legacy JSON-RPC errors use null.
+#[must_use]
+pub fn rpc_error_with_data_for_era(
+    id: Value,
+    code: i32,
+    message: &str,
+    data: Option<Value>,
+    era: ProtocolEra,
+) -> Value {
     let mut error = Map::new();
     error.insert("code".to_owned(), Value::Number(Number::from(code)));
     error.insert("message".to_owned(), Value::String(message.to_owned()));
@@ -533,7 +566,9 @@ pub fn rpc_error_with_data(id: Value, code: i32, message: &str, data: Option<Val
     }
     let mut response = Map::new();
     response.insert("jsonrpc".to_owned(), Value::String("2.0".to_owned()));
-    response.insert("id".to_owned(), id);
+    if !id.is_null() || era == ProtocolEra::Legacy {
+        response.insert("id".to_owned(), id);
+    }
     response.insert("error".to_owned(), Value::Object(error));
     Value::Object(response)
 }
@@ -565,6 +600,34 @@ fn tool_error(id: Value, message: &str, era: ProtocolEra) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn invalid_ids_never_reach_an_injected_dispatcher() {
+        let calls = std::cell::Cell::new(0);
+        for era in [ProtocolEra::Legacy, ProtocolEra::Modern] {
+            for id in [
+                Value::Null,
+                serde_json::json!(true),
+                serde_json::json!([]),
+                serde_json::json!({}),
+                serde_json::json!(1.5),
+            ] {
+                let message = serde_json::from_value(serde_json::json!({
+                    "jsonrpc": "2.0", "id": id, "method": "tools/call"
+                }))
+                .expect("request AST");
+                let response = handle_mcp_with_era(message, era, |_| {
+                    calls.set(calls.get() + 1);
+                    std::future::ready(Ok(serde_json::json!({})))
+                })
+                .await
+                .expect("invalid ID error");
+                assert_eq!(response["error"]["code"], -32_600);
+                assert_eq!(response.get("id").is_some(), era == ProtocolEra::Legacy);
+            }
+        }
+        assert_eq!(calls.get(), 0);
+    }
 
     #[test]
     fn object_entries_match_javascript_key_order_and_duplicate_semantics() {

@@ -11,6 +11,19 @@ The server supports two contracts side by side:
 - Stateless MCP `2026-07-28` for clients that negotiate typed outputs, resources, MCP Apps, and
   durable tasks.
 
+Legacy `initialize` always negotiates `2025-06-18`. An unsupported string version, including
+`2026-07-28` in a legacy handshake, falls back to that supported legacy version. Omitting
+`protocolVersion` keeps the same default; supplying a non-string returns `-32602` (Invalid Params).
+Modern clients use stateless discovery and request metadata instead of `initialize`.
+
+Request IDs must be strings or integers. Empty strings, zero, and negative integers are valid.
+A present null, boolean, array, object, or fractional ID returns `-32600` (Invalid Request)
+before the method runs. Omitting the ID remains a notification with no JSON-RPC response.
+Errors with an unreadable ID use `id: null` in the legacy contract and omit `id` in the modern
+contract. Malformed requests with a valid ID preserve it in the error response.
+Use string IDs for values outside JavaScript's safe integer range (`±9007199254740991`) to
+preserve the same identifier in both runtimes.
+
 Clients without the newer capabilities receive the ordinary text and structured result fallback.
 Artifact resources use private-cache-aware responses through `resources/list`, `resources/read`,
 and `resources/templates/list`. Configured servers also support `server/discover`.

@@ -144,6 +144,36 @@ async fn post_as(
     (status, value)
 }
 
+async fn post_optional(
+    router: &Router,
+    body: Value,
+    headers: &[(&str, &str)],
+) -> (StatusCode, Option<Value>) {
+    let mut request = Request::post("/mcp")
+        .header("authorization", "Bearer owner-secret")
+        .header("content-type", "application/json");
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let response = router
+        .clone()
+        .oneshot(
+            request
+                .body(Body::from(body.to_string()))
+                .expect("MCP request"),
+        )
+        .await
+        .expect("MCP response");
+    let status = response.status();
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("read MCP response")
+        .to_vec();
+    let value =
+        (!bytes.is_empty()).then(|| serde_json::from_slice(&bytes).expect("MCP JSON response"));
+    (status, value)
+}
+
 #[tokio::test]
 async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
     let temp = TempDir::new();
@@ -916,7 +946,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             )
             .await;
             assert_eq!(status, StatusCode::OK);
-            assert_eq!(initialized["result"]["protocolVersion"], "2025-11-25");
+            assert_eq!(initialized["result"]["protocolVersion"], "2025-06-18");
             assert!(initialized["result"].get("resultType").is_none());
 
             let (status, legacy_with_version_header) = post(
@@ -1050,6 +1080,249 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
     )
     .await
     .expect("run production MCP transport");
+}
+
+#[tokio::test]
+async fn mcp_validates_request_ids_before_dispatch_in_both_protocol_eras() {
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            let invalid_ids = [
+                Value::Null,
+                json!(true),
+                json!([]),
+                json!({}),
+                json!(1.5),
+            ];
+            for (era, headers, metadata) in [
+                ("legacy", vec![], None),
+                (
+                    "modern",
+                    vec![
+                        ("mcp-protocol-version", MODERN_VERSION),
+                        ("mcp-method", "tools/call"),
+                        ("mcp-name", "publish_artifact"),
+                    ],
+                    Some(MODERN_VERSION),
+                ),
+            ] {
+                for id in &invalid_ids {
+                    let params = if let Some(version) = metadata {
+                        json!({
+                            "name": "publish_artifact",
+                            "arguments": { "html": "<h1>must not publish</h1>" },
+                            "_meta": meta(version),
+                        })
+                    } else {
+                        json!({
+                            "name": "publish_artifact",
+                            "arguments": { "html": "<h1>must not publish</h1>" },
+                        })
+                    };
+                    let (status, response) = post_optional(
+                        &router,
+                        json!({ "jsonrpc": "2.0", "id": id, "method": "tools/call", "params": params }),
+                        &headers,
+                    )
+                    .await;
+                    assert_eq!(status, StatusCode::OK, "{era} invalid request id status");
+                    let response = response.expect("invalid request must have a JSON-RPC error");
+                    assert_eq!(response["error"]["code"], -32_600, "{era} invalid request id");
+                    if era == "modern" {
+                        assert!(response.get("id").is_none(), "modern error must omit unreadable id");
+                    } else {
+                        assert!(response["id"].is_null(), "legacy error id is null");
+                    }
+                }
+            }
+
+            let (status, listed) = post(
+                &router,
+                json!({ "jsonrpc": "2.0", "id": "list", "method": "tools/call", "params": { "name": "list_artifacts", "arguments": {} } }),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(listed["result"]["structuredContent"]["count"], 0, "invalid IDs must not dispatch mutations");
+
+            let (_, seeded) = post(
+                &router,
+                json!({
+                    "jsonrpc": "2.0",
+                    "id": "seed",
+                    "method": "tools/call",
+                    "params": {
+                        "name": "publish_artifact",
+                        "arguments": { "html": "<h1>must survive invalid delete IDs</h1>" }
+                    }
+                }),
+                &[],
+            )
+            .await;
+            let seeded_id = seeded["result"]["structuredContent"]["id"]
+                .as_str()
+                .expect("seed artifact id")
+                .to_owned();
+            for id in &invalid_ids {
+                let (status, response) = post_optional(
+                    &router,
+                    json!({
+                        "jsonrpc": "2.0",
+                        "id": id,
+                        "method": "tools/call",
+                        "params": {
+                            "name": "delete_artifact",
+                            "arguments": { "id": seeded_id }
+                        }
+                    }),
+                    &[],
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK);
+                let response = response.expect("invalid delete ID error");
+                assert_eq!(response["error"]["code"], -32_600);
+            }
+            let (status, listed) = post(
+                &router,
+                json!({ "jsonrpc": "2.0", "id": "list-after-delete", "method": "tools/call", "params": { "name": "list_artifacts", "arguments": {} } }),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(listed["result"]["structuredContent"]["count"], 1, "invalid IDs must not dispatch deletes");
+
+            for id in [json!(""), json!(0), json!(-1), json!(1.0)] {
+                let (status, response) = post(
+                    &router,
+                    json!({ "jsonrpc": "2.0", "id": id, "method": "tools/list" }),
+                    &[],
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK);
+                assert!(response.get("result").is_some(), "valid legacy ID must be accepted");
+            }
+            for id in [json!(""), json!(0), json!(-1), json!(1.0)] {
+                let (status, response) = post(
+                    &router,
+                    json!({ "jsonrpc": "2.0", "id": id, "method": "tools/list", "params": { "_meta": meta(MODERN_VERSION) } }),
+                    &[
+                        ("mcp-protocol-version", MODERN_VERSION),
+                        ("mcp-method", "tools/list"),
+                    ],
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK);
+                assert!(response.get("result").is_some(), "valid modern ID must be accepted");
+            }
+
+            let (status, malformed) = post(
+                &router,
+                json!({ "jsonrpc": "2.0", "id": "preserve", "method": 42 }),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(malformed["error"]["code"], -32_600);
+            assert_eq!(malformed["id"], "preserve");
+
+            let (status, transport_invalid_id) = post(
+                &router,
+                json!({ "jsonrpc": "2.0", "id": {}, "method": "tools/list", "params": { "_meta": meta(MODERN_VERSION) } }),
+                &[
+                    ("mcp-protocol-version", MODERN_VERSION),
+                    ("mcp-method", "tools/call"),
+                ],
+            )
+            .await;
+            assert_eq!(status, StatusCode::BAD_REQUEST);
+            assert_eq!(transport_invalid_id["error"]["code"], -32_020);
+            assert!(transport_invalid_id.get("id").is_none(), "transport errors must not echo unreadable modern IDs");
+
+            let (status, notification) = post_optional(
+                &router,
+                json!({ "jsonrpc": "2.0", "method": "tools/list" }),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::ACCEPTED);
+            assert!(notification.is_none(), "omitted ID remains a notification");
+
+            let (status, batch) = post(
+                &router,
+                json!([
+                    { "jsonrpc": "2.0", "id": "good", "method": "tools/list" },
+                    { "jsonrpc": "2.0", "id": {}, "method": "tools/list" }
+                ]),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            let batch = batch.as_array().expect("legacy read-only batch response");
+            assert_eq!(batch.len(), 2);
+            assert_eq!(batch[0]["id"], "good");
+            assert!(batch[0].get("result").is_some());
+            assert_eq!(batch[1]["error"]["code"], -32_600);
+            assert!(batch[1]["id"].is_null(), "invalid batch member uses legacy null error ID");
+            Ok(())
+        },
+    )
+    .await
+    .expect("run request-ID validation regression");
+}
+
+#[tokio::test]
+async fn legacy_initialize_negotiates_only_supported_versions() {
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            for (label, params, expected) in [
+                (
+                    "supported",
+                    json!({ "protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": { "name": "test", "version": "1" } }),
+                    Some("2025-06-18"),
+                ),
+                (
+                    "unknown",
+                    json!({ "protocolVersion": "2099-01-01", "capabilities": {}, "clientInfo": { "name": "test", "version": "1" } }),
+                    Some("2025-06-18"),
+                ),
+                (
+                    "modern-string",
+                    json!({ "protocolVersion": MODERN_VERSION, "capabilities": {}, "clientInfo": { "name": "test", "version": "1" } }),
+                    Some("2025-06-18"),
+                ),
+                (
+                    "omitted",
+                    json!({ "capabilities": {}, "clientInfo": { "name": "test", "version": "1" } }),
+                    Some("2025-06-18"),
+                ),
+            ] {
+                let (status, response) = post(
+                    &router,
+                    json!({ "jsonrpc": "2.0", "id": label, "method": "initialize", "params": params }),
+                    &[],
+                )
+                .await;
+                assert_eq!(status, StatusCode::OK, "{label}");
+                assert_eq!(response["result"]["protocolVersion"], expected.unwrap());
+            }
+            let (status, invalid) = post(
+                &router,
+                json!({ "jsonrpc": "2.0", "id": "non-string", "method": "initialize", "params": { "protocolVersion": {}, "capabilities": {}, "clientInfo": { "name": "test", "version": "1" } } }),
+                &[],
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK);
+            assert_eq!(invalid["error"]["code"], -32_602);
+            Ok(())
+        },
+    )
+    .await
+    .expect("run legacy version negotiation regression");
 }
 
 #[tokio::test]

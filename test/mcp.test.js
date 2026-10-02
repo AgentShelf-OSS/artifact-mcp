@@ -18,6 +18,69 @@ test.after(() => rmSync(dataDir, { recursive: true, force: true }));
 
 const auth = { clientId: "publisher", org: "acme", label: "Agent" };
 
+test("MCP request IDs reject malformed values before mutation in both eras", async () => {
+  const { createOrg } = await import("../lib/orgs.js");
+  createOrg({ name: "request-id-tests" });
+  const identity = { ...auth, org: "request-id-tests" };
+  for (const protocolVersion of [PROTOCOL_VERSION, MODERN_PROTOCOL_VERSION]) {
+    const modern = protocolVersion === MODERN_PROTOCOL_VERSION;
+    const params = (name, args) => ({ name, arguments: args, ...(modern ? { _meta: modernMeta() } : {}) });
+    const request = (id, name, args) => ({ jsonrpc: "2.0", id, method: "tools/call", params: params(name, args) });
+    const options = { protocolVersion };
+    const published = await handleMcp(request("seed", "publish_artifact", { html: "<p>keep me</p>" }), identity, options);
+    const artifactId = published.result.structuredContent.id;
+    assert.equal(typeof artifactId, "string");
+    for (const id of [null, true, [], {}, 1.5]) {
+      const response = await handleMcp(request(id, "delete_artifact", { id: artifactId }), identity, options);
+      assert.equal(response?.error?.code, -32600, `${protocolVersion} ID ${JSON.stringify(id)}`);
+      assert.equal(Object.hasOwn(response, "id"), !modern);
+      if (!modern) assert.equal(response.id, null);
+    }
+    const listed = await handleMcp(request("check", "list_artifacts", {}), identity, options);
+    assert.ok(listed.result.structuredContent.artifacts.some((row) => row.id === artifactId));
+    for (const id of ["", "string-id", 0, -1, 1.0]) {
+      const response = await handleMcp({ jsonrpc: "2.0", id, method: "tools/list", params: modern ? { _meta: modernMeta() } : {} }, identity, options);
+      assert.equal(response.id, id);
+      assert.ok(response.result);
+    }
+    assert.equal(await handleMcp({ jsonrpc: "2.0", method: "tools/list", params: modern ? { _meta: modernMeta() } : {} }, identity, options), null);
+    const malformed = await handleMcp({ jsonrpc: "wrong", id: "readable", method: "tools/list" }, identity, options);
+    assert.equal(malformed.id, "readable");
+    assert.equal(malformed.error.code, -32600);
+  }
+});
+
+test("MCP request IDs remain normalized on transport errors and mixed legacy batches", async () => {
+  for (const id of [null, true, [], {}, 1.5]) {
+    const checked = validateMcpHttpRequest({ jsonrpc: "2.0", id, method: false }, { "mcp-protocol-version": MODERN_PROTOCOL_VERSION });
+    assert.equal(checked.response.error.code, -32600);
+    assert.equal(Object.hasOwn(checked.response, "id"), false);
+  }
+  const batch = await handleMcp([
+    { jsonrpc: "2.0", id: 0, method: "ping" },
+    { jsonrpc: "2.0", id: false, method: "ping" },
+    { jsonrpc: "2.0", method: "ping" }
+  ], auth);
+  assert.equal(batch.length, 2);
+  assert.ok(batch[0].result);
+  assert.equal(batch[1].id, null);
+  assert.equal(batch[1].error.code, -32600);
+});
+
+test("legacy initialize negotiates the supported version and rejects non-string versions", async () => {
+  for (const requested of [PROTOCOL_VERSION, "2025-11-25", "2099-01-01", MODERN_PROTOCOL_VERSION, ""]) {
+    const response = await handleMcp({ jsonrpc: "2.0", id: 1, method: "initialize", params: { protocolVersion: requested } }, auth);
+    assert.equal(response.result.protocolVersion, PROTOCOL_VERSION, requested);
+  }
+  const omitted = await handleMcp({ jsonrpc: "2.0", id: 2, method: "initialize" }, auth);
+  assert.equal(omitted.result.protocolVersion, PROTOCOL_VERSION);
+  for (const requested of [null, true, 42, [], {}]) {
+    const response = await handleMcp({ jsonrpc: "2.0", id: 3, method: "initialize", params: { protocolVersion: requested } }, auth);
+    assert.equal(response.error?.code, -32602, JSON.stringify(requested));
+    assert.equal(response.id, 3);
+  }
+});
+
 function modernMeta(version = MODERN_PROTOCOL_VERSION) {
   return {
     "io.modelcontextprotocol/protocolVersion": version,

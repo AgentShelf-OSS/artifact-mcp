@@ -1,0 +1,351 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "id": null,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": "",
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 0,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": -1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 202,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": "",
+          "jsonrpc": "2.0",
+          "result": {
+            "_meta": {
+              "io.modelcontextprotocol/serverInfo": {
+                "name": "artifact-mcp",
+                "version": "1.10.0"
+              }
+            },
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "resultType": "complete",
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 0,
+          "jsonrpc": "2.0",
+          "result": {
+            "_meta": {
+              "io.modelcontextprotocol/serverInfo": {
+                "name": "artifact-mcp",
+                "version": "1.10.0"
+              }
+            },
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "resultType": "complete",
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": -1,
+          "jsonrpc": "2.0",
+          "result": {
+            "_meta": {
+              "io.modelcontextprotocol/serverInfo": {
+                "name": "artifact-mcp",
+                "version": "1.10.0"
+              }
+            },
+            "content": [
+              {
+                "text": "{\"count\":0,\"artifacts\":[]}",
+                "type": "text"
+              }
+            ],
+            "resultType": "complete",
+            "structuredContent": {
+              "artifacts": [],
+              "count": 0
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 202,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": ""
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32600,
+            "message": "Invalid Request: method must be a string"
+          },
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": [
+          {
+            "id": 0,
+            "jsonrpc": "2.0",
+            "result": {}
+          },
+          {
+            "error": {
+              "code": -32600,
+              "message": "Invalid Request"
+            },
+            "id": null,
+            "jsonrpc": "2.0"
+          }
+        ]
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "no_invalid_id_mutations": [
+        {
+          "count": 0
+        }
+      ]
+    }
+  }
+}
