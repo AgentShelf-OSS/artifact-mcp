@@ -8,13 +8,30 @@ asserts behaviour a user would see.
 
 ## Run
 
-    cd playwright
-    npm install
-    npx playwright install chrome   # once
-    RUST_ARTIFACT_MCP_BIN=../target/release/artifact-mcp npm test
+The Playwright suite does not start the application servers. Build the Rust release binary, create
+separate throwaway data directories, and start Node on `3485` and Rust on `3483` with
+`LISTEN_HOST=127.0.0.1`, `TRUST_ACCESS_HEADERS=1`, `ADMIN_EMAILS=admin@example.test`, matching
+`PUBLIC_BASE_URL`, an empty
+`PREVIEW_RENDERER_URL`, and disposable test-only `AUDIT_LEDGER_HMAC_KEY` and `WEBHOOK_ENC_KEY`.
+Use the elevated isolated-run `INGRESS_*` budgets shown in the CI browser job. The complete launch,
+health-check, and cleanup recipe is in [`ci.yml`](../.github/workflows/ci.yml#L101-L156).
 
-Two projects — `node` and `rust` — each boot their own server on a throwaway data dir with
-header-trust identity and a seeded artifact (`server.mjs`), then run every spec against both.
+Then, from the repository root, install dependencies and run both configured projects against those
+instances:
+
+    cargo build --release --locked
+    npm --prefix playwright ci
+    npm --prefix playwright exec -- playwright install --with-deps chromium
+    PW_NODE_URL=http://127.0.0.1:3485 \
+      PW_RUST_URL=http://127.0.0.1:3483 \
+      PW_ADMIN_EMAIL=admin@example.test \
+      PW_RUN_ID=local-$(date +%s) \
+      PW_USE_BUNDLED_CHROMIUM=1 \
+      bash -c 'cd playwright && npm test'
+
+The `node` and `rust` projects run the same specs against the two already-running servers. The
+global setup creates a throwaway organization in each instance; teardown removes it. Never point
+the suite at production data.
 
 ## What it guards (both found by manual testing, both now fixed)
 

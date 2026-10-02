@@ -6,6 +6,22 @@ split between agent, human, and public routes.
 
 Report vulnerabilities through the private process in [SECURITY.md](../SECURITY.md).
 
+## Required startup secret
+
+The Rust production server and Node reference require `AUDIT_LEDGER_HMAC_KEY` before serving
+requests. It must be canonical standard base64 encoding of exactly 32 random bytes. Generate it
+into a protected file, then import it into your secret store privately:
+
+```bash
+(umask 077; openssl rand -base64 32 > /path/to/private/audit-key)
+```
+
+Put the value in a protected secret store or a mode-0600 environment file; never commit it, place
+it in SQLite, or include it in a backup report. Keep an encrypted recovery copy under the same
+access controls as the service secrets. Without the original key, restored audit-chain records
+cannot be verified. Key rotation requires an explicit future operational migration; overwriting
+the key is unsupported. See the [audit-ledger contract](security-audit-ledger.md#access-query-retention-and-rotation).
+
 ## Viewer identity
 
 Cloudflare removes client-supplied `Cf-Access-*` headers at the edge. Artifact MCP still verifies
