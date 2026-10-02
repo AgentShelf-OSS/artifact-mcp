@@ -1,8 +1,8 @@
 // Synthetic regression fixtures for issue #41. Run with node playwright/tests/reader-mixed-content.cjs.
-const {chromium}=require('playwright');
+const {launchChromium}=require('../reader-fixture.cjs');
 const fs=require('fs'),assert=require('node:assert/strict');
 const bridge=fs.readFileSync(require('node:path').join(__dirname,'../../assets/reader-bridge.js'),'utf8');
-(async()=>{const b=await chromium.launch({args:['--no-sandbox']});try{const p=await b.newPage();let frame;const errors=[];p.on('pageerror',e=>errors.push(e.message));
+(async()=>{const b=await launchChromium();try{const p=await b.newPage();let frame;const errors=[];p.on('pageerror',e=>errors.push(e.message));
 async function setup(html){await p.setContent('<iframe style="width:95vw;height:90vh" sandbox="allow-scripts"></iframe>');await p.evaluate(html=>{window.messages=[];window.onmessage=e=>messages.push(e.data);document.querySelector('iframe').srcdoc=html},html+'<script>'+bridge+'</script>');frame=p.frames()[1];await p.waitForFunction(()=>messages.some(m=>m.type==='reader:ready'));}
 async function send(data){await p.evaluate(data=>document.querySelector('iframe').contentWindow.postMessage(data,'*'),data)}
 let n=0;async function extract(mode='page'){const requestId='case'+n++;await send({type:'reader:extract',requestId,mode});await p.waitForFunction(id=>messages.some(m=>m.requestId===id),requestId);return p.evaluate(id=>messages.find(m=>m.requestId===id),requestId);}
