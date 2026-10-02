@@ -109,10 +109,14 @@ test("canonical bundle and retained bundle history are verified; previews remain
   }));
   await fs.mkdir(path.join(data, "artifacts", ".history", "bundle1", "1"), { recursive: true });
   await fs.writeFile(path.join(data, "artifacts", ".history", "bundle1", "1", "index.html"), "old");
+  const preview = Buffer.from("preview-cache");
+  await fs.mkdir(path.join(data, "previews"), { recursive: true });
+  await fs.writeFile(path.join(data, "previews", "bundle1.png"), preview);
   db.close();
   assert.equal(await runBackup(data, backups), 0);
   const [name] = await fs.readdir(backups);
   assert.equal(await fs.readFile(path.join(backups, name, "artifacts", "bundle1", "assets", "site.css"), "utf8"), "css");
+  assert.equal(hash(await fs.readFile(path.join(backups, name, "previews", "bundle1.png"))), hash(preview));
 });
 
 test("digest or required-body failure leaves no completed backup; fixing it permits retry", async (t) => {
@@ -209,4 +213,59 @@ test("the verifier fails closed on omitted paths and required missing databases"
   const verifier = path.resolve("scripts/backup-coherence.py");
   assert.notEqual(spawnSync("python3", [verifier]).status, 0);
   assert.equal(spawnSync("python3", [verifier, root, "--database-required"]).status, 1);
+});
+
+test("deleting a current body after the database cut fails closed and cleans staging", async (t) => {
+  const { root, data, backups, db } = await fixture(t);
+  db.prepare("INSERT INTO artifacts VALUES (?, 0, ?)").run("gone", hash("body"));
+  await fs.writeFile(path.join(data, "artifacts", "gone.html"), "body");
+  db.close();
+  const pause = path.join(root, "pause");
+  const running = startBackup(data, backups, pause, "after");
+  await waitForFile(pause);
+  await fs.rm(path.join(data, "artifacts", "gone.html"));
+  await release(pause);
+  assert.notEqual(await running, 0);
+  assert.deepEqual(await fs.readdir(backups), []);
+  assert.deepEqual((await fs.readdir(backups, { withFileTypes: true })).filter((entry) => entry.name.startsWith(".incomplete-")), []);
+  await assert.rejects(fs.access(path.join(data, "artifacts", "gone.html")), { code: "ENOENT" });
+});
+
+test("pruning retained history after the database cut fails closed and cleans staging", async (t) => {
+  const { root, data, backups, db } = await fixture(t);
+  db.prepare("INSERT INTO artifacts VALUES (?, 0, ?)").run("history", hash("current"));
+  db.prepare("INSERT INTO artifact_revisions VALUES (?, 1, 0, ?)").run("history", hash("old"));
+  await fs.writeFile(path.join(data, "artifacts", "history.html"), "current");
+  await fs.mkdir(path.join(data, "artifacts", ".history", "history"), { recursive: true });
+  const retained = path.join(data, "artifacts", ".history", "history", "1.html");
+  await fs.writeFile(retained, "old");
+  db.close();
+  const pause = path.join(root, "pause");
+  const running = startBackup(data, backups, pause, "after");
+  await waitForFile(pause);
+  await fs.rm(retained);
+  await release(pause);
+  assert.notEqual(await running, 0);
+  assert.deepEqual(await fs.readdir(backups), []);
+  assert.deepEqual((await fs.readdir(backups, { withFileTypes: true })).filter((entry) => entry.name.startsWith(".incomplete-")), []);
+  await assert.rejects(fs.access(retained), { code: "ENOENT" });
+});
+
+test("interrupting after the database cut removes incomplete staging", async (t) => {
+  const { root, data, backups, db } = await fixture(t);
+  db.prepare("INSERT INTO artifacts VALUES (?, 0, ?)").run("survive", hash("body"));
+  await fs.writeFile(path.join(data, "artifacts", "survive.html"), "body");
+  db.close();
+  const pause = path.join(root, "pause");
+  const child = spawn("bash", [script, data, backups, "14"], {
+    detached: true,
+    env: { ...process.env, PATH: `${path.join(path.dirname(data), "bin")}:${process.env.PATH}`, BACKUP_TEST_PAUSE: pause, BACKUP_TEST_PHASE: "after" },
+  });
+  t.after(() => { if (child.exitCode === null) { try { process.kill(-child.pid, "SIGKILL"); } catch {} } });
+  await waitForFile(pause);
+  process.kill(-child.pid, "SIGTERM");
+  await new Promise((resolve) => child.once("close", resolve));
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  assert.deepEqual(await fs.readdir(backups), []);
+  assert.equal(await fs.readFile(path.join(data, "artifacts", "survive.html"), "utf8"), "body");
 });

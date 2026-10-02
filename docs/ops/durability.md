@@ -54,3 +54,15 @@ before the staging directory is atomically renamed; the destination directory is
 run uses a unique staging and final name, and `KEEP` must be a positive integer. A failed check
 leaves no completed backup. Pending intents are retained in the live data directory for the normal
 startup reconciliation path and must be resolved before retrying the backup.
+
+Run the focused backup regressions from the repository root:
+
+```bash
+node --test test/backup.test.js
+```
+
+These tests use temporary databases and directories. They cover writes and missing required
+content around the SQLite snapshot, pending lifecycle intents, optional previews, publication
+cleanup, and retention. Before deploying a change to this workflow, also restore a completed
+backup into fresh data directories and verify current bodies, retained revisions, and bundles
+through both application runtimes.
