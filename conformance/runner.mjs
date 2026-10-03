@@ -381,6 +381,12 @@ async function runCaseAgainst(driver, caseDef) {
 
   try {
     materializeFixture(caseDef.fixture, dataDir);
+    if (caseDef.dataSources) {
+      // Both runtimes read the same operator file, regardless of their launch directory.
+      const path = join(dataDir, "data-sources.json");
+      writeFileSync(path, JSON.stringify(caseDef.dataSources));
+      env.ARTIFACT_DATA_SOURCES_FILE = path;
+    }
     handle = await driver.start({ dataDir, port, env });
     await waitForHealth(handle.baseUrl);
 

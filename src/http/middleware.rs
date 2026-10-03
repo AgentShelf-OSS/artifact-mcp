@@ -279,6 +279,11 @@ pub async fn express_etag(request: Request, next: Next) -> Response {
 
 fn express_send_response(response: &Response) -> bool {
     response.headers().contains_key(header::CONTENT_TYPE)
+        && !response
+            .headers()
+            .get(header::CONTENT_TYPE)
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.starts_with("text/event-stream"))
         && !(response.status().is_redirection()
             && response.headers().contains_key(header::LOCATION))
 }

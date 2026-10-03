@@ -16,6 +16,13 @@ use crate::{
 const SETTINGS_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/settings.css"));
 const SETTINGS_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/settings.js"));
 
+const CONNECTIONS_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/connections.css"));
+const CONNECTIONS_HTML: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/connections.html"));
+const CONNECTIONS_SCRIPT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/connections.js"));
+
 #[derive(Template)]
 #[template(path = "settings.html")]
 struct SettingsTemplate<'a> {
@@ -23,6 +30,9 @@ struct SettingsTemplate<'a> {
     theme_boot: TrustedStatic,
     portal_css: TrustedStatic,
     settings_css: TrustedStatic,
+    connections_css: TrustedStatic,
+    connections_html: TrustedStatic,
+    connections_script: TrustedStatic,
     script: TrustedStatic,
     site_host: &'a str,
     app_name: &'a str,
@@ -194,6 +204,9 @@ pub(super) fn render_settings(
         theme_boot: THEME_BOOT,
         portal_css: PORTAL_CSS,
         settings_css: SETTINGS_CSS,
+        connections_css: CONNECTIONS_CSS,
+        connections_html: CONNECTIONS_HTML,
+        connections_script: CONNECTIONS_SCRIPT,
         script: SETTINGS_SCRIPT,
         site_host,
         app_name,

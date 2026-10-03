@@ -19,6 +19,8 @@ import * as views from "./lib/views.js";
 import * as shares from "./lib/shares.js";
 import { addFeedback, listForArtifact as feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer } from "./lib/feedback.js";
 import { createStateStore } from "./lib/state.js";
+import { createArtifactData, parseDataSources } from "./lib/artifact-data.js";
+import { createDataSourceRegistry } from "./lib/data-source-registry.js";
 import * as webhooks from "./lib/webhooks.js";
 import * as discussions from "./lib/discussions.js";
 import * as notify from "./lib/notify.js";
@@ -161,6 +163,9 @@ try {
 
 const artifactNotifier = createArtifactPreviewNotifier({ artifacts: artifactStore, notify, thumbnails, thumbnailQueue });
 const state = createStateStore({ db });
+const operatorDataSources = parseDataSources();
+const artifactData = createArtifactData({ db, sources: operatorDataSources });
+const dataSources = createDataSourceRegistry({ db, data: artifactData, operatorSources: operatorDataSources, orgs: { has: orgs.orgExists }, artifacts: artifactStore, audit: securityAudit });
 
 // Queue existing single-file artifacts at low priority. The serial worker starts on a
 // microtask and mutation events are always selected before remaining backfill jobs.
@@ -192,7 +197,8 @@ const app = createApp({
       ...options,
       notify: artifactNotifier.emit,
       preview: thumbnails,
-      tasks: previewTasks
+      tasks: previewTasks,
+      data: artifactData
     }),
   validateMcpHttpRequest,
   invalidMcpRequest,
@@ -226,6 +232,8 @@ const app = createApp({
   views,
   feedback: { add: addFeedback, listForArtifact: feedbackForArtifact, getFeedback, deleteFeedback, resolveByViewer },
   state,
+  data: artifactData,
+  dataSources,
   pages: { gallery: renderGallery, shell: renderArtifactShell, notFound: notFoundPage, notSignedIn: notSignedInPage, settings: renderSettings },
   publicBase: PUBLIC_BASE,
   oauth: oauthConfig,

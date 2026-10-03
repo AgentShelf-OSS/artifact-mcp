@@ -69,9 +69,18 @@ for required claims and scopes.
 | `resolve_feedback(feedback_id)` | Mark a feedback thread resolved. |
 | `reopen_feedback(feedback_id)` | Reopen a resolved feedback thread. |
 | `regenerate_artifact_preview(id)` | Regenerate the current single-file thumbnail. Newer clients receive a durable task. |
+| `list_data_sources(org?)` | Discover configured sources and public operation/subscription definitions for an organization. |
+| `get_data_bindings(id)` | Read an artifact's live-data bindings. |
+| `set_data_bindings(id, bindings)` | Atomically replace an artifact's bindings with authorized named sources. |
+| `set_artifact_data(id, binding, key, value)` | Update a producer snapshot without changing the HTML revision. |
+| `append_artifact_events(id, binding, subscription, events)` | Append an idempotent producer event batch for subscribed viewers. |
 
-The legacy catalog contains 21 tools. MCP 2026 adds `regenerate_artifact_preview` for 22. A client
+The legacy catalog contains 26 tools. MCP 2026 adds `regenerate_artifact_preview` for 27. A client
 that negotiates MCP Apps also receives the app-only `submit_feedback` action.
+
+Live-data discovery and binding reads require `artifacts:read`; binding and producer writes require
+`artifacts:publish` plus the existing artifact write policy. See [live data and PR Watch](live-data.md)
+for source configuration, client examples, limits, and publication.
 
 ## Durable tasks
 

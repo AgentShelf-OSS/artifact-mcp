@@ -1,0 +1,101 @@
+{
+  "sources": [
+    {
+      "id": "pr-watch",
+      "org": "agentshelf",
+      "kind": "http",
+      "base_url": "http://192.168.0.102:8477",
+      "operations": {
+        "status": {
+          "path": "/api/status"
+        },
+        "runs": {
+          "path": "/api/runs",
+          "params": {
+            "limit": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "cursor": {
+              "type": "string",
+              "max_length": 256
+            },
+            "filter": {
+              "type": "string",
+              "max_length": 64
+            }
+          },
+          "timeout_ms": 30000
+        },
+        "run_detail": {
+          "path": "/api/runs/by-id/{runId}",
+          "params": {
+            "runId": {
+              "type": "string",
+              "required": true,
+              "max_length": 256
+            }
+          },
+          "timeout_ms": 30000
+        },
+        "run_routes": {
+          "path": "/api/runs/by-id/{runId}/routes",
+          "params": {
+            "runId": {
+              "type": "string",
+              "required": true,
+              "max_length": 256
+            }
+          },
+          "timeout_ms": 30000
+        },
+        "route_detail": {
+          "path": "/api/runs/by-id/{runId}/routes/{routeAttemptId}",
+          "params": {
+            "runId": {
+              "type": "string",
+              "required": true,
+              "max_length": 256
+            },
+            "routeAttemptId": {
+              "type": "string",
+              "required": true,
+              "max_length": 256
+            }
+          },
+          "timeout_ms": 30000
+        },
+        "daily": {
+          "path": "/api/runs/aggregate/daily",
+          "timeout_ms": 30000
+        },
+        "analytics": {
+          "path": "/api/analytics",
+          "params": {
+            "days": {
+              "type": "integer",
+              "enum": [
+                7,
+                14,
+                30,
+                90
+              ]
+            }
+          },
+          "timeout_ms": 30000
+        }
+      },
+      "subscriptions": {
+        "events": {
+          "transport": "sse",
+          "path": "/api/events",
+          "events": [
+            "dashboard-event",
+            "dashboard-resync"
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod artifact;
+pub mod data;
 pub mod discussions;
 pub mod feedback;
 pub mod gallery;

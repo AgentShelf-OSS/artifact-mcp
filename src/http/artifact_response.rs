@@ -25,6 +25,7 @@ pub const READER_BRIDGE: &str = concat!(
     "\n",
     include_str!("../../assets/reader-bridge.js")
 );
+pub const DATA_CLIENT: &str = include_str!("../../assets/artifact-data-client.js");
 
 /// Server-owned anchor bridge copied byte-for-byte from `lib/artifact-http.js`.
 ///
@@ -167,6 +168,24 @@ pub fn inject_reader_bridge(content: &[u8], _page_path: Option<&str>) -> Vec<u8>
     output.into_bytes()
 }
 
+/// Install the data client before published scripts, matching the Node representation.
+#[must_use]
+pub fn inject_data_client(content: &[u8]) -> Vec<u8> {
+    let html = String::from_utf8_lossy(content);
+    let sdk = format!("<script id=\"artifact-data-client\">{DATA_CLIENT}</script>");
+    let lower = html.to_ascii_lowercase();
+    let insertion = lower
+        .match_indices("<script")
+        .find(|(offset, _)| {
+            lower
+                .as_bytes()
+                .get(offset + 7)
+                .is_none_or(|b| !b.is_ascii_alphanumeric() && *b != b'_')
+        })
+        .map_or(0, |(offset, _)| offset);
+    format!("{}{}{}", &html[..insertion], sdk, &html[insertion..]).into_bytes()
+}
+
 /// Remove the same closed `<script>...</script>` blocks as the Node preview representation.
 ///
 /// This is console-noise suppression, not a security boundary. Preview iframes remain sandboxed.
@@ -230,7 +249,7 @@ pub fn artifact_response(
     let attachment_name = options.download_title.map(download_name);
     let mut content = file.content;
     if options.anchor && attachment_name.is_none() && html {
-        content = inject_anchor_bridge(&content, options.page_path);
+        content = inject_data_client(&inject_anchor_bridge(&content, options.page_path));
     }
     if options.reader && attachment_name.is_none() && html {
         content = inject_reader_bridge(&content, options.page_path);

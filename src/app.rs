@@ -24,6 +24,7 @@ use crate::{
 /// concrete Axum state type, while individual capabilities remain replaceable.
 #[derive(Clone)]
 pub struct AppDeps {
+    pub data: Arc<crate::data::DataBroker>,
     pub publisher_auth: Arc<dyn PublisherAuthenticator>,
     pub viewer_identity: Arc<dyn ViewerIdentity>,
     pub artifacts: Arc<dyn ArtifactService>,

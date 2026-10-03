@@ -1,0 +1,1107 @@
+{
+  "id": "connections.lifecycle",
+  "tags": [
+    "connections",
+    "admin",
+    "live-data"
+  ],
+  "fixture": "empty-v21",
+  "env": {
+    "INGRESS_MUTATIONS_PER_WINDOW": "1000",
+    "INGRESS_ADMIN_PER_WINDOW": "1000"
+  },
+  "note": "Admin source lifecycle, optimistic versions, operator protection, binding impact and cleanup. Definition serialization defaults are checked by runtime validator tests; timestamps and read-only test timing are volatile.",
+  "dataSources": {
+    "sources": [
+      {
+        "id": "operator-feed",
+        "org": "connections-test",
+        "kind": "push",
+        "operations": {
+          "latest": {}
+        },
+        "subscriptions": {
+          "events": {
+            "transport": "push"
+          }
+        }
+      },
+      {
+        "id": "operator-http",
+        "org": "connections-test",
+        "kind": "http",
+        "base_url": "https://example.invalid",
+        "operations": {
+          "status": {
+            "path": "/status"
+          }
+        },
+        "subscriptions": {}
+      }
+    ]
+  },
+  "steps": [
+    {
+      "name": "create test organization",
+      "request": {
+        "method": "POST",
+        "path": "/settings/orgs",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "connections-test"
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "non-admin cannot inspect source definitions",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 403
+      }
+    },
+    {
+      "name": "unsafe requests require mutation signal",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true
+        }
+      },
+      "expect": {
+        "status": 403
+      }
+    },
+    {
+      "name": "create managed source",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "unknown artifacts have no editable bindings",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-bindings/does-not-exist",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "unbound sources cannot move to an unknown organization",
+      "request": {
+        "method": "PATCH",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "does-not-exist",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true,
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "source IDs cannot collide",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "operator source is read only",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/operator-feed/disable",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "operator source cannot be deleted",
+      "request": {
+        "method": "DELETE",
+        "path": "/settings/data-sources/operator-feed",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "operator impact is never deletable",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources/operator-feed/impact",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "inspect managed source",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "source can be tested without an upstream request",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {}
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "push tests reject query parameters",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "params": {
+            "unexpected": true
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "HTTP tests reject undeclared parameters before contacting upstream",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/operator-http/test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "operation": "status",
+          "params": {
+            "unknown": "x"
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "push tests reject a non-string operation",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "operation": 123
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "publish artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_admin}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "org": "connections-test",
+              "html": "<main>Connection lifecycle</main>",
+              "title": "Connection lifecycle"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "admin assigns artifact grants",
+      "request": {
+        "method": "PUT",
+        "path": "/settings/data-bindings/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "bindings": {
+            "feed": {
+              "source": "managed-push",
+              "operations": [
+                "latest"
+              ],
+              "subscriptions": [
+                "updates"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "inspect artifact grants",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-bindings/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "impact includes exact artifact",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources/managed-push/impact",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "in-use source deletion is blocked",
+      "request": {
+        "method": "DELETE",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "bound operations cannot be removed",
+      "request": {
+        "method": "PATCH",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {},
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true,
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "disable retains grants",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/disable",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "disabled sources still have bindings",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-bindings/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "stale version cannot override state",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/enable",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 409,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "re-enable connection",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/managed-push/enable",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 2
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "reject unknown source fields",
+      "request": {
+        "method": "PATCH",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            },
+            "unknown": "x"
+          },
+          "enabled": true,
+          "expected_version": 3
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "source ID is immutable",
+      "request": {
+        "method": "PATCH",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "other-id",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": true,
+          "expected_version": 3
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "enabled must be boolean",
+      "request": {
+        "method": "PATCH",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "managed-push",
+            "org": "connections-test",
+            "kind": "push",
+            "operations": {
+              "latest": {
+                "key": "summary"
+              }
+            },
+            "subscriptions": {
+              "updates": {
+                "transport": "push"
+              }
+            }
+          },
+          "enabled": "true",
+          "expected_version": 3
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "remove grants",
+      "request": {
+        "method": "PUT",
+        "path": "/settings/data-bindings/${artifact_id_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "bindings": {}
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "impact permits deletion after grants removed",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources/managed-push/impact",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "delete unused source",
+      "request": {
+        "method": "DELETE",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 3
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "deleted source is absent",
+      "request": {
+        "method": "GET",
+        "path": "/settings/data-sources/managed-push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing references can be persisted",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "missing-credential",
+            "org": "connections-test",
+            "kind": "http",
+            "base_url": "http://127.0.0.1:1",
+            "headers_env": {
+              "Authorization": "CONFORMANCE_MISSING_CREDENTIAL"
+            },
+            "operations": {
+              "status": {
+                "path": "/status"
+              }
+            },
+            "subscriptions": {}
+          },
+          "enabled": true
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "missing references make tests unavailable",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources/missing-credential/test",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "operation": "status",
+          "params": {}
+        }
+      },
+      "expect": {
+        "status": 502,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
+      "name": "delete unbound missing-reference source",
+      "request": {
+        "method": "DELETE",
+        "path": "/settings/data-sources/missing-credential",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "expected_version": 1
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "managed_sources_removed",
+        "query": "SELECT COUNT(*) AS count FROM data_sources"
+      },
+      {
+        "name": "grants_removed",
+        "query": "SELECT bindings FROM artifact_data_bindings WHERE artifact_id='${artifact_id_1}'"
+      },
+      {
+        "name": "source_audit",
+        "query": "SELECT tenant,operation,target_id,result FROM security_audit_events WHERE operation LIKE 'data_source.%' OR operation='data_bindings.update' ORDER BY sequence"
+      }
+    ]
+  }
+}

@@ -380,6 +380,11 @@ fn safe_name(method: &str, name: Option<&str>) -> &'static str {
         return "none";
     }
     match name {
+        Some("list_data_sources") => "list_data_sources",
+        Some("get_data_bindings") => "get_data_bindings",
+        Some("set_data_bindings") => "set_data_bindings",
+        Some("set_artifact_data") => "set_artifact_data",
+        Some("append_artifact_events") => "append_artifact_events",
         Some("publish_artifact") => "publish_artifact",
         Some("publish_bundle") => "publish_bundle",
         Some("list_artifacts") => "list_artifacts",

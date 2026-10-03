@@ -61,7 +61,8 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     portalScript: lastBlock(gallery, 'script'),
     shellCss: lastBlock(shell, 'style'),
     settingsCss: lastBlock(settingsHtml, 'style'),
-    settingsScript: lastBlock(settingsHtml, 'script'),
+    settingsScript: blocks(settingsHtml, 'script').at(-2),
+    connectionsScript: lastBlock(settingsHtml, 'script'),
     orgColor: portal.orgColor(input.meta.org, input.orgAccent),
     sandbox: match(shell, /sandbox="([^"]+)"/),
     shellSrc: match(shell, /id="vframe" src="([^"]+)"/),
@@ -459,9 +460,10 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
     assert_eq!(
         node["settingsCss"].as_str().expect("Node settings CSS"),
         format!(
-            "{}{}",
+            "{}{}{}",
             include_str!("../../assets/portal.css"),
-            include_str!("../../assets/settings.css")
+            include_str!("../../assets/settings.css"),
+            include_str!("../../assets/connections.css")
         )
     );
     assert_eq!(
@@ -469,6 +471,12 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             .as_str()
             .expect("Node settings script"),
         include_str!("../../assets/settings.js")
+    );
+    assert_eq!(
+        node["connectionsScript"]
+            .as_str()
+            .expect("Node connections script"),
+        include_str!("../../assets/connections.js")
     );
     assert_eq!(
         node["sandbox"],

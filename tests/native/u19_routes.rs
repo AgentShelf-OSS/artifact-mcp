@@ -949,6 +949,7 @@ fn feedback_row(meta: &ArtifactMeta) -> Feedback {
 
 fn deps(harness: Arc<RouteHarness>) -> AppDeps {
     AppDeps {
+        data: Arc::new(artifact_mcp::data::DataBroker::empty()),
         publisher_auth: harness.clone(),
         viewer_identity: harness.clone(),
         artifacts: harness.clone(),

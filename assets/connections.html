@@ -1,0 +1,43 @@
+<section class="workspace" id="connections-workspace" data-workspace="connections" role="tabpanel" hidden>
+  <div class="workspace-heading"><div><p class="detail-kicker">Connections</p><h2>Keep artifacts connected</h2><p>Manage API operations, event streams and incoming producer data.</p></div><a class="secondary-button conn-permalink" href="/settings/connections">Open Connections</a></div>
+  <div class="conn-layout">
+    <aside class="org-directory conn-directory" aria-label="Connections">
+      <div class="directory-head">
+        <label class="field" for="conn-org-filter"><span>Organization</span><select id="conn-org-filter"><option value="">All organizations</option></select></label>
+        <label class="search-field" for="conn-search"><span aria-hidden="true">⌕</span><input id="conn-search" type="search" placeholder="Find a connection" autocomplete="off"></label>
+        <button class="new-org-trigger" id="conn-new" type="button">New connection</button>
+      </div>
+      <div class="org-list" id="conn-list" aria-live="polite"><p class="directory-empty">Loading connections…</p></div>
+      <button class="secondary-button conn-refresh" id="conn-refresh" type="button">Refresh health</button>
+    </aside>
+    <div class="conn-detail-region">
+      <p class="conn-status" id="conn-status" role="status" aria-live="polite"></p>
+      <p class="conn-error" id="conn-error" role="alert" hidden></p>
+      <section class="empty-detail" id="conn-empty"><p class="detail-kicker">Live data</p><h2>Select a connection</h2><p>Choose a source to inspect its health, configuration and connected artifacts.</p></section>
+      <article class="org-detail conn-detail" id="conn-detail" hidden>
+        <header class="detail-head"><div><p class="detail-kicker" id="conn-origin"></p><h2 id="conn-title">New connection</h2><p id="conn-description"></p></div><button class="secondary-button" id="conn-toggle" type="button" hidden>Disable connection</button></header>
+        <div class="conn-health" id="conn-health" hidden></div>
+        <p class="conn-notice" id="conn-notice" hidden></p>
+        <div class="conn-notice" id="conn-stale" role="alert" hidden><p>This connection changed in another session. Reload before changing it. Reloading discards unsaved edits.</p><button class="secondary-button" id="conn-reload" type="button">Reload connection</button></div>
+        <form id="conn-form">
+          <fieldset id="conn-config">
+            <section class="conn-section"><h3>Source</h3><div class="field-grid">
+              <div class="field"><label for="conn-id">Connection ID</label><input id="conn-id" name="id" maxlength="64" pattern="[A-Za-z0-9._\-]+" placeholder="metrics-api" required autocomplete="off"><small>Stable name used by artifact bindings.</small></div>
+              <div class="field"><label for="conn-org">Organization</label><select id="conn-org" name="org" required></select><small>Artifacts can use sources in their own organization.</small></div>
+              <div class="field"><label for="conn-kind">Source type</label><select id="conn-kind" name="kind"><option value="http">HTTP API</option><option value="push">Producer channel</option></select><small>Producer channels receive snapshots and events.</small></div>
+            </div><div class="field conn-url-field" id="conn-url-field"><label for="conn-url">Base URL</label><input id="conn-url" name="base_url" type="url" placeholder="https://api.example.com" autocomplete="off"><small>Operations use paths below this URL. Redirects are refused.</small></div>
+            <label class="conn-check"><input id="conn-enabled" type="checkbox" checked> Enabled</label>
+          </section>
+          <section class="conn-section" id="conn-credentials"><div class="conn-section-head"><div><h3>Credential references</h3><p>Use environment variables already provided to the server. Credential values stay in deployment configuration.</p></div><button class="secondary-button" type="button" id="conn-add-header">Add reference</button></div><div id="conn-headers"></div></section>
+          <section class="conn-section"><div class="conn-section-head"><div><h3>Named operations</h3><p>Each name grants one configured query or producer snapshot key.</p></div><button class="secondary-button" type="button" id="conn-add-operation">Add operation</button></div><div id="conn-operations"></div></section>
+          <section class="conn-section"><div class="conn-section-head"><div><h3>Subscriptions</h3><p>Deliver selected events, poll an operation, or receive producer events.</p></div><button class="secondary-button" type="button" id="conn-add-subscription">Add subscription</button></div><div id="conn-subscriptions"></div></section>
+          <div class="conn-save"><p id="conn-save-impact"></p><button class="primary-button" id="conn-save" type="submit">Save connection</button></div>
+          </fieldset>
+        </form>
+        <section class="conn-section" id="conn-test-section" hidden><div class="conn-section-head"><div><h3>Test this connection</h3><p>Run a bounded, read-only check. Results contain timing and response metadata.</p></div></div><form id="conn-test-form"><div class="conn-test-fields"><div class="field"><label for="conn-test-operation">Operation</label><select id="conn-test-operation"></select></div><div id="conn-test-params"></div><button class="secondary-button" id="conn-test" type="submit">Test connection</button></div></form><p id="conn-test-result" class="conn-test-result" role="status" aria-live="polite"></p></section>
+        <section class="conn-section" id="conn-impact-section" hidden><div class="conn-section-head"><div><h3>Connected artifacts</h3><p>Review the exact affected artifacts before changing this connection.</p></div></div><div id="conn-artifacts"></div><div class="conn-delete-area"><p id="conn-delete-help"></p><button class="secondary-button conn-danger" id="conn-delete" type="button">Delete connection</button></div></section>
+      </article>
+    </div>
+  </div>
+  <dialog id="conn-binding-dialog" class="conn-dialog"><form id="conn-binding-form"><header class="conn-section-head"><div><p class="detail-kicker">Artifact bindings</p><h2 id="conn-binding-title"></h2></div><button class="secondary-button" type="button" id="conn-binding-close" aria-label="Close binding editor">Close</button></header><p>Changes to a binding clear its producer snapshots and events. Unchanged bindings keep their data.</p><div id="conn-bindings"></div><button class="secondary-button" id="conn-add-binding" type="button">Add binding</button><p id="conn-binding-error" class="conn-error" role="alert"></p><div class="form-actions"><button class="primary-button" id="conn-binding-save" type="submit">Save bindings</button></div></form></dialog>
+</section>

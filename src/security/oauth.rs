@@ -291,8 +291,11 @@ pub fn required_scope(method: &str, name: Option<&str>) -> Option<&'static str> 
         "tools/call" => match name {
             Some(
                 "list_artifacts" | "read_artifact" | "list_categories" | "list_revisions"
-                | "list_shares" | "artifact_stats",
+                | "list_shares" | "artifact_stats" | "list_data_sources" | "get_data_bindings",
             ) => Some(SCOPE_READ),
+            Some("set_data_bindings" | "set_artifact_data" | "append_artifact_events") => {
+                Some(SCOPE_PUBLISH)
+            }
             Some(
                 "publish_artifact"
                 | "publish_bundle"

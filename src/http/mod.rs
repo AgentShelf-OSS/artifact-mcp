@@ -20,6 +20,7 @@ pub(crate) fn router() -> Router<AppDeps> {
         .merge(routes::raw::router())
         .merge(routes::feedback::router())
         .merge(routes::state::router())
+        .merge(routes::data::router())
         .merge(routes::speech::router())
         .merge(routes::artifact::router())
         .merge(routes::gallery::router())

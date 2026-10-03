@@ -1,0 +1,542 @@
+{
+  "steps": [
+    {
+      "status": 200
+    },
+    {
+      "status": 403
+    },
+    {
+      "status": 403
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifact_count": 0,
+          "definition": "<volatile>",
+          "enabled": true,
+          "health": {
+            "error": null,
+            "last_event_at": "<volatile>",
+            "last_query_at": "<volatile>",
+            "last_success_at": "<volatile>",
+            "retry_count": 0,
+            "state": "idle"
+          },
+          "id": "managed-push",
+          "missing_references": [],
+          "org": "connections-test",
+          "origin": "managed",
+          "version": 1
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "unknown_org",
+          "message": "The selected organization does not exist."
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "source_conflict",
+          "message": "A connection with this id already exists."
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "operator_read_only",
+          "message": "Operator connections are read-only."
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "operator_read_only",
+          "message": "Operator connections are read-only."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifacts": [],
+          "can_delete": false
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifact_count": 0,
+          "definition": "<volatile>",
+          "enabled": true,
+          "health": {
+            "error": null,
+            "last_event_at": "<volatile>",
+            "last_query_at": "<volatile>",
+            "last_success_at": "<volatile>",
+            "retry_count": 0,
+            "state": "idle"
+          },
+          "id": "managed-push",
+          "missing_references": [],
+          "org": "connections-test",
+          "origin": "managed",
+          "version": 1
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "elapsed_ms": "<volatile>",
+          "error": null,
+          "ok": true,
+          "source_id": "managed-push",
+          "summary": {
+            "kind": "push"
+          }
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params",
+          "message": "Request parameters are invalid."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params",
+          "message": "Request parameters are invalid."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params",
+          "message": "Request parameters are invalid."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"connections-test\",\"bytes\":33,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 33,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "connections-test",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "bindings": {
+            "feed": {
+              "operations": [
+                "latest"
+              ],
+              "source": "managed-push",
+              "subscriptions": [
+                "updates"
+              ]
+            }
+          },
+          "id": "${artifact_id_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "bindings": {
+            "feed": {
+              "operations": [
+                "latest"
+              ],
+              "source": "managed-push",
+              "subscriptions": [
+                "updates"
+              ]
+            }
+          },
+          "id": "${artifact_id_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifacts": [
+            {
+              "bindings": [
+                {
+                  "name": "feed",
+                  "operations": [
+                    "latest"
+                  ],
+                  "subscriptions": [
+                    "updates"
+                  ]
+                }
+              ],
+              "id": "${artifact_id_1}",
+              "org": "connections-test",
+              "title": "Connection lifecycle",
+              "url": "/${artifact_id_1}"
+            }
+          ],
+          "can_delete": false
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "source_in_use",
+          "message": "Remove all artifact bindings before deleting this connection."
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "binding_in_use",
+          "message": "Remove or migrate the affected bindings first."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifact_count": 1,
+          "definition": "<volatile>",
+          "enabled": false,
+          "health": {
+            "error": null,
+            "last_event_at": "<volatile>",
+            "last_query_at": "<volatile>",
+            "last_success_at": "<volatile>",
+            "retry_count": 0,
+            "state": "disabled"
+          },
+          "id": "managed-push",
+          "missing_references": [],
+          "org": "connections-test",
+          "origin": "managed",
+          "version": 2
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "bindings": {
+            "feed": {
+              "operations": [
+                "latest"
+              ],
+              "source": "managed-push",
+              "subscriptions": [
+                "updates"
+              ]
+            }
+          },
+          "id": "${artifact_id_1}"
+        }
+      }
+    },
+    {
+      "status": 409,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "stale_version",
+          "message": "Connection changed; reload before saving."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifact_count": 1,
+          "definition": "<volatile>",
+          "enabled": true,
+          "health": {
+            "error": null,
+            "last_event_at": "<volatile>",
+            "last_query_at": "<volatile>",
+            "last_success_at": "<volatile>",
+            "retry_count": 0,
+            "state": "connected"
+          },
+          "id": "managed-push",
+          "missing_references": [],
+          "org": "connections-test",
+          "origin": "managed",
+          "version": 3
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_source",
+          "message": "The connection definition is invalid."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_source",
+          "message": "The connection definition is invalid."
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params",
+          "message": "Request parameters are invalid."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "bindings": {},
+          "id": "${artifact_id_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifacts": [],
+          "can_delete": true
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "deleted": true,
+          "id": "managed-push"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "Connection not found."
+        }
+      }
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifact_count": 0,
+          "definition": "<volatile>",
+          "enabled": true,
+          "health": {
+            "error": null,
+            "last_event_at": "<volatile>",
+            "last_query_at": "<volatile>",
+            "last_success_at": "<volatile>",
+            "retry_count": 0,
+            "state": "config_error"
+          },
+          "id": "missing-credential",
+          "missing_references": [
+            "CONFORMANCE_MISSING_CREDENTIAL"
+          ],
+          "org": "connections-test",
+          "origin": "managed",
+          "version": 1
+        }
+      }
+    },
+    {
+      "status": 502,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "test_unavailable",
+          "message": "The connection could not be tested."
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "deleted": true,
+          "id": "missing-credential"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "managed_sources_removed": [
+        {
+          "count": 0
+        }
+      ],
+      "grants_removed": [
+        {
+          "bindings": "{\"bindings\":{}}"
+        }
+      ],
+      "source_audit": [
+        {
+          "operation": "data_source.create",
+          "result": "success",
+          "target_id": "managed-push",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.test",
+          "result": "success",
+          "target_id": "managed-push",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_bindings.update",
+          "result": "success",
+          "target_id": "${artifact_id_1}",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.disable",
+          "result": "success",
+          "target_id": "managed-push",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.enable",
+          "result": "success",
+          "target_id": "managed-push",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_bindings.update",
+          "result": "success",
+          "target_id": "${artifact_id_1}",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.delete",
+          "result": "success",
+          "target_id": "managed-push",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.create",
+          "result": "success",
+          "target_id": "missing-credential",
+          "tenant": "connections-test"
+        },
+        {
+          "operation": "data_source.delete",
+          "result": "success",
+          "target_id": "missing-credential",
+          "tenant": "connections-test"
+        }
+      ]
+    }
+  }
+}

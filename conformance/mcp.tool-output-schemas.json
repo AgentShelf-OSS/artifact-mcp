@@ -234,6 +234,31 @@
       "truncated"
     ]
   },
+  "list_data_sources": {
+    "type": "object",
+    "properties": { "sources": { "type": "array", "items": { "type": "object" } } },
+    "required": ["sources"]
+  },
+  "get_data_bindings": {
+    "type": "object",
+    "properties": { "id": { "type": "string" }, "bindings": { "type": "object" } },
+    "required": ["id", "bindings"]
+  },
+  "set_data_bindings": {
+    "type": "object",
+    "properties": { "id": { "type": "string" }, "bindings": { "type": "object" } },
+    "required": ["id", "bindings"]
+  },
+  "set_artifact_data": {
+    "type": "object",
+    "properties": { "id": { "type": "string" }, "revision": { "type": "integer" } },
+    "required": ["id", "revision"]
+  },
+  "append_artifact_events": {
+    "type": "object",
+    "properties": { "id": { "type": "string" }, "accepted": { "type": "integer" }, "duplicates": { "type": "integer" } },
+    "required": ["id", "accepted", "duplicates"]
+  },
   "patch_artifact": {
     "type": "object",
     "properties": {

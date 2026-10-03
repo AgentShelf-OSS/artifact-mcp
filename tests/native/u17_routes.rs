@@ -995,6 +995,7 @@ fn deps(fake: &Fake) -> AppDeps {
 fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
     let fake = Arc::new(fake.clone());
     AppDeps {
+        data: Arc::new(artifact_mcp::data::DataBroker::empty()),
         publisher_auth: fake.clone(),
         viewer_identity: fake.clone(),
         artifacts: fake.clone(),

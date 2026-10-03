@@ -554,8 +554,9 @@ fn mcp_cost(method: &str, name: Option<&str>) -> McpCost {
                 | "regenerate_artifact_preview",
             ) => McpCost::Mutation,
             Some(
-                "list_artifacts" | "read_artifact" | "list_categories" | "list_revisions"
-                | "list_shares" | "artifact_stats" | "list_feedback",
+                "list_data_sources" | "get_data_bindings" | "list_artifacts" | "read_artifact"
+                | "list_categories" | "list_revisions" | "list_shares" | "artifact_stats"
+                | "list_feedback",
             ) => McpCost::Read,
             // An unrecognised tool may be added by a newer server. Reserve mutation capacity
             // until its semantics are explicitly classified rather than silently admitting a

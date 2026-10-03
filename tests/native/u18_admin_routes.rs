@@ -116,6 +116,7 @@ impl Harness {
             Arc::new(artifact_mcp::security::audit::AuditAccess::new(pool, key))
         });
         AppDeps {
+            data: Arc::new(artifact_mcp::data::DataBroker::empty()),
             publisher_auth: self.clone(),
             viewer_identity: self.clone(),
             artifacts: self.clone(),

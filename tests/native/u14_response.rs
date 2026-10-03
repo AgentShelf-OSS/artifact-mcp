@@ -3,8 +3,8 @@ use artifact_mcp::{
     http::{
         artifact_response::{
             ANCHOR_BRIDGE, ArtifactResponseOptions, DOCUMENT_SANDBOX, RawCachePolicy,
-            artifact_response, download_name, inject_anchor_bridge, raw_artifact_headers,
-            strip_scripts,
+            artifact_response, download_name, inject_anchor_bridge, inject_data_client,
+            raw_artifact_headers, strip_scripts,
         },
         middleware::{append_no_transform, mcp_body_limit, prevent_response_transforms, weak_etag},
     },
@@ -86,10 +86,10 @@ fn raw_anchor_bridge_golden_freezes_the_current_injected_bridge_bytes() {
         "../../conformance/goldens/raw.anchor-bridge.json"
     ))
     .expect("valid raw anchor-bridge golden");
-    let body = String::from_utf8(inject_anchor_bridge(
+    let body = String::from_utf8(inject_data_client(&inject_anchor_bridge(
         b"<!doctype html><html><body><p>anchor me</p></body></html>",
         None,
-    ))
+    )))
     .expect("injected bridge remains UTF-8");
 
     assert_eq!(golden["steps"][2]["body"]["data"], body);

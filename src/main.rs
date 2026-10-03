@@ -1960,6 +1960,7 @@ async fn bootstrap(
     observer: Arc<dyn StartupObserver>,
 ) -> Result<Bootstrapped, RuntimeError> {
     assert_ready(&config)?;
+    let data_broker = artifact_mcp::data::DataBroker::from_env().map_err(AppError::Validation)?;
     let config = Arc::new(config);
     let protection = Arc::new(WebhookUrlProtection::from_config_key(
         config.webhook_enc_key.as_ref(),
@@ -1999,6 +2000,14 @@ async fn bootstrap(
     let audit_key = parse_hmac_key(
         config.audit_ledger_hmac_key.as_ref().ok_or_else(|| AppError::Validation("AUDIT_LEDGER_HMAC_KEY is required; refusing to start without a tamper-evident audit ledger".to_owned()))?.expose(),
     )?;
+    let data = Arc::new(
+        data_broker
+            .with_pool(pool.clone())
+            .with_audit_key(audit_key),
+    );
+    data.validate_registry()
+        .await
+        .map_err(AppError::Validation)?;
     let seeded = seed_configured_keys(&pool, config.seed_keys.clone(), audit_key).await?;
     tracing::info!(seeded_keys = seeded, "publisher key seed complete");
     let key_store = KeyStore::new(pool.clone());
@@ -2206,6 +2215,7 @@ async fn bootstrap(
     let host = config.listen_host.clone();
     let port = config.port;
     let deps = AppDeps {
+        data,
         publisher_auth,
         viewer_identity,
         artifacts,

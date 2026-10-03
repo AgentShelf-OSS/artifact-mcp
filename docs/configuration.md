@@ -9,6 +9,11 @@ the additional values required behind Cloudflare Access.
 
 ## Publishing credentials
 
+Set `ARTIFACT_DATA_SOURCES_FILE` to an operator-owned JSON file to enable named live-data sources.
+An unset value leaves sources disabled. Invalid configuration prevents startup. The file contains
+source definitions and references to credential environment variables, never resolved credentials.
+See [live-data setup](live-data.md) and the [PR Watch example](../ops/data-sources.pr-watch.example.json).
+
 | Variable | Purpose |
 |---|---|
 | `ARTIFACT_API_KEYS` | Bootstrap keys in comma-separated `clientId:org:secret` form. SQLite becomes authoritative after the first boot. |
@@ -235,3 +240,12 @@ E-reader paragraphs are split at sentence boundaries where supported, with a
 bounded one-paragraph prefetch to reduce gaps between paragraphs. The player’s
 Preview paragraph control uses the same current paragraph for quick voice and
 style comparisons.
+
+### Managed live-data connections
+
+Administrators can manage additional sources at `/settings/connections`. These definitions
+are stored in SQLite and load on startup. `ARTIFACT_DATA_SOURCES_FILE` still defines
+operator-owned sources, which appear read-only. Source IDs must be unique across both
+origins. Credential values remain environment configuration; administration stores only
+`headers_env` reference names. See [connection management](live-data.md#manage-connections-in-administration)
+for edits, health checks, binding impact, and API contracts.

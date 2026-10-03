@@ -452,6 +452,11 @@ async fn call_tool(
     let arguments = &call.arguments;
 
     let result = match name {
+        "list_data_sources" => list_data_sources(arguments, auth, deps).await,
+        "get_data_bindings" => data_bindings(arguments, auth, deps, false).await,
+        "set_data_bindings" => data_bindings(arguments, auth, deps, true).await,
+        "set_artifact_data" => set_artifact_data(arguments, auth, deps).await,
+        "append_artifact_events" => append_artifact_events(arguments, auth, deps).await,
         "publish_artifact" => publish_artifact(arguments, auth, deps).await,
         "publish_bundle" => publish_bundle(arguments, auth, deps).await,
         "list_artifacts" => list_artifacts(auth, deps).await,
@@ -488,6 +493,113 @@ async fn call_tool(
     }
     validate_tool_output(name, &result)?;
     Ok(result)
+}
+
+async fn list_data_sources(
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let requested = arguments.get("org").and_then(OrderedJson::as_str);
+    let org = if auth.is_admin() {
+        requested
+    } else {
+        Some(auth.org.0.as_str())
+    };
+    let value = serde_json::to_value(deps.data.public_sources(org).await)
+        .map_err(|_| JsonRpcError::Internal("data serialization failed".into()))?;
+    tool_result(
+        object! { "sources" => serde_json::from_value(value).unwrap_or_else(|_| OrderedJson::Array(vec![])) },
+    )
+}
+
+async fn data_bindings(
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+    write: bool,
+) -> Result<Value, McpError> {
+    let id = required_string(arguments, "id")?;
+    let authorized = if write {
+        publisher_write(id, auth, deps).await?.into_authorized()
+    } else {
+        publisher_read(id, auth, deps).await?.into_authorized()
+    };
+    if !write {
+        let manifest = deps
+            .data
+            .try_bindings(id)
+            .await
+            .map_err(AppError::Validation)?;
+        return tool_result(
+            object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
+        );
+    }
+    let raw = arguments
+        .get("bindings")
+        .cloned()
+        .ok_or_else(|| JsonRpcError::InvalidParams("bindings is required".into()))?;
+    let manifest: crate::data::BindingManifest =
+        serde_json::from_value(serde_json::json!({"bindings": serde_json::to_value(raw).unwrap()}))
+            .map_err(|_| AppError::Validation("bad_params".into()))?;
+    deps.data
+        .set_bindings(id, manifest.clone(), &authorized.meta().org.0)
+        .await
+        .map_err(AppError::Validation)?;
+    tool_result(
+        object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
+    )
+}
+
+async fn set_artifact_data(
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let id = required_string(arguments, "id")?;
+    let owned = publisher_write(id, auth, deps).await?;
+    let binding = required_string(arguments, "binding")?;
+    let key = required_string(arguments, "key")?;
+    let value = arguments
+        .get("value")
+        .cloned()
+        .ok_or_else(|| JsonRpcError::InvalidParams("value is required".into()))?;
+    let revision = deps
+        .data
+        .set_snapshot(id, binding, key, serde_json::to_value(value).unwrap())
+        .await
+        .map_err(AppError::Validation)?;
+    let _ = owned;
+    tool_result(
+        object! {"id"=>OrderedJson::string(id),"revision"=>OrderedJson::number_u64(revision)},
+    )
+}
+
+async fn append_artifact_events(
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let id = required_string(arguments, "id")?;
+    let owned = publisher_write(id, auth, deps).await?;
+    let binding = required_string(arguments, "binding")?;
+    let sub = required_string(arguments, "subscription")?;
+    let raw = arguments
+        .get("events")
+        .cloned()
+        .ok_or_else(|| JsonRpcError::InvalidParams("events is required".into()))?;
+    let events: Vec<crate::data::Event> =
+        serde_json::from_value(serde_json::to_value(raw).unwrap())
+            .map_err(|_| AppError::Validation("bad_params".into()))?;
+    let (accepted, duplicates) = deps
+        .data
+        .append_events(id, binding, sub, events)
+        .await
+        .map_err(AppError::Validation)?;
+    let _ = owned;
+    tool_result(
+        object! {"id"=>OrderedJson::string(id),"accepted"=>OrderedJson::number_u64(accepted as u64),"duplicates"=>OrderedJson::number_u64(duplicates as u64)},
+    )
 }
 
 fn validate_tool_output(name: &str, result: &Value) -> Result<(), McpError> {

@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 34;
+pub const LATEST_SCHEMA_VERSION: i64 = 36;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -261,6 +261,16 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 34,
         name: "viewer-state-scope-and-member-display-name",
         up: m034_viewer_state_scope,
+    },
+    Migration {
+        version: 35,
+        name: "artifact-data-bindings",
+        up: m035_artifact_data_bindings,
+    },
+    Migration {
+        version: 36,
+        name: "managed-data-sources",
+        up: m036_managed_data_sources,
     },
 ];
 
@@ -1784,6 +1794,58 @@ pub fn encrypt_plaintext_webhook_urls(
 fn internal(error: impl Display) -> AppError {
     tracing::error!(error = %error, "webhook url conversion failed");
     AppError::Internal
+}
+
+fn m035_artifact_data_bindings(
+    tx: &Transaction<'_>,
+    _ctx: &MigrationContext,
+) -> rusqlite::Result<()> {
+    tx.execute_batch(
+        "\
+      CREATE TABLE IF NOT EXISTS artifact_data_bindings (
+        artifact_id TEXT PRIMARY KEY REFERENCES artifacts(id) ON DELETE CASCADE,
+        org TEXT NOT NULL,
+        bindings TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      );
+      CREATE TABLE IF NOT EXISTS artifact_data_snapshots (
+        artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE,
+        binding TEXT NOT NULL, key TEXT NOT NULL,
+        value TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (artifact_id, binding, key)
+      );
+      CREATE TABLE IF NOT EXISTS artifact_data_events (
+        artifact_id TEXT NOT NULL REFERENCES artifacts(id) ON DELETE CASCADE, binding TEXT NOT NULL, subscription TEXT NOT NULL,
+        event_id TEXT NOT NULL, event_name TEXT NOT NULL, data TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (artifact_id, binding, subscription, event_id)
+      );
+      ",
+    )
+}
+
+/// Persistent administrator-managed source definitions. Operator-file sources remain outside
+/// SQLite and are merged by the runtime registry. The definition contains references such as
+/// environment-variable names only; resolved credential values never enter this table.
+fn m036_managed_data_sources(
+    tx: &Transaction<'_>,
+    _ctx: &MigrationContext,
+) -> rusqlite::Result<()> {
+    tx.execute_batch(
+        "
+      CREATE TABLE IF NOT EXISTS data_sources (
+        id         TEXT PRIMARY KEY,
+        org        TEXT NOT NULL,
+        definition TEXT NOT NULL,
+        enabled    INTEGER NOT NULL DEFAULT 1 CHECK (enabled IN (0, 1)),
+        version    INTEGER NOT NULL DEFAULT 1 CHECK (version >= 1),
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+      CREATE INDEX IF NOT EXISTS data_sources_org_id_idx ON data_sources(org, id);
+        ",
+    )
 }
 
 #[cfg(test)]
