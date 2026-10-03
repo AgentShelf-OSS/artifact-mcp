@@ -1,0 +1,715 @@
+{
+  "id": "live-data.push",
+  "tags": [
+    "live-data",
+    "mcp",
+    "tenant",
+    "roles"
+  ],
+  "fixture": "empty-v21",
+  "note": "The real HTTP and MCP implementations verify source discovery, binding grants, producer idempotency, validated viewer queries and role gates. Data writes must preserve HTML revision history.",
+  "dataSources": {
+    "sources": [
+      {
+        "id": "acme-push",
+        "org": "acme",
+        "kind": "push",
+        "operations": {
+          "latest": {
+            "key": "summary"
+          }
+        },
+        "subscriptions": {
+          "events": {
+            "transport": "push"
+          }
+        }
+      },
+      {
+        "id": "beta-push",
+        "org": "beta",
+        "kind": "push",
+        "operations": {
+          "latest": {
+            "key": "summary"
+          }
+        },
+        "subscriptions": {
+          "events": {
+            "transport": "push"
+          }
+        }
+      }
+    ]
+  },
+  "steps": [
+    {
+      "name": "publisher discovers only its organization sources",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "list_data_sources",
+            "arguments": {}
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "admin filters source discovery by organization",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_admin}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "list_data_sources",
+            "arguments": {
+              "org": "beta"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "publish HTML once",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>Live data</p>",
+              "title": "Live data"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "attach validated live binding",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "set_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "bindings": {
+                "reviews": {
+                  "source": "acme-push",
+                  "operations": [
+                    "latest"
+                  ],
+                  "subscriptions": [
+                    "events"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "read binding manifest",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "get_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "another author cannot read bindings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "get_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "Permission denied: this API key cannot read this artifact"
+      },
+      "afterSql": [
+        "UPDATE api_keys SET role='reader' WHERE client_id='${client_acme2}'"
+      ]
+    },
+    {
+      "name": "reader can read organization bindings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "get_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "reader cannot replace bindings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "set_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "bindings": {
+                "reviews": {
+                  "source": "acme-push",
+                  "operations": [
+                    "latest"
+                  ],
+                  "subscriptions": [
+                    "events"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "Permission denied: this API key cannot modify this artifact"
+      }
+    },
+    {
+      "name": "reader cannot push snapshot",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 9,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_data",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "key": "summary",
+              "value": {}
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "Permission denied: this API key cannot modify this artifact"
+      }
+    },
+    {
+      "name": "cross organization producer is refused",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 10,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_data",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "key": "summary",
+              "value": {}
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "Unknown artifact: ${artifact_id_1}"
+      }
+    },
+    {
+      "name": "cross organization source is refused",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 11,
+          "method": "tools/call",
+          "params": {
+            "name": "set_data_bindings",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "bindings": {
+                "reviews": {
+                  "source": "beta-push"
+                }
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "bad_params"
+      }
+    },
+    {
+      "name": "snapshot key differs from operation name",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 12,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_data",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "key": "summary",
+              "value": {
+                "version": 1
+              }
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "authorized viewer reads snapshot",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/data/query",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "binding": "reviews",
+          "operation": "latest"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "viewer parameters cannot select arbitrary destination",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/data/query",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "binding": "reviews",
+          "operation": "latest",
+          "params": {
+            "url": "https://example.test"
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "query rejects extra fields",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/data/query",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "binding": "reviews",
+          "operation": "latest",
+          "url": "https://example.test"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "another organization cannot read snapshot",
+      "request": {
+        "method": "POST",
+        "path": "/${artifact_id_1}/data/query",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "binding": "reviews",
+          "operation": "latest"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "signed out viewer cannot read manifest",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/data",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "authorized viewer reads manifest",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/data",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "producer appends event",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 19,
+          "method": "tools/call",
+          "params": {
+            "name": "append_artifact_events",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "subscription": "events",
+              "events": [
+                {
+                  "id": "first",
+                  "event": "deployment",
+                  "data": {
+                    "version": 1
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "producer retry is idempotent",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 20,
+          "method": "tools/call",
+          "params": {
+            "name": "append_artifact_events",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "subscription": "events",
+              "events": [
+                {
+                  "id": "first",
+                  "event": "deployment",
+                  "data": {
+                    "version": 1
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "invalid batch does not partially append",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 21,
+          "method": "tools/call",
+          "params": {
+            "name": "append_artifact_events",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "subscription": "events",
+              "events": [
+                {
+                  "id": "valid",
+                  "event": "deployment",
+                  "data": {}
+                },
+                {
+                  "id": "invalid\n",
+                  "event": "deployment",
+                  "data": {}
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "bad_params"
+      }
+    },
+    {
+      "name": "reader cannot append events",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 22,
+          "method": "tools/call",
+          "params": {
+            "name": "append_artifact_events",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "binding": "reviews",
+              "subscription": "events",
+              "events": [
+                {
+                  "id": "first",
+                  "event": "deployment",
+                  "data": {
+                    "version": 1
+                  }
+                }
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "mcpError": "Permission denied: this API key cannot modify this artifact"
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "independent_data",
+        "query": "SELECT a.revision, (SELECT COUNT(*) FROM artifact_revisions WHERE artifact_id=a.id) AS html_history, (SELECT COUNT(*) FROM artifact_data_events WHERE artifact_id=a.id) AS events, (SELECT revision FROM artifact_data_snapshots WHERE artifact_id=a.id) AS snapshot_revision FROM artifacts a WHERE id='${artifact_id_1}'"
+      }
+    ]
+  }
+}

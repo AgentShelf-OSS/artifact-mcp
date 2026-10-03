@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { rawArtifactHeaders, injectAnchorBridge, ANCHOR_BRIDGE_MARKER, ANCHOR_BRIDGE } from "../lib/artifact-http.js";
+import { rawArtifactHeaders, injectAnchorBridge, injectDataClient, ANCHOR_BRIDGE_MARKER, ANCHOR_BRIDGE } from "../lib/artifact-http.js";
 
 const ARTIFACT_CSP = "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:";
 
@@ -205,7 +205,7 @@ test("anchor bridge does not mistake another origin's raw-looking URL for an in-
 
 test("raw anchor-bridge golden freezes the current injected bridge bytes", () => {
   const golden = JSON.parse(readFileSync("conformance/goldens/raw.anchor-bridge.json", "utf8"));
-  const body = injectAnchorBridge("<!doctype html><html><body><p>anchor me</p></body></html>");
+  const body = injectDataClient(injectAnchorBridge("<!doctype html><html><body><p>anchor me</p></body></html>"));
   const expectedEtag = 'W/"' + Buffer.byteLength(body).toString(16) + "-" +
     createHash("sha1").update(body).digest("base64").replace(/=$/, "") + '"';
 

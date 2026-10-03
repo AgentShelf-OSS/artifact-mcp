@@ -23,6 +23,11 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Reaction** — a viewer’s favorite flag and sentiment vote (`-1`, `0`, or `1`) for an artifact.
 - **Gallery** — the organization-scoped artifact index.
 - **Viewer shell** — trusted application chrome around a sandboxed raw artifact.
+- **Data source**: An API or producer channel belonging to one organization. It exposes named operations and subscriptions while keeping connection settings and credentials on the server.
+- **Managed connection**: A data source whose configuration an administrator maintains in the Connections workspace.
+- **Operator connection**: A data source whose configuration the deployment operator maintains. Administrators can inspect it but cannot change it in the Connections workspace.
+- **Artifact binding**: An artifact's named grant to selected operations and subscriptions from a data source. One artifact can bind several sources.
+- **Live data**: Runtime JSON snapshots and events delivered through the viewer shell. Its lifetime is separate from artifact HTML revisions and viewer state.
 - **Viewer state**: JSON values belonging to an artifact in a chosen viewer state scope. State survives artifact revisions. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
 - **Viewer state scope**: The audience for a state key. `org` shares the value with viewers who can access the artifact and is the default. `viewer` restricts the value to the authenticated person who owns it, including when that person is an administrator.
 - **Viewer handle**: An opaque, stable viewer ID and a display name that an artifact can use for attribution. A handle does not grant access to another viewer's private state.
@@ -42,6 +47,7 @@ The application is a dependency-light modular monolith: one server process, one 
 9. Persistent data, secrets, repository metadata, and local planning files are excluded from Docker build contexts.
 10. Artifact code never receives a network capability; viewer state crosses the sandbox only through the shell bridge.
 11. Viewer-scope rows are readable and writable only by their owner; the bridge exposes a viewer handle, never an email. Administrators have no cross-viewer access to this scope.
+12. Live-data bindings can reference only sources belonging to the artifact's organization. Artifact code cannot select upstream URLs, headers, or credentials. Raw, historical, and public-share representations have no live-data capability.
 
 ## Trust model
 

@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark"><link rel="icon" href="{{ favicon }}"><title>Administration · {{ app_name }}</title>
-<script>{{ theme_boot }}</script><style>{{ portal_css }}{{ settings_css }}</style></head>
+<script>{{ theme_boot }}</script><style>{{ portal_css }}{{ settings_css }}{{ connections_css }}</style></head>
 <body>
 <a class="skip-link" href="#settings-content">Skip to administration</a>
 <div class="wrap">
@@ -19,6 +19,7 @@
       <button class="admin-tab" data-admin-tab="organizations" type="button" role="tab" aria-selected="true" aria-controls="organizations-workspace">Organizations <span>{{ organization_count }}</span></button>
       <button class="admin-tab" data-admin-tab="keys" type="button" role="tab" aria-selected="false" aria-controls="keys-workspace">Publisher keys <span>{{ active_count }}</span></button>
       <button class="admin-tab" data-admin-tab="notifications" type="button" role="tab" aria-selected="false" aria-controls="notifications-workspace">Notifications</button>
+      <button class="admin-tab" data-admin-tab="connections" type="button" role="tab" aria-selected="false" aria-controls="connections-workspace">Connections</button>
     </div>
 
     <section class="workspace organizations-workspace" id="organizations-workspace" data-workspace="organizations" role="tabpanel">
@@ -82,5 +83,6 @@
       </div>
       <section class="empty-detail" id="no-notification-detail"{% if !organizations.is_empty() %} hidden{% endif %}><p class="detail-kicker">Notifications</p><h2>No organization selected</h2><p>Create an organization before configuring delivery rules.</p><button class="primary-button" type="button" data-open-new-org>New organization</button></section>
     </section>
+    {{ connections_html }}
   </main><footer class="footer"><span>{{ app_name }} · Administration</span><span>Upload keys are stored hashed</span></footer>
-</div><script>{{ script }}</script></body></html>
+</div><script>{{ script }}</script><script>{{ connections_script }}</script></body></html>

@@ -23,6 +23,7 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 - Publish a self-contained HTML page or a multi-file bundle through MCP.
 - Update an artifact without changing its URL, with retained revision history and restore.
 - Persist org-shared notes and other JSON through the [viewer state bridge](GETTING_STARTED.md#persisting-state-from-an-artifact).
+- Connect artifacts to several APIs through [named live-data sources](docs/live-data.md), with JSON queries, polling, event streams, and producer updates through MCP. Manage saved sources and artifact bindings in the admin [Connections workspace](docs/live-data.md#manage-connections-in-administration).
 - Read HTML aloud from the viewer with optional [local narration](ops/tts/README.md), including
   a mini player, saved positions, and automatic chapter continuation for supported ereaders.
 - Search and organize artifacts by organization, category, owner, review state, and visibility.

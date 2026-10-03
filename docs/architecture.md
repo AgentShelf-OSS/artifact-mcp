@@ -34,6 +34,8 @@ The server separates three access paths:
 | `GET /metrics` | Prometheus request, outcome, latency, cancellation, and bounded result-size metrics. |
 | `GET /` | Organization-scoped gallery. Administrators can see all organizations. |
 | `GET /:id` | Trusted viewer shell around a sandboxed artifact iframe. |
+| `GET /:id/data`, `POST /:id/data/query` | Authorized live-data bindings and named JSON queries. |
+| `GET /:id/data/events` | One authorized SSE stream combining selected subscriptions from several bindings. |
 | `GET /thumbnails/:id?v=<body_sha256>` | Authenticated current-revision thumbnail or a no-store placeholder. |
 | `GET /raw/:id` and `GET /raw/:id/*` | Raw single-file or bundle delivery. `?anchor=1` injects the comment bridge, and `?download` forces an attachment. |
 | `GET /raw/:id/rev/:n/*` | Deliver a retained revision body or bundle path. |
@@ -48,7 +50,7 @@ The server separates three access paths:
 | `POST /:id/visibility` | Hide or show an artifact as its verified uploader or an administrator. |
 | `POST /:id/move` | Change category or organization. Organization moves require an administrator. |
 | `DELETE /:id` | Delete an artifact as its verified uploader or an administrator. |
-| `GET /settings` and `/settings/*` | Administrator management for organizations, members, categories, webhooks, and publisher keys. |
+| `GET /settings` and `/settings/*` | Administrator management for organizations, members, categories, webhooks, publisher keys, and live-data connections. |
 
 Bundle path handling rejects traversal, absolute paths, and configured size or file-count overages.
 
@@ -81,5 +83,12 @@ the [durability runbook](ops/durability.md).
 Read [CONTEXT.md](../CONTEXT.md) for domain language and module responsibilities. The decision
 records under [docs/adr](adr/) explain why the server uses a modular monolith, SQLite plus files,
 and a sandboxed null-origin artifact boundary.
+
+Live API connections run on the server through operator or administrator-managed data sources. The trusted shell
+uses first-party data routes and passes selected JSON values and events into the iframe. Bindings
+and producer data persist separately from HTML revisions. The Connections workspace stores managed
+source definitions in SQLite, applies changes to the affected adapters, and commits audit records
+with each mutation. File-defined sources stay read-only. See [live data](live-data.md) and
+[ADR-0009](adr/0009-live-data-via-named-sources-and-shell-broker.md).
 
 [Return to the documentation index](README.md).

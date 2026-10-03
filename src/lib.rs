@@ -5,6 +5,7 @@
 pub mod app;
 pub mod artifacts;
 pub mod config;
+pub mod data;
 pub mod error;
 pub mod http;
 pub mod integrations;

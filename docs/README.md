@@ -11,6 +11,8 @@ Use this index when you need the complete API, deployment, security, or maintena
   the operational procedures tied to encrypted webhooks and persistent previews.
 - [MCP API and tools](mcp-api.md) covers authentication, protocol negotiation, tools, resources,
   MCP Apps, and durable tasks.
+- [Live data and PR Watch](live-data.md) explains named API sources, multiple bindings, the
+  artifact data client, producer writes, connection administration, and dashboard publication.
 
 ## Product and design
 

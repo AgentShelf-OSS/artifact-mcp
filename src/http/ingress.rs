@@ -805,6 +805,7 @@ enum RequestClass {
     Probe,
     Share,
     Read,
+    Data,
     Mutation,
     Feedback,
     State,
@@ -818,6 +819,7 @@ impl RequestClass {
             Self::Probe => "probe",
             Self::Share => "share",
             Self::Read => "read",
+            Self::Data => "data_read",
             Self::Mutation => "mutation",
             Self::Feedback => "feedback",
             Self::State => "state",
@@ -853,6 +855,9 @@ fn classify(method: &Method, path: &str) -> RequestClass {
     if path == "/mcp" {
         return RequestClass::Mcp;
     }
+    if *method == Method::POST && path.split('/').count() == 4 && path.ends_with("/data/query") {
+        return RequestClass::Data;
+    }
     if path.contains("/feedback") {
         return RequestClass::Feedback;
     }
@@ -875,6 +880,7 @@ fn is_audit_route(path: &str) -> bool {
 
 fn body_limit(config: &BodyLimits, class: RequestClass) -> u64 {
     match class {
+        RequestClass::Data => 64 * 1024,
         RequestClass::Mcp => config.mcp_json,
         RequestClass::Admin => config.key_json,
         RequestClass::Mutation | RequestClass::Feedback => config
@@ -895,7 +901,7 @@ fn rate_limit(config: &IngressConfig, class: RequestClass) -> u64 {
         RequestClass::State => config.state_per_window,
         RequestClass::Mcp => config.mcp_per_window,
         RequestClass::Admin => config.admin_per_window,
-        RequestClass::Read => config.reads_per_window,
+        RequestClass::Read | RequestClass::Data => config.reads_per_window,
     }
 }
 

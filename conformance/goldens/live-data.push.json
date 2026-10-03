@@ -1,0 +1,476 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"sources\":[{\"id\":\"acme-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"params\":{}}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "sources": [
+                {
+                  "id": "acme-push",
+                  "kind": "push",
+                  "operations": {
+                    "latest": {
+                      "params": {}
+                    }
+                  },
+                  "subscriptions": {
+                    "events": {
+                      "transport": "push"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"sources\":[{\"id\":\"beta-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"params\":{}}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "sources": [
+                {
+                  "id": "beta-push",
+                  "kind": "push",
+                  "operations": {
+                    "latest": {
+                      "params": {}
+                    }
+                  },
+                  "subscriptions": {
+                    "events": {
+                      "transport": "push"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":16,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 16,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"bindings\":{\"reviews\":{\"operations\":[\"latest\"],\"source\":\"acme-push\",\"subscriptions\":[\"events\"]}}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bindings": {
+                "reviews": {
+                  "operations": [
+                    "latest"
+                  ],
+                  "source": "acme-push",
+                  "subscriptions": [
+                    "events"
+                  ]
+                }
+              },
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"bindings\":{\"reviews\":{\"operations\":[\"latest\"],\"source\":\"acme-push\",\"subscriptions\":[\"events\"]}}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bindings": {
+                "reviews": {
+                  "operations": [
+                    "latest"
+                  ],
+                  "source": "acme-push",
+                  "subscriptions": [
+                    "events"
+                  ]
+                }
+              },
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Permission denied: this API key cannot read this artifact",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 7,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"bindings\":{\"reviews\":{\"operations\":[\"latest\"],\"source\":\"acme-push\",\"subscriptions\":[\"events\"]}}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bindings": {
+                "reviews": {
+                  "operations": [
+                    "latest"
+                  ],
+                  "source": "acme-push",
+                  "subscriptions": [
+                    "events"
+                  ]
+                }
+              },
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 8,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Permission denied: this API key cannot modify this artifact",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Permission denied: this API key cannot modify this artifact",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 10,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown artifact: ${artifact_id_1}",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 11,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "bad_params",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 12,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"revision\":1}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "id": "${artifact_id_1}",
+              "revision": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "data": {
+            "version": 1
+          }
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_params"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "bindings": {
+            "reviews": {
+              "operations": [
+                "latest"
+              ],
+              "source": "acme-push",
+              "subscriptions": [
+                "events"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 19,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"accepted\":1,\"duplicates\":0}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "accepted": 1,
+              "duplicates": 0,
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 20,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"accepted\":0,\"duplicates\":1}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "accepted": 0,
+              "duplicates": 1,
+              "id": "${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 21,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "bad_params",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 22,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Permission denied: this API key cannot modify this artifact",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "independent_data": [
+        {
+          "events": 1,
+          "html_history": 1,
+          "revision": 1,
+          "snapshot_revision": 1
+        }
+      ]
+    }
+  }
+}

@@ -148,11 +148,11 @@ test("MCP enforces the published tool input schemas", async () => {
   assert.match(malformedEdit.error.message, /edits\.0\.replace must be a string/);
 });
 
-test("tools/list advertises the exact 21-tool golden", async () => {
+test("tools/list advertises the exact live-data tool golden", async () => {
   const listed = await handleMcp({ jsonrpc: "2.0", id: 23, method: "tools/list" }, auth);
   const golden = JSON.parse(readFileSync(new URL("../conformance/goldens/mcp.tools-list.json", import.meta.url)));
   assert.deepEqual(listed.result.tools, golden.steps[0].body.json.result.tools);
-  assert.equal(listed.result.tools.length, 21);
+  assert.equal(listed.result.tools.length, 26);
   assert.equal(listed.result.tools.at(-1).name, "patch_artifact");
 });
 
@@ -187,7 +187,7 @@ test("MCP 2026 discovery and tool listing use typed stateless results", async ()
     method: "tools/list",
     params: { _meta: modernMeta() }
   }, auth, { protocolVersion: MODERN_PROTOCOL_VERSION });
-  assert.equal(listed.result.tools.length, 22);
+  assert.equal(listed.result.tools.length, 27);
   assert.equal(listed.result.tools.at(-1).name, "regenerate_artifact_preview");
   assert.ok(listed.result.tools.every((tool) => tool.outputSchema?.type === "object"));
   assert.equal(listed.result.resultType, "complete");
@@ -405,7 +405,7 @@ test("MCP App review is negotiated, isolated, and keeps fallback output intact",
   const fallbackTools = await invoke("fallback-tools", "tools/list", {}, modernMeta());
   assert.ok(fallbackTools.result.tools.every((tool) => tool._meta === undefined));
   const appTools = await invoke("app-tools", "tools/list");
-  assert.equal(appTools.result.tools.length, 23);
+  assert.equal(appTools.result.tools.length, 28);
   assert.deepEqual(
     appTools.result.tools
       .filter((tool) => tool._meta?.ui?.resourceUri)
@@ -722,7 +722,7 @@ test("MCP 2026 HTTP metadata rejects mismatches before dispatch", async () => {
     auth,
     { protocolVersion: legacyList.protocolVersion }
   );
-  assert.equal(listedAsLegacy.result.tools.length, 21);
+  assert.equal(listedAsLegacy.result.tools.length, 26);
   assert.equal(listedAsLegacy.result.resultType, undefined);
 
   const missingModernMetadata = validateMcpHttpRequest(

@@ -527,8 +527,23 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (32, "feedback-anchor-v2".to_owned()),
         (33, "viewer-state".to_owned()),
         (34, "viewer-state-scope-and-member-display-name".to_owned()),
+        (35, "artifact-data-bindings".to_owned()),
+        (36, "managed-data-sources".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
+    assert_eq!(
+        column_names(&conn, "data_sources"),
+        vec![
+            "id",
+            "org",
+            "definition",
+            "enabled",
+            "version",
+            "created_at",
+            "updated_at"
+        ],
+        "migration 36 creates the managed source registry"
+    );
     assert!(
         column_names(&conn, "security_audit_receipts")
             .iter()
