@@ -1046,6 +1046,8 @@ pub struct OAuthConfig {
     pub max_token_lifetime_seconds: u64,
     /// Compatibility switch for database-backed API keys.
     pub api_keys_enabled: bool,
+    /// Permit HTTP OAuth endpoints only when each HTTP endpoint is a canonical loopback host.
+    pub allow_loopback_http: bool,
 }
 
 impl Default for OAuthConfig {
@@ -1058,6 +1060,7 @@ impl Default for OAuthConfig {
             clock_tolerance_seconds: DEFAULT_OAUTH_CLOCK_TOLERANCE_SECONDS,
             max_token_lifetime_seconds: DEFAULT_OAUTH_MAX_TOKEN_LIFETIME_SECONDS,
             api_keys_enabled: true,
+            allow_loopback_http: false,
         }
     }
 }
@@ -1087,9 +1090,17 @@ impl OAuthConfig {
                     .to_owned(),
             ));
         }
+        // This development-only exception is intentionally ignored when OAuth is disabled, so
+        // API-key-only deployments keep accepting unrelated environment variables. Once the
+        // complete OAuth triple is present, the switch itself is strict.
+        let allow_loopback_http = if configured == 3 {
+            strict_oauth_loopback_opt_in(env)?
+        } else {
+            false
+        };
         if configured == 3 {
-            validate_oauth_url("MCP_OAUTH_ISSUER", &issuer)?;
-            validate_oauth_url("MCP_OAUTH_JWKS_URL", &jwks_url)?;
+            validate_oauth_url("MCP_OAUTH_ISSUER", &issuer, allow_loopback_http)?;
+            validate_oauth_url("MCP_OAUTH_JWKS_URL", &jwks_url, allow_loopback_http)?;
         }
 
         let algorithms = present(env, "MCP_OAUTH_ALLOWED_ALGS").map_or_else(
@@ -1133,24 +1144,63 @@ impl OAuthConfig {
                 DEFAULT_OAUTH_MAX_TOKEN_LIFETIME_SECONDS,
             )?,
             api_keys_enabled: enabled_unless_zero(env, "MCP_API_KEYS_ENABLED")?,
+            allow_loopback_http,
         })
     }
 }
 
-fn validate_oauth_url(key: &str, value: &str) -> Result<(), AppError> {
-    let parsed =
-        url::Url::parse(value).map_err(|_| invalid(key, value, "an absolute http(s) URL"))?;
-    if !matches!(parsed.scheme(), "http" | "https")
-        || parsed.host_str().is_none()
+fn validate_oauth_url(key: &str, value: &str, allow_loopback_http: bool) -> Result<(), AppError> {
+    let parsed = url::Url::parse(value).map_err(|_| {
+        AppError::Validation(format!(
+            "{key} must be an absolute HTTPS URL (or canonical loopback HTTP URL with MCP_OAUTH_ALLOW_LOOPBACK_HTTP=1)"
+        ))
+    })?;
+    let host = parsed.host();
+    let is_loopback = host.as_ref().is_some_and(|host| match host {
+        url::Host::Domain(domain) => domain.eq_ignore_ascii_case("localhost"),
+        url::Host::Ipv4(address) => address.is_loopback(),
+        url::Host::Ipv6(address) => *address == std::net::Ipv6Addr::LOCALHOST,
+    });
+    let secure = parsed.scheme() == "https";
+    let loopback_http = parsed.scheme() == "http" && allow_loopback_http && is_loopback;
+    if !(secure || loopback_http) {
+        return Err(AppError::Validation(format!(
+            "{key} must use HTTPS; HTTP is allowed only for canonical loopback hosts when MCP_OAUTH_ALLOW_LOOPBACK_HTTP=1"
+        )));
+    }
+    let authority_has_userinfo = value
+        .find("://")
+        .and_then(|scheme_end| value.get(scheme_end + 3..))
+        .and_then(|authority| {
+            authority
+                .find(['/', '?', '#'])
+                .map_or(Some(authority), |end| authority.get(..end))
+        })
+        .is_some_and(|authority| authority.contains('@'));
+    if host.is_none()
         || parsed.fragment().is_some()
+        || !parsed.username().is_empty()
+        || parsed.password().is_some()
+        || authority_has_userinfo
     {
-        return Err(invalid(
-            key,
-            value,
-            "an absolute http(s) URL without a fragment",
-        ));
+        return Err(AppError::Validation(format!(
+            "{key} must be an absolute HTTPS URL without credentials or a fragment"
+        )));
     }
     Ok(())
+}
+
+/// Strict opt-in switch for development-only loopback HTTP. Unlike the legacy compatibility
+/// switches, this defaults to false and never treats an unrecognised value as enabled.
+fn strict_oauth_loopback_opt_in(env: &dyn EnvSource) -> Result<bool, AppError> {
+    match env.get("MCP_OAUTH_ALLOW_LOOPBACK_HTTP").as_deref() {
+        None | Some("") | Some("0") => Ok(false),
+        Some(raw) if raw.trim().is_empty() => Ok(false),
+        Some("1") => Ok(true),
+        Some(_) => Err(AppError::Validation(
+            "MCP_OAUTH_ALLOW_LOOPBACK_HTTP must be \"0\" or \"1\"".to_owned(),
+        )),
+    }
 }
 
 /// Port of the `DOMAIN_ORG` map builder — [lib/identity.js:25-31]
