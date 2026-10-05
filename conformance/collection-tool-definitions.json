@@ -1,0 +1,281 @@
+[
+  {
+    "name": "list_collections",
+    "description": "List accessible organization collections, called folders in the library UI. Returns bounded summaries and a next-page cursor.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Page size, default 25, maximum 100."
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "Opaque cursor from the previous page. Empty or omitted starts the first page."
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "get_collection",
+    "description": "Read a folder and a bounded page of readable artifact references. Folder membership never grants artifact access.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Collection ID returned by list_collections or create_collection."
+        },
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "Page size, default 25, maximum 100."
+        },
+        "cursor": {
+          "type": "string",
+          "maxLength": 1024,
+          "description": "Opaque cursor from the previous page. Empty or omitted starts the first page."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "create_collection",
+    "description": "Create an organization folder referencing existing artifacts. Duplicate names return a conflict; creation never silently updates an existing folder.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Empty string clears the description."
+        },
+        "color": {
+          "type": "string",
+          "description": "Six-digit hex color, or empty string to clear."
+        },
+        "cover_artifact_id": {
+          "type": "string",
+          "description": "Readable collection member ID, or empty string to clear the cover."
+        },
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 100,
+          "description": "At most 100 readable artifact IDs from the same organization."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "update_collection",
+    "description": "Edit folder metadata. Omitted fields are preserved; empty description, color, or cover_artifact_id clears that field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Collection ID returned by list_collections or create_collection."
+        },
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "Empty string clears the description."
+        },
+        "color": {
+          "type": "string",
+          "description": "Six-digit hex color, or empty string to clear."
+        },
+        "cover_artifact_id": {
+          "type": "string",
+          "description": "Readable collection member ID, or empty string to clear the cover."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "delete_collection",
+    "description": "Delete a folder and its membership links. All underlying artifacts, revisions, and links in other folders are preserved. Missing folders return Not found.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Collection ID returned by list_collections or create_collection."
+        },
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "add_artifacts_to_collection",
+    "description": "Add readable same-organization artifact references to a folder. Safe to retry; all batch targets validate before any write.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Collection ID returned by list_collections or create_collection."
+        },
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 100,
+          "description": "At most 100 readable artifact IDs from the same organization."
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ids"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  },
+  {
+    "name": "remove_artifacts_from_collection",
+    "description": "Remove artifact references from a folder, preserving artifacts and other folders. Safe to retry; reports already-absent references.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "Collection ID returned by list_collections or create_collection."
+        },
+        "org": {
+          "type": "string",
+          "description": "Concrete registered organization. Required for admin credentials; other credentials are locked to their own organization."
+        },
+        "artifact_ids": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "maxItems": 100,
+          "description": "At most 100 readable artifact IDs from the same organization."
+        }
+      },
+      "required": [
+        "id",
+        "artifact_ids"
+      ],
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": false
+    }
+  }
+]

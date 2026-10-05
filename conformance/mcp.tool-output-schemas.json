@@ -269,5 +269,308 @@
       "edits_applied": { "type": "integer" }
     },
     "required": ["id", "revision", "bytes_before", "bytes_after", "edits_applied"]
+  },
+  "list_collections": {
+    "type": "object",
+    "properties": {
+      "collections": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "org": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "color": {
+              "type": "string"
+            },
+            "cover_artifact_id": {
+              "type": "string"
+            },
+            "artifact_count": {
+              "type": "integer"
+            },
+            "editable": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "org",
+            "name",
+            "description",
+            "color",
+            "cover_artifact_id",
+            "artifact_count",
+            "editable"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "next_cursor": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "collections",
+      "next_cursor"
+    ],
+    "additionalProperties": false
+  },
+  "get_collection": {
+    "type": "object",
+    "properties": {
+      "collection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "cover_artifact_id": {
+            "type": "string"
+          },
+          "artifact_count": {
+            "type": "integer"
+          },
+          "editable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "org",
+          "name",
+          "description",
+          "color",
+          "cover_artifact_id",
+          "artifact_count",
+          "editable"
+        ],
+        "additionalProperties": false
+      },
+      "artifacts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "url",
+            "category"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "next_cursor": {
+        "type": "string"
+      }
+    },
+    "required": [
+      "collection",
+      "artifacts",
+      "next_cursor"
+    ],
+    "additionalProperties": false
+  },
+  "create_collection": {
+    "type": "object",
+    "properties": {
+      "collection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "cover_artifact_id": {
+            "type": "string"
+          },
+          "artifact_count": {
+            "type": "integer"
+          },
+          "editable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "org",
+          "name",
+          "description",
+          "color",
+          "cover_artifact_id",
+          "artifact_count",
+          "editable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "collection"
+    ],
+    "additionalProperties": false
+  },
+  "update_collection": {
+    "type": "object",
+    "properties": {
+      "collection": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "org": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string"
+          },
+          "cover_artifact_id": {
+            "type": "string"
+          },
+          "artifact_count": {
+            "type": "integer"
+          },
+          "editable": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "org",
+          "name",
+          "description",
+          "color",
+          "cover_artifact_id",
+          "artifact_count",
+          "editable"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "required": [
+      "collection"
+    ],
+    "additionalProperties": false
+  },
+  "delete_collection": {
+    "type": "object",
+    "properties": {
+      "id": {
+        "type": "string"
+      },
+      "deleted": {
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "id",
+      "deleted"
+    ],
+    "additionalProperties": false
+  },
+  "add_artifacts_to_collection": {
+    "type": "object",
+    "properties": {
+      "collection_id": {
+        "type": "string"
+      },
+      "added": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "already_present": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "collection_id",
+      "added",
+      "already_present"
+    ],
+    "additionalProperties": false
+  },
+  "remove_artifacts_from_collection": {
+    "type": "object",
+    "properties": {
+      "collection_id": {
+        "type": "string"
+      },
+      "removed": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      },
+      "already_absent": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "collection_id",
+      "removed",
+      "already_absent"
+    ],
+    "additionalProperties": false
   }
 }

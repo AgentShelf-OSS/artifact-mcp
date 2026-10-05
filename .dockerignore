@@ -16,6 +16,7 @@ coverage/
 tests/
 conformance/*
 !conformance/mcp.tool-output-schemas.json
+!conformance/collection-tool-definitions.json
 *.log
 *.bak
 *.bak-*

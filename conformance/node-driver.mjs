@@ -44,6 +44,8 @@ export function createNodeDriver() {
       join(root, "conformance", "mcp.tool-output-schemas.json"),
       { recursive: true }
     );
+    cpSync(join(REPO_ROOT, "conformance", "collection-tool-definitions.json"),
+      join(root, "conformance", "collection-tool-definitions.json"));
     // Dependencies come from a real, built node_modules via symlink (native better-sqlite3
     // included). ESM bare-import resolution walks up from lib/ into this symlinked dir.
     symlinkSync(nm, join(root, "node_modules"), "dir");

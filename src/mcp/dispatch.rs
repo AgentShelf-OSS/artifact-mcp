@@ -439,6 +439,16 @@ fn validate_modern_request_metadata(message: &OrderedJson) -> Result<(), McpErro
     Ok(())
 }
 
+async fn collection_call(
+    name: &str,
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let value = super::collections::call(name, arguments, auth, deps).await?;
+    tool_result(super::collections::ordered_response(value))
+}
+
 async fn call_tool(
     params: Option<&OrderedJson>,
     auth: &PublisherIdentity,
@@ -460,6 +470,13 @@ async fn call_tool(
         "publish_artifact" => publish_artifact(arguments, auth, deps).await,
         "publish_bundle" => publish_bundle(arguments, auth, deps).await,
         "list_artifacts" => list_artifacts(auth, deps).await,
+        "list_collections" => collection_call(name, arguments, auth, deps).await,
+        "get_collection" => collection_call(name, arguments, auth, deps).await,
+        "create_collection" => collection_call(name, arguments, auth, deps).await,
+        "update_collection" => collection_call(name, arguments, auth, deps).await,
+        "delete_collection" => collection_call(name, arguments, auth, deps).await,
+        "add_artifacts_to_collection" => collection_call(name, arguments, auth, deps).await,
+        "remove_artifacts_from_collection" => collection_call(name, arguments, auth, deps).await,
         "read_artifact" => read_artifact(arguments, auth, deps).await,
         "patch_artifact" => patch_artifact(arguments, auth, deps).await,
         "delete_artifact" => delete_artifact(arguments, auth, deps).await,

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     error::AppError,
+    model::PublisherIdentity,
     persistence::db::{self, DbPool},
     security::audit::{AuditEvent, MutationAudit, append_in_transaction},
 };
@@ -23,10 +24,32 @@ pub const MAX_NAME_LENGTH: usize = 80;
 pub const MAX_DESCRIPTION_LENGTH: usize = 500;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CollectionPrincipal {
+    HumanEmail(String),
+    ApiKeyClient(String),
+    OAuthClient { issuer: String, client_id: String },
+}
+
+impl CollectionPrincipal {
+    pub fn kind_id(&self) -> (&'static str, String) {
+        match self {
+            Self::HumanEmail(value) => ("email", value.to_lowercase()),
+            Self::ApiKeyClient(value) => ("api_key", value.clone()),
+            Self::OAuthClient { issuer, client_id } => (
+                "oauth",
+                serde_json::to_string(&[issuer, client_id]).unwrap_or_default(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CollectionActor {
     pub email: String,
     pub org: String,
     pub is_admin: bool,
+    pub principal: CollectionPrincipal,
+    pub publisher: Option<PublisherIdentity>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -39,6 +62,8 @@ pub struct Collection {
     pub color: Option<String>,
     pub cover_artifact_id: Option<String>,
     pub created_by: String,
+    #[serde(skip)]
+    pub created_by_kind: String,
     pub created_at: String,
     pub updated_at: String,
     pub artifact_count: u64,
@@ -133,8 +158,9 @@ impl CollectionStore {
         let org = actor.org.clone();
         let limit = limit.clamp(1, MAX_COLLECTIONS_PER_ORG) as i64;
         db::interact(&self.pool, move |conn| {
+            ensure_existing_org(conn, &org)?;
             let mut stmt = conn.prepare(
-                "SELECT c.id,c.org,c.name,c.description,c.color,c.cover_artifact_id,c.created_by,c.created_at,c.updated_at,COUNT(m.artifact_id) FROM collections c LEFT JOIN collection_artifacts m ON m.collection_id=c.id WHERE c.org=?1 GROUP BY c.id ORDER BY c.created_at ASC,c.id ASC LIMIT ?2",
+                "SELECT c.id,c.org,c.name,c.description,c.color,c.cover_artifact_id,c.created_by,c.created_at,c.updated_at,COUNT(m.artifact_id),c.created_by_kind FROM collections c LEFT JOIN collection_artifacts m ON m.collection_id=c.id WHERE c.org=?1 GROUP BY c.id ORDER BY c.created_at ASC,c.id ASC LIMIT ?2",
             ).map_err(|_| AppError::Internal)?;
             stmt.query_map(params![org, limit], collection_row)
                 .map_err(|_| AppError::Internal)?.collect::<Result<Vec<_>, _>>().map_err(|_| AppError::Internal)
@@ -185,6 +211,11 @@ impl CollectionStore {
             validate_color(color)?;
         }
         validate_ids(&artifact_ids)?;
+        let mut seen = HashSet::new();
+        let artifact_ids = artifact_ids
+            .into_iter()
+            .filter(|id| seen.insert(id.clone()))
+            .collect::<Vec<_>>();
         let actor = actor.clone();
         let audit_key = self.audit_key;
         db::interact(&self.pool, move |conn| {
@@ -199,12 +230,13 @@ impl CollectionStore {
                 return Err(AppError::Validation("cover artifact must be a collection member".into()));
             }
             let name_key = normalize_name(&name);
-            tx.execute("INSERT INTO collections(id,org,name,name_key,description,color,cover_artifact_id,cover_artifact_org,created_by) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9)", params![id,actor.org,normalize_text(&name),name_key,normalize_text(&description),color,cover,cover.as_ref().map(|_| actor.org.clone()),actor.email]).map_err(|e| if matches!(e, rusqlite::Error::SqliteFailure(_, _)) { AppError::Conflict("a collection with that name already exists".into()) } else { AppError::Internal })?;
+            let (principal_kind, principal_id) = actor.principal.kind_id();
+            tx.execute("INSERT INTO collections(id,org,name,name_key,description,color,cover_artifact_id,cover_artifact_org,created_by,created_by_kind) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)", params![id,actor.org,normalize_text(&name),name_key,normalize_text(&description),color,cover,cover.as_ref().map(|_| actor.org.clone()),principal_id,principal_kind]).map_err(|e| if matches!(e, rusqlite::Error::SqliteFailure(_, _)) { AppError::Conflict("a collection with that name already exists".into()) } else { AppError::Internal })?;
             for artifact_id in &artifact_ids {
                 tx.execute("INSERT INTO collection_artifacts(collection_id,artifact_id,org) VALUES (?1,?2,?3)", params![id, artifact_id, actor.org]).map_err(|_| AppError::Internal)?;
             }
             Self::append_audit(audit_key, &tx, audit.as_ref(), "collection.create", &id, &actor.org)?;
-            let result = tx.query_row("SELECT c.id,c.org,c.name,c.description,c.color,c.cover_artifact_id,c.created_by,c.created_at,c.updated_at,COUNT(m.artifact_id) FROM collections c LEFT JOIN collection_artifacts m ON m.collection_id=c.id WHERE c.id=?1 GROUP BY c.id", [&id], collection_row).map_err(|_| AppError::Internal)?;
+            let result = tx.query_row("SELECT c.id,c.org,c.name,c.description,c.color,c.cover_artifact_id,c.created_by,c.created_at,c.updated_at,COUNT(m.artifact_id),c.created_by_kind FROM collections c LEFT JOIN collection_artifacts m ON m.collection_id=c.id WHERE c.id=?1 GROUP BY c.id", [&id], collection_row).map_err(|_| AppError::Internal)?;
             tx.commit().map_err(|_| AppError::Internal)?; Ok(result)
         }).await
     }
@@ -225,6 +257,34 @@ impl CollectionStore {
         }).await
     }
 
+    pub async fn readable_members(
+        &self,
+        actor: &CollectionActor,
+        collection_id: String,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<String>, AppError> {
+        validate_id(&collection_id)?;
+        let actor = actor.clone();
+        let limit = limit.clamp(1, MAX_MEMBERSHIPS_PER_COLLECTION) as i64;
+        let offset =
+            i64::try_from(offset).map_err(|_| AppError::Validation("invalid cursor".into()))?;
+        db::interact(&self.pool, move |conn| {
+            let tx = conn.transaction().map_err(|_| AppError::Internal)?;
+            let org: Option<String> = tx.query_row("SELECT org FROM collections WHERE id=?1", [&collection_id], |r| r.get(0)).optional().map_err(|_| AppError::Internal)?;
+            let Some(org) = org else { return Err(AppError::NotFound("Collection not found".into())); };
+            if org != actor.org { return Err(AppError::ConcealedNotFound); }
+            let mut stmt = tx.prepare("SELECT m.artifact_id FROM collection_artifacts m JOIN artifacts a ON a.id=m.artifact_id AND a.org=m.org WHERE m.collection_id=?1 AND m.org=?2 ORDER BY m.artifact_id ASC LIMIT 1000").map_err(|_| AppError::Internal)?;
+            let ids = stmt.query_map(params![collection_id, actor.org], |r| r.get::<_, String>(0)).map_err(|_| AppError::Internal)?;
+            let mut readable = Vec::new();
+            for id in ids {
+                let id = id.map_err(|_| AppError::Internal)?;
+                if ensure_artifact_readable(&tx, &id, &actor).is_ok() { readable.push(id); }
+            }
+            Ok(readable.into_iter().skip(offset as usize).take(limit as usize).collect())
+        }).await
+    }
+
     pub async fn add_memberships(
         &self,
         actor: &CollectionActor,
@@ -242,27 +302,41 @@ impl CollectionStore {
         artifact_ids: Vec<String>,
         audit: Option<MutationAudit>,
     ) -> Result<usize, AppError> {
+        self.add_memberships_diff_audited(actor, collection_id, artifact_ids, audit)
+            .await
+            .map(|(changed, _)| changed.len())
+    }
+
+    pub async fn add_memberships_diff_audited(
+        &self,
+        actor: &CollectionActor,
+        collection_id: String,
+        artifact_ids: Vec<String>,
+        audit: Option<MutationAudit>,
+    ) -> Result<(Vec<String>, Vec<String>), AppError> {
         validate_id(&collection_id)?;
         validate_ids(&artifact_ids)?;
+        let mut seen = HashSet::new();
+        let artifact_ids = artifact_ids
+            .into_iter()
+            .filter(|id| seen.insert(id.clone()))
+            .collect::<Vec<_>>();
         let actor = actor.clone();
         let audit_key = self.audit_key;
         db::interact(&self.pool, move |conn| {
-            authorize_org(&actor)?;
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_| AppError::Internal)?;
+            authorize_org(&actor)?; let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_| AppError::Internal)?;
             ensure_collection_creator(&tx, &collection_id, &actor)?;
             for id in &artifact_ids { ensure_artifact_readable(&tx, id, &actor)?; }
             let count: i64 = tx.query_row("SELECT COUNT(*) FROM collection_artifacts WHERE collection_id=?1", [&collection_id], |r| r.get(0)).map_err(|_| AppError::Internal)?;
-            let mut extra = 0;
+            let mut added = Vec::new(); let mut already = Vec::new();
             for id in &artifact_ids {
-                let exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM collection_artifacts WHERE collection_id=?1 AND artifact_id=?2)", params![collection_id,id], |r|r.get(0)).map_err(|_|AppError::Internal)?;
-                if !exists { extra += 1; }
+                let exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM collection_artifacts WHERE collection_id=?1 AND artifact_id=?2)", params![collection_id,id], |r| r.get(0)).map_err(|_| AppError::Internal)?;
+                if exists { already.push(id.clone()); } else { added.push(id.clone()); }
             }
-            if count + extra > MAX_MEMBERSHIPS_PER_COLLECTION as i64 { return Err(AppError::Validation("collection member limit reached".into())); }
-            let mut added = 0;
-            for id in &artifact_ids { added += tx.execute("INSERT OR IGNORE INTO collection_artifacts(collection_id,artifact_id,org) VALUES (?1,?2,?3)", params![collection_id,id,actor.org]).map_err(|_| AppError::Internal)?; }
-            tx.execute("UPDATE collections SET updated_at=datetime('now') WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?;
-            Self::append_audit(audit_key, &tx, audit.as_ref(), "collection.membership.add", &collection_id, &actor.org)?;
-            tx.commit().map_err(|_| AppError::Internal)?; Ok(added)
+            if count + i64::try_from(added.len()).unwrap_or(i64::MAX) > MAX_MEMBERSHIPS_PER_COLLECTION as i64 { return Err(AppError::Validation("collection member limit reached".into())); }
+            for id in &added { tx.execute("INSERT INTO collection_artifacts(collection_id,artifact_id,org) VALUES (?1,?2,?3)", params![collection_id,id,actor.org]).map_err(|_| AppError::Internal)?; }
+            tx.execute("UPDATE collections SET updated_at=datetime('now') WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?; Self::append_audit(audit_key, &tx, audit.as_ref(), "collection.membership.add", &collection_id, &actor.org)?;
+            tx.commit().map_err(|_| AppError::Internal)?; Ok((added, already))
         }).await
     }
 
@@ -283,23 +357,37 @@ impl CollectionStore {
         artifact_ids: Vec<String>,
         audit: Option<MutationAudit>,
     ) -> Result<usize, AppError> {
+        self.remove_memberships_diff_audited(actor, collection_id, artifact_ids, audit)
+            .await
+            .map(|(changed, _)| changed.len())
+    }
+
+    pub async fn remove_memberships_diff_audited(
+        &self,
+        actor: &CollectionActor,
+        collection_id: String,
+        artifact_ids: Vec<String>,
+        audit: Option<MutationAudit>,
+    ) -> Result<(Vec<String>, Vec<String>), AppError> {
         validate_id(&collection_id)?;
         validate_ids(&artifact_ids)?;
+        let mut seen = HashSet::new();
+        let artifact_ids = artifact_ids
+            .into_iter()
+            .filter(|id| seen.insert(id.clone()))
+            .collect::<Vec<_>>();
         let actor = actor.clone();
         let audit_key = self.audit_key;
         db::interact(&self.pool, move |conn| {
-            authorize_org(&actor)?;
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_| AppError::Internal)?;
+            authorize_org(&actor)?; let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_| AppError::Internal)?;
             ensure_collection_creator(&tx, &collection_id, &actor)?;
             for id in &artifact_ids { ensure_artifact_readable(&tx, id, &actor)?; }
-            let mut removed = 0;
-            for id in &artifact_ids { removed += tx.execute("DELETE FROM collection_artifacts WHERE collection_id=?1 AND artifact_id=?2", params![collection_id,id]).map_err(|_| AppError::Internal)?; }
-            if let Some(cover) = tx.query_row("SELECT cover_artifact_id FROM collections WHERE id=?1", [&collection_id], |r| r.get::<_, Option<String>>(0)).optional().map_err(|_| AppError::Internal)?.flatten() && artifact_ids.iter().any(|id| id == &cover) {
-                tx.execute("UPDATE collections SET cover_artifact_id=NULL, cover_artifact_org=NULL WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?;
-            }
-            tx.execute("UPDATE collections SET updated_at=datetime('now') WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?;
-            Self::append_audit(audit_key, &tx, audit.as_ref(), "collection.membership.remove", &collection_id, &actor.org)?;
-            tx.commit().map_err(|_| AppError::Internal)?; Ok(removed)
+            let mut removed = Vec::new(); let mut absent = Vec::new();
+            for id in &artifact_ids { let exists: bool = tx.query_row("SELECT EXISTS(SELECT 1 FROM collection_artifacts WHERE collection_id=?1 AND artifact_id=?2)", params![collection_id,id], |r| r.get(0)).map_err(|_| AppError::Internal)?; if exists { removed.push(id.clone()); } else { absent.push(id.clone()); } }
+            for id in &removed { tx.execute("DELETE FROM collection_artifacts WHERE collection_id=?1 AND artifact_id=?2", params![collection_id,id]).map_err(|_| AppError::Internal)?; }
+            if let Some(cover) = tx.query_row("SELECT cover_artifact_id FROM collections WHERE id=?1", [&collection_id], |r| r.get::<_, Option<String>>(0)).optional().map_err(|_| AppError::Internal)?.flatten() && removed.iter().any(|id| id == &cover) { tx.execute("UPDATE collections SET cover_artifact_id=NULL,cover_artifact_org=NULL WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?; }
+            tx.execute("UPDATE collections SET updated_at=datetime('now') WHERE id=?1", [&collection_id]).map_err(|_| AppError::Internal)?; Self::append_audit(audit_key, &tx, audit.as_ref(), "collection.membership.remove", &collection_id, &actor.org)?;
+            tx.commit().map_err(|_| AppError::Internal)?; Ok((removed, absent))
         }).await
     }
 
@@ -337,7 +425,7 @@ impl CollectionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_| AppError::Internal)?;
             ensure_collection_creator(&tx, &collection_id, &actor)?;
-            if let Some(ref cover) = update.cover_artifact_id { ensure_artifact_readable(&tx, cover, &actor)?; }
+            if !update.clear_cover && let Some(ref cover) = update.cover_artifact_id { ensure_artifact_readable(&tx, cover, &actor)?; }
             let current: (String, String, Option<String>, Option<String>) = tx.query_row("SELECT name,description,color,cover_artifact_id FROM collections WHERE id=?1", [&collection_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?))).map_err(|_| AppError::Internal)?;
             let name = normalize_text(update.name.as_deref().unwrap_or(&current.0));
             let description = normalize_text(update.description.as_deref().unwrap_or(&current.1));
@@ -425,7 +513,7 @@ impl CollectionStore {
 }
 
 fn authorize_org(actor: &CollectionActor) -> Result<(), AppError> {
-    if actor.email.trim().is_empty() || actor.org.trim().is_empty() {
+    if actor.org.trim().is_empty() {
         return Err(AppError::Unauthorized("Not signed in".into()));
     }
     Ok(())
@@ -436,25 +524,31 @@ fn ensure_collection_creator(
     id: &str,
     actor: &CollectionActor,
 ) -> Result<(), AppError> {
-    let row: Option<(String, String)> = tx
+    let row: Option<(String, String, String)> = tx
         .query_row(
-            "SELECT org,created_by FROM collections WHERE id=?1",
+            "SELECT org,created_by,created_by_kind FROM collections WHERE id=?1",
             [id],
-            |r| Ok((r.get(0)?, r.get(1)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
         )
         .optional()
         .map_err(|_| AppError::Internal)?;
-    let Some((org, created_by)) = row else {
+    let Some((org, created_by, created_by_kind)) = row else {
         return Err(AppError::NotFound("Collection not found".into()));
     };
     if org != actor.org {
         return Err(AppError::ConcealedNotFound);
     }
-    if actor.is_admin || created_by.eq_ignore_ascii_case(&actor.email) {
+    let (kind, principal_id) = actor.principal.kind_id();
+    let matches_principal = if created_by_kind == "email" {
+        kind == "email" && created_by.eq_ignore_ascii_case(&principal_id)
+    } else {
+        created_by_kind == kind && created_by == principal_id
+    };
+    if actor.is_admin || matches_principal {
         Ok(())
     } else {
         Err(AppError::Forbidden(
-            "You cannot modify this collection".into(),
+            "Only the collection creator or an administrator can edit this collection".into(),
         ))
     }
 }
@@ -479,22 +573,21 @@ fn ensure_artifact_readable(
     id: &str,
     actor: &CollectionActor,
 ) -> Result<(), AppError> {
-    let found: Option<(String, bool, Option<String>)> = tx
+    let found: Option<(String, bool, Option<String>, String)> = tx
         .query_row(
-            "SELECT org,hidden,owner_email FROM artifacts WHERE id=?1",
+            "SELECT org,hidden,owner_email,client_id FROM artifacts WHERE id=?1",
             [id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)),
+            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)),
         )
         .optional()
         .map_err(|_| AppError::Internal)?;
     match found {
-        Some((org, hidden, owner))
+        Some((org, hidden, owner, client_id))
             if org == actor.org
-                && (actor.is_admin
-                    || !hidden
-                    || owner
-                        .as_deref()
-                        .is_some_and(|email| email.eq_ignore_ascii_case(&actor.email))) =>
+                && (match actor.publisher.as_ref() {
+                    Some(auth) => auth.is_admin() || ((auth.org.0 == org) && (matches!(auth.role.as_str(), "reader" | "collaborator") || (auth.role == "author" && auth.client_id.0 == client_id))),
+                    None => actor.is_admin || !hidden || owner.as_deref().is_some_and(|email| matches!(&actor.principal, CollectionPrincipal::HumanEmail(value) if email.eq_ignore_ascii_case(value))),
+                }) =>
         {
             Ok(())
         }
@@ -551,6 +644,7 @@ fn collection_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Collection> {
         color: row.get(4)?,
         cover_artifact_id: row.get(5)?,
         created_by: row.get(6)?,
+        created_by_kind: row.get(10)?,
         created_at: row.get(7)?,
         updated_at: row.get(8)?,
         artifact_count: row.get::<_, i64>(9)? as u64,

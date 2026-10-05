@@ -18,7 +18,8 @@ use crate::{
     error::AppError,
     model::{OrgId, Viewer},
     persistence::collections::{
-        CollectionActor, CollectionStore, CollectionUpdate, MAX_COLLECTIONS_PER_ORG,
+        CollectionActor, CollectionPrincipal, CollectionStore, CollectionUpdate,
+        MAX_COLLECTIONS_PER_ORG,
     },
     security::audit::MutationAudit,
 };
@@ -130,6 +131,8 @@ fn actor(viewer: &Viewer, org: &str) -> Result<CollectionActor, AppError> {
         email: email.0.clone(),
         org: org.to_owned(),
         is_admin: viewer.is_admin,
+        principal: CollectionPrincipal::HumanEmail(email.0.clone()),
+        publisher: None,
     })
 }
 async fn viewer(deps: &AppDeps, headers: &HeaderMap) -> Result<Viewer, AppError> {
@@ -242,7 +245,7 @@ async fn projection(
                 .cloned(),
         );
         let previews = preview_ids.iter().map(|id| json!({"id":id,"thumbnail":format!("/thumbnails/{}?v={}",id,visible.get(id).map(|a|a.body_sha256.clone()).unwrap_or_default())})).collect::<Vec<_>>();
-        projected.push(json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.filter(|color|!color.is_empty()),"createdBy":row.created_by,"editable":actor.is_admin || row.created_by.eq_ignore_ascii_case(&actor.email),"artifactCount":ids.len(),"artifactIds":ids,"coverArtifactId":cover,"previewArtifacts":previews}));
+        projected.push(json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.filter(|color|!color.is_empty()),"createdBy":row.created_by,"editable":actor.is_admin || (row.created_by_kind == "email" && row.created_by.eq_ignore_ascii_case(&actor.email)),"artifactCount":ids.len(),"artifactIds":ids,"coverArtifactId":cover,"previewArtifacts":previews}));
     }
     Ok(
         json!({"collections":projected,"uncollectedCount":visible.len().saturating_sub(collected.len()),"preferences":store.preferences(actor).await?}),

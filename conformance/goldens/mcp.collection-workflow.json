@@ -1,0 +1,626 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${a}\",\"url\":\"http://conformance.test/${a}\",\"org\":\"acme\",\"bytes\":29,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 29,
+              "category": "",
+              "id": "${a}",
+              "org": "acme",
+              "url": "http://conformance.test/${a}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${b}\",\"url\":\"http://conformance.test/${b}\",\"org\":\"acme\",\"bytes\":28,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 28,
+              "category": "",
+              "id": "${b}",
+              "org": "acme",
+              "url": "http://conformance.test/${b}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${c}\",\"url\":\"http://conformance.test/${c}\",\"org\":\"acme\",\"bytes\":29,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 29,
+              "category": "",
+              "id": "${c}",
+              "org": "acme",
+              "url": "http://conformance.test/${c}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"MCP folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":1,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "MCP folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"MCP secondary\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "MCP secondary",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collections\":[{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"MCP folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":1,\"editable\":true}],\"next_cursor\":\"${cursor}\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collections": [
+                {
+                  "artifact_count": 1,
+                  "color": "",
+                  "cover_artifact_id": "${a}",
+                  "description": "",
+                  "editable": true,
+                  "id": "${f}",
+                  "name": "MCP folder",
+                  "org": "acme"
+                }
+              ],
+              "next_cursor": "${cursor}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collections\":[{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"MCP secondary\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1,\"editable\":true}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collections": [
+                {
+                  "artifact_count": 1,
+                  "color": "",
+                  "cover_artifact_id": "",
+                  "description": "",
+                  "editable": true,
+                  "id": "${g}",
+                  "name": "MCP secondary",
+                  "org": "acme"
+                }
+              ],
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection_id\":\"${f}\",\"added\":[\"${b}\"],\"already_present\":[\"${a}\"]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "added": [
+                "${b}"
+              ],
+              "already_present": [
+                "${a}"
+              ],
+              "collection_id": "${f}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection_id\":\"${f}\",\"added\":[],\"already_present\":[\"${a}\",\"${b}\"]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "added": [],
+              "already_present": [
+                "${a}",
+                "${b}"
+              ],
+              "collection_id": "${f}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"MCP folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":2,\"editable\":true},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"MCP folder Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"},{\"id\":\"${b}\",\"title\":\"MCP folder Beta\",\"url\":\"http://conformance.test/${b}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "MCP folder Alpha",
+                  "url": "http://conformance.test/${a}"
+                },
+                {
+                  "category": "",
+                  "id": "${b}",
+                  "title": "MCP folder Beta",
+                  "url": "http://conformance.test/${b}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "MCP folder",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"MCP folder\",\"description\":\"Research references\",\"color\":\"#c4d8cd\",\"cover_artifact_id\":\"${b}\",\"artifact_count\":2,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 2,
+                "color": "#c4d8cd",
+                "cover_artifact_id": "${b}",
+                "description": "Research references",
+                "editable": true,
+                "id": "${f}",
+                "name": "MCP folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"MCP folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":2,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "MCP folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection_id\":\"${f}\",\"removed\":[\"${a}\"],\"already_absent\":[]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "already_absent": [],
+              "collection_id": "${f}",
+              "removed": [
+                "${a}"
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection_id\":\"${f}\",\"removed\":[],\"already_absent\":[\"${a}\"]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "already_absent": [
+                "${a}"
+              ],
+              "collection_id": "${f}",
+              "removed": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${f}\",\"deleted\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "deleted": true,
+              "id": "${f}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"MCP secondary\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1,\"editable\":true},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"MCP folder Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "MCP folder Alpha",
+                  "url": "http://conformance.test/${a}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "MCP secondary",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${a}\",\"org\":\"acme\",\"is_bundle\":false,\"revision\":1,\"content_type\":\"text/html; charset=utf-8\",\"bytes_total\":29,\"offset\":0,\"bytes_returned\":29,\"truncated\":false,\"content\":\"<!doctype html><h1>Alpha</h1>\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes_returned": 29,
+              "bytes_total": 29,
+              "content": "<!doctype html><h1>Alpha</h1>",
+              "content_type": "text/html; charset=utf-8",
+              "id": "${a}",
+              "is_bundle": false,
+              "offset": 0,
+              "org": "acme",
+              "revision": 1,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "grid",
+          "collapsedCollectionIdsByOrg": {},
+          "collectionOrderByOrg": {},
+          "previewSize": "compact",
+          "view": "reel"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "artifact_metadata": [
+        {
+          "category": "",
+          "hidden": 0,
+          "id": "${a}",
+          "org": "acme",
+          "revision": 1,
+          "title": "MCP folder Alpha"
+        },
+        {
+          "category": "",
+          "hidden": 0,
+          "id": "${b}",
+          "org": "acme",
+          "revision": 1,
+          "title": "MCP folder Beta"
+        },
+        {
+          "category": "",
+          "hidden": 0,
+          "id": "${c}",
+          "org": "acme",
+          "revision": 1,
+          "title": "MCP folder Gamma"
+        }
+      ],
+      "memberships": [
+        {
+          "artifact_id": "${a}",
+          "collection_id": "${g}",
+          "org": "acme"
+        }
+      ],
+      "principals": [
+        {
+          "created_by": "pub-acme",
+          "created_by_kind": "api_key",
+          "id": "${g}",
+          "org": "acme"
+        }
+      ],
+      "preferences": [
+        {
+          "count": 0
+        }
+      ],
+      "audit": [
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.create",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.create",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.membership.add",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.membership.add",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.update",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.update",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.membership.remove",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.membership.remove",
+          "source": "mcp"
+        },
+        {
+          "actor_id": "pub-acme",
+          "actor_type": "api_key",
+          "operation": "collection.delete",
+          "source": "mcp"
+        }
+      ]
+    }
+  }
+}

@@ -303,7 +303,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert_eq!(status, StatusCode::OK);
             assert_eq!(listed["result"]["resultType"], "complete");
             assert_eq!(listed["result"]["cacheScope"], "private");
-            assert_eq!(listed["result"]["tools"].as_array().map(Vec::len), Some(27));
+            assert_eq!(listed["result"]["tools"].as_array().map(Vec::len), Some(34));
             assert!(
                 listed["result"]["tools"]
                     .as_array()
@@ -336,7 +336,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert_eq!(status, StatusCode::OK);
             assert_eq!(
                 app_tools["result"]["tools"].as_array().map(Vec::len),
-                Some(28)
+                Some(35)
             );
             let linked_tools = app_tools["result"]["tools"]
                 .as_array()
@@ -971,7 +971,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert!(
                 legacy_with_version_header["result"]["tools"]
                     .as_array()
-                    .is_some_and(|tools| tools.len() == 26)
+                    .is_some_and(|tools| tools.len() == 33)
             );
 
             let (status, legacy) = post(
@@ -1591,6 +1591,9 @@ async fn durable_preview_tasks_recover_after_restart_and_enforce_ownership() {
     let renderer = super::u16_support::StubRenderer::rendering(super::u16_support::sample_png());
     let mut config = config_for(temp.path());
     config.preview = renderer.config();
+    // This recovery test permits 200 bounded polls on a slower CI worker.
+    config.ingress.mcp_per_window = 256;
+    config.ingress.reads_per_window = 256;
     let task_id = task.task_id.clone();
     runtime::run_with_bind(
         config,
@@ -1621,7 +1624,7 @@ async fn durable_preview_tasks_recover_after_restart_and_enforce_ownership() {
                     completed = Some(response);
                     break;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             }
             let completed = completed.expect("recovered task completed");
             assert_eq!(

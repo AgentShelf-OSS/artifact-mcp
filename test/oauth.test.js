@@ -337,7 +337,9 @@ test("OAuth scope mapping separates read, publish, review, visibility, and delet
     ["publish_artifact", "artifacts:publish"],
     ["submit_feedback", "artifacts:review"],
     ["set_visibility", "artifacts:visibility"],
-    ["delete_artifact", "artifacts:delete"]
+    ["delete_artifact", "artifacts:delete"],
+    ...["list_collections", "get_collection"].map((name) => [name, "artifacts:read"]),
+    ...["create_collection", "update_collection", "delete_collection", "add_artifacts_to_collection", "remove_artifacts_from_collection"].map((name) => [name, "artifacts:publish"])
   ];
   for (const [name, expected] of cases) {
     const required = requiredScopeForMcpRequest({

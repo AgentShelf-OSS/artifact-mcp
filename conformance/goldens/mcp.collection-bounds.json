@@ -1,0 +1,1588 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Large folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":0,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 0,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "Large folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":0,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 0,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Large folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1000,\"editable\":true},\"artifacts\":[{\"id\":\"bound0001\",\"title\":\"Reference 0001\",\"url\":\"http://conformance.test/bound0001\",\"category\":\"\"},{\"id\":\"bound0002\",\"title\":\"Reference 0002\",\"url\":\"http://conformance.test/bound0002\",\"category\":\"\"},{\"id\":\"bound0003\",\"title\":\"Reference 0003\",\"url\":\"http://conformance.test/bound0003\",\"category\":\"\"},{\"id\":\"bound0004\",\"title\":\"Reference 0004\",\"url\":\"http://conformance.test/bound0004\",\"category\":\"\"},{\"id\":\"bound0005\",\"title\":\"Reference 0005\",\"url\":\"http://conformance.test/bound0005\",\"category\":\"\"},{\"id\":\"bound0006\",\"title\":\"Reference 0006\",\"url\":\"http://conformance.test/bound0006\",\"category\":\"\"},{\"id\":\"bound0007\",\"title\":\"Reference 0007\",\"url\":\"http://conformance.test/bound0007\",\"category\":\"\"},{\"id\":\"bound0008\",\"title\":\"Reference 0008\",\"url\":\"http://conformance.test/bound0008\",\"category\":\"\"},{\"id\":\"bound0009\",\"title\":\"Reference 0009\",\"url\":\"http://conformance.test/bound0009\",\"category\":\"\"},{\"id\":\"bound0010\",\"title\":\"Reference 0010\",\"url\":\"http://conformance.test/bound0010\",\"category\":\"\"},{\"id\":\"bound0011\",\"title\":\"Reference 0011\",\"url\":\"http://conformance.test/bound0011\",\"category\":\"\"},{\"id\":\"bound0012\",\"title\":\"Reference 0012\",\"url\":\"http://conformance.test/bound0012\",\"category\":\"\"},{\"id\":\"bound0013\",\"title\":\"Reference 0013\",\"url\":\"http://conformance.test/bound0013\",\"category\":\"\"},{\"id\":\"bound0014\",\"title\":\"Reference 0014\",\"url\":\"http://conformance.test/bound0014\",\"category\":\"\"},{\"id\":\"bound0015\",\"title\":\"Reference 0015\",\"url\":\"http://conformance.test/bound0015\",\"category\":\"\"},{\"id\":\"bound0016\",\"title\":\"Reference 0016\",\"url\":\"http://conformance.test/bound0016\",\"category\":\"\"},{\"id\":\"bound0017\",\"title\":\"Reference 0017\",\"url\":\"http://conformance.test/bound0017\",\"category\":\"\"},{\"id\":\"bound0018\",\"title\":\"Reference 0018\",\"url\":\"http://conformance.test/bound0018\",\"category\":\"\"},{\"id\":\"bound0019\",\"title\":\"Reference 0019\",\"url\":\"http://conformance.test/bound0019\",\"category\":\"\"},{\"id\":\"bound0020\",\"title\":\"Reference 0020\",\"url\":\"http://conformance.test/bound0020\",\"category\":\"\"},{\"id\":\"bound0021\",\"title\":\"Reference 0021\",\"url\":\"http://conformance.test/bound0021\",\"category\":\"\"},{\"id\":\"bound0022\",\"title\":\"Reference 0022\",\"url\":\"http://conformance.test/bound0022\",\"category\":\"\"},{\"id\":\"bound0023\",\"title\":\"Reference 0023\",\"url\":\"http://conformance.test/bound0023\",\"category\":\"\"},{\"id\":\"bound0024\",\"title\":\"Reference 0024\",\"url\":\"http://conformance.test/bound0024\",\"category\":\"\"},{\"id\":\"bound0025\",\"title\":\"Reference 0025\",\"url\":\"http://conformance.test/bound0025\",\"category\":\"\"},{\"id\":\"bound0026\",\"title\":\"Reference 0026\",\"url\":\"http://conformance.test/bound0026\",\"category\":\"\"},{\"id\":\"bound0027\",\"title\":\"Reference 0027\",\"url\":\"http://conformance.test/bound0027\",\"category\":\"\"},{\"id\":\"bound0028\",\"title\":\"Reference 0028\",\"url\":\"http://conformance.test/bound0028\",\"category\":\"\"},{\"id\":\"bound0029\",\"title\":\"Reference 0029\",\"url\":\"http://conformance.test/bound0029\",\"category\":\"\"},{\"id\":\"bound0030\",\"title\":\"Reference 0030\",\"url\":\"http://conformance.test/bound0030\",\"category\":\"\"},{\"id\":\"bound0031\",\"title\":\"Reference 0031\",\"url\":\"http://conformance.test/bound0031\",\"category\":\"\"},{\"id\":\"bound0032\",\"title\":\"Reference 0032\",\"url\":\"http://conformance.test/bound0032\",\"category\":\"\"},{\"id\":\"bound0033\",\"title\":\"Reference 0033\",\"url\":\"http://conformance.test/bound0033\",\"category\":\"\"},{\"id\":\"bound0034\",\"title\":\"Reference 0034\",\"url\":\"http://conformance.test/bound0034\",\"category\":\"\"},{\"id\":\"bound0035\",\"title\":\"Reference 0035\",\"url\":\"http://conformance.test/bound0035\",\"category\":\"\"},{\"id\":\"bound0036\",\"title\":\"Reference 0036\",\"url\":\"http://conformance.test/bound0036\",\"category\":\"\"},{\"id\":\"bound0037\",\"title\":\"Reference 0037\",\"url\":\"http://conformance.test/bound0037\",\"category\":\"\"},{\"id\":\"bound0038\",\"title\":\"Reference 0038\",\"url\":\"http://conformance.test/bound0038\",\"category\":\"\"},{\"id\":\"bound0039\",\"title\":\"Reference 0039\",\"url\":\"http://conformance.test/bound0039\",\"category\":\"\"},{\"id\":\"bound0040\",\"title\":\"Reference 0040\",\"url\":\"http://conformance.test/bound0040\",\"category\":\"\"},{\"id\":\"bound0041\",\"title\":\"Reference 0041\",\"url\":\"http://conformance.test/bound0041\",\"category\":\"\"},{\"id\":\"bound0042\",\"title\":\"Reference 0042\",\"url\":\"http://conformance.test/bound0042\",\"category\":\"\"},{\"id\":\"bound0043\",\"title\":\"Reference 0043\",\"url\":\"http://conformance.test/bound0043\",\"category\":\"\"},{\"id\":\"bound0044\",\"title\":\"Reference 0044\",\"url\":\"http://conformance.test/bound0044\",\"category\":\"\"},{\"id\":\"bound0045\",\"title\":\"Reference 0045\",\"url\":\"http://conformance.test/bound0045\",\"category\":\"\"},{\"id\":\"bound0046\",\"title\":\"Reference 0046\",\"url\":\"http://conformance.test/bound0046\",\"category\":\"\"},{\"id\":\"bound0047\",\"title\":\"Reference 0047\",\"url\":\"http://conformance.test/bound0047\",\"category\":\"\"},{\"id\":\"bound0048\",\"title\":\"Reference 0048\",\"url\":\"http://conformance.test/bound0048\",\"category\":\"\"},{\"id\":\"bound0049\",\"title\":\"Reference 0049\",\"url\":\"http://conformance.test/bound0049\",\"category\":\"\"},{\"id\":\"bound0050\",\"title\":\"Reference 0050\",\"url\":\"http://conformance.test/bound0050\",\"category\":\"\"},{\"id\":\"bound0051\",\"title\":\"Reference 0051\",\"url\":\"http://conformance.test/bound0051\",\"category\":\"\"},{\"id\":\"bound0052\",\"title\":\"Reference 0052\",\"url\":\"http://conformance.test/bound0052\",\"category\":\"\"},{\"id\":\"bound0053\",\"title\":\"Reference 0053\",\"url\":\"http://conformance.test/bound0053\",\"category\":\"\"},{\"id\":\"bound0054\",\"title\":\"Reference 0054\",\"url\":\"http://conformance.test/bound0054\",\"category\":\"\"},{\"id\":\"bound0055\",\"title\":\"Reference 0055\",\"url\":\"http://conformance.test/bound0055\",\"category\":\"\"},{\"id\":\"bound0056\",\"title\":\"Reference 0056\",\"url\":\"http://conformance.test/bound0056\",\"category\":\"\"},{\"id\":\"bound0057\",\"title\":\"Reference 0057\",\"url\":\"http://conformance.test/bound0057\",\"category\":\"\"},{\"id\":\"bound0058\",\"title\":\"Reference 0058\",\"url\":\"http://conformance.test/bound0058\",\"category\":\"\"},{\"id\":\"bound0059\",\"title\":\"Reference 0059\",\"url\":\"http://conformance.test/bound0059\",\"category\":\"\"},{\"id\":\"bound0060\",\"title\":\"Reference 0060\",\"url\":\"http://conformance.test/bound0060\",\"category\":\"\"},{\"id\":\"bound0061\",\"title\":\"Reference 0061\",\"url\":\"http://conformance.test/bound0061\",\"category\":\"\"},{\"id\":\"bound0062\",\"title\":\"Reference 0062\",\"url\":\"http://conformance.test/bound0062\",\"category\":\"\"},{\"id\":\"bound0063\",\"title\":\"Reference 0063\",\"url\":\"http://conformance.test/bound0063\",\"category\":\"\"},{\"id\":\"bound0064\",\"title\":\"Reference 0064\",\"url\":\"http://conformance.test/bound0064\",\"category\":\"\"},{\"id\":\"bound0065\",\"title\":\"Reference 0065\",\"url\":\"http://conformance.test/bound0065\",\"category\":\"\"},{\"id\":\"bound0066\",\"title\":\"Reference 0066\",\"url\":\"http://conformance.test/bound0066\",\"category\":\"\"},{\"id\":\"bound0067\",\"title\":\"Reference 0067\",\"url\":\"http://conformance.test/bound0067\",\"category\":\"\"},{\"id\":\"bound0068\",\"title\":\"Reference 0068\",\"url\":\"http://conformance.test/bound0068\",\"category\":\"\"},{\"id\":\"bound0069\",\"title\":\"Reference 0069\",\"url\":\"http://conformance.test/bound0069\",\"category\":\"\"},{\"id\":\"bound0070\",\"title\":\"Reference 0070\",\"url\":\"http://conformance.test/bound0070\",\"category\":\"\"},{\"id\":\"bound0071\",\"title\":\"Reference 0071\",\"url\":\"http://conformance.test/bound0071\",\"category\":\"\"},{\"id\":\"bound0072\",\"title\":\"Reference 0072\",\"url\":\"http://conformance.test/bound0072\",\"category\":\"\"},{\"id\":\"bound0073\",\"title\":\"Reference 0073\",\"url\":\"http://conformance.test/bound0073\",\"category\":\"\"},{\"id\":\"bound0074\",\"title\":\"Reference 0074\",\"url\":\"http://conformance.test/bound0074\",\"category\":\"\"},{\"id\":\"bound0075\",\"title\":\"Reference 0075\",\"url\":\"http://conformance.test/bound0075\",\"category\":\"\"},{\"id\":\"bound0076\",\"title\":\"Reference 0076\",\"url\":\"http://conformance.test/bound0076\",\"category\":\"\"},{\"id\":\"bound0077\",\"title\":\"Reference 0077\",\"url\":\"http://conformance.test/bound0077\",\"category\":\"\"},{\"id\":\"bound0078\",\"title\":\"Reference 0078\",\"url\":\"http://conformance.test/bound0078\",\"category\":\"\"},{\"id\":\"bound0079\",\"title\":\"Reference 0079\",\"url\":\"http://conformance.test/bound0079\",\"category\":\"\"},{\"id\":\"bound0080\",\"title\":\"Reference 0080\",\"url\":\"http://conformance.test/bound0080\",\"category\":\"\"},{\"id\":\"bound0081\",\"title\":\"Reference 0081\",\"url\":\"http://conformance.test/bound0081\",\"category\":\"\"},{\"id\":\"bound0082\",\"title\":\"Reference 0082\",\"url\":\"http://conformance.test/bound0082\",\"category\":\"\"},{\"id\":\"bound0083\",\"title\":\"Reference 0083\",\"url\":\"http://conformance.test/bound0083\",\"category\":\"\"},{\"id\":\"bound0084\",\"title\":\"Reference 0084\",\"url\":\"http://conformance.test/bound0084\",\"category\":\"\"},{\"id\":\"bound0085\",\"title\":\"Reference 0085\",\"url\":\"http://conformance.test/bound0085\",\"category\":\"\"},{\"id\":\"bound0086\",\"title\":\"Reference 0086\",\"url\":\"http://conformance.test/bound0086\",\"category\":\"\"},{\"id\":\"bound0087\",\"title\":\"Reference 0087\",\"url\":\"http://conformance.test/bound0087\",\"category\":\"\"},{\"id\":\"bound0088\",\"title\":\"Reference 0088\",\"url\":\"http://conformance.test/bound0088\",\"category\":\"\"},{\"id\":\"bound0089\",\"title\":\"Reference 0089\",\"url\":\"http://conformance.test/bound0089\",\"category\":\"\"},{\"id\":\"bound0090\",\"title\":\"Reference 0090\",\"url\":\"http://conformance.test/bound0090\",\"category\":\"\"},{\"id\":\"bound0091\",\"title\":\"Reference 0091\",\"url\":\"http://conformance.test/bound0091\",\"category\":\"\"},{\"id\":\"bound0092\",\"title\":\"Reference 0092\",\"url\":\"http://conformance.test/bound0092\",\"category\":\"\"},{\"id\":\"bound0093\",\"title\":\"Reference 0093\",\"url\":\"http://conformance.test/bound0093\",\"category\":\"\"},{\"id\":\"bound0094\",\"title\":\"Reference 0094\",\"url\":\"http://conformance.test/bound0094\",\"category\":\"\"},{\"id\":\"bound0095\",\"title\":\"Reference 0095\",\"url\":\"http://conformance.test/bound0095\",\"category\":\"\"},{\"id\":\"bound0096\",\"title\":\"Reference 0096\",\"url\":\"http://conformance.test/bound0096\",\"category\":\"\"},{\"id\":\"bound0097\",\"title\":\"Reference 0097\",\"url\":\"http://conformance.test/bound0097\",\"category\":\"\"},{\"id\":\"bound0098\",\"title\":\"Reference 0098\",\"url\":\"http://conformance.test/bound0098\",\"category\":\"\"},{\"id\":\"bound0099\",\"title\":\"Reference 0099\",\"url\":\"http://conformance.test/bound0099\",\"category\":\"\"},{\"id\":\"bound0100\",\"title\":\"Reference 0100\",\"url\":\"http://conformance.test/bound0100\",\"category\":\"\"}],\"next_cursor\":\"${members_cursor}\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "bound0001",
+                  "title": "Reference 0001",
+                  "url": "http://conformance.test/bound0001"
+                },
+                {
+                  "category": "",
+                  "id": "bound0002",
+                  "title": "Reference 0002",
+                  "url": "http://conformance.test/bound0002"
+                },
+                {
+                  "category": "",
+                  "id": "bound0003",
+                  "title": "Reference 0003",
+                  "url": "http://conformance.test/bound0003"
+                },
+                {
+                  "category": "",
+                  "id": "bound0004",
+                  "title": "Reference 0004",
+                  "url": "http://conformance.test/bound0004"
+                },
+                {
+                  "category": "",
+                  "id": "bound0005",
+                  "title": "Reference 0005",
+                  "url": "http://conformance.test/bound0005"
+                },
+                {
+                  "category": "",
+                  "id": "bound0006",
+                  "title": "Reference 0006",
+                  "url": "http://conformance.test/bound0006"
+                },
+                {
+                  "category": "",
+                  "id": "bound0007",
+                  "title": "Reference 0007",
+                  "url": "http://conformance.test/bound0007"
+                },
+                {
+                  "category": "",
+                  "id": "bound0008",
+                  "title": "Reference 0008",
+                  "url": "http://conformance.test/bound0008"
+                },
+                {
+                  "category": "",
+                  "id": "bound0009",
+                  "title": "Reference 0009",
+                  "url": "http://conformance.test/bound0009"
+                },
+                {
+                  "category": "",
+                  "id": "bound0010",
+                  "title": "Reference 0010",
+                  "url": "http://conformance.test/bound0010"
+                },
+                {
+                  "category": "",
+                  "id": "bound0011",
+                  "title": "Reference 0011",
+                  "url": "http://conformance.test/bound0011"
+                },
+                {
+                  "category": "",
+                  "id": "bound0012",
+                  "title": "Reference 0012",
+                  "url": "http://conformance.test/bound0012"
+                },
+                {
+                  "category": "",
+                  "id": "bound0013",
+                  "title": "Reference 0013",
+                  "url": "http://conformance.test/bound0013"
+                },
+                {
+                  "category": "",
+                  "id": "bound0014",
+                  "title": "Reference 0014",
+                  "url": "http://conformance.test/bound0014"
+                },
+                {
+                  "category": "",
+                  "id": "bound0015",
+                  "title": "Reference 0015",
+                  "url": "http://conformance.test/bound0015"
+                },
+                {
+                  "category": "",
+                  "id": "bound0016",
+                  "title": "Reference 0016",
+                  "url": "http://conformance.test/bound0016"
+                },
+                {
+                  "category": "",
+                  "id": "bound0017",
+                  "title": "Reference 0017",
+                  "url": "http://conformance.test/bound0017"
+                },
+                {
+                  "category": "",
+                  "id": "bound0018",
+                  "title": "Reference 0018",
+                  "url": "http://conformance.test/bound0018"
+                },
+                {
+                  "category": "",
+                  "id": "bound0019",
+                  "title": "Reference 0019",
+                  "url": "http://conformance.test/bound0019"
+                },
+                {
+                  "category": "",
+                  "id": "bound0020",
+                  "title": "Reference 0020",
+                  "url": "http://conformance.test/bound0020"
+                },
+                {
+                  "category": "",
+                  "id": "bound0021",
+                  "title": "Reference 0021",
+                  "url": "http://conformance.test/bound0021"
+                },
+                {
+                  "category": "",
+                  "id": "bound0022",
+                  "title": "Reference 0022",
+                  "url": "http://conformance.test/bound0022"
+                },
+                {
+                  "category": "",
+                  "id": "bound0023",
+                  "title": "Reference 0023",
+                  "url": "http://conformance.test/bound0023"
+                },
+                {
+                  "category": "",
+                  "id": "bound0024",
+                  "title": "Reference 0024",
+                  "url": "http://conformance.test/bound0024"
+                },
+                {
+                  "category": "",
+                  "id": "bound0025",
+                  "title": "Reference 0025",
+                  "url": "http://conformance.test/bound0025"
+                },
+                {
+                  "category": "",
+                  "id": "bound0026",
+                  "title": "Reference 0026",
+                  "url": "http://conformance.test/bound0026"
+                },
+                {
+                  "category": "",
+                  "id": "bound0027",
+                  "title": "Reference 0027",
+                  "url": "http://conformance.test/bound0027"
+                },
+                {
+                  "category": "",
+                  "id": "bound0028",
+                  "title": "Reference 0028",
+                  "url": "http://conformance.test/bound0028"
+                },
+                {
+                  "category": "",
+                  "id": "bound0029",
+                  "title": "Reference 0029",
+                  "url": "http://conformance.test/bound0029"
+                },
+                {
+                  "category": "",
+                  "id": "bound0030",
+                  "title": "Reference 0030",
+                  "url": "http://conformance.test/bound0030"
+                },
+                {
+                  "category": "",
+                  "id": "bound0031",
+                  "title": "Reference 0031",
+                  "url": "http://conformance.test/bound0031"
+                },
+                {
+                  "category": "",
+                  "id": "bound0032",
+                  "title": "Reference 0032",
+                  "url": "http://conformance.test/bound0032"
+                },
+                {
+                  "category": "",
+                  "id": "bound0033",
+                  "title": "Reference 0033",
+                  "url": "http://conformance.test/bound0033"
+                },
+                {
+                  "category": "",
+                  "id": "bound0034",
+                  "title": "Reference 0034",
+                  "url": "http://conformance.test/bound0034"
+                },
+                {
+                  "category": "",
+                  "id": "bound0035",
+                  "title": "Reference 0035",
+                  "url": "http://conformance.test/bound0035"
+                },
+                {
+                  "category": "",
+                  "id": "bound0036",
+                  "title": "Reference 0036",
+                  "url": "http://conformance.test/bound0036"
+                },
+                {
+                  "category": "",
+                  "id": "bound0037",
+                  "title": "Reference 0037",
+                  "url": "http://conformance.test/bound0037"
+                },
+                {
+                  "category": "",
+                  "id": "bound0038",
+                  "title": "Reference 0038",
+                  "url": "http://conformance.test/bound0038"
+                },
+                {
+                  "category": "",
+                  "id": "bound0039",
+                  "title": "Reference 0039",
+                  "url": "http://conformance.test/bound0039"
+                },
+                {
+                  "category": "",
+                  "id": "bound0040",
+                  "title": "Reference 0040",
+                  "url": "http://conformance.test/bound0040"
+                },
+                {
+                  "category": "",
+                  "id": "bound0041",
+                  "title": "Reference 0041",
+                  "url": "http://conformance.test/bound0041"
+                },
+                {
+                  "category": "",
+                  "id": "bound0042",
+                  "title": "Reference 0042",
+                  "url": "http://conformance.test/bound0042"
+                },
+                {
+                  "category": "",
+                  "id": "bound0043",
+                  "title": "Reference 0043",
+                  "url": "http://conformance.test/bound0043"
+                },
+                {
+                  "category": "",
+                  "id": "bound0044",
+                  "title": "Reference 0044",
+                  "url": "http://conformance.test/bound0044"
+                },
+                {
+                  "category": "",
+                  "id": "bound0045",
+                  "title": "Reference 0045",
+                  "url": "http://conformance.test/bound0045"
+                },
+                {
+                  "category": "",
+                  "id": "bound0046",
+                  "title": "Reference 0046",
+                  "url": "http://conformance.test/bound0046"
+                },
+                {
+                  "category": "",
+                  "id": "bound0047",
+                  "title": "Reference 0047",
+                  "url": "http://conformance.test/bound0047"
+                },
+                {
+                  "category": "",
+                  "id": "bound0048",
+                  "title": "Reference 0048",
+                  "url": "http://conformance.test/bound0048"
+                },
+                {
+                  "category": "",
+                  "id": "bound0049",
+                  "title": "Reference 0049",
+                  "url": "http://conformance.test/bound0049"
+                },
+                {
+                  "category": "",
+                  "id": "bound0050",
+                  "title": "Reference 0050",
+                  "url": "http://conformance.test/bound0050"
+                },
+                {
+                  "category": "",
+                  "id": "bound0051",
+                  "title": "Reference 0051",
+                  "url": "http://conformance.test/bound0051"
+                },
+                {
+                  "category": "",
+                  "id": "bound0052",
+                  "title": "Reference 0052",
+                  "url": "http://conformance.test/bound0052"
+                },
+                {
+                  "category": "",
+                  "id": "bound0053",
+                  "title": "Reference 0053",
+                  "url": "http://conformance.test/bound0053"
+                },
+                {
+                  "category": "",
+                  "id": "bound0054",
+                  "title": "Reference 0054",
+                  "url": "http://conformance.test/bound0054"
+                },
+                {
+                  "category": "",
+                  "id": "bound0055",
+                  "title": "Reference 0055",
+                  "url": "http://conformance.test/bound0055"
+                },
+                {
+                  "category": "",
+                  "id": "bound0056",
+                  "title": "Reference 0056",
+                  "url": "http://conformance.test/bound0056"
+                },
+                {
+                  "category": "",
+                  "id": "bound0057",
+                  "title": "Reference 0057",
+                  "url": "http://conformance.test/bound0057"
+                },
+                {
+                  "category": "",
+                  "id": "bound0058",
+                  "title": "Reference 0058",
+                  "url": "http://conformance.test/bound0058"
+                },
+                {
+                  "category": "",
+                  "id": "bound0059",
+                  "title": "Reference 0059",
+                  "url": "http://conformance.test/bound0059"
+                },
+                {
+                  "category": "",
+                  "id": "bound0060",
+                  "title": "Reference 0060",
+                  "url": "http://conformance.test/bound0060"
+                },
+                {
+                  "category": "",
+                  "id": "bound0061",
+                  "title": "Reference 0061",
+                  "url": "http://conformance.test/bound0061"
+                },
+                {
+                  "category": "",
+                  "id": "bound0062",
+                  "title": "Reference 0062",
+                  "url": "http://conformance.test/bound0062"
+                },
+                {
+                  "category": "",
+                  "id": "bound0063",
+                  "title": "Reference 0063",
+                  "url": "http://conformance.test/bound0063"
+                },
+                {
+                  "category": "",
+                  "id": "bound0064",
+                  "title": "Reference 0064",
+                  "url": "http://conformance.test/bound0064"
+                },
+                {
+                  "category": "",
+                  "id": "bound0065",
+                  "title": "Reference 0065",
+                  "url": "http://conformance.test/bound0065"
+                },
+                {
+                  "category": "",
+                  "id": "bound0066",
+                  "title": "Reference 0066",
+                  "url": "http://conformance.test/bound0066"
+                },
+                {
+                  "category": "",
+                  "id": "bound0067",
+                  "title": "Reference 0067",
+                  "url": "http://conformance.test/bound0067"
+                },
+                {
+                  "category": "",
+                  "id": "bound0068",
+                  "title": "Reference 0068",
+                  "url": "http://conformance.test/bound0068"
+                },
+                {
+                  "category": "",
+                  "id": "bound0069",
+                  "title": "Reference 0069",
+                  "url": "http://conformance.test/bound0069"
+                },
+                {
+                  "category": "",
+                  "id": "bound0070",
+                  "title": "Reference 0070",
+                  "url": "http://conformance.test/bound0070"
+                },
+                {
+                  "category": "",
+                  "id": "bound0071",
+                  "title": "Reference 0071",
+                  "url": "http://conformance.test/bound0071"
+                },
+                {
+                  "category": "",
+                  "id": "bound0072",
+                  "title": "Reference 0072",
+                  "url": "http://conformance.test/bound0072"
+                },
+                {
+                  "category": "",
+                  "id": "bound0073",
+                  "title": "Reference 0073",
+                  "url": "http://conformance.test/bound0073"
+                },
+                {
+                  "category": "",
+                  "id": "bound0074",
+                  "title": "Reference 0074",
+                  "url": "http://conformance.test/bound0074"
+                },
+                {
+                  "category": "",
+                  "id": "bound0075",
+                  "title": "Reference 0075",
+                  "url": "http://conformance.test/bound0075"
+                },
+                {
+                  "category": "",
+                  "id": "bound0076",
+                  "title": "Reference 0076",
+                  "url": "http://conformance.test/bound0076"
+                },
+                {
+                  "category": "",
+                  "id": "bound0077",
+                  "title": "Reference 0077",
+                  "url": "http://conformance.test/bound0077"
+                },
+                {
+                  "category": "",
+                  "id": "bound0078",
+                  "title": "Reference 0078",
+                  "url": "http://conformance.test/bound0078"
+                },
+                {
+                  "category": "",
+                  "id": "bound0079",
+                  "title": "Reference 0079",
+                  "url": "http://conformance.test/bound0079"
+                },
+                {
+                  "category": "",
+                  "id": "bound0080",
+                  "title": "Reference 0080",
+                  "url": "http://conformance.test/bound0080"
+                },
+                {
+                  "category": "",
+                  "id": "bound0081",
+                  "title": "Reference 0081",
+                  "url": "http://conformance.test/bound0081"
+                },
+                {
+                  "category": "",
+                  "id": "bound0082",
+                  "title": "Reference 0082",
+                  "url": "http://conformance.test/bound0082"
+                },
+                {
+                  "category": "",
+                  "id": "bound0083",
+                  "title": "Reference 0083",
+                  "url": "http://conformance.test/bound0083"
+                },
+                {
+                  "category": "",
+                  "id": "bound0084",
+                  "title": "Reference 0084",
+                  "url": "http://conformance.test/bound0084"
+                },
+                {
+                  "category": "",
+                  "id": "bound0085",
+                  "title": "Reference 0085",
+                  "url": "http://conformance.test/bound0085"
+                },
+                {
+                  "category": "",
+                  "id": "bound0086",
+                  "title": "Reference 0086",
+                  "url": "http://conformance.test/bound0086"
+                },
+                {
+                  "category": "",
+                  "id": "bound0087",
+                  "title": "Reference 0087",
+                  "url": "http://conformance.test/bound0087"
+                },
+                {
+                  "category": "",
+                  "id": "bound0088",
+                  "title": "Reference 0088",
+                  "url": "http://conformance.test/bound0088"
+                },
+                {
+                  "category": "",
+                  "id": "bound0089",
+                  "title": "Reference 0089",
+                  "url": "http://conformance.test/bound0089"
+                },
+                {
+                  "category": "",
+                  "id": "bound0090",
+                  "title": "Reference 0090",
+                  "url": "http://conformance.test/bound0090"
+                },
+                {
+                  "category": "",
+                  "id": "bound0091",
+                  "title": "Reference 0091",
+                  "url": "http://conformance.test/bound0091"
+                },
+                {
+                  "category": "",
+                  "id": "bound0092",
+                  "title": "Reference 0092",
+                  "url": "http://conformance.test/bound0092"
+                },
+                {
+                  "category": "",
+                  "id": "bound0093",
+                  "title": "Reference 0093",
+                  "url": "http://conformance.test/bound0093"
+                },
+                {
+                  "category": "",
+                  "id": "bound0094",
+                  "title": "Reference 0094",
+                  "url": "http://conformance.test/bound0094"
+                },
+                {
+                  "category": "",
+                  "id": "bound0095",
+                  "title": "Reference 0095",
+                  "url": "http://conformance.test/bound0095"
+                },
+                {
+                  "category": "",
+                  "id": "bound0096",
+                  "title": "Reference 0096",
+                  "url": "http://conformance.test/bound0096"
+                },
+                {
+                  "category": "",
+                  "id": "bound0097",
+                  "title": "Reference 0097",
+                  "url": "http://conformance.test/bound0097"
+                },
+                {
+                  "category": "",
+                  "id": "bound0098",
+                  "title": "Reference 0098",
+                  "url": "http://conformance.test/bound0098"
+                },
+                {
+                  "category": "",
+                  "id": "bound0099",
+                  "title": "Reference 0099",
+                  "url": "http://conformance.test/bound0099"
+                },
+                {
+                  "category": "",
+                  "id": "bound0100",
+                  "title": "Reference 0100",
+                  "url": "http://conformance.test/bound0100"
+                }
+              ],
+              "collection": {
+                "artifact_count": 1000,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "Large folder",
+                "org": "acme"
+              },
+              "next_cursor": "${members_cursor}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Large folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1000,\"editable\":true},\"artifacts\":[{\"id\":\"bound0101\",\"title\":\"Reference 0101\",\"url\":\"http://conformance.test/bound0101\",\"category\":\"\"},{\"id\":\"bound0102\",\"title\":\"Reference 0102\",\"url\":\"http://conformance.test/bound0102\",\"category\":\"\"},{\"id\":\"bound0103\",\"title\":\"Reference 0103\",\"url\":\"http://conformance.test/bound0103\",\"category\":\"\"},{\"id\":\"bound0104\",\"title\":\"Reference 0104\",\"url\":\"http://conformance.test/bound0104\",\"category\":\"\"},{\"id\":\"bound0105\",\"title\":\"Reference 0105\",\"url\":\"http://conformance.test/bound0105\",\"category\":\"\"},{\"id\":\"bound0106\",\"title\":\"Reference 0106\",\"url\":\"http://conformance.test/bound0106\",\"category\":\"\"},{\"id\":\"bound0107\",\"title\":\"Reference 0107\",\"url\":\"http://conformance.test/bound0107\",\"category\":\"\"},{\"id\":\"bound0108\",\"title\":\"Reference 0108\",\"url\":\"http://conformance.test/bound0108\",\"category\":\"\"},{\"id\":\"bound0109\",\"title\":\"Reference 0109\",\"url\":\"http://conformance.test/bound0109\",\"category\":\"\"},{\"id\":\"bound0110\",\"title\":\"Reference 0110\",\"url\":\"http://conformance.test/bound0110\",\"category\":\"\"},{\"id\":\"bound0111\",\"title\":\"Reference 0111\",\"url\":\"http://conformance.test/bound0111\",\"category\":\"\"},{\"id\":\"bound0112\",\"title\":\"Reference 0112\",\"url\":\"http://conformance.test/bound0112\",\"category\":\"\"},{\"id\":\"bound0113\",\"title\":\"Reference 0113\",\"url\":\"http://conformance.test/bound0113\",\"category\":\"\"},{\"id\":\"bound0114\",\"title\":\"Reference 0114\",\"url\":\"http://conformance.test/bound0114\",\"category\":\"\"},{\"id\":\"bound0115\",\"title\":\"Reference 0115\",\"url\":\"http://conformance.test/bound0115\",\"category\":\"\"},{\"id\":\"bound0116\",\"title\":\"Reference 0116\",\"url\":\"http://conformance.test/bound0116\",\"category\":\"\"},{\"id\":\"bound0117\",\"title\":\"Reference 0117\",\"url\":\"http://conformance.test/bound0117\",\"category\":\"\"},{\"id\":\"bound0118\",\"title\":\"Reference 0118\",\"url\":\"http://conformance.test/bound0118\",\"category\":\"\"},{\"id\":\"bound0119\",\"title\":\"Reference 0119\",\"url\":\"http://conformance.test/bound0119\",\"category\":\"\"},{\"id\":\"bound0120\",\"title\":\"Reference 0120\",\"url\":\"http://conformance.test/bound0120\",\"category\":\"\"},{\"id\":\"bound0121\",\"title\":\"Reference 0121\",\"url\":\"http://conformance.test/bound0121\",\"category\":\"\"},{\"id\":\"bound0122\",\"title\":\"Reference 0122\",\"url\":\"http://conformance.test/bound0122\",\"category\":\"\"},{\"id\":\"bound0123\",\"title\":\"Reference 0123\",\"url\":\"http://conformance.test/bound0123\",\"category\":\"\"},{\"id\":\"bound0124\",\"title\":\"Reference 0124\",\"url\":\"http://conformance.test/bound0124\",\"category\":\"\"},{\"id\":\"bound0125\",\"title\":\"Reference 0125\",\"url\":\"http://conformance.test/bound0125\",\"category\":\"\"},{\"id\":\"bound0126\",\"title\":\"Reference 0126\",\"url\":\"http://conformance.test/bound0126\",\"category\":\"\"},{\"id\":\"bound0127\",\"title\":\"Reference 0127\",\"url\":\"http://conformance.test/bound0127\",\"category\":\"\"},{\"id\":\"bound0128\",\"title\":\"Reference 0128\",\"url\":\"http://conformance.test/bound0128\",\"category\":\"\"},{\"id\":\"bound0129\",\"title\":\"Reference 0129\",\"url\":\"http://conformance.test/bound0129\",\"category\":\"\"},{\"id\":\"bound0130\",\"title\":\"Reference 0130\",\"url\":\"http://conformance.test/bound0130\",\"category\":\"\"},{\"id\":\"bound0131\",\"title\":\"Reference 0131\",\"url\":\"http://conformance.test/bound0131\",\"category\":\"\"},{\"id\":\"bound0132\",\"title\":\"Reference 0132\",\"url\":\"http://conformance.test/bound0132\",\"category\":\"\"},{\"id\":\"bound0133\",\"title\":\"Reference 0133\",\"url\":\"http://conformance.test/bound0133\",\"category\":\"\"},{\"id\":\"bound0134\",\"title\":\"Reference 0134\",\"url\":\"http://conformance.test/bound0134\",\"category\":\"\"},{\"id\":\"bound0135\",\"title\":\"Reference 0135\",\"url\":\"http://conformance.test/bound0135\",\"category\":\"\"},{\"id\":\"bound0136\",\"title\":\"Reference 0136\",\"url\":\"http://conformance.test/bound0136\",\"category\":\"\"},{\"id\":\"bound0137\",\"title\":\"Reference 0137\",\"url\":\"http://conformance.test/bound0137\",\"category\":\"\"},{\"id\":\"bound0138\",\"title\":\"Reference 0138\",\"url\":\"http://conformance.test/bound0138\",\"category\":\"\"},{\"id\":\"bound0139\",\"title\":\"Reference 0139\",\"url\":\"http://conformance.test/bound0139\",\"category\":\"\"},{\"id\":\"bound0140\",\"title\":\"Reference 0140\",\"url\":\"http://conformance.test/bound0140\",\"category\":\"\"},{\"id\":\"bound0141\",\"title\":\"Reference 0141\",\"url\":\"http://conformance.test/bound0141\",\"category\":\"\"},{\"id\":\"bound0142\",\"title\":\"Reference 0142\",\"url\":\"http://conformance.test/bound0142\",\"category\":\"\"},{\"id\":\"bound0143\",\"title\":\"Reference 0143\",\"url\":\"http://conformance.test/bound0143\",\"category\":\"\"},{\"id\":\"bound0144\",\"title\":\"Reference 0144\",\"url\":\"http://conformance.test/bound0144\",\"category\":\"\"},{\"id\":\"bound0145\",\"title\":\"Reference 0145\",\"url\":\"http://conformance.test/bound0145\",\"category\":\"\"},{\"id\":\"bound0146\",\"title\":\"Reference 0146\",\"url\":\"http://conformance.test/bound0146\",\"category\":\"\"},{\"id\":\"bound0147\",\"title\":\"Reference 0147\",\"url\":\"http://conformance.test/bound0147\",\"category\":\"\"},{\"id\":\"bound0148\",\"title\":\"Reference 0148\",\"url\":\"http://conformance.test/bound0148\",\"category\":\"\"},{\"id\":\"bound0149\",\"title\":\"Reference 0149\",\"url\":\"http://conformance.test/bound0149\",\"category\":\"\"},{\"id\":\"bound0150\",\"title\":\"Reference 0150\",\"url\":\"http://conformance.test/bound0150\",\"category\":\"\"},{\"id\":\"bound0151\",\"title\":\"Reference 0151\",\"url\":\"http://conformance.test/bound0151\",\"category\":\"\"},{\"id\":\"bound0152\",\"title\":\"Reference 0152\",\"url\":\"http://conformance.test/bound0152\",\"category\":\"\"},{\"id\":\"bound0153\",\"title\":\"Reference 0153\",\"url\":\"http://conformance.test/bound0153\",\"category\":\"\"},{\"id\":\"bound0154\",\"title\":\"Reference 0154\",\"url\":\"http://conformance.test/bound0154\",\"category\":\"\"},{\"id\":\"bound0155\",\"title\":\"Reference 0155\",\"url\":\"http://conformance.test/bound0155\",\"category\":\"\"},{\"id\":\"bound0156\",\"title\":\"Reference 0156\",\"url\":\"http://conformance.test/bound0156\",\"category\":\"\"},{\"id\":\"bound0157\",\"title\":\"Reference 0157\",\"url\":\"http://conformance.test/bound0157\",\"category\":\"\"},{\"id\":\"bound0158\",\"title\":\"Reference 0158\",\"url\":\"http://conformance.test/bound0158\",\"category\":\"\"},{\"id\":\"bound0159\",\"title\":\"Reference 0159\",\"url\":\"http://conformance.test/bound0159\",\"category\":\"\"},{\"id\":\"bound0160\",\"title\":\"Reference 0160\",\"url\":\"http://conformance.test/bound0160\",\"category\":\"\"},{\"id\":\"bound0161\",\"title\":\"Reference 0161\",\"url\":\"http://conformance.test/bound0161\",\"category\":\"\"},{\"id\":\"bound0162\",\"title\":\"Reference 0162\",\"url\":\"http://conformance.test/bound0162\",\"category\":\"\"},{\"id\":\"bound0163\",\"title\":\"Reference 0163\",\"url\":\"http://conformance.test/bound0163\",\"category\":\"\"},{\"id\":\"bound0164\",\"title\":\"Reference 0164\",\"url\":\"http://conformance.test/bound0164\",\"category\":\"\"},{\"id\":\"bound0165\",\"title\":\"Reference 0165\",\"url\":\"http://conformance.test/bound0165\",\"category\":\"\"},{\"id\":\"bound0166\",\"title\":\"Reference 0166\",\"url\":\"http://conformance.test/bound0166\",\"category\":\"\"},{\"id\":\"bound0167\",\"title\":\"Reference 0167\",\"url\":\"http://conformance.test/bound0167\",\"category\":\"\"},{\"id\":\"bound0168\",\"title\":\"Reference 0168\",\"url\":\"http://conformance.test/bound0168\",\"category\":\"\"},{\"id\":\"bound0169\",\"title\":\"Reference 0169\",\"url\":\"http://conformance.test/bound0169\",\"category\":\"\"},{\"id\":\"bound0170\",\"title\":\"Reference 0170\",\"url\":\"http://conformance.test/bound0170\",\"category\":\"\"},{\"id\":\"bound0171\",\"title\":\"Reference 0171\",\"url\":\"http://conformance.test/bound0171\",\"category\":\"\"},{\"id\":\"bound0172\",\"title\":\"Reference 0172\",\"url\":\"http://conformance.test/bound0172\",\"category\":\"\"},{\"id\":\"bound0173\",\"title\":\"Reference 0173\",\"url\":\"http://conformance.test/bound0173\",\"category\":\"\"},{\"id\":\"bound0174\",\"title\":\"Reference 0174\",\"url\":\"http://conformance.test/bound0174\",\"category\":\"\"},{\"id\":\"bound0175\",\"title\":\"Reference 0175\",\"url\":\"http://conformance.test/bound0175\",\"category\":\"\"},{\"id\":\"bound0176\",\"title\":\"Reference 0176\",\"url\":\"http://conformance.test/bound0176\",\"category\":\"\"},{\"id\":\"bound0177\",\"title\":\"Reference 0177\",\"url\":\"http://conformance.test/bound0177\",\"category\":\"\"},{\"id\":\"bound0178\",\"title\":\"Reference 0178\",\"url\":\"http://conformance.test/bound0178\",\"category\":\"\"},{\"id\":\"bound0179\",\"title\":\"Reference 0179\",\"url\":\"http://conformance.test/bound0179\",\"category\":\"\"},{\"id\":\"bound0180\",\"title\":\"Reference 0180\",\"url\":\"http://conformance.test/bound0180\",\"category\":\"\"},{\"id\":\"bound0181\",\"title\":\"Reference 0181\",\"url\":\"http://conformance.test/bound0181\",\"category\":\"\"},{\"id\":\"bound0182\",\"title\":\"Reference 0182\",\"url\":\"http://conformance.test/bound0182\",\"category\":\"\"},{\"id\":\"bound0183\",\"title\":\"Reference 0183\",\"url\":\"http://conformance.test/bound0183\",\"category\":\"\"},{\"id\":\"bound0184\",\"title\":\"Reference 0184\",\"url\":\"http://conformance.test/bound0184\",\"category\":\"\"},{\"id\":\"bound0185\",\"title\":\"Reference 0185\",\"url\":\"http://conformance.test/bound0185\",\"category\":\"\"},{\"id\":\"bound0186\",\"title\":\"Reference 0186\",\"url\":\"http://conformance.test/bound0186\",\"category\":\"\"},{\"id\":\"bound0187\",\"title\":\"Reference 0187\",\"url\":\"http://conformance.test/bound0187\",\"category\":\"\"},{\"id\":\"bound0188\",\"title\":\"Reference 0188\",\"url\":\"http://conformance.test/bound0188\",\"category\":\"\"},{\"id\":\"bound0189\",\"title\":\"Reference 0189\",\"url\":\"http://conformance.test/bound0189\",\"category\":\"\"},{\"id\":\"bound0190\",\"title\":\"Reference 0190\",\"url\":\"http://conformance.test/bound0190\",\"category\":\"\"},{\"id\":\"bound0191\",\"title\":\"Reference 0191\",\"url\":\"http://conformance.test/bound0191\",\"category\":\"\"},{\"id\":\"bound0192\",\"title\":\"Reference 0192\",\"url\":\"http://conformance.test/bound0192\",\"category\":\"\"},{\"id\":\"bound0193\",\"title\":\"Reference 0193\",\"url\":\"http://conformance.test/bound0193\",\"category\":\"\"},{\"id\":\"bound0194\",\"title\":\"Reference 0194\",\"url\":\"http://conformance.test/bound0194\",\"category\":\"\"},{\"id\":\"bound0195\",\"title\":\"Reference 0195\",\"url\":\"http://conformance.test/bound0195\",\"category\":\"\"},{\"id\":\"bound0196\",\"title\":\"Reference 0196\",\"url\":\"http://conformance.test/bound0196\",\"category\":\"\"},{\"id\":\"bound0197\",\"title\":\"Reference 0197\",\"url\":\"http://conformance.test/bound0197\",\"category\":\"\"},{\"id\":\"bound0198\",\"title\":\"Reference 0198\",\"url\":\"http://conformance.test/bound0198\",\"category\":\"\"},{\"id\":\"bound0199\",\"title\":\"Reference 0199\",\"url\":\"http://conformance.test/bound0199\",\"category\":\"\"},{\"id\":\"bound0200\",\"title\":\"Reference 0200\",\"url\":\"http://conformance.test/bound0200\",\"category\":\"\"}],\"next_cursor\":\"${members_cursor_2}\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "bound0101",
+                  "title": "Reference 0101",
+                  "url": "http://conformance.test/bound0101"
+                },
+                {
+                  "category": "",
+                  "id": "bound0102",
+                  "title": "Reference 0102",
+                  "url": "http://conformance.test/bound0102"
+                },
+                {
+                  "category": "",
+                  "id": "bound0103",
+                  "title": "Reference 0103",
+                  "url": "http://conformance.test/bound0103"
+                },
+                {
+                  "category": "",
+                  "id": "bound0104",
+                  "title": "Reference 0104",
+                  "url": "http://conformance.test/bound0104"
+                },
+                {
+                  "category": "",
+                  "id": "bound0105",
+                  "title": "Reference 0105",
+                  "url": "http://conformance.test/bound0105"
+                },
+                {
+                  "category": "",
+                  "id": "bound0106",
+                  "title": "Reference 0106",
+                  "url": "http://conformance.test/bound0106"
+                },
+                {
+                  "category": "",
+                  "id": "bound0107",
+                  "title": "Reference 0107",
+                  "url": "http://conformance.test/bound0107"
+                },
+                {
+                  "category": "",
+                  "id": "bound0108",
+                  "title": "Reference 0108",
+                  "url": "http://conformance.test/bound0108"
+                },
+                {
+                  "category": "",
+                  "id": "bound0109",
+                  "title": "Reference 0109",
+                  "url": "http://conformance.test/bound0109"
+                },
+                {
+                  "category": "",
+                  "id": "bound0110",
+                  "title": "Reference 0110",
+                  "url": "http://conformance.test/bound0110"
+                },
+                {
+                  "category": "",
+                  "id": "bound0111",
+                  "title": "Reference 0111",
+                  "url": "http://conformance.test/bound0111"
+                },
+                {
+                  "category": "",
+                  "id": "bound0112",
+                  "title": "Reference 0112",
+                  "url": "http://conformance.test/bound0112"
+                },
+                {
+                  "category": "",
+                  "id": "bound0113",
+                  "title": "Reference 0113",
+                  "url": "http://conformance.test/bound0113"
+                },
+                {
+                  "category": "",
+                  "id": "bound0114",
+                  "title": "Reference 0114",
+                  "url": "http://conformance.test/bound0114"
+                },
+                {
+                  "category": "",
+                  "id": "bound0115",
+                  "title": "Reference 0115",
+                  "url": "http://conformance.test/bound0115"
+                },
+                {
+                  "category": "",
+                  "id": "bound0116",
+                  "title": "Reference 0116",
+                  "url": "http://conformance.test/bound0116"
+                },
+                {
+                  "category": "",
+                  "id": "bound0117",
+                  "title": "Reference 0117",
+                  "url": "http://conformance.test/bound0117"
+                },
+                {
+                  "category": "",
+                  "id": "bound0118",
+                  "title": "Reference 0118",
+                  "url": "http://conformance.test/bound0118"
+                },
+                {
+                  "category": "",
+                  "id": "bound0119",
+                  "title": "Reference 0119",
+                  "url": "http://conformance.test/bound0119"
+                },
+                {
+                  "category": "",
+                  "id": "bound0120",
+                  "title": "Reference 0120",
+                  "url": "http://conformance.test/bound0120"
+                },
+                {
+                  "category": "",
+                  "id": "bound0121",
+                  "title": "Reference 0121",
+                  "url": "http://conformance.test/bound0121"
+                },
+                {
+                  "category": "",
+                  "id": "bound0122",
+                  "title": "Reference 0122",
+                  "url": "http://conformance.test/bound0122"
+                },
+                {
+                  "category": "",
+                  "id": "bound0123",
+                  "title": "Reference 0123",
+                  "url": "http://conformance.test/bound0123"
+                },
+                {
+                  "category": "",
+                  "id": "bound0124",
+                  "title": "Reference 0124",
+                  "url": "http://conformance.test/bound0124"
+                },
+                {
+                  "category": "",
+                  "id": "bound0125",
+                  "title": "Reference 0125",
+                  "url": "http://conformance.test/bound0125"
+                },
+                {
+                  "category": "",
+                  "id": "bound0126",
+                  "title": "Reference 0126",
+                  "url": "http://conformance.test/bound0126"
+                },
+                {
+                  "category": "",
+                  "id": "bound0127",
+                  "title": "Reference 0127",
+                  "url": "http://conformance.test/bound0127"
+                },
+                {
+                  "category": "",
+                  "id": "bound0128",
+                  "title": "Reference 0128",
+                  "url": "http://conformance.test/bound0128"
+                },
+                {
+                  "category": "",
+                  "id": "bound0129",
+                  "title": "Reference 0129",
+                  "url": "http://conformance.test/bound0129"
+                },
+                {
+                  "category": "",
+                  "id": "bound0130",
+                  "title": "Reference 0130",
+                  "url": "http://conformance.test/bound0130"
+                },
+                {
+                  "category": "",
+                  "id": "bound0131",
+                  "title": "Reference 0131",
+                  "url": "http://conformance.test/bound0131"
+                },
+                {
+                  "category": "",
+                  "id": "bound0132",
+                  "title": "Reference 0132",
+                  "url": "http://conformance.test/bound0132"
+                },
+                {
+                  "category": "",
+                  "id": "bound0133",
+                  "title": "Reference 0133",
+                  "url": "http://conformance.test/bound0133"
+                },
+                {
+                  "category": "",
+                  "id": "bound0134",
+                  "title": "Reference 0134",
+                  "url": "http://conformance.test/bound0134"
+                },
+                {
+                  "category": "",
+                  "id": "bound0135",
+                  "title": "Reference 0135",
+                  "url": "http://conformance.test/bound0135"
+                },
+                {
+                  "category": "",
+                  "id": "bound0136",
+                  "title": "Reference 0136",
+                  "url": "http://conformance.test/bound0136"
+                },
+                {
+                  "category": "",
+                  "id": "bound0137",
+                  "title": "Reference 0137",
+                  "url": "http://conformance.test/bound0137"
+                },
+                {
+                  "category": "",
+                  "id": "bound0138",
+                  "title": "Reference 0138",
+                  "url": "http://conformance.test/bound0138"
+                },
+                {
+                  "category": "",
+                  "id": "bound0139",
+                  "title": "Reference 0139",
+                  "url": "http://conformance.test/bound0139"
+                },
+                {
+                  "category": "",
+                  "id": "bound0140",
+                  "title": "Reference 0140",
+                  "url": "http://conformance.test/bound0140"
+                },
+                {
+                  "category": "",
+                  "id": "bound0141",
+                  "title": "Reference 0141",
+                  "url": "http://conformance.test/bound0141"
+                },
+                {
+                  "category": "",
+                  "id": "bound0142",
+                  "title": "Reference 0142",
+                  "url": "http://conformance.test/bound0142"
+                },
+                {
+                  "category": "",
+                  "id": "bound0143",
+                  "title": "Reference 0143",
+                  "url": "http://conformance.test/bound0143"
+                },
+                {
+                  "category": "",
+                  "id": "bound0144",
+                  "title": "Reference 0144",
+                  "url": "http://conformance.test/bound0144"
+                },
+                {
+                  "category": "",
+                  "id": "bound0145",
+                  "title": "Reference 0145",
+                  "url": "http://conformance.test/bound0145"
+                },
+                {
+                  "category": "",
+                  "id": "bound0146",
+                  "title": "Reference 0146",
+                  "url": "http://conformance.test/bound0146"
+                },
+                {
+                  "category": "",
+                  "id": "bound0147",
+                  "title": "Reference 0147",
+                  "url": "http://conformance.test/bound0147"
+                },
+                {
+                  "category": "",
+                  "id": "bound0148",
+                  "title": "Reference 0148",
+                  "url": "http://conformance.test/bound0148"
+                },
+                {
+                  "category": "",
+                  "id": "bound0149",
+                  "title": "Reference 0149",
+                  "url": "http://conformance.test/bound0149"
+                },
+                {
+                  "category": "",
+                  "id": "bound0150",
+                  "title": "Reference 0150",
+                  "url": "http://conformance.test/bound0150"
+                },
+                {
+                  "category": "",
+                  "id": "bound0151",
+                  "title": "Reference 0151",
+                  "url": "http://conformance.test/bound0151"
+                },
+                {
+                  "category": "",
+                  "id": "bound0152",
+                  "title": "Reference 0152",
+                  "url": "http://conformance.test/bound0152"
+                },
+                {
+                  "category": "",
+                  "id": "bound0153",
+                  "title": "Reference 0153",
+                  "url": "http://conformance.test/bound0153"
+                },
+                {
+                  "category": "",
+                  "id": "bound0154",
+                  "title": "Reference 0154",
+                  "url": "http://conformance.test/bound0154"
+                },
+                {
+                  "category": "",
+                  "id": "bound0155",
+                  "title": "Reference 0155",
+                  "url": "http://conformance.test/bound0155"
+                },
+                {
+                  "category": "",
+                  "id": "bound0156",
+                  "title": "Reference 0156",
+                  "url": "http://conformance.test/bound0156"
+                },
+                {
+                  "category": "",
+                  "id": "bound0157",
+                  "title": "Reference 0157",
+                  "url": "http://conformance.test/bound0157"
+                },
+                {
+                  "category": "",
+                  "id": "bound0158",
+                  "title": "Reference 0158",
+                  "url": "http://conformance.test/bound0158"
+                },
+                {
+                  "category": "",
+                  "id": "bound0159",
+                  "title": "Reference 0159",
+                  "url": "http://conformance.test/bound0159"
+                },
+                {
+                  "category": "",
+                  "id": "bound0160",
+                  "title": "Reference 0160",
+                  "url": "http://conformance.test/bound0160"
+                },
+                {
+                  "category": "",
+                  "id": "bound0161",
+                  "title": "Reference 0161",
+                  "url": "http://conformance.test/bound0161"
+                },
+                {
+                  "category": "",
+                  "id": "bound0162",
+                  "title": "Reference 0162",
+                  "url": "http://conformance.test/bound0162"
+                },
+                {
+                  "category": "",
+                  "id": "bound0163",
+                  "title": "Reference 0163",
+                  "url": "http://conformance.test/bound0163"
+                },
+                {
+                  "category": "",
+                  "id": "bound0164",
+                  "title": "Reference 0164",
+                  "url": "http://conformance.test/bound0164"
+                },
+                {
+                  "category": "",
+                  "id": "bound0165",
+                  "title": "Reference 0165",
+                  "url": "http://conformance.test/bound0165"
+                },
+                {
+                  "category": "",
+                  "id": "bound0166",
+                  "title": "Reference 0166",
+                  "url": "http://conformance.test/bound0166"
+                },
+                {
+                  "category": "",
+                  "id": "bound0167",
+                  "title": "Reference 0167",
+                  "url": "http://conformance.test/bound0167"
+                },
+                {
+                  "category": "",
+                  "id": "bound0168",
+                  "title": "Reference 0168",
+                  "url": "http://conformance.test/bound0168"
+                },
+                {
+                  "category": "",
+                  "id": "bound0169",
+                  "title": "Reference 0169",
+                  "url": "http://conformance.test/bound0169"
+                },
+                {
+                  "category": "",
+                  "id": "bound0170",
+                  "title": "Reference 0170",
+                  "url": "http://conformance.test/bound0170"
+                },
+                {
+                  "category": "",
+                  "id": "bound0171",
+                  "title": "Reference 0171",
+                  "url": "http://conformance.test/bound0171"
+                },
+                {
+                  "category": "",
+                  "id": "bound0172",
+                  "title": "Reference 0172",
+                  "url": "http://conformance.test/bound0172"
+                },
+                {
+                  "category": "",
+                  "id": "bound0173",
+                  "title": "Reference 0173",
+                  "url": "http://conformance.test/bound0173"
+                },
+                {
+                  "category": "",
+                  "id": "bound0174",
+                  "title": "Reference 0174",
+                  "url": "http://conformance.test/bound0174"
+                },
+                {
+                  "category": "",
+                  "id": "bound0175",
+                  "title": "Reference 0175",
+                  "url": "http://conformance.test/bound0175"
+                },
+                {
+                  "category": "",
+                  "id": "bound0176",
+                  "title": "Reference 0176",
+                  "url": "http://conformance.test/bound0176"
+                },
+                {
+                  "category": "",
+                  "id": "bound0177",
+                  "title": "Reference 0177",
+                  "url": "http://conformance.test/bound0177"
+                },
+                {
+                  "category": "",
+                  "id": "bound0178",
+                  "title": "Reference 0178",
+                  "url": "http://conformance.test/bound0178"
+                },
+                {
+                  "category": "",
+                  "id": "bound0179",
+                  "title": "Reference 0179",
+                  "url": "http://conformance.test/bound0179"
+                },
+                {
+                  "category": "",
+                  "id": "bound0180",
+                  "title": "Reference 0180",
+                  "url": "http://conformance.test/bound0180"
+                },
+                {
+                  "category": "",
+                  "id": "bound0181",
+                  "title": "Reference 0181",
+                  "url": "http://conformance.test/bound0181"
+                },
+                {
+                  "category": "",
+                  "id": "bound0182",
+                  "title": "Reference 0182",
+                  "url": "http://conformance.test/bound0182"
+                },
+                {
+                  "category": "",
+                  "id": "bound0183",
+                  "title": "Reference 0183",
+                  "url": "http://conformance.test/bound0183"
+                },
+                {
+                  "category": "",
+                  "id": "bound0184",
+                  "title": "Reference 0184",
+                  "url": "http://conformance.test/bound0184"
+                },
+                {
+                  "category": "",
+                  "id": "bound0185",
+                  "title": "Reference 0185",
+                  "url": "http://conformance.test/bound0185"
+                },
+                {
+                  "category": "",
+                  "id": "bound0186",
+                  "title": "Reference 0186",
+                  "url": "http://conformance.test/bound0186"
+                },
+                {
+                  "category": "",
+                  "id": "bound0187",
+                  "title": "Reference 0187",
+                  "url": "http://conformance.test/bound0187"
+                },
+                {
+                  "category": "",
+                  "id": "bound0188",
+                  "title": "Reference 0188",
+                  "url": "http://conformance.test/bound0188"
+                },
+                {
+                  "category": "",
+                  "id": "bound0189",
+                  "title": "Reference 0189",
+                  "url": "http://conformance.test/bound0189"
+                },
+                {
+                  "category": "",
+                  "id": "bound0190",
+                  "title": "Reference 0190",
+                  "url": "http://conformance.test/bound0190"
+                },
+                {
+                  "category": "",
+                  "id": "bound0191",
+                  "title": "Reference 0191",
+                  "url": "http://conformance.test/bound0191"
+                },
+                {
+                  "category": "",
+                  "id": "bound0192",
+                  "title": "Reference 0192",
+                  "url": "http://conformance.test/bound0192"
+                },
+                {
+                  "category": "",
+                  "id": "bound0193",
+                  "title": "Reference 0193",
+                  "url": "http://conformance.test/bound0193"
+                },
+                {
+                  "category": "",
+                  "id": "bound0194",
+                  "title": "Reference 0194",
+                  "url": "http://conformance.test/bound0194"
+                },
+                {
+                  "category": "",
+                  "id": "bound0195",
+                  "title": "Reference 0195",
+                  "url": "http://conformance.test/bound0195"
+                },
+                {
+                  "category": "",
+                  "id": "bound0196",
+                  "title": "Reference 0196",
+                  "url": "http://conformance.test/bound0196"
+                },
+                {
+                  "category": "",
+                  "id": "bound0197",
+                  "title": "Reference 0197",
+                  "url": "http://conformance.test/bound0197"
+                },
+                {
+                  "category": "",
+                  "id": "bound0198",
+                  "title": "Reference 0198",
+                  "url": "http://conformance.test/bound0198"
+                },
+                {
+                  "category": "",
+                  "id": "bound0199",
+                  "title": "Reference 0199",
+                  "url": "http://conformance.test/bound0199"
+                },
+                {
+                  "category": "",
+                  "id": "bound0200",
+                  "title": "Reference 0200",
+                  "url": "http://conformance.test/bound0200"
+                }
+              ],
+              "collection": {
+                "artifact_count": 1000,
+                "color": "",
+                "cover_artifact_id": "",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "Large folder",
+                "org": "acme"
+              },
+              "next_cursor": "${members_cursor_2}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Invalid collection cursor",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Invalid collection cursor",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Invalid collection cursor",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "collection member limit reached",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection_id\":\"${f}\",\"added\":[],\"already_present\":[\"bound0001\"]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "added": [],
+              "already_present": [
+                "bound0001"
+              ],
+              "collection_id": "${f}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "A collection with that name already exists",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collections\":[{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Large folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":1000,\"editable\":true}],\"next_cursor\":\"${folders_cursor}\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collections": [
+                {
+                  "artifact_count": 1000,
+                  "color": "",
+                  "cover_artifact_id": "",
+                  "description": "",
+                  "editable": true,
+                  "id": "${f}",
+                  "name": "Large folder",
+                  "org": "acme"
+                }
+              ],
+              "next_cursor": "${folders_cursor}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collections\":[{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"\",\"artifact_count\":0,\"editable\":true}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collections": [
+                {
+                  "artifact_count": 0,
+                  "color": "",
+                  "cover_artifact_id": "",
+                  "description": "",
+                  "editable": true,
+                  "id": "${g}",
+                  "name": "界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界界",
+                  "org": "acme"
+                }
+              ],
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "organization collection limit reached",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "org is required",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "org is required",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "counts": [
+        {
+          "folders": 200,
+          "members": 1000
+        }
+      ],
+      "failed_target_absent": [
+        {
+          "count": 0
+        }
+      ]
+    }
+  }
+}

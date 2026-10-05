@@ -200,7 +200,8 @@ const app = createApp({
       notify: artifactNotifier.emit,
       preview: thumbnails,
       tasks: previewTasks,
-      data: artifactData
+      data: artifactData,
+      collections
     }),
   validateMcpHttpRequest,
   invalidMcpRequest,

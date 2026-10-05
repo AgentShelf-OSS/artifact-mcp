@@ -54,6 +54,13 @@ for required claims and scopes.
 | `update_artifact(id, html\|files, entry, title, description, category)` | Replace content or metadata at the same URL and create a revision. |
 | `patch_artifact(id, expected_revision, edits, path?)` | Apply an atomic, revision-guarded batch of UTF-8-safe partial edits. |
 | `set_visibility(id, hidden)` | Unlist or relist an artifact. |
+| `list_collections(org?, limit?, cursor?)` | List accessible folder summaries. |
+| `get_collection(id, org?, limit?, cursor?)` | Read folder metadata and paginated artifact references. |
+| `create_collection(name, org?, description?, color?, cover_artifact_id?, artifact_ids?)` | Create an organization folder with optional initial members. |
+| `update_collection(id, org?, name?, description?, color?, cover_artifact_id?)` | Edit folder metadata while preserving omitted fields. |
+| `delete_collection(id, org?)` | Delete a folder while preserving its artifacts. |
+| `add_artifacts_to_collection(id, artifact_ids, org?)` | Add up to 100 same-organization references atomically. |
+| `remove_artifacts_from_collection(id, artifact_ids, org?)` | Remove references while preserving artifacts and other folders. |
 | `list_categories(org?)` | List categories for the current organization or an administrator-selected organization. |
 | `set_category(id, category)` | Assign a category without creating a content revision. |
 | `create_category(name, org?)` | Add an organization category. |
@@ -75,12 +82,82 @@ for required claims and scopes.
 | `set_artifact_data(id, binding, key, value)` | Update a producer snapshot without changing the HTML revision. |
 | `append_artifact_events(id, binding, subscription, events)` | Append an idempotent producer event batch for subscribed viewers. |
 
-The legacy catalog contains 26 tools. MCP 2026 adds `regenerate_artifact_preview` for 27. A client
+The legacy catalog contains 33 tools. MCP 2026 adds `regenerate_artifact_preview` for 34. A client
 that negotiates MCP Apps also receives the app-only `submit_feedback` action.
 
 Live-data discovery and binding reads require `artifacts:read`; binding and producer writes require
 `artifacts:publish` plus the existing artifact write policy. See [live data and PR Watch](live-data.md)
 for source configuration, client examples, limits, and publication.
+
+## Organization folders
+
+Collections are the folders shown in Reel Shelf, Contact Sheets, and Gallery Ribbons.
+All three views use the same membership links. A folder can reference an artifact that is
+also in another folder. Adding or removing a reference does not change artifact content,
+revision, category, organization, visibility, or public shares. Deleting a folder removes
+only that folder and its links.
+
+Categories label artifacts within an organization. Organizations define access boundaries.
+Folders group readable artifacts within one organization. View selection, ribbon order,
+and collapse state are personal gallery preferences and are not changed by these tools.
+
+An organization credential is locked to its own organization. Administrator credentials must
+supply a concrete registered `org` for every collection tool. The virtual `all` gallery scope
+cannot own a folder. Readers can list and inspect folders but cannot mutate them. Authors and
+collaborators can create folders and edit the folders they created. Administrators can edit any
+folder. Artifact references and covers still require the caller's existing artifact read access;
+a folder never grants extra access to its members.
+
+MCP folders belong to the authenticated service principal. An API key uses its stable client ID;
+OAuth uses the configured issuer and client ID together. A key label, assigned owner email, or
+caller-supplied field cannot impersonate a browser folder creator. Browser-created folders
+keep their email creator. A browser administrator can curate a service-owned folder. Replacing
+a secret while retaining the client ID preserves ownership; creating a different client ID does
+not inherit old folders. See [ADR-0013](adr/0013-mcp-collection-principals.md).
+
+OAuth reads require `artifacts:read`; collection mutations require `artifacts:publish`, including
+folder deletion. Existing artifact deletion continues to require `artifacts:delete`. Collection
+read results filter hidden artifact discovery according to the publisher policy and include only
+authorized references, counts, and covers.
+The `editable` flag also reflects the caller's role and granted OAuth publish scope.
+
+`list_collections` and `get_collection` default to 25 results and accept `limit` from 1 to 100.
+Pass the returned `next_cursor` unchanged to continue the same query with the same credential
+and page size. An empty `next_cursor` means there are no more results. Cursors bind the caller,
+organization, operation, folder, and page size; they never authorize access. Permissions are
+checked again on every request. Concurrent membership changes can shift page boundaries.
+
+Create and update return `collection` summaries. Colors and cover IDs use an empty string when
+unset. Omitted update fields stay unchanged; an empty `description`, `color`, or
+`cover_artifact_id` clears that field. A nonempty cover must be a readable current member.
+Names are limited to 80 characters, descriptions to 500, collections to 200 per organization,
+and memberships to 1,000 per collection. Each membership request accepts at most 100 IDs and
+commits all of them together. Duplicate names return a conflict instead of updating a folder.
+
+Add/remove requests are safe to retry. They report `added` and `already_present`, or `removed`
+and `already_absent`. Creation is not idempotent: after a lost response, list folders to recover
+the ID rather than retrying blindly. Repeating deletion returns Not found. The underlying state
+remains deleted and the artifacts remain intact.
+
+For example, publish your artifacts first and then use their returned IDs:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"create_collection","arguments":{"name":"Interface ideas","artifact_ids":["<artifact-a>","<artifact-b>"],"cover_artifact_id":"<artifact-a>"}}}
+```
+
+Use the returned `result.structuredContent.collection.id` for subsequent calls:
+
+```json
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"add_artifacts_to_collection","arguments":{"id":"<collection-id>","artifact_ids":["<artifact-c>"]}}}
+{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_collection","arguments":{"id":"<collection-id>","limit":25}}}
+{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"update_collection","arguments":{"id":"<collection-id>","name":"Interaction research","color":"#c4d8cd"}}}
+{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"remove_artifacts_from_collection","arguments":{"id":"<collection-id>","artifact_ids":["<artifact-b>"]}}}
+{"jsonrpc":"2.0","id":6,"method":"tools/call","params":{"name":"delete_collection","arguments":{"id":"<collection-id>"}}}
+```
+
+Administrator calls must also include `org`. Folder mutations use the existing transactional
+security audit with the MCP credential as actor and `mcp` as source. No gallery preference is
+written by this workflow. Refresh the browser library to see the shared folder changes.
 
 ## Durable tasks
 

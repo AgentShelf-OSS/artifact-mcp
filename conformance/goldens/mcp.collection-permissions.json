@@ -1,0 +1,551 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${a}\",\"url\":\"http://conformance.test/${a}\",\"org\":\"acme\",\"bytes\":29,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 29,
+              "category": "",
+              "id": "${a}",
+              "org": "acme",
+              "url": "http://conformance.test/${a}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${b}\",\"url\":\"http://conformance.test/${b}\",\"org\":\"acme\",\"bytes\":28,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 28,
+              "category": "",
+              "id": "${b}",
+              "org": "acme",
+              "url": "http://conformance.test/${b}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${c}\",\"url\":\"http://conformance.test/${c}\",\"org\":\"beta\",\"bytes\":31,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 31,
+              "category": "",
+              "id": "${c}",
+              "org": "beta",
+              "url": "http://conformance.test/${c}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Author folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":1,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${f}",
+                "name": "Author folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${a}\",\"hidden\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "hidden": true,
+              "id": "${a}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Author folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":1,\"editable\":false},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "Alpha",
+                  "url": "http://conformance.test/${a}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": false,
+                "id": "${f}",
+                "name": "Author folder",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Only the collection creator or an administrator can edit this collection",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Not found",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Not found",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Not found",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Not found",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Not found",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"Collaborator folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":2,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "Collaborator folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"Collaborator folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":2,\"editable\":true},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"},{\"id\":\"${b}\",\"title\":\"Beta\",\"url\":\"http://conformance.test/${b}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "Alpha",
+                  "url": "http://conformance.test/${a}"
+                },
+                {
+                  "category": "",
+                  "id": "${b}",
+                  "title": "Beta",
+                  "url": "http://conformance.test/${b}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "Collaborator folder",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"Collaborator folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":2,\"editable\":true},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"},{\"id\":\"${b}\",\"title\":\"Beta\",\"url\":\"http://conformance.test/${b}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "Alpha",
+                  "url": "http://conformance.test/${a}"
+                },
+                {
+                  "category": "",
+                  "id": "${b}",
+                  "title": "Beta",
+                  "url": "http://conformance.test/${b}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": true,
+                "id": "${g}",
+                "name": "Collaborator folder",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${f}\",\"org\":\"acme\",\"name\":\"Author folder\",\"description\":\"Admin curation\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":1,\"editable\":true}}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "collection": {
+                "artifact_count": 1,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "Admin curation",
+                "editable": true,
+                "id": "${f}",
+                "name": "Author folder",
+                "org": "acme"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Permission denied: reader keys cannot manage collections",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"collection\":{\"id\":\"${g}\",\"org\":\"acme\",\"name\":\"Collaborator folder\",\"description\":\"\",\"color\":\"\",\"cover_artifact_id\":\"${a}\",\"artifact_count\":2,\"editable\":false},\"artifacts\":[{\"id\":\"${a}\",\"title\":\"Alpha\",\"url\":\"http://conformance.test/${a}\",\"category\":\"\"},{\"id\":\"${b}\",\"title\":\"Beta\",\"url\":\"http://conformance.test/${b}\",\"category\":\"\"}],\"next_cursor\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "category": "",
+                  "id": "${a}",
+                  "title": "Alpha",
+                  "url": "http://conformance.test/${a}"
+                },
+                {
+                  "category": "",
+                  "id": "${b}",
+                  "title": "Beta",
+                  "url": "http://conformance.test/${b}"
+                }
+              ],
+              "collection": {
+                "artifact_count": 2,
+                "color": "",
+                "cover_artifact_id": "${a}",
+                "description": "",
+                "editable": false,
+                "id": "${g}",
+                "name": "Collaborator folder",
+                "org": "acme"
+              },
+              "next_cursor": ""
+            }
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "memberships": [
+        {
+          "artifact_id": "${a}",
+          "name": "Author folder"
+        },
+        {
+          "artifact_id": "${a}",
+          "name": "Collaborator folder"
+        },
+        {
+          "artifact_id": "${b}",
+          "name": "Collaborator folder"
+        }
+      ],
+      "metadata": [
+        {
+          "hidden": 1,
+          "id": "${a}",
+          "org": "acme",
+          "revision": 1,
+          "title": "Alpha"
+        },
+        {
+          "hidden": 0,
+          "id": "${b}",
+          "org": "acme",
+          "revision": 1,
+          "title": "Beta"
+        },
+        {
+          "hidden": 0,
+          "id": "${c}",
+          "org": "beta",
+          "revision": 1,
+          "title": "Foreign"
+        }
+      ],
+      "principal_kinds": [
+        {
+          "created_by": "pub-acme",
+          "created_by_kind": "api_key",
+          "name": "Author folder"
+        },
+        {
+          "created_by": "pub-acme2",
+          "created_by_kind": "api_key",
+          "name": "Collaborator folder"
+        }
+      ]
+    }
+  }
+}

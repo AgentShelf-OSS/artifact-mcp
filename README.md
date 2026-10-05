@@ -27,6 +27,9 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 - Read HTML aloud from the viewer with optional [local narration](ops/tts/README.md), including
   a mini player, saved positions, and automatic chapter continuation for supported ereaders.
 - Search and organize artifacts by organization, category, owner, review state, and visibility.
+- Organize readable artifacts into reusable organization folders through MCP. Reel Shelf, Contact
+  Sheets, and Gallery Ribbons share the same folder memberships, so one folder can be explored in
+  each library presentation without copying artifact content.
 - Attach threaded feedback to a point or region and copy the exact revision context back to an
   agent.
 - Keep organizations isolated with scoped publisher keys and verified viewer identity.
@@ -139,7 +142,10 @@ sandboxed iframe, separate from the trusted gallery and review controls.
 
 Artifact MCP supports the stateful MCP `2025-06-18` contract and the stateless `2026-07-28`
 contract. Modern clients can negotiate typed outputs, resources, MCP Apps, and durable preview
-tasks. See the [MCP API reference](docs/mcp-api.md) for the complete tool catalog.
+tasks. Organization-scoped MCP tools can list, inspect, create, update, and delete folders, and
+add or remove artifact references. Deleting a folder preserves the artifacts and their other
+memberships. See the [MCP API reference](docs/mcp-api.md) for the complete tool catalog, limits,
+and authorization rules.
 
 ## Is it a fit?
 
