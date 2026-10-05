@@ -131,7 +131,7 @@ impl CollectionStore {
         limit: usize,
     ) -> Result<Vec<Collection>, AppError> {
         let org = actor.org.clone();
-        let limit = limit.min(MAX_COLLECTIONS_PER_ORG).max(1) as i64;
+        let limit = limit.clamp(1, MAX_COLLECTIONS_PER_ORG) as i64;
         db::interact(&self.pool, move |conn| {
             let mut stmt = conn.prepare(
                 "SELECT c.id,c.org,c.name,c.description,c.color,c.cover_artifact_id,c.created_by,c.created_at,c.updated_at,COUNT(m.artifact_id) FROM collections c LEFT JOIN collection_artifacts m ON m.collection_id=c.id WHERE c.org=?1 GROUP BY c.id ORDER BY c.created_at ASC,c.id ASC LIMIT ?2",
@@ -165,6 +165,8 @@ impl CollectionStore {
             .await
     }
 
+    // Keep creation fields and the audit receipt together at the transaction boundary.
+    #[allow(clippy::too_many_arguments)]
     pub async fn create_atomic(
         &self,
         actor: &CollectionActor,
@@ -325,10 +327,10 @@ impl CollectionStore {
         if let Some(description) = &update.description {
             validate_description(description)?;
         }
-        if let Some(color) = &update.color {
-            if !color.is_empty() {
-                validate_color(color)?;
-            }
+        if let Some(color) = &update.color
+            && !color.is_empty()
+        {
+            validate_color(color)?;
         }
         let actor = actor.clone();
         let audit_key = self.audit_key;

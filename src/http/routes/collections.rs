@@ -359,7 +359,7 @@ async fn create(
         Ok(r) => r,
         Err(e) => return collection_error(e),
     };
-    match projection(&deps, &a, &[row.org.clone()]).await {
+    match projection(&deps, &a, std::slice::from_ref(&row.org)).await {
         Ok(x) => {
             let item=x.get("collections").and_then(Value::as_array).and_then(|rows|rows.iter().find(|item|item.get("id").and_then(Value::as_str)==Some(row.id.as_str()))).cloned().unwrap_or_else(||json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.filter(|color|!color.is_empty()),"createdBy":row.created_by,"artifactCount":row.artifact_count,"artifactIds":[]}));
             (StatusCode::CREATED, Json(item)).into_response()
@@ -723,14 +723,13 @@ fn parse_body<T: serde::de::DeserializeOwned>(
     let object = value
         .as_object_mut()
         .ok_or_else(|| AppError::Validation("invalid_body".into()))?;
-    if let Some(ids) = object.get("artifactIds") {
-        if !ids.is_array()
+    if let Some(ids) = object.get("artifactIds")
+        && (!ids.is_array()
             || ids
                 .as_array()
-                .is_some_and(|ids| ids.len() > 100 || ids.iter().any(|id| !id.is_string()))
-        {
-            return Err(AppError::Validation("invalid_ids".into()));
-        }
+                .is_some_and(|ids| ids.len() > 100 || ids.iter().any(|id| !id.is_string())))
+    {
+        return Err(AppError::Validation("invalid_ids".into()));
     }
     for field in ["name", "view", "previewSize", "artifactLayout"] {
         if object.get(field).is_some_and(|value| !value.is_string()) {

@@ -351,9 +351,9 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
     );
     let html = renderer.shell(&view).expect("render viewer shell");
     assert!(html.contains("data-cast-enabled=\"1\""));
-    assert!(html.contains(&format!(
+    assert!(html.contains(
         "/raw/artifact1234?anchor=1&#38;reader=1&#38;cast-pin=3.deadbeefcafebabe000000000000000000000000000000000000000000000000"
-    )));
+    ));
     assert!(
         html.find("type: 'cast:host-init'").unwrap()
             < html.find("nativeFetch=window.fetch").unwrap()

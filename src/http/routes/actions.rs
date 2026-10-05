@@ -132,8 +132,8 @@ async fn start(
         Ok(a) => a,
         Err(e) => return e.into_response(),
     };
-    if let Some(ledger) = &deps.audit_access {
-        if ledger
+    if let Some(ledger) = &deps.audit_access
+        && ledger
             .record_live_action(
                 audit.clone(),
                 id.clone(),
@@ -143,16 +143,15 @@ async fn start(
             )
             .await
             .is_err()
-        {
-            return response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                json!({"error":"action_unavailable"}),
-            );
-        }
+    {
+        return response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({"error":"action_unavailable"}),
+        );
     }
     let result = dispatch(&g, Some(&input.request_id)).await;
-    if let Some(ledger) = &deps.audit_access {
-        if ledger
+    if let Some(ledger) = &deps.audit_access
+        && ledger
             .record_live_action(
                 audit,
                 id,
@@ -162,12 +161,11 @@ async fn start(
             )
             .await
             .is_err()
-        {
-            return response(
-                StatusCode::SERVICE_UNAVAILABLE,
-                json!({"error":"action_unavailable"}),
-            );
-        }
+    {
+        return response(
+            StatusCode::SERVICE_UNAVAILABLE,
+            json!({"error":"action_unavailable"}),
+        );
     }
     match result {
         Ok(v) => response(StatusCode::ACCEPTED, v),

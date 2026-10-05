@@ -143,6 +143,8 @@ fn keys(v: &Value, expected: &[&str]) -> bool {
     v.as_object()
         .is_some_and(|o| o.len() == expected.len() && expected.iter().all(|k| o.contains_key(*k)))
 }
+// The boundary exposes only valid/invalid, without details from an untrusted worker reply.
+#[allow(clippy::result_unit_err)]
 pub fn validate_reply(v: &Value) -> Result<(), ()> {
     if !keys(
         v,
@@ -254,6 +256,8 @@ fn hash(v: &Value, size: usize) -> bool {
                 .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
     })
 }
+// Keep the same binary validation result for both fixed worker reply contracts.
+#[allow(clippy::result_unit_err)]
 pub fn validate_advisory_reply(v: &Value) -> Result<(), ()> {
     if v["schemaVersion"] != "org-intelligence/advisory-run/v1" {
         return Err(());
