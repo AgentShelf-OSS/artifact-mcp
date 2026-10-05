@@ -119,6 +119,7 @@ OAuth reads require `artifacts:read`; collection mutations require `artifacts:pu
 folder deletion. Existing artifact deletion continues to require `artifacts:delete`. Collection
 read results filter hidden artifact discovery according to the publisher policy and include only
 authorized references, counts, and covers.
+The `editable` flag also reflects the caller's role and granted OAuth publish scope.
 
 `list_collections` and `get_collection` default to 25 results and accept `limit` from 1 to 100.
 Pass the returned `next_cursor` unchanged to continue the same query with the same credential

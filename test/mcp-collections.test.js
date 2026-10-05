@@ -143,6 +143,8 @@ test("registered collection tools require read or publish scopes for OAuth calle
   const readOnly = { ...oauth, scopes: new Set(["artifacts:read"]) };
   assert.ok((await call("list_collections", {}, readOnly)).collections.some((c) => c.id === folder.collection.id));
   assert.equal((await call("get_collection", { id: folder.collection.id }, readOnly)).collection.description, "");
+  assert.equal((await call("get_collection", { id: folder.collection.id }, readOnly)).collection.editable, false);
+  assert.equal((await call("list_collections", {}, readOnly)).collections.find((c) => c.id === folder.collection.id).editable, false);
   assert.equal(db.prepare("SELECT COUNT(*) FROM collection_artifacts WHERE collection_id=?").pluck().get(folder.collection.id), 0);
   await call("delete_collection", { id: folder.collection.id }, oauth);
 });

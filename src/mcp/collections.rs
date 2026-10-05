@@ -238,7 +238,7 @@ fn next_cursor(
 }
 
 fn summary(row: &crate::persistence::collections::Collection, actor: &CollectionActor) -> Value {
-    json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.clone().unwrap_or_default(),"cover_artifact_id":row.cover_artifact_id.clone().unwrap_or_default(),"artifact_count":row.artifact_count,"editable":actor.publisher.as_ref().is_none_or(|p| p.role != "reader") && (actor.is_admin || (row.created_by_kind == actor.principal.kind_id().0 && row.created_by == actor.principal.kind_id().1))})
+    json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.clone().unwrap_or_default(),"cover_artifact_id":row.cover_artifact_id.clone().unwrap_or_default(),"artifact_count":row.artifact_count,"editable":actor.publisher.as_ref().is_none_or(|p| p.role != "reader" && p.has_scope("artifacts:publish")) && (actor.is_admin || (row.created_by_kind == actor.principal.kind_id().0 && row.created_by == actor.principal.kind_id().1))})
 }
 
 async fn list(

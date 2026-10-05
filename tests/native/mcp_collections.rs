@@ -121,6 +121,21 @@ async fn every_registered_folder_tool_requires_its_exact_oauth_scope() {
             );
         }
     }
+    let read_only = oauth(&["artifacts:read"]);
+    let read_only_folder = call(&deps, &read_only, "get_collection", json!({"id":id}))
+        .await
+        .unwrap();
+    assert_eq!(
+        read_only_folder["structuredContent"]["collection"]["editable"],
+        false
+    );
+    let read_only_list = call(&deps, &read_only, "list_collections", json!({}))
+        .await
+        .unwrap();
+    assert_eq!(
+        read_only_list["structuredContent"]["collections"][0]["editable"],
+        false
+    );
     let mut reader = oauth(&["artifacts:read", "artifacts:publish"]);
     reader.role = "reader".into();
     let inspected = call(&deps, &reader, "get_collection", json!({"id":id}))
