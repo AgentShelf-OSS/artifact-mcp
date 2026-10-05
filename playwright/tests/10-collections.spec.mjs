@@ -50,6 +50,7 @@ test.describe("collection organization", () => {
     expect((await api(request, "post", "/collections", { org, name: "View QA", artifactIds: [alpha.id] })).ok()).toBeTruthy();
     await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
     await selectOrg(page, org);
+    await expect(page.locator("#organization-label")).toHaveText(org);
     for (const [view, surface] of [["reel", ".collection-grid"], ["sheets", ".collection-sheet"], ["ribbons", ".collection-ribbons"]]) {
       await page.locator(`[data-library-view='${view}']`).click();
       await expect(page.locator(`[data-library-view='${view}']`)).toHaveAttribute("aria-pressed", "true");

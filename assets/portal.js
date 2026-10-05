@@ -104,6 +104,8 @@
   }
   var activeView = "all";
   var activeOrg = "all";
+  var organizationLabel = document.getElementById("organization-label");
+  var defaultOrganizationLabel = organizationLabel?.textContent || "All organizations";
   var activeCategory = "all";
   var collectionScope = null;
 
@@ -223,6 +225,7 @@
       if (visible) shown += 1;
     });
     if (empty) empty.hidden = shown !== 0;
+    if (organizationLabel) organizationLabel.textContent = activeOrg === "all" ? defaultOrganizationLabel : activeOrg;
     if (count) count.textContent = "Showing " + shown + " of " + visibleCards().length;
     if (resetFilters) {
       resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");

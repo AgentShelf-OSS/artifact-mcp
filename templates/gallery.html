@@ -80,7 +80,7 @@
     <section class="collection-results" aria-label="Artifact results">
       <span id="org-category-data" hidden data-json="{{ org_category_json }}" data-can-create="{% if viewer_is_admin %}1{% else %}0{% endif %}"></span>
         <div class="result-summary">
-          <span>{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %} · <span id="sort-label">Updated recently</span></span>
+          <span><span id="organization-label">{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %}</span> · <span id="sort-label">Updated recently</span></span>
           <span class="count" id="count" aria-live="polite">Showing {{ total }} of {{ total }}</span>
         </div>
 

@@ -92,7 +92,7 @@ test.describe("inline folder memberships", () => {
   test(`new-folder ${close} returns to the expanded artifact popup`, async ({ page, request, org, publisherKey }) => {
     const { card, panel } = await fixture(page, request, org, publisherKey);
     await panel.locator("[data-picker-new]").click();
-    const dialog = page.getByRole("dialog", { name: "New folder", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Create a folder", exact: true });
     await expect(dialog).toBeVisible();
     if (close === "Escape") await page.keyboard.press("Escape");
     else await dialog.getByRole("button", { name: close, exact: true }).click();

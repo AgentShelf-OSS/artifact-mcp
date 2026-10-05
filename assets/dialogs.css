@@ -1,0 +1,16 @@
+/* Shared tokens support both the index and the artifact viewer. */
+.artifact-confirm-dialog{width:min(460px,calc(100vw - 2rem));max-height:calc(100dvh - 2rem);padding:0;overflow:auto;border:1px solid var(--line);border-radius:8px;background:var(--paper,var(--panel));color:var(--ink,var(--txt));box-shadow:0 24px 70px #0004}
+.artifact-confirm-dialog::backdrop{background:#0e151d94;backdrop-filter:blur(2px)}
+.artifact-confirm-dialog header{display:flex;justify-content:space-between;align-items:start;gap:1rem;padding:1.1rem;border-bottom:1px solid var(--line)}
+.artifact-confirm-kicker{margin:0 0 .35rem;color:var(--brass);font:600 .6rem/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase}
+.artifact-confirm-dialog h2{margin:0;font:400 1.7rem/1.15 Georgia,"Times New Roman",serif}
+.artifact-confirm-dialog button{min-height:44px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:5px;background:var(--card,var(--bar));color:inherit;font:600 .72rem var(--font-ui,system-ui);cursor:pointer}
+.artifact-confirm-dialog [data-confirm-close]{min-width:44px;font-size:1.1rem}
+.artifact-confirm-dialog button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.artifact-confirm-body{padding:1.1rem;font:.85rem/1.6 var(--font-ui,system-ui);overflow-wrap:anywhere}
+.artifact-confirm-body p{margin:.5rem 0 0}
+.artifact-confirm-subject{display:block;font:400 1.2rem/1.3 Georgia,"Times New Roman",serif}
+.artifact-confirm-subject[hidden]{display:none}
+.artifact-confirm-dialog footer{display:flex;justify-content:flex-end;gap:.5rem;padding:1rem 1.1rem;border-top:1px solid var(--line)}
+.artifact-confirm-dialog .artifact-confirm-primary{background:var(--ink,var(--txt));color:var(--paper,var(--panel));border-color:var(--ink,var(--txt))}
+.artifact-confirm-dialog .artifact-confirm-primary.is-danger{background:#9e3441;color:#fff;border-color:#9e3441}
