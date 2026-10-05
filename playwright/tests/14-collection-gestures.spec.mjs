@@ -17,6 +17,11 @@ test.describe("collection gestures", () => {
     expect(source.ok() && target.ok()).toBeTruthy();
     const sourceBody = await source.json();
     const targetBody = await target.json();
+    const preferences = await api(request, "put", `/gallery/preferences?org=${encodeURIComponent(org)}`, {
+      view: "reel", previewSize: "compact", artifactLayout: "grid",
+      collectionOrderByOrg: { [org]: [sourceBody.id, targetBody.id] }, collapsedCollectionIdsByOrg: {},
+    });
+    expect(preferences.ok()).toBeTruthy();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
     const sourceFace = page.locator("[data-collection-peek]").filter({ hasText: `Gesture source ${org}` });
@@ -27,6 +32,12 @@ test.describe("collection gestures", () => {
     const preview = card.locator('.preview a[aria-label^="Open "]');
     const sourceBox = await preview.boundingBox();
     const destinationBox = await targetFace.boundingBox();
+    expect(destinationBox.x).toBeGreaterThanOrEqual(0);
+    expect(destinationBox.x + destinationBox.width).toBeLessThanOrEqual(1440);
+    expect(await targetFace.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest("[data-collection-id]")?.dataset.collectionId;
+    })).toBe(targetBody.id);
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 10, sourceBox.y + sourceBox.height / 2 + 10, {steps: 3});
