@@ -529,6 +529,10 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         (34, "viewer-state-scope-and-member-display-name".to_owned()),
         (35, "artifact-data-bindings".to_owned()),
         (36, "managed-data-sources".to_owned()),
+        (
+            37,
+            "artifact-collections-and-gallery-preferences".to_owned(),
+        ),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert_eq!(

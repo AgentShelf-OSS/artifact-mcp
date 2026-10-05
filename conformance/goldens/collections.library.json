@@ -1,0 +1,617 @@
+{
+  "steps": [
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 1,
+          "artifactIds": [
+            "${artifact_1}"
+          ],
+          "color": "#e4d3b4",
+          "coverArtifactId": "${artifact_1}",
+          "createdBy": "alice@acme.test",
+          "description": "Topic studies",
+          "editable": true,
+          "id": "${collection_1}",
+          "name": "Interface ideas",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${artifact_1}",
+              "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "added": [
+            "${artifact_2}"
+          ],
+          "alreadyPresent": [],
+          "collectionId": "${collection_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 2,
+          "artifactIds": [
+            "${artifact_1}",
+            "${artifact_2}"
+          ],
+          "color": "#e4d3b4",
+          "coverArtifactId": "${artifact_2}",
+          "createdBy": "alice@acme.test",
+          "description": "Topic studies",
+          "editable": true,
+          "id": "${collection_1}",
+          "name": "Interface ideas",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${artifact_2}",
+              "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+            },
+            {
+              "id": "${artifact_1}",
+              "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 2,
+              "artifactIds": [
+                "${artifact_1}",
+                "${artifact_2}"
+              ],
+              "color": "#e4d3b4",
+              "coverArtifactId": "${artifact_2}",
+              "createdBy": "alice@acme.test",
+              "description": "Topic studies",
+              "editable": true,
+              "id": "${collection_1}",
+              "name": "Interface ideas",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_2}",
+                  "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+                },
+                {
+                  "id": "${artifact_1}",
+                  "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 0
+        }
+      }
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 1,
+          "artifactIds": [
+            "${artifact_3}"
+          ],
+          "color": null,
+          "coverArtifactId": null,
+          "createdBy": "admin@corp.test",
+          "description": "",
+          "editable": true,
+          "id": "${collection_2}",
+          "name": "Operations",
+          "org": "beta",
+          "previewArtifacts": [
+            {
+              "id": "${artifact_3}",
+              "thumbnail": "/thumbnails/${artifact_3}?v=233294adaf8239e9522190eb92e3ad82b1717e7ca056b357a40c81fa18cca07c"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 2,
+              "artifactIds": [
+                "${artifact_1}",
+                "${artifact_2}"
+              ],
+              "color": "#e4d3b4",
+              "coverArtifactId": "${artifact_2}",
+              "createdBy": "alice@acme.test",
+              "description": "Topic studies",
+              "editable": true,
+              "id": "${collection_1}",
+              "name": "Interface ideas",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_2}",
+                  "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+                },
+                {
+                  "id": "${artifact_1}",
+                  "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+                }
+              ]
+            },
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${artifact_3}"
+              ],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "admin@corp.test",
+              "description": "",
+              "editable": true,
+              "id": "${collection_2}",
+              "name": "Operations",
+              "org": "beta",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_3}",
+                  "thumbnail": "/thumbnails/${artifact_3}?v=233294adaf8239e9522190eb92e3ad82b1717e7ca056b357a40c81fa18cca07c"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 0
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 2,
+              "artifactIds": [
+                "${artifact_1}",
+                "${artifact_2}"
+              ],
+              "color": "#e4d3b4",
+              "coverArtifactId": "${artifact_2}",
+              "createdBy": "alice@acme.test",
+              "description": "Topic studies",
+              "editable": true,
+              "id": "${collection_1}",
+              "name": "Interface ideas",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_2}",
+                  "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+                },
+                {
+                  "id": "${artifact_1}",
+                  "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+                }
+              ]
+            },
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${artifact_3}"
+              ],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "admin@corp.test",
+              "description": "",
+              "editable": true,
+              "id": "${collection_2}",
+              "name": "Operations",
+              "org": "beta",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_3}",
+                  "thumbnail": "/thumbnails/${artifact_3}?v=233294adaf8239e9522190eb92e3ad82b1717e7ca056b357a40c81fa18cca07c"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 0
+        }
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "forbidden",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_body",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "list",
+          "collapsedCollectionIdsByOrg": {
+            "all": [
+              "${collection_1}"
+            ]
+          },
+          "collectionOrderByOrg": {
+            "acme": [
+              "${collection_1}"
+            ],
+            "all": [
+              "${collection_2}",
+              "${collection_1}"
+            ]
+          },
+          "previewSize": "large",
+          "view": "ribbons"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "list",
+          "collapsedCollectionIdsByOrg": {
+            "all": [
+              "${collection_1}"
+            ]
+          },
+          "collectionOrderByOrg": {
+            "acme": [
+              "${collection_1}"
+            ],
+            "all": [
+              "${collection_2}",
+              "${collection_1}"
+            ]
+          },
+          "previewSize": "compact",
+          "view": "ribbons"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "list",
+          "collapsedCollectionIdsByOrg": {
+            "all": [
+              "${collection_1}"
+            ]
+          },
+          "collectionOrderByOrg": {
+            "acme": [
+              "${collection_1}"
+            ],
+            "all": [
+              "${collection_2}",
+              "${collection_1}"
+            ]
+          },
+          "previewSize": "compact",
+          "view": "ribbons"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "grid",
+          "collapsedCollectionIdsByOrg": {},
+          "collectionOrderByOrg": {},
+          "previewSize": "compact",
+          "view": "reel"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 2,
+          "artifactIds": [
+            "${artifact_1}",
+            "${artifact_2}"
+          ],
+          "color": "#e4d3b4",
+          "coverArtifactId": null,
+          "createdBy": "alice@acme.test",
+          "description": "Topic studies",
+          "editable": true,
+          "id": "${collection_1}",
+          "name": "Interface ideas",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${artifact_1}",
+              "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+            },
+            {
+              "id": "${artifact_2}",
+              "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "added": [],
+          "alreadyPresent": [
+            "${artifact_1}"
+          ],
+          "collectionId": "${collection_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 2,
+          "artifactIds": [
+            "${artifact_1}",
+            "${artifact_2}"
+          ],
+          "color": "#e4d3b4",
+          "coverArtifactId": "${artifact_2}",
+          "createdBy": "alice@acme.test",
+          "description": "Topic studies",
+          "editable": true,
+          "id": "${collection_1}",
+          "name": "Interface ideas",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${artifact_2}",
+              "thumbnail": "/thumbnails/${artifact_2}?v=72b1edac9473bd7773f702b9d0125bb275e8a2d6bd00b27b8812821c1cd3eda9"
+            },
+            {
+              "id": "${artifact_1}",
+              "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collectionId": "${collection_1}",
+          "removed": [
+            "${artifact_2}"
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${artifact_1}"
+              ],
+              "color": "#e4d3b4",
+              "coverArtifactId": null,
+              "createdBy": "alice@acme.test",
+              "description": "Topic studies",
+              "editable": true,
+              "id": "${collection_1}",
+              "name": "Interface ideas",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${artifact_1}",
+                  "thumbnail": "/thumbnails/${artifact_1}?v=a6ca952fa804d745cced07ed768ff020f793338daea4318da38cfeaa19faafec"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 1
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "grid",
+          "collapsedCollectionIdsByOrg": {
+            "acme": [
+              "${collection_1}"
+            ]
+          },
+          "collectionOrderByOrg": {
+            "acme": [
+              "${collection_1}"
+            ]
+          },
+          "previewSize": "compact",
+          "view": "reel"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "deleted": true,
+          "id": "${collection_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "grid",
+          "collapsedCollectionIdsByOrg": {},
+          "collectionOrderByOrg": {},
+          "previewSize": "compact",
+          "view": "reel"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "surviving_artifacts": [
+        {
+          "id": "${artifact_1}",
+          "org": "acme"
+        },
+        {
+          "id": "${artifact_2}",
+          "org": "acme"
+        },
+        {
+          "id": "${artifact_3}",
+          "org": "beta"
+        }
+      ],
+      "surviving_collection": [
+        {
+          "id": "${collection_2}",
+          "name": "Operations",
+          "org": "beta"
+        }
+      ],
+      "surviving_memberships": [
+        {
+          "artifact_id": "${artifact_3}",
+          "collection_id": "${collection_2}",
+          "org": "beta"
+        }
+      ]
+    }
+  }
+}

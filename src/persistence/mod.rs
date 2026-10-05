@@ -1,5 +1,6 @@
 //! Persistence declarations frozen by U01; adapters are owned by U03 and U09–U12.
 
+pub mod collections;
 pub mod db;
 pub mod discord_inbound;
 pub mod discord_organization;

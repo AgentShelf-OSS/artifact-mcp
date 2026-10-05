@@ -180,6 +180,36 @@ the artifact organization. Add `--artifact-id` to update an existing dashboard a
 The publisher script checks source discovery before publishing HTML, then applies its bindings.
 If binding assignment fails, the error identifies the artifact so the operation can be retried.
 
+### Managed publishing on pve1
+
+Neil's pve1 installation has a scoped launcher that fetches the selected
+organization token from Infisical. It runs this same publisher script:
+
+```sh
+homelab-artifact-publish --org homelab \
+  --html /path/to/dashboard.html \
+  --bindings /path/to/bindings.json \
+  --title 'Dashboard'
+```
+
+Choose `agentshelf`, `trustedtech`, `cairn`, or `homelab`. This choice selects
+an existing manager reference. The launcher pins the approved MCP endpoint
+and does not pass the script's administrator `--org` option. It does not read
+the repository `.env` or accept inherited credentials as a fallback.
+
+An empty manifest, `{"bindings": {}}`, is valid for static HTML. For live data,
+select sources available to the chosen organization. The script checks source
+discovery before writing. The local repository `.env` remains a separate
+development Compose input and is not removed by this publishing workflow.
+
+Add `--artifact-id ID` to update a known artifact. Updates replace its HTML
+without an expected-revision guard, so coordinate with its owner. Binding
+assignment is a separate write and can fail after HTML publication. See the
+homelab client contract at
+`/root/homelab-automation/services/homelab-secrets/README.md` for installation
+and the private missing-secret flow. Other hosts must use their own approved
+manager delivery; do not copy pve1's reader bootstrap into a repository.
+
 PR Watch's regular JSON requests and its live event tail use the bridge in exported mode. The
 standalone dashboard continues to use its own API. Artifact viewers never enter a dashboard token
 or contact the LAN API directly. The current LAN deployment is reachable without login; a

@@ -53,6 +53,14 @@ pub(super) const FAVICON: TrustedStatic = TrustedStatic::new(PORTAL_FAVICON);
 pub(super) const PORTAL_CSS: TrustedStatic =
     TrustedStatic::new(include_str!("../../assets/portal.css"));
 const PORTAL_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/portal.js"));
+const COLLECTION_TOOLBAR_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collection-toolbar.css"));
+const COLLECTION_TOOLBAR_SCRIPT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collection-toolbar.js"));
+const COLLECTION_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collections.css"));
+const COLLECTION_SCRIPT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collections.js"));
 pub(super) const THEME_BOOT: TrustedStatic =
     TrustedStatic::new(include_str!("../../assets/theme-boot.js"));
 const NOT_FOUND_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/not-found.css"));
@@ -204,6 +212,10 @@ const ICONS: Icons = Icons {
 #[derive(Template)]
 #[template(path = "gallery.html")]
 struct GalleryTemplate<'a> {
+    collection_toolbar_css: TrustedStatic,
+    collection_toolbar_script: TrustedStatic,
+    collection_css: TrustedStatic,
+    collection_script: TrustedStatic,
     favicon: TrustedStatic,
     theme_boot: TrustedStatic,
     css: TrustedStatic,
@@ -301,6 +313,8 @@ struct MoveOptionTemplate {
 
 const SHELL_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/shell.css"));
 const SHELL_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/shell.js"));
+const ACTION_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/actions.js"));
+const CAST_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/cast.js"));
 
 #[derive(Template)]
 #[template(path = "artifact-shell.html")]
@@ -309,6 +323,9 @@ struct ShellTemplate<'a> {
     theme_boot: TrustedStatic,
     css: TrustedStatic,
     script: TrustedStatic,
+    cast_script: TrustedStatic,
+    action_script: TrustedStatic,
+    cast_enabled: bool,
     icons: Icons,
     app_name: &'a str,
     title: String,
@@ -542,6 +559,9 @@ fn shell_template<'a>(
         theme_boot: THEME_BOOT,
         css: SHELL_CSS,
         script: SHELL_SCRIPT,
+        cast_script: CAST_SCRIPT,
+        action_script: ACTION_SCRIPT,
+        cast_enabled: view.cast_enabled,
         icons: ICONS,
         app_name: &renderer.app_name,
         title: meta.title.clone(),
@@ -568,7 +588,14 @@ fn shell_template<'a>(
             .count(),
         revision: meta.revision,
         raw_src: raw_src.clone(),
-        anchor_raw_src: format!("{raw_src}?anchor=1&reader=1{version_query}"),
+        anchor_raw_src: if view.cast_enabled && !meta.is_bundle {
+            format!(
+                "{raw_src}?anchor=1&reader=1&cast-pin={}.{}{version_query}",
+                meta.revision, meta.body_sha256
+            )
+        } else {
+            format!("{raw_src}?anchor=1&reader=1{version_query}")
+        },
         threads,
         viewers,
         artifact_id: meta.id.0.clone(),
@@ -807,6 +834,10 @@ fn gallery_template<'a>(
     let org_category_json =
         serde_json::to_string(&org_category_index).unwrap_or_else(|_| "{}".to_owned());
     GalleryTemplate {
+        collection_toolbar_css: COLLECTION_TOOLBAR_CSS,
+        collection_toolbar_script: COLLECTION_TOOLBAR_SCRIPT,
+        collection_css: COLLECTION_CSS,
+        collection_script: COLLECTION_SCRIPT,
         favicon: FAVICON,
         theme_boot: THEME_BOOT,
         css: PORTAL_CSS,

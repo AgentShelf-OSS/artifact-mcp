@@ -3,7 +3,7 @@
 use axum::{
     Json, Router,
     body::Body,
-    extract::{Path, State},
+    extract::{OriginalUri, Path, State},
     http::{HeaderMap, HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
@@ -290,15 +290,21 @@ async fn mark_notifications_seen_result(
 async fn shell(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,
+    OriginalUri(uri): OriginalUri,
     headers: HeaderMap,
 ) -> Response {
-    match shell_result(&deps, &headers, &id).await {
+    match shell_result(&deps, &headers, &id, uri.query()).await {
         Ok(response) => response,
         Err(error) => page_error_response(&deps, error),
     }
 }
 
-async fn shell_result(deps: &AppDeps, headers: &HeaderMap, id: &str) -> Result<Response, AppError> {
+async fn shell_result(
+    deps: &AppDeps,
+    headers: &HeaderMap,
+    id: &str,
+    query: Option<&str>,
+) -> Result<Response, AppError> {
     let (viewer, artifact) = resolve_page_artifact(deps, headers, id).await?;
 
     if !viewer.is_admin
@@ -377,6 +383,23 @@ async fn shell_result(deps: &AppDeps, headers: &HeaderMap, id: &str) -> Result<R
         .get(&artifact.meta().org)
         .cloned()
         .flatten();
+    let historical_query = query.is_some_and(|query| {
+        url::form_urlencoded::parse(query.as_bytes())
+            .any(|(key, _)| key == "v" || key == "revision")
+    });
+    let cast_enabled = AccessPolicy::is_signed_in(&viewer)
+        && !artifact.meta().is_bundle
+        && artifact.meta().body_sha256.len() == 64
+        && artifact
+            .meta()
+            .body_sha256
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+        && !historical_query
+        && deps
+            .config
+            .cast_ids
+            .contains(&(artifact.meta().id.0.clone(), artifact.meta().revision));
     let body = deps.pages.shell(&ShellView {
         artifact,
         navigation,
@@ -393,6 +416,7 @@ async fn shell_result(deps: &AppDeps, headers: &HeaderMap, id: &str) -> Result<R
         },
         viewer,
         org_accent,
+        cast_enabled,
     })?;
     Ok(html_response(StatusCode::OK, body, true))
 }

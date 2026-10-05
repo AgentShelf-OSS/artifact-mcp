@@ -76,6 +76,7 @@ fn empty_environment_reproduces_every_node_default() {
     assert_eq!(config.listen_host, "0.0.0.0");
     assert_eq!(config.public_base_url, DEFAULT_PUBLIC_BASE_URL);
     assert_eq!(config.public_base_url, "http://localhost:3480");
+    assert!(config.cast_ids.is_empty());
     assert_eq!(config.data_dir, PathBuf::from(DEFAULT_DATA_DIR));
     assert_eq!(config.data_dir, PathBuf::from("/data"));
 
@@ -122,6 +123,27 @@ fn empty_environment_reproduces_every_node_default() {
 
     // `AppConfig::default()` must agree so route fixtures need no environment at all.
     assert_eq!(config, AppConfig::default());
+}
+
+#[test]
+fn cast_allowlist_requires_exact_artifact_revision_grants() {
+    let config = parse_ok(&[("ARTIFACT_CAST_IDS", "7qgi2ehng52j@17, abcdef@2")]);
+    assert!(config.cast_ids.contains(&("7qgi2ehng52j".to_owned(), 17)));
+    assert!(config.cast_ids.contains(&("abcdef".to_owned(), 2)));
+    for malformed in [
+        "7qgi2ehng52j",
+        "7qgi2ehng52j@0",
+        "7qgi2ehng52j@01",
+        "7qgi2ehng52j@9007199254740992",
+        "7qgi2ehng52j@x",
+        "7qgi2ehng52j@17,",
+        "@2",
+    ] {
+        assert!(
+            parse(&[("ARTIFACT_CAST_IDS", malformed)]).is_err(),
+            "accepted {malformed:?}"
+        );
+    }
 }
 
 #[test]

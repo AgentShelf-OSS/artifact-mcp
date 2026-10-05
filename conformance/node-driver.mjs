@@ -37,6 +37,7 @@ export function createNodeDriver() {
     cpSync(join(REPO_ROOT, "package.json"), join(root, "package.json"));
     cpSync(join(REPO_ROOT, "lib"), join(root, "lib"), { recursive: true });
     cpSync(join(REPO_ROOT, "assets"), join(root, "assets"), { recursive: true });
+    cpSync(join(REPO_ROOT, "migrations"), join(root, "migrations"), { recursive: true });
     mkdirSync(join(root, "conformance"), { recursive: true });
     cpSync(
       join(REPO_ROOT, "conformance", "mcp.tool-output-schemas.json"),

@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+pub mod actions;
 pub mod app;
 pub mod artifacts;
 pub mod config;

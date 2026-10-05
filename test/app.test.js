@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -7,6 +8,7 @@ import { createApp } from "../lib/app.js";
 import { createMcpTelemetry } from "../lib/observability.js";
 import { createArtifactPreviewNotifier } from "../lib/preview.js";
 import { renderSettings } from "../lib/settings.js";
+import { renderArtifactShell } from "../lib/portal.js";
 
 const identityDataDir = mkdtempSync(join(tmpdir(), "artifact-mcp-identity-"));
 process.env.DATA_DIR = identityDataDir;
@@ -719,6 +721,49 @@ test("raw artifact fetches never record a view", async () => {
   assert.equal(recorded, 0);
 });
 
+test("raw cast pin rejects stale, malformed, duplicate, and digest-mismatched requests", async () => {
+  const html = "<h1>Cast body</h1>";
+  const digest = createHash("sha256").update(html).digest("hex");
+  const meta = { id: "abc123", org: "acme", title: "Cast", client_id: "publisher", is_bundle: 0, revision: 17, body_sha256: digest };
+  const app = createApp(dependencies({
+    resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
+    artifacts: {
+      ...dependencies().artifacts,
+      getArtifactMeta: () => meta,
+      readArtifact: () => ({ meta, html })
+    }
+  }));
+  await serve(app, async (baseUrl) => {
+    const valid = await fetch(`${baseUrl}/raw/abc123?anchor=1&reader=1&cast-pin=17.${digest}`);
+    assert.equal(valid.status, 200);
+    assert.match(await valid.text(), /artifact-anchor-bridge/);
+    assert.equal(valid.headers.get("content-security-policy"), "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:");
+    for (const suffix of [
+      `cast-pin=16.${digest}`,
+      `cast-pin=17.${"b".repeat(64)}`,
+      `cast-pin=017.${digest}`,
+      `cast-pin=17.${digest}&cast-pin=17.${digest}`,
+      "cast-pin=17.not-a-sha256"
+    ]) {
+      const denied = await fetch(`${baseUrl}/raw/abc123?${suffix}`);
+      assert.equal(denied.status, 404, suffix);
+    }
+    const unpinned = await fetch(`${baseUrl}/raw/abc123?anchor=1&reader=1`);
+    assert.equal(unpinned.status, 200);
+  });
+
+  const staleHtml = "<h1>Published after shell render</h1>";
+  const staleMeta = { ...meta };
+  const staleApp = createApp(dependencies({
+    resolveViewer: async () => ({ email: "member@acme.test", org: "acme", isAdmin: false }),
+    artifacts: { ...dependencies().artifacts, getArtifactMeta: () => staleMeta, readArtifact: () => ({ meta: staleMeta, html: staleHtml }) }
+  }));
+  await serve(staleApp, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/raw/abc123?cast-pin=17.${digest}`);
+    assert.equal(response.status, 404);
+  });
+});
+
 test("unsigned artifact reads are concealed as not found", async () => {
   const app = createApp(dependencies({
     resolveViewer: async () => ({ email: "", org: "", isAdmin: false })
@@ -1207,6 +1252,42 @@ test("bundle shell marks anchors stale when their recorded page no longer exists
 
   assert.equal(response.status, 200);
   assert.equal(shellFeedback[0].anchor_page_stale, true);
+});
+
+test("cast capability is rendered only for an authenticated current allowlisted single-page view", async () => {
+  const artifact = { id: "abc123", org: "acme", title: "Cast fixture", client_id: "publisher", is_bundle: 0, revision: 17, body_sha256: "a".repeat(64), bytes: 20 };
+  const makeApp = ({ viewer = { email: "member@acme.test", org: "acme", isAdmin: false }, grant = "abc123@17", bundle = false, digest = artifact.body_sha256 } = {}) => {
+    const meta = { ...artifact, body_sha256: digest, is_bundle: bundle ? 1 : 0 };
+    return createApp(dependencies({
+      resolveViewer: async () => viewer,
+      artifacts: { ...dependencies().artifacts, getArtifactMeta: () => meta, readArtifact: () => ({ meta, html: "<h1>Cast fixture</h1>" }) },
+      castIds: new Set(grant ? [grant] : []),
+      pages: { ...dependencies().pages, shell: (...args) => renderArtifactShell(...args) }
+    }));
+  };
+  const requestShell = (app, query = {}) => invokeRoute(app, "get", "/:id", { params: { id: artifact.id }, query });
+  const current = await requestShell(makeApp());
+  assert.equal(current.status, 200);
+  assert.match(current.body, /data-cast-enabled="1"/);
+  assert.match(current.body, /type: 'cast:host-init'/);
+  assert.ok(current.body.indexOf("type: 'cast:host-init'") < current.body.indexOf("nativeFetch=window.fetch"));
+
+  for (const app of [
+    makeApp({ grant: "abc123@16" }),
+    makeApp({ viewer: { email: "", org: "", isAdmin: false } }),
+    makeApp({ bundle: true }),
+    makeApp({ digest: "" }),
+  ]) {
+    const denied = await requestShell(app);
+    assert.doesNotMatch(String(denied.body), /type: 'cast:host-init'/);
+    assert.doesNotMatch(String(denied.body), /data-cast-enabled="1"/);
+  }
+  for (const query of [{ v: "older" }, { revision: "16" }]) {
+    const historical = await requestShell(makeApp(), query);
+    assert.equal(historical.status, 200);
+    assert.match(historical.body, /data-cast-enabled="0"/);
+    assert.doesNotMatch(historical.body, /type: 'cast:host-init'/);
+  }
 });
 
 test("viewer feedback management routes scope feedback to the artifact and enforce own-or-admin results", async () => {

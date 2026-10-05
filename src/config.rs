@@ -331,6 +331,38 @@ fn present(env: &dyn EnvSource, key: &str) -> Option<String> {
     env.get(key).filter(|value| !value.trim().is_empty())
 }
 
+fn parse_cast_ids(raw: Option<&str>) -> Result<BTreeSet<(String, u64)>, AppError> {
+    let mut ids = BTreeSet::new();
+    let Some(raw) = raw else { return Ok(ids) };
+    for grant in raw.split(',').map(str::trim) {
+        let Some((id, revision)) = grant.split_once('@') else {
+            return Err(invalid(
+                "ARTIFACT_CAST_IDS",
+                raw,
+                "comma-separated artifactId@revision grants",
+            ));
+        };
+        let parsed_revision = revision.parse::<u64>().ok().filter(|value| *value > 0);
+        if !is_valid_artifact_id(id)
+            || revision.is_empty()
+            || revision.starts_with('0')
+            || !revision.bytes().all(|b| b.is_ascii_digit())
+            || parsed_revision.is_none()
+            || parsed_revision.is_some_and(|value| value > 9_007_199_254_740_991)
+        {
+            return Err(invalid(
+                "ARTIFACT_CAST_IDS",
+                raw,
+                "comma-separated artifactId@positiveRevision grants",
+            ));
+        }
+        if let Some(parsed_revision) = parsed_revision {
+            ids.insert((id.to_owned(), parsed_revision));
+        }
+    }
+    Ok(ids)
+}
+
 /// Port of `nonEmptyString(value, fallback)` — [lib/config.js:8-11]
 fn non_empty_string(env: &dyn EnvSource, key: &str, default: &str) -> String {
     present(env, key).map_or_else(|| default.to_owned(), |value| value.trim().to_owned())
@@ -1303,6 +1335,7 @@ impl SeedKeys {
 /// build an `AppDeps` without touching the process environment.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppConfig {
+    pub action_grants: Vec<crate::actions::ActionGrant>,
     /// `PORT` — [server.js:27]
     pub port: u16,
     /// `LISTEN_HOST` — [server.js:190]
@@ -1342,6 +1375,8 @@ pub struct AppConfig {
     pub audit_ledger_hmac_key: Option<Secret>,
     /// `ARTIFACT_API_KEYS` bootstrap entries. [lib/db.js:30]
     pub seed_keys: SeedKeys,
+    /// Exact artifact ID and current revision grants for the trusted casting integration.
+    pub cast_ids: BTreeSet<(String, u64)>,
 }
 
 impl Default for AppConfig {
@@ -1355,6 +1390,7 @@ impl AppConfig {
     #[must_use]
     pub fn defaults() -> Self {
         Self {
+            action_grants: vec![],
             port: DEFAULT_PORT,
             listen_host: DEFAULT_LISTEN_HOST.to_owned(),
             public_base_url: DEFAULT_PUBLIC_BASE_URL.to_owned(),
@@ -1376,6 +1412,7 @@ impl AppConfig {
             discord_inbound_enabled: false,
             audit_ledger_hmac_key: None,
             seed_keys: SeedKeys::default(),
+            cast_ids: BTreeSet::new(),
         }
     }
 
@@ -1413,6 +1450,9 @@ impl AppConfig {
         validate_public_base_url(&public_base_url)?;
 
         Ok(Self {
+            action_grants: crate::actions::load_grants(
+                present(env, "ARTIFACT_ACTIONS_FILE").as_deref(),
+            )?,
             port,
             listen_host: non_empty_string(env, "LISTEN_HOST", DEFAULT_LISTEN_HOST),
             public_base_url,
@@ -1435,6 +1475,7 @@ impl AppConfig {
                 present(env, "AUDIT_LEDGER_HMAC_KEY").as_deref(),
             )?,
             seed_keys: SeedKeys::parse(&env.get("ARTIFACT_API_KEYS").unwrap_or_default()),
+            cast_ids: parse_cast_ids(present(env, "ARTIFACT_CAST_IDS").as_deref())?,
         })
     }
 

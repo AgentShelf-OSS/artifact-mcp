@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 36;
+pub const LATEST_SCHEMA_VERSION: i64 = 37;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -271,6 +271,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 36,
         name: "managed-data-sources",
         up: m036_managed_data_sources,
+    },
+    Migration {
+        version: 37,
+        name: "artifact-collections-and-gallery-preferences",
+        up: m037_artifact_collections_and_viewer_preferences,
     },
 ];
 
@@ -1846,6 +1851,18 @@ fn m036_managed_data_sources(
       CREATE INDEX IF NOT EXISTS data_sources_org_id_idx ON data_sources(org, id);
         ",
     )
+}
+
+/// Durable organization collections are references to existing artifacts.  The viewer
+/// presentation table is deliberately keyed by email: it stores personal layout state and
+/// never changes shared collection membership.
+fn m037_artifact_collections_and_viewer_preferences(
+    tx: &Transaction<'_>,
+    _ctx: &MigrationContext,
+) -> rusqlite::Result<()> {
+    tx.execute_batch(include_str!(
+        "../../migrations/037-artifact-collections.sql"
+    ))
 }
 
 #[cfg(test)]

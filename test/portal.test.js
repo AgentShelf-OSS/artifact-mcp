@@ -180,6 +180,8 @@ test("viewer shell includes an escaped public-share inspector", () => {
   assert.match(html, /Until a date/);
   assert.match(html, /No expiration/);
   assert.match(html, /data-artifact-id="&quot;abc123&quot;"/);
+  assert.match(html, /data-cast-enabled="0"/);
+  assert.doesNotMatch(html, /cast:host-init/);
   assert.doesNotMatch(html, /<script><\/script><img>/);
 });
 
@@ -474,6 +476,8 @@ test("gallery cards use static digest-addressed images while the viewer iframe s
   // digest, not revision, drives the token when body_sha256 is present
   const shell = renderArtifactShell({ ...item }, nav, {}, []);
   assert.match(shell, /\/raw\/abc123\?anchor=1&reader=1&v=deadbeefcafe/);
+  const castShell = renderArtifactShell({ ...item }, nav, {}, [], {}, {}, null, true);
+  assert.match(castShell, new RegExp(`/raw/abc123\\?anchor=1&reader=1&cast-pin=5\\.${sha}`));
 
   // a changed body digest changes the token (cache is actually busted)
   const nextSha = "000000000000111122223333444455556666777788889999aaaabbbbccccdddd";
@@ -522,11 +526,12 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
     reactions
   );
 
+  const memberCards = member.slice(member.indexOf('<main id="stage">'), member.indexOf("</main>"));
   assert.match(member, /class="artifact-grid"/);
   assert.doesNotMatch(member, /class="cat-track"/);
   assert.doesNotMatch(member, /data-ui="nav-administration"/);
   assert.equal(
-    (member.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
+    (memberCards.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
     1,
   );
   assert.match(member, /data-id="owned123"[^>]*data-owned="1"/);
@@ -541,15 +546,15 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
   assert.doesNotMatch(member, /data-filter-category=/);
   assert.ok(member.indexOf('data-id="owned123"') < member.indexOf('data-id="other123"'));
   assert.equal(
-    (member.match(/<button class="act save[^"]*"[^>]*data-action="favorite"/g) || []).length,
+    (memberCards.match(/<button class="act save[^"]*"[^>]*data-action="favorite"/g) || []).length,
     2,
   );
   assert.equal(
-    (member.match(/<button class="act share"[^>]*data-action="share"/g) || []).length,
+    (memberCards.match(/<button class="act share"[^>]*data-action="share"/g) || []).length,
     2,
   );
   assert.equal(
-    (member.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
+    (memberCards.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
     1,
   );
   assert.match(member, /HTML download unavailable for Teammate bundle/);
@@ -559,13 +564,14 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
     [{ org: "acme", items: [teammate, owned] }],
     reactions
   );
+  const adminCards = admin.slice(admin.indexOf('<main id="stage">'), admin.indexOf("</main>"));
   assert.match(admin, /data-ui="nav-administration"/);
   assert.equal(
-    (admin.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
+    (adminCards.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
     2,
   );
   assert.equal(
-    (admin.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
+    (adminCards.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
     2,
   );
   assert.match(admin, />Needs review <span>/);
