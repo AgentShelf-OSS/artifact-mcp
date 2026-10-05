@@ -66,9 +66,7 @@
     });
   }
 
-  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
-  cards.forEach(function (card, index) {
-    card.style.animationDelay = (index % 12 * 35) + "ms";
+  function revealCardPreview(card) {
     var image = card.querySelector(".pv");
     if (!image) return;
     var reveal = function () {
@@ -79,6 +77,11 @@
       image.addEventListener("load", reveal, { once: true });
       image.addEventListener("error", reveal, { once: true });
     }
+  }
+  var cards = Array.prototype.slice.call(document.querySelectorAll(".card"));
+  cards.forEach(function (card, index) {
+    card.style.animationDelay = (index % 12 * 35) + "ms";
+    revealCardPreview(card);
   });
 
   var search = document.getElementById("q");
@@ -102,6 +105,7 @@
   var activeView = "all";
   var activeOrg = "all";
   var activeCategory = "all";
+  var collectionScope = null;
 
   function categoryRows(org) {
     if (org !== "all") return Array.isArray(orgCategoryIndex[org]) ? orgCategoryIndex[org].slice() : [];
@@ -156,11 +160,19 @@
   function applySort() {
     if (!grid || !sort) return;
     var mode = sort.value;
-    visibleCards().sort(function (left, right) {
+    var ordered = visibleCards().sort(function (left, right) {
       if (mode === "title") return (left.querySelector(".card-title").textContent || "").localeCompare(right.querySelector(".card-title").textContent || "");
       if (mode === "views") return viewCount(right) - viewCount(left);
       return String(right.dataset.updated || "").localeCompare(String(left.dataset.updated || ""));
-    }).forEach(function (card) { grid.appendChild(card); });
+    });
+    // Filtering does not usually change order. Avoid detaching every card (and its
+    // focused controls) on each filter or collection refresh.
+    var existing = Array.prototype.slice.call(grid.children);
+    if (ordered.some(function (card, index) { return existing[index] !== card; })) {
+      var fragment = document.createDocumentFragment();
+      ordered.forEach(function (card) { fragment.appendChild(card); });
+      grid.appendChild(fragment);
+    }
     if (sortLabel && sort.selectedOptions[0]) sortLabel.textContent = sort.selectedOptions[0].textContent;
   }
 
@@ -204,8 +216,9 @@
         (activeView === "hidden" && card.dataset.hidden === "1");
       var orgMatch = activeOrg === "all" || card.dataset.org === activeOrg;
       var categoryMatch = activeCategory === "all" || card.dataset.category === activeCategory;
-      var termMatch = !term || card.dataset.q.indexOf(term) !== -1;
-      var visible = viewMatch && orgMatch && categoryMatch && termMatch;
+      var termMatch = !term || (card.dataset.q + " " + (card.dataset.collectionNames || "")).indexOf(term) !== -1;
+      var scopeMatch = !collectionScope || collectionScope(card.dataset.id);
+      var visible = viewMatch && orgMatch && categoryMatch && termMatch && scopeMatch;
       card.hidden = !visible;
       if (visible) shown += 1;
     });
@@ -215,6 +228,7 @@
       resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");
     }
     saveLibraryState();
+    document.dispatchEvent(new CustomEvent("collections:filters-changed"));
   }
 
   document.addEventListener("click", function (event) {
@@ -710,8 +724,9 @@
           card.style.opacity = "0";
           card.style.transform = "scale(.975)";
           setTimeout(function () {
-            card.remove();
+            document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function(instance){instance.remove();});
             applyFilters();
+            document.dispatchEvent(new CustomEvent("artifact:updated",{detail:{id:card.dataset.id,deleted:true}}));
             toast("Artifact deleted");
           }, 210);
         })
@@ -732,14 +747,16 @@
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ hidden: nextHidden }),
     }).then(function (body) {
-      card.dataset.hidden = body.hidden ? "1" : "0";
+      document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function (instance) { instance.dataset.hidden = body.hidden ? "1" : "0"; instance.classList.toggle("is-hidden",!!body.hidden); });
       card.classList.toggle("is-hidden", !!body.hidden);
       control.setAttribute("aria-label", (body.hidden ? "Show " : "Hide ") + card.querySelector(".card-title").textContent.trim() + " in the gallery");
       control.title = body.hidden ? "Show in gallery" : "Hide from gallery";
       control.innerHTML = body.hidden
         ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 6.2A10.5 10.5 0 0 1 12 6c6 0 9.5 6 9.5 6a17.7 17.7 0 0 1-3.1 3.8M6.1 6.1C3.8 7.7 2.5 10 2.5 12c0 0 3.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>'
         : '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"></path><circle cx="12" cy="12" r="2.5"></circle></svg>';
+      document.querySelectorAll('.card[data-id="'+CSS.escape(card.dataset.id)+'"] [data-action="visibility"]').forEach(function(button){button.innerHTML=control.innerHTML;button.title=control.title;button.setAttribute("aria-label",control.getAttribute("aria-label"));});
       toast(body.hidden ? "Artifact hidden from Gallery" : "Artifact shown in Gallery");
+      document.dispatchEvent(new CustomEvent("artifact:updated", { detail: { id: card.dataset.id, body: body } }));
     }).catch(function (error) {
       toast(error.message || "Could not change visibility");
     }).finally(function () {
@@ -756,13 +773,18 @@
       body: JSON.stringify({ favorite: nextFavorite, vote: Number(card.dataset.vote || 0) }),
     }).then(function (body) {
       var favorite = !!body.favorite;
-      card.dataset.fav = favorite ? "1" : "0";
+      document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function (instance) {
+        instance.dataset.fav = favorite ? "1" : "0";
+        var button = instance.querySelector('[data-action="favorite"]');
+        if(button){button.classList.toggle("active",favorite);button.setAttribute("aria-pressed",String(favorite));var text=button.querySelector("span");if(text)text.textContent=favorite?"Saved":"Save";}
+      });
       control.classList.toggle("active", favorite);
       control.setAttribute("aria-pressed", favorite ? "true" : "false");
       var label = control.querySelector("span");
       if (label) label.textContent = favorite ? "Saved" : "Save";
       applyFilters();
       toast(favorite ? "Saved to favorites" : "Removed from favorites");
+      document.dispatchEvent(new CustomEvent("artifact:updated", { detail: { id: card.dataset.id, body: body } }));
     }).catch(function (error) {
       toast(error.message || "Could not update favorite");
     }).finally(function () {
@@ -906,4 +928,46 @@
   var returnScrollY = restoreLibraryState();
   applyFilters();
   if (returnScrollY !== null) requestAnimationFrame(function () { window.scrollTo(0, returnScrollY); });
+
+  // Collection views render the same artifact actions in a different arrangement. Keep
+  // their integration on this trusted portal surface so they reuse the gallery's existing
+  // request handlers, URL/history behavior, and feedback instead of copying mutations.
+  window.ArtifactPortal = Object.freeze({
+    getLibraryState: function () {
+      return {
+        q: search && search.value || "",
+        view: activeView,
+        org: activeOrg,
+        category: activeCategory,
+        sort: sort && sort.value || "recent",
+        status: activeView
+      };
+    },
+    applyFilters: applyFilters,
+    revealCardPreview: revealCardPreview,
+    saveLibraryState: saveLibraryState,
+    clearFilters: function () {
+      activeView = "all"; activeOrg = "all"; activeCategory = "all";
+      if (search) search.value = "";
+      if (sort) sort.value = "recent";
+      if (orgFilter) orgFilter.value = "all";
+      rebuildCategoryFilter("all");
+      var all = document.querySelector('[data-filter-view="all"]');
+      if (all) pressOnly("[data-filter-view]", all);
+      applyFilters();
+    },
+    setCollectionScope: function (predicate) { collectionScope = typeof predicate === "function" ? predicate : null; applyFilters(); },
+    clearCollectionScope: function () { collectionScope = null; applyFilters(); },
+    toast: toast,
+    openActions: function (trigger) {
+      if (trigger && trigger.matches && trigger.matches('[data-action="more"]')) openMenu(trigger);
+    },
+    triggerAction: function (card, action) {
+      if (!card || !action) return false;
+      var target = card.querySelector('[data-action="' + CSS.escape(action) + '"]');
+      if (!target) return false;
+      target.click();
+      return true;
+    }
+  });
 }());

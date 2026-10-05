@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mcpJsonLimitFor } from "../lib/config.js";
+import { mcpJsonLimitFor, parseArtifactCastGrants } from "../lib/config.js";
+
+test("cast grants require exact artifact IDs and positive revisions", () => {
+  assert.deepEqual([...parseArtifactCastGrants("7qgi2ehng52j@17,abcdef@2")], ["7qgi2ehng52j@17", "abcdef@2"]);
+  for (const value of ["7qgi2ehng52j", "7qgi2ehng52j@0", "7qgi2ehng52j@01", "7qgi2ehng52j@9007199254740992", "7qgi2ehng52j@x", "7qgi2ehng52j@17,", "@2"]) {
+    assert.throws(() => parseArtifactCastGrants(value), /ARTIFACT_CAST_IDS/);
+  }
+});
 
 test("the largest valid worst-case bundle fits the MCP request limit", () => {
   const maxBundleBytes = 8 * 1024 * 1024;

@@ -259,11 +259,19 @@
     var pin=pinFromRow(row);if(pin){pins.push(pin);pinById[pin.id]=pin;}
   });
   function postToFrame(type,extra){try{if(frame&&frame.contentWindow)frame.contentWindow.postMessage(Object.assign({type:type},extra||{}),'*');}catch(_){}}
+  var castBridge=null,nativeReader=null;
+  var outerRevisionQuery=new URLSearchParams(window.location.search);
+  var historicalView=outerRevisionQuery.has('v')||outerRevisionQuery.has('revision');
+  if(typeof window.createArtifactCastBridge==='function'&&shellConfig.castEnabled==='1'&&!historicalView&&!isBundle&&shellConfig.stateEnabled==='1'&&!!configLiteral('viewerEmail')){
+    castBridge=window.createArtifactCastBridge({frame:frame,getCurrentFrame:function(){return frame&&frame.contentWindow;},post:function(message){try{if(frame&&frame.contentWindow)frame.contentWindow.postMessage(message,'*');}catch(_){}},artifactId:artifactId,revision:Number(shellConfig.revision),serverEnabled:shellConfig.castEnabled==='1',authenticated:!!configLiteral('viewerEmail'),stateEnabled:shellConfig.stateEnabled==='1',onCaptureActive:function(active){ttsCapturePaused=active===true;if(ttsCapturePaused){ttsActive.forEach(function(controller){controller.abort();});ttsActive.clear();}if(nativeReader)nativeReader.setCaptureActive(active);}});
+    if(frame)frame.addEventListener('load',function(){castBridge.onFrameLoad();});
+    window.addEventListener('pagehide',function(){castBridge.destroy();},{once:true});
+  }
   // Speech is brokered here because the artifact iframe has an opaque origin and no network capability.
-  var ttsActive=new Map(),ttsMax=2,ttsVoices=[],ttsRequested=false;
+  var ttsActive=new Map(),ttsMax=2,ttsVoices=[],ttsRequested=false,ttsCapturePaused=false;
   function ttsError(id,error){postToFrame('tts:error',{requestId:String(id||''),error:error});}
   function ttsHello(){ttsRequested=true;fetch('/'+encodeURIComponent(artifactId)+'/speech/voices').then(function(r){return r.json().then(function(body){return {ok:r.ok,body:body};});}).then(function(result){ttsVoices=result.ok&&result.body&&Array.isArray(result.body.voices)?result.body.voices:[];postToFrame('tts:ready',{enabled:!!(result.ok&&result.body&&result.body.enabled),voices:ttsVoices,maxChars:result.body&&result.body.maxChars||1500});}).catch(function(){postToFrame('tts:ready',{enabled:false,voices:[],maxChars:1500});});}
-  function ttsRequest(data){var id=typeof data.requestId==='string'?data.requestId:'',text=typeof data.text==='string'?data.text:'',voice=typeof data.voice==='string'?data.voice:'';if(!id||id.length>80){ttsError(id,'bad_request');return;}if(ttsActive.has(id)){ttsError(id,'duplicate_request');return;}if(!text.trim()||text.length>1500){ttsError(id,'bad_text');return;}if(!ttsVoices.some(function(item){return item&&item.id===voice;})){ttsError(id,'bad_voice');return;}if(ttsActive.size>=ttsMax){ttsError(id,'busy');return;}var controller=new AbortController();ttsActive.set(id,controller);fetch('/'+encodeURIComponent(artifactId)+'/speech',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text:text,voice:voice}),signal:controller.signal}).then(function(response){if(!response.ok){var error=new Error(response.status===429?'busy':'unavailable');error.code=error.message;throw error;}return response.arrayBuffer();}).then(function(audio){if(ttsActive.get(id)!==controller)return;try{frame.contentWindow.postMessage({type:'tts:audio',requestId:id,audio:audio,mime:'audio/wav'},'*',[audio]);}catch(_){ttsError(id,'unavailable');}}).catch(function(error){if(error&&error.name==='AbortError')return;if(ttsActive.get(id)===controller)ttsError(id,error&&error.code==='busy'?'busy':'unavailable');}).finally(function(){if(ttsActive.get(id)===controller)ttsActive.delete(id);});}
+  function ttsRequest(data){var id=typeof data.requestId==='string'?data.requestId:'',text=typeof data.text==='string'?data.text:'',voice=typeof data.voice==='string'?data.voice:'';if(ttsCapturePaused){ttsError(id,'unavailable');return;}if(!id||id.length>80){ttsError(id,'bad_request');return;}if(ttsActive.has(id)){ttsError(id,'duplicate_request');return;}if(!text.trim()||text.length>1500){ttsError(id,'bad_text');return;}if(!ttsVoices.some(function(item){return item&&item.id===voice;})){ttsError(id,'bad_voice');return;}if(ttsActive.size>=ttsMax){ttsError(id,'busy');return;}var controller=new AbortController();ttsActive.set(id,controller);fetch('/'+encodeURIComponent(artifactId)+'/speech',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({text:text,voice:voice}),signal:controller.signal}).then(function(response){if(!response.ok){var error=new Error(response.status===429?'busy':'unavailable');error.code=error.message;throw error;}return response.arrayBuffer();}).then(function(audio){if(ttsActive.get(id)!==controller)return;try{frame.contentWindow.postMessage({type:'tts:audio',requestId:id,audio:audio,mime:'audio/wav'},'*',[audio]);}catch(_){ttsError(id,'unavailable');}}).catch(function(error){if(error&&error.name==='AbortError')return;if(ttsActive.get(id)===controller)ttsError(id,error&&error.code==='busy'?'busy':'unavailable');}).finally(function(){if(ttsActive.get(id)===controller)ttsActive.delete(id);});}
   function ttsCancel(data){var id=typeof data.requestId==='string'?data.requestId:'',controller=id.length<=80?ttsActive.get(id):null;if(controller){ttsActive.delete(id);controller.abort();}}
   function ttsReset(){ttsActive.forEach(function(controller){controller.abort();});ttsActive.clear();ttsVoices=[];if(ttsRequested)ttsHello();}
   if(frame)frame.addEventListener('load',ttsReset);
@@ -297,7 +305,7 @@
     const readerMeasurements = [];
     window.artifactReaderDiagnostics = () => readerMeasurements.map(item => ({...item}));
     let previousAudioEnd = null;
-    let ready = false, enabled = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
+    let ready = false, enabled = false, captureActive = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
     let queue = [], position = 0, wants = false, loading = false, currentUrl = null, loaded = -1, chapter = null;
     let controller = new AbortController(), cache = new Map(), voice = '', mode = 'page';
     let audioContext = null, stream = null;
@@ -352,7 +360,7 @@
       if (view !== 'closed') refreshOutline();
     }
     function jumpTo(fields) {
-      if (!enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions())) return;
+      if (captureActive || !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions())) return;
       stop('Opening reading position…'); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').disabled = true;
       mode = Number.isInteger(fields.chapterIndex) ? 'page' : 'here'; get('mode').value = mode;
       sleepBoundary = null; clearTarget(); wants = true;
@@ -611,6 +619,7 @@
       });
     }
     function synth(index) {
+      if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (cache.has(index)) return cache.get(index);
       const signal = controller.signal, entry = queue[index], chosenVoice = voice;
       const work = (async () => {
@@ -628,6 +637,7 @@
     // RAVEN trial uses complete paragraph WAVs while its live-stream buzzing is investigated.
     function streamingVoice() { return /^(qwen_|pocket_)/.test(voice); }
     function fetchStream(index) {
+      if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (streamRequests.has(index)) return streamRequests.get(index);
       const signal = controller.signal, entry = queue[index], chosenVoice = voice;
       const work = (async () => {
@@ -650,6 +660,7 @@
       return work;
     }
     async function streamCurrent(index) {
+      if (captureActive) return true;
       const measurement = {startedAt:performance.now(),prefetched:streamRequests.has(index),firstScheduledAudioMs:null,interChunkGapMs:null,underruns:0,maxUnderrunMs:0,receivedAudioSeconds:0};
       readerMeasurements.push(measurement); if (readerMeasurements.length > 50) readerMeasurements.shift();
       const context = ensureAudioContext();
@@ -880,11 +891,12 @@
       }
     }
     async function playLoaded() {
+      if (captureActive) return;
       try { await audio.play(); }
       catch (_) { wants = false; status('Press Play to start audio.'); paint(); }
     }
     async function loadCurrent(retry = 0) {
-      if (loading) return;
+      if (captureActive || loading) return;
       if (checkSleep()) return; armSleep();
       const token = epoch, index = position;
       if (previewEnd !== null && index >= previewEnd) {
@@ -931,6 +943,7 @@
       }
     }
     function requestContent(nextChapter, preview = false) {
+      if (captureActive) return;
       const scopeKey = !nextChapter && ['view','detail','section'].includes(mode) ? restartScopeKey : '';
       const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview;
       extraction = 'read-' + (++serial);
@@ -957,6 +970,7 @@
       if (clickedTarget) { jumpTo({ordinal:clickedTarget.ordinal,fingerprint:clickedTarget.fingerprint}); if (event.currentTarget === get('inline-read')) get(compact ? 'mini-play' : 'play').focus(); }
     };
     function readDetails(target) {
+      if (captureActive) return;
       if (!target || typeof target.scopeKey !== 'string' || !target.scopeKey || target.scopeKey.length > 500) return;
       stop('Opening details…'); mode = 'detail'; get('mode').value = mode; wants = true;
       const context = streamingVoice() ? ensureAudioContext() : null; if (context?.state === 'suspended') context.resume().catch(() => {});
@@ -971,6 +985,7 @@
     window.addEventListener('resize', placeTargetAction);
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !get('panel').hidden) { setPlayerView(queue.length || extraction ? 'compact' : 'closed'); get('toggle').focus(); } });
     get('play').onclick = () => {
+      if (captureActive) return;
       if (checkSleep()) return; armSleep();
       if (wants) { savePlace(); wants = false; audio.pause(); if (audioContext && audioContext.state === 'running' && streamingVoice()) audioContext.suspend().catch(() => {}); if (stream) { stream.boxState = 'paused'; box.dataset.streamState = 'paused'; } status(readingMessage()); paint(); return; }
       wants = true; if (loaded >= 0 || stream) status(readingMessage()); paint();
@@ -1128,8 +1143,21 @@
       voice = get('voice').value; enabled = true; box.hidden = false; updateStyle(); send('reader:hello'); paint();
     }).catch(() => {});
     paint();
+    function setCaptureActive(active) {
+      active = active === true;
+      if (captureActive === active) return;
+      captureActive = active;
+      if (active) {
+        stop('Reading paused while casting. Your place is saved.', true);
+        box.inert = true;
+      } else {
+        box.inert = false;
+        paint();
+      }
+    }
+    return { setCaptureActive };
   }
-  createNativeReader();
+  nativeReader=createNativeReader();
   function pinOnCurrentPage(pin){return !isBundle||pin.page===null||pin.page===currentPage;}
   function hideAllMarkers(){[].slice.call(overlay.querySelectorAll('.vanchor-marker')).forEach(function(marker){marker.hidden=true;});}
   function requestRepaint(){var pagePins=pins.filter(function(pin){return pinOnCurrentPage(pin)&&!pin.stale;});var anchors=pagePins.map(function(pin){return {id:pin.id,path:pin.path,x:pin.x,y:pin.y,w:pin.w,h:pin.h};});if(draftAnchor&&bridgeReady&&(!isBundle||draftAnchor.page===null||draftAnchor.page===currentPage))anchors.push({id:'__draft__',path:draftAnchor.path||null,x:draftAnchor.x,y:draftAnchor.y,w:draftAnchor.w||null,h:draftAnchor.h||null});postToFrame('anchor:repaint',{anchors:anchors});}
@@ -1188,6 +1216,7 @@
   function showOutbound(url){ensureOutboundPanel();outboundUrl=url;outboundHost.textContent=url.host;outboundPanel.removeAttribute('inert');outboundPanel.classList.add('open');outboundPanel.setAttribute('aria-hidden','false');outboundConfirm.focus();}
   window.addEventListener('message',function(event){
     if(!frame||event.source!==frame.contentWindow)return;var data=event.data;if(!data||typeof data!=='object')return;
+    if(castBridge&&castBridge.handle(event))return;
     if(data.type==='tts:hello'){ttsHello();return;}
     if(data.type==='tts:request'){ttsRequest(data);return;}
     if(data.type==='tts:cancel'){ttsCancel(data);return;}

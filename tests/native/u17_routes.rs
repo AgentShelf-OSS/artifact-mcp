@@ -1127,6 +1127,95 @@ async fn snapshot(fake: &Fake, method: Method, uri: &str) -> (StatusCode, Header
     (status, headers, body)
 }
 
+async fn render_cast_shell(fake: &Fake, config: AppConfig, uri: &str) -> (StatusCode, String) {
+    let mut dependencies = deps_with_config(fake, config);
+    dependencies.pages = Arc::new(
+        artifact_mcp::render::portal::AskamaPageRenderer::from_config(&dependencies.config),
+    );
+    let response = build_router(dependencies)
+        .oneshot(
+            Request::builder()
+                .uri(uri)
+                .body(Body::empty())
+                .expect("shell request"),
+        )
+        .await
+        .expect("shell response");
+    let status = response.status();
+    let body = to_bytes(response.into_body(), 512 * 1024)
+        .await
+        .expect("shell response body");
+    (
+        status,
+        String::from_utf8(body.to_vec()).expect("rendered HTML"),
+    )
+}
+
+#[tokio::test]
+async fn cast_capability_requires_exact_grant_and_current_authenticated_single_page_view() {
+    let grant = (ID.to_owned(), 2);
+    let mut config = AppConfig::default();
+    config.cast_ids.insert(grant.clone());
+
+    let (status, allowed) =
+        render_cast_shell(&Fake::standard(), config.clone(), &format!("/{ID}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(allowed.contains("data-cast-enabled=\"1\""));
+    assert!(allowed.contains(&format!(
+        "/raw/{ID}?anchor=1&#38;reader=1&#38;cast-pin=2.{DIGEST}"
+    )));
+    assert!(allowed.contains("type: 'cast:host-init'"));
+    assert!(
+        allowed.find("type: 'cast:host-init'").unwrap()
+            < allowed.find("nativeFetch=window.fetch").unwrap()
+    );
+
+    let mut wrong_revision = config.clone();
+    wrong_revision.cast_ids.clear();
+    wrong_revision.cast_ids.insert((ID.to_owned(), 1));
+    let (_, denied_revision) =
+        render_cast_shell(&Fake::standard(), wrong_revision, &format!("/{ID}")).await;
+    assert!(denied_revision.contains("data-cast-enabled=\"0\""));
+    assert!(!denied_revision.contains("type: 'cast:host-init'"));
+
+    let unsigned = Fake::standard();
+    unsigned.lock().viewer = Viewer::default();
+    let (_, denied_unsigned) =
+        render_cast_shell(&unsigned, config.clone(), &format!("/{ID}")).await;
+    assert!(!denied_unsigned.contains("type: 'cast:host-init'"));
+
+    let bundle = Fake::standard();
+    bundle
+        .lock()
+        .meta
+        .as_mut()
+        .expect("fixture metadata")
+        .is_bundle = true;
+    let (_, denied_bundle) = render_cast_shell(&bundle, config.clone(), &format!("/{ID}")).await;
+    assert!(denied_bundle.contains("data-cast-enabled=\"0\""));
+    assert!(!denied_bundle.contains("type: 'cast:host-init'"));
+
+    let missing_digest = Fake::standard();
+    missing_digest
+        .lock()
+        .meta
+        .as_mut()
+        .expect("fixture metadata")
+        .body_sha256
+        .clear();
+    let (_, denied_digest) =
+        render_cast_shell(&missing_digest, config.clone(), &format!("/{ID}")).await;
+    assert!(denied_digest.contains("data-cast-enabled=\"0\""));
+    assert!(!denied_digest.contains("type: 'cast:host-init'"));
+
+    for query in ["v=old", "revision=1"] {
+        let (_, historical) =
+            render_cast_shell(&Fake::standard(), config.clone(), &format!("/{ID}?{query}")).await;
+        assert!(historical.contains("data-cast-enabled=\"0\""), "{query}");
+        assert!(!historical.contains("type: 'cast:host-init'"), "{query}");
+    }
+}
+
 async fn discussion_request(
     fake: &Fake,
     method: Method,
@@ -1492,6 +1581,51 @@ async fn raw_current_bundle_history_and_public_share_delivery_use_the_u14_policy
 }
 
 #[tokio::test]
+async fn raw_cast_pin_requires_exact_metadata_and_delivered_body_match() {
+    let body = "<h1>Artifact</h1>";
+    let digest = artifact_mcp::artifacts::digest::sha256_hex(body.as_bytes());
+    let pin = format!("17.{digest}");
+    let matching = Fake::standard();
+    {
+        let mut state = matching.lock();
+        let meta = state.meta.as_mut().unwrap();
+        meta.revision = 17;
+        meta.body_sha256 = digest.clone();
+    }
+    let valid = snapshot(
+        &matching,
+        Method::GET,
+        &format!("/raw/{ID}?anchor=1&reader=1&cast-pin={pin}"),
+    )
+    .await;
+    assert_eq!(valid.0, StatusCode::OK);
+    assert!(String::from_utf8_lossy(&valid.2).contains(ANCHOR_BRIDGE_MARKER));
+    assert!(String::from_utf8_lossy(&valid.2).contains("artifact-reader-bridge"));
+    assert_eq!(valid.1[header::CONTENT_SECURITY_POLICY], DOCUMENT_SANDBOX);
+
+    for query in [
+        format!("cast-pin=16.{digest}"),
+        format!("cast-pin=17.{}", "b".repeat(64)),
+        format!("cast-pin=017.{digest}"),
+        format!("cast-pin={pin}&cast-pin={pin}"),
+    ] {
+        let denied = snapshot(&matching, Method::GET, &format!("/raw/{ID}?{query}")).await;
+        assert_eq!(denied.0, StatusCode::NOT_FOUND, "{query}");
+    }
+
+    let stale = Fake::standard();
+    {
+        let mut state = stale.lock();
+        let meta = state.meta.as_mut().unwrap();
+        meta.revision = 17;
+        meta.body_sha256 = digest.clone();
+        state.body = Some(html_file("<h1>Changed body</h1>"));
+    }
+    let denied = snapshot(&stale, Method::GET, &format!("/raw/{ID}?cast-pin={pin}")).await;
+    assert_eq!(denied.0, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
 async fn thumbnails_are_identity_gated_and_bound_to_one_current_digest_string() {
     let current = Fake::standard();
     current.lock().thumbnail = Some(b"persisted png".to_vec());
@@ -1768,4 +1902,240 @@ async fn rust_route_shapes_match_the_real_node_app_oracle() {
     // Express adds transport-level details (ETag/content length) outside these route handlers;
     // the route-owned status, representation headers and bytes must be identical.
     assert_eq!(rust, node);
+}
+
+#[tokio::test]
+async fn live_actions_are_owner_and_revision_pinned_with_csrf_and_fixed_body() {
+    let fake = Fake::standard();
+    fake.lock().meta.as_mut().unwrap().owner_email = Some("member@acme.test".into());
+    let mut config = AppConfig::default();
+    config
+        .action_grants
+        .push(artifact_mcp::actions::ActionGrant {
+            artifact_id: ID.into(),
+            org: "acme".into(),
+            revision: fake.lock().meta.as_ref().unwrap().revision,
+            action: "check-live-signals".into(),
+            worker_url: "http://127.0.0.1:1/".into(),
+        });
+    let app = build_router(deps_with_config(&fake, config));
+    let get_request = || {
+        Request::builder()
+            .uri(format!("/{ID}/actions/check-live-signals"))
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::BAD_GATEWAY
+    );
+    fake.lock().viewer.email = Some(EmailAddress::from("another@acme.test"));
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    fake.lock().viewer.email = Some(EmailAddress::from("member@acme.test"));
+    fake.lock().meta.as_mut().unwrap().revision += 1;
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+    fake.lock().meta.as_mut().unwrap().revision -= 1;
+    for body in [
+        r#"{"request_id":"safe","command":"arbitrary"}"#,
+        r#"{"request_id":"bad space"}"#,
+        r#"{"request_id":"one","request_id":"two"}"#,
+    ] {
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("/{ID}/actions/check-live-signals"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("x-artifact-mutation", "1")
+            .header("sec-fetch-site", "same-origin")
+            .body(Body::from(body))
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(request).await.unwrap().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let csrf = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/{ID}/actions/check-live-signals"))
+        .header(header::COOKIE, "CF_Authorization=opaque")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("sec-fetch-site", "cross-site")
+        .body(Body::from(r#"{"request_id":"safe"}"#))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(csrf).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    let missing = Request::builder()
+        .uri(format!("/{ID}/actions/arbitrary"))
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app.oneshot(missing).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+}
+
+#[tokio::test]
+async fn live_action_start_reaches_only_reviewed_loopback_worker() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let upstream=axum::Router::new().route("/start",axum::routing::post(|axum::Json(v):axum::Json<Value>| async move {
+        assert_eq!(v["action"],"check-live-signals");
+        assert_eq!(v["artifact_id"],ID);
+        assert_eq!(v["request_id"],"click-1");
+        axum::Json(json!({"schemaVersion":"org-intelligence/action-run/v1","current":null,"history":[],"availableAt":null,"workerCheckedAt":"2026-10-05T02:00:00Z"}))
+    }));
+    let task = tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+    let fake = Fake::standard();
+    fake.lock().meta.as_mut().unwrap().owner_email = Some("member@acme.test".into());
+    let mut config = AppConfig::default();
+    config
+        .action_grants
+        .push(artifact_mcp::actions::ActionGrant {
+            artifact_id: ID.into(),
+            org: "acme".into(),
+            revision: fake.lock().meta.as_ref().unwrap().revision,
+            action: "check-live-signals".into(),
+            worker_url: format!("http://127.0.0.1:{port}/"),
+        });
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/{ID}/actions/check-live-signals"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-artifact-mutation", "1")
+        .header("sec-fetch-site", "same-origin")
+        .body(Body::from(r#"{"request_id":"click-1"}"#))
+        .unwrap();
+    let result = build_router(deps_with_config(&fake, config))
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(result.status(), StatusCode::ACCEPTED);
+    task.abort();
+}
+
+#[tokio::test]
+async fn advisory_start_reaches_only_fixed_advisory_path() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let upstream=axum::Router::new().route("/advisory/start",axum::routing::post(|axum::Json(v):axum::Json<Value>| async move {
+        assert_eq!(v["action"],"analyze-differences");
+        assert_eq!(v["artifact_id"],ID);
+        assert_eq!(v["request_id"],"click-1");
+        axum::Json(json!({"schemaVersion":"org-intelligence/advisory-run/v1","current":null,"history":[],"availableAt":null,"workerCheckedAt":"2026-10-05T02:00:00Z"}))
+    }));
+    let task = tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+    let fake = Fake::standard();
+    fake.lock().meta.as_mut().unwrap().owner_email = Some("member@acme.test".into());
+    let mut config = AppConfig::default();
+    config
+        .action_grants
+        .push(artifact_mcp::actions::ActionGrant {
+            artifact_id: ID.into(),
+            org: "acme".into(),
+            revision: fake.lock().meta.as_ref().unwrap().revision,
+            action: "analyze-differences".into(),
+            worker_url: format!("http://127.0.0.1:{port}/"),
+        });
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/{ID}/actions/analyze-differences"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-artifact-mutation", "1")
+        .header("sec-fetch-site", "same-origin")
+        .body(Body::from(r#"{"request_id":"click-1"}"#))
+        .unwrap();
+    let result = build_router(deps_with_config(&fake, config))
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(result.status(), StatusCode::ACCEPTED);
+    task.abort();
+}
+
+#[tokio::test]
+async fn advisory_actions_preserve_owner_revision_csrf_and_fixed_body() {
+    let fake = Fake::standard();
+    fake.lock().meta.as_mut().unwrap().owner_email = Some("member@acme.test".into());
+    let mut config = AppConfig::default();
+    config
+        .action_grants
+        .push(artifact_mcp::actions::ActionGrant {
+            artifact_id: ID.into(),
+            org: "acme".into(),
+            revision: fake.lock().meta.as_ref().unwrap().revision,
+            action: "analyze-differences".into(),
+            worker_url: "http://127.0.0.1:1/".into(),
+        });
+    let app = build_router(deps_with_config(&fake, config));
+    let get_request = || {
+        Request::builder()
+            .uri(format!("/{ID}/actions/analyze-differences"))
+            .body(Body::empty())
+            .unwrap()
+    };
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::BAD_GATEWAY
+    );
+    fake.lock().viewer.email = Some(EmailAddress::from("another@acme.test"));
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    fake.lock().viewer.email = Some(EmailAddress::from("member@acme.test"));
+    fake.lock().meta.as_mut().unwrap().revision += 1;
+    assert_eq!(
+        app.clone().oneshot(get_request()).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
+    fake.lock().meta.as_mut().unwrap().revision -= 1;
+    for body in [
+        r#"{"request_id":"safe","command":"arbitrary"}"#,
+        r#"{"request_id":"bad space"}"#,
+        r#"{"request_id":"one","request_id":"two"}"#,
+    ] {
+        let request = Request::builder()
+            .method(Method::POST)
+            .uri(format!("/{ID}/actions/analyze-differences"))
+            .header(header::CONTENT_TYPE, "application/json")
+            .header("x-artifact-mutation", "1")
+            .header("sec-fetch-site", "same-origin")
+            .body(Body::from(body))
+            .unwrap();
+        assert_eq!(
+            app.clone().oneshot(request).await.unwrap().status(),
+            StatusCode::BAD_REQUEST
+        );
+    }
+    let csrf = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/{ID}/actions/analyze-differences"))
+        .header(header::COOKIE, "CF_Authorization=opaque")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("sec-fetch-site", "cross-site")
+        .body(Body::from(r#"{"request_id":"safe"}"#))
+        .unwrap();
+    assert_eq!(
+        app.clone().oneshot(csrf).await.unwrap().status(),
+        StatusCode::FORBIDDEN
+    );
+    let missing = Request::builder()
+        .uri(format!("/{ID}/actions/arbitrary"))
+        .body(Body::empty())
+        .unwrap();
+    assert_eq!(
+        app.oneshot(missing).await.unwrap().status(),
+        StatusCode::NOT_FOUND
+    );
 }

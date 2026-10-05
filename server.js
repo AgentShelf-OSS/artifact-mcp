@@ -33,6 +33,7 @@ import {
 } from "./lib/oauth.js";
 import { createPreviewTaskStore } from "./lib/tasks.js";
 import { assertAuditReady, createAuditLedger, createAuditMetrics, systemAuditContext } from "./lib/audit.js";
+import { createCollectionService } from "./lib/collections.js";
 
 const PORT = Number(process.env.PORT || 3480);
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:3480";
@@ -166,6 +167,7 @@ const state = createStateStore({ db });
 const operatorDataSources = parseDataSources();
 const artifactData = createArtifactData({ db, sources: operatorDataSources });
 const dataSources = createDataSourceRegistry({ db, data: artifactData, operatorSources: operatorDataSources, orgs: { has: orgs.orgExists }, artifacts: artifactStore, audit: securityAudit });
+const collections = createCollectionService({ db, artifacts: artifactStore, audit: securityAudit });
 
 // Queue existing single-file artifacts at low priority. The serial worker starts on a
 // microtask and mutation events are always selected before remaining backfill jobs.
@@ -245,8 +247,10 @@ const app = createApp({
     return { status: "ok" };
   },
   limits: {
-    mcpJson: MCP_JSON_LIMIT
-  }
+    mcpJson: MCP_JSON_LIMIT,
+    collectionJson: "128kb"
+  },
+  collections
 });
 
 const LISTEN_HOST = process.env.LISTEN_HOST || "0.0.0.0";

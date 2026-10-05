@@ -2,8 +2,9 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark"><link rel="icon" href="{{ favicon }}"><title>{{ app_name }} &middot; {{ site_host }}</title>
 <script>{{ theme_boot }}</script>
-<style>{{ css }}</style></head>
+<style>{{ css }}</style><style>{{ collection_css }}</style><style>{{ collection_toolbar_css }}</style></head>
 <body>
+<div id="collection-config" hidden data-viewer-email="{{ viewer_email }}" data-viewer-org="{{ viewer_org }}" data-viewer-admin="{% if viewer_is_admin %}1{% else %}0{% endif %}"></div>
 <a class="skip-link" href="#stage">Skip to artifacts</a>
 <div class="wrap">
   <header class="masthead" data-ui="app-frame">
@@ -75,6 +76,7 @@
       </div>
     </section>
 
+    <section id="collection-surface" class="collection-surface" aria-label="Collections"></section>
     <section class="collection-results" aria-label="Artifact results">
       <span id="org-category-data" hidden data-json="{{ org_category_json }}" data-can-create="{% if viewer_is_admin %}1{% else %}0{% endif %}"></span>
         <div class="result-summary">
@@ -160,5 +162,5 @@
   </main>
   <footer class="footer"><span>{{ app_name }}</span><span>Private · tenant-scoped · live HTML</span></footer>
 </div>
-<script>{{ script }}</script>
+<script>{{ script }}</script><script>{{ collection_toolbar_script }}</script><script>{{ collection_script }}</script>
 </body></html>

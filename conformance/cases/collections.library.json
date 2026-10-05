@@ -1,0 +1,674 @@
+{
+  "id": "collections.library",
+  "fixture": "empty-v21",
+  "tags": [
+    "collections",
+    "issue-77"
+  ],
+  "env": {
+    "INGRESS_MUTATIONS_PER_WINDOW": "1000",
+    "INGRESS_READS_PER_WINDOW": "1000"
+  },
+  "note": "Approved shared topic model and viewer preferences. Error message text is deliberately not a contract; stable status/error codes are.",
+  "steps": [
+    {
+      "name": "Publish reference 1",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Collection reference 1",
+              "html": "<!doctype html><h1>Reference 1</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "artifact_1": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Publish reference 2",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Collection reference 2",
+              "html": "<!doctype html><h1>Reference 2</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "artifact_2": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Publish reference 3",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Collection reference 3",
+              "html": "<!doctype html><h1>Reference 3</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "artifact_3": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      },
+      "afterSql": [
+        "UPDATE artifacts SET owner_email='${viewer_acme}' WHERE org='acme'"
+      ]
+    },
+    {
+      "name": "Creator collects same-org references",
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "  Interface   ideas  ",
+          "org": "acme",
+          "description": " Topic  studies ",
+          "color": "#e4d3b4",
+          "artifactIds": [
+            "${artifact_1}"
+          ],
+          "coverArtifactId": "${artifact_1}"
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "capture": {
+        "collection_1": "id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "collection_1",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "afterSql": [
+        "UPDATE collection_artifacts SET created_at='2000-01-01 00:00:00' WHERE collection_id='${collection_1}'"
+      ]
+    },
+    {
+      "name": "Add another reference",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${collection_1}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${artifact_2}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "Choose a cover independently of member order",
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/${collection_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "coverArtifactId": "${artifact_2}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "Owner projection has explicit cover first",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=acme&include=projection",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Admin collects other org",
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "Operations",
+          "org": "beta",
+          "artifactIds": [
+            "${artifact_3}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "capture": {
+        "collection_2": "id"
+      }
+    },
+    {
+      "name": "Admin aggregate without org",
+      "request": {
+        "method": "GET",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Admin aggregate all alias",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=all&include=projection",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Reader can browse but cannot curate",
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/${collection_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "Forbidden"
+        }
+      },
+      "expect": {
+        "status": 403,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Foreign query is concealed",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=beta",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Unknown organization is concealed",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=missing",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Unknown body field rejected",
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "No",
+          "org": "acme",
+          "unexpected": true
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Mixed org membership is atomic",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${collection_1}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${artifact_1}",
+            "${artifact_3}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Set admin mixed order and collapsed state",
+      "request": {
+        "method": "PUT",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "view": "ribbons",
+          "previewSize": "large",
+          "artifactLayout": "list",
+          "collectionOrderByOrg": {
+            "all": [
+              "${collection_2}",
+              "${collection_1}"
+            ],
+            "acme": [
+              "${collection_1}"
+            ]
+          },
+          "collapsedCollectionIdsByOrg": {
+            "all": [
+              "${collection_1}"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Scoped admin preference write preserves order",
+      "request": {
+        "method": "PUT",
+        "path": "/gallery/preferences?org=acme",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "previewSize": "compact"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Admin preferences persisted",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Another viewer has independent preferences",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Explicit null clears cover",
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/${collection_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "coverArtifactId": null
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Membership duplicate request is idempotent",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${collection_1}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${artifact_1}",
+            "${artifact_1}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Set cover to member",
+      "request": {
+        "method": "PATCH",
+        "path": "/collections/${collection_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "coverArtifactId": "${artifact_2}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Removing member clears cover",
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/${collection_1}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${artifact_2}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Projection keeps remaining membership",
+      "request": {
+        "method": "GET",
+        "path": "/collections?include=projection",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Set stale preferences",
+      "request": {
+        "method": "PUT",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "collectionOrderByOrg": {
+            "acme": [
+              "${collection_1}",
+              "stale"
+            ]
+          },
+          "collapsedCollectionIdsByOrg": {
+            "acme": [
+              "${collection_1}"
+            ]
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Deleting folder preserves artifacts",
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/${collection_1}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Preferences prune deleted folder",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "surviving_artifacts",
+        "query": "SELECT id,org FROM artifacts ORDER BY org,title"
+      },
+      {
+        "name": "surviving_collection",
+        "query": "SELECT id,org,name FROM collections ORDER BY org"
+      },
+      {
+        "name": "surviving_memberships",
+        "query": "SELECT collection_id,artifact_id,org FROM collection_artifacts ORDER BY org"
+      }
+    ]
+  }
+}

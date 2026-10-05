@@ -1,0 +1,330 @@
+{
+  "steps": [
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 1,
+          "artifactIds": [
+            "${a0}"
+          ],
+          "color": null,
+          "coverArtifactId": null,
+          "createdBy": "alice@acme.test",
+          "description": "",
+          "editable": true,
+          "id": "${c0}",
+          "name": "Shared study",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${a0}",
+              "thumbnail": "/thumbnails/${a0}?v=1493e1813da158b849190679b4d6889bc6f3fe030a0d7cdf5ae076e60823df21"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 201,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactCount": 1,
+          "artifactIds": [
+            "${a1}"
+          ],
+          "color": null,
+          "coverArtifactId": "${a1}",
+          "createdBy": "charlie@acme.test",
+          "description": "",
+          "editable": true,
+          "id": "${c1}",
+          "name": "Private review",
+          "org": "acme",
+          "previewArtifacts": [
+            {
+              "id": "${a1}",
+              "thumbnail": "/thumbnails/${a1}?v=8be8e0f3043c1e0d8e2854e6b1e20606e3d511a9607cfa2d6698a2226bcfd24c"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 0,
+              "artifactIds": [],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "charlie@acme.test",
+              "description": "",
+              "editable": false,
+              "id": "${c1}",
+              "name": "Private review",
+              "org": "acme",
+              "previewArtifacts": []
+            },
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${a0}"
+              ],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "alice@acme.test",
+              "description": "",
+              "editable": true,
+              "id": "${c0}",
+              "name": "Shared study",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${a0}",
+                  "thumbnail": "/thumbnails/${a0}?v=1493e1813da158b849190679b4d6889bc6f3fe030a0d7cdf5ae076e60823df21"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 1
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "not_found",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "forbidden",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_ids",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_query",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "artifactLayout": "grid",
+          "collapsedCollectionIdsByOrg": {},
+          "collectionOrderByOrg": {},
+          "previewSize": "compact",
+          "view": "reel"
+        }
+      }
+    },
+    {
+      "status": 500,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "internal_error",
+          "message": "<volatile>"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 0,
+              "artifactIds": [],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "charlie@acme.test",
+              "description": "",
+              "editable": false,
+              "id": "${c1}",
+              "name": "Private review",
+              "org": "acme",
+              "previewArtifacts": []
+            },
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${a0}"
+              ],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "alice@acme.test",
+              "description": "",
+              "editable": true,
+              "id": "${c0}",
+              "name": "Shared study",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${a0}",
+                  "thumbnail": "/thumbnails/${a0}?v=1493e1813da158b849190679b4d6889bc6f3fe030a0d7cdf5ae076e60823df21"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 1
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "category": "",
+          "id": "${a1}",
+          "org": "beta"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "collections": [
+            {
+              "artifactCount": 0,
+              "artifactIds": [],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "charlie@acme.test",
+              "description": "",
+              "editable": true,
+              "id": "${c1}",
+              "name": "Private review",
+              "org": "acme",
+              "previewArtifacts": []
+            },
+            {
+              "artifactCount": 1,
+              "artifactIds": [
+                "${a0}"
+              ],
+              "color": null,
+              "coverArtifactId": null,
+              "createdBy": "alice@acme.test",
+              "description": "",
+              "editable": false,
+              "id": "${c0}",
+              "name": "Shared study",
+              "org": "acme",
+              "previewArtifacts": [
+                {
+                  "id": "${a0}",
+                  "thumbnail": "/thumbnails/${a0}?v=1493e1813da158b849190679b4d6889bc6f3fe030a0d7cdf5ae076e60823df21"
+                }
+              ]
+            }
+          ],
+          "preferences": {
+            "artifactLayout": "grid",
+            "collapsedCollectionIdsByOrg": {},
+            "collectionOrderByOrg": {},
+            "previewSize": "compact",
+            "view": "reel"
+          },
+          "uncollectedCount": 1
+        }
+      }
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "invalid_preferences",
+          "message": "<volatile>"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "memberships_after_cleanup": [],
+      "cleared_covers": [
+        {
+          "cover_artifact_id": null,
+          "id": "${c1}"
+        },
+        {
+          "cover_artifact_id": null,
+          "id": "${c0}"
+        }
+      ]
+    }
+  }
+}

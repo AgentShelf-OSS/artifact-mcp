@@ -43,6 +43,8 @@ pub struct ShellView {
     pub viewer: Viewer,
     pub viewer_display_name: Option<String>,
     pub org_accent: Option<String>,
+    /// True only for an authenticated current-revision single-page allowlisted artifact.
+    pub cast_enabled: bool,
 }
 
 #[derive(Clone, Debug)]

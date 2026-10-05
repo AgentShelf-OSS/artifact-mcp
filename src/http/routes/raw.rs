@@ -10,6 +10,7 @@ use axum::{
 
 use crate::{
     AppDeps,
+    artifacts::digest::sha256_hex,
     artifacts::validation::posix_normalize_relative,
     error::AppError,
     http::{
@@ -54,6 +55,30 @@ async fn current_root_result(
         return Err(AppError::ConcealedNotFound);
     };
     let parsed = QueryValues::parse(query);
+    let cast_pinned = parsed.has("cast-pin");
+    if cast_pinned {
+        let expected = format!(
+            "{}.{}",
+            artifact.meta().revision,
+            artifact.meta().body_sha256
+        );
+        let Some(pin) = parsed.single("cast-pin") else {
+            return Err(AppError::ConcealedNotFound);
+        };
+        if artifact.meta().revision == 0
+            || artifact.meta().is_bundle
+            || artifact.meta().body_sha256.len() != 64
+            || !artifact
+                .meta()
+                .body_sha256
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte))
+            || pin != expected
+            || sha256_hex(&file.content) != artifact.meta().body_sha256
+        {
+            return Err(AppError::ConcealedNotFound);
+        }
+    }
     artifact_response(
         file,
         ArtifactResponseOptions {

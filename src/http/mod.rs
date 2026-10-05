@@ -21,8 +21,10 @@ pub(crate) fn router() -> Router<AppDeps> {
         .merge(routes::feedback::router())
         .merge(routes::state::router())
         .merge(routes::data::router())
+        .merge(routes::actions::router())
         .merge(routes::speech::router())
         .merge(routes::artifact::router())
         .merge(routes::gallery::router())
+        .merge(routes::collections::router())
         .layer(axum_middleware::from_fn(middleware::express_etag))
 }

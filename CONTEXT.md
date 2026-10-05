@@ -22,6 +22,10 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Publisher key** — a revocable, per-organization upload credential. Only its hash is stored; the secret is displayed once.
 - **Reaction** — a viewer’s favorite flag and sentiment vote (`-1`, `0`, or `1`) for an artifact.
 - **Gallery** — the organization-scoped artifact index.
+- **Collection** — an organization-owned topic grouping that references existing artifacts. The gallery calls a collection a folder. An artifact can belong to several collections in its organization.
+- **Collection membership** — a reference between a collection and an artifact. It does not copy the artifact or change its access, category, or content revision.
+- **Library presentation** — the viewer's chosen display of collections: Reel Shelf, Contact Sheets, or Gallery Ribbons. All artifacts remains an ungrouped gallery presentation.
+- **Gallery preference** — display choices belonging to the verified viewer, including presentation, preview size, artifact layout, collection order, and collapsed ribbons.
 - **Viewer shell** — trusted application chrome around a sandboxed raw artifact.
 - **Data source**: An API or producer channel belonging to one organization. It exposes named operations and subscriptions while keeping connection settings and credentials on the server.
 - **Managed connection**: A data source whose configuration an administrator maintains in the Connections workspace.
@@ -48,6 +52,7 @@ The application is a dependency-light modular monolith: one server process, one 
 10. Artifact code never receives a network capability; viewer state crosses the sandbox only through the shell bridge.
 11. Viewer-scope rows are readable and writable only by their owner; the bridge exposes a viewer handle, never an email. Administrators have no cross-viewer access to this scope.
 12. Live-data bindings can reference only sources belonging to the artifact's organization. Artifact code cannot select upstream URLs, headers, or credentials. Raw, historical, and public-share representations have no live-data capability.
+13. Scene capture is an opt-in shell capability for an authenticated current single-page view of an exactly reviewed artifact revision. Raw, historical, bundle, and public-share views have no capture capability. The shell validates the current tab and crops to the reviewed scene before upload. See `docs/adr/0011-reviewed-scene-capture-via-viewer-shell.md`.
 
 ## Trust model
 

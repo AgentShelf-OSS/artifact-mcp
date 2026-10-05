@@ -12,6 +12,7 @@ COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY src ./src
 COPY templates ./templates
 COPY assets ./assets
+COPY migrations ./migrations
 COPY conformance/mcp.tool-output-schemas.json ./conformance/mcp.tool-output-schemas.json
 
 ENV RUSTUP_TOOLCHAIN=1.97.1 \

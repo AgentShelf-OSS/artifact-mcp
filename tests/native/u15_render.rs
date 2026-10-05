@@ -55,10 +55,13 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     .replaceAll('&quot;', '"').replaceAll('&#39;', "'")
     .replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
   const blocks = (html, tag) => Array.from(html.matchAll(new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'g')), row => row[1]);
+  const galleryMarkup = (gallery.match(/<main\b[^>]*>([\s\S]*?)<\/main>/) || ['', ''])[1];
   const lastBlock = (html, tag) => { const found = blocks(html, tag); return found[found.length - 1] || null; };
   process.stdout.write(JSON.stringify({
     portalCss: portal.PORTAL_CSS,
-    portalScript: lastBlock(gallery, 'script'),
+    portalScript: blocks(gallery, 'script').at(-3),
+    collectionToolbarScript: blocks(gallery, 'script').at(-2),
+    collectionScript: lastBlock(gallery, 'script'),
     shellCss: lastBlock(shell, 'style'),
     settingsCss: lastBlock(settingsHtml, 'style'),
     settingsScript: blocks(settingsHtml, 'script').at(-2),
@@ -73,7 +76,7 @@ Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, s
     galleryHasJustNow: gallery.includes('Just now'),
     settingsEscaped: !settingsHtml.includes(input.attack) && settingsHtml.includes('Specific emails'),
     categoryFilters: Array.from((gallery.match(/<select id="category-filter"[^>]*>([\s\S]*?)<\/select>/) || ['', ''])[1].matchAll(/<option value="([^"]*)"/g), row => row[1]).slice(1),
-    cardOrder: Array.from(gallery.matchAll(/<article class="card[^"]*"[^>]*data-id="([^"]*)"/g), row => row[1]),
+    cardOrder: Array.from(galleryMarkup.matchAll(/<article class="card[^"]*"[^>]*data-id="([^"]*)"/g), row => row[1]),
     notificationHref: match(gallery, /<a class="notif-row[^\"]*" href="([^"]+)"/)
   }));
 }).catch((error) => { console.error(error); process.exit(1); });
@@ -284,7 +287,7 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         revision: 3,
         category: attack.to_owned(),
         hidden: false,
-        body_sha256: "deadbeefcafebabe".to_owned(),
+        body_sha256: "deadbeefcafebabe000000000000000000000000000000000000000000000000".to_owned(),
     };
     let authorized =
         AccessPolicy::authorize_viewer(&viewer, Some(meta)).expect("same-org authorization");
@@ -339,6 +342,7 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         viewer,
         viewer_display_name: None,
         org_accent: Some("#123456".to_owned()),
+        cast_enabled: true,
     };
 
     assert_eq!(
@@ -346,6 +350,14 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         "\"\\u003c\\u003e\\u0026\\u2028\\u2029\\\"🎉\""
     );
     let html = renderer.shell(&view).expect("render viewer shell");
+    assert!(html.contains("data-cast-enabled=\"1\""));
+    assert!(html.contains(&format!(
+        "/raw/artifact1234?anchor=1&#38;reader=1&#38;cast-pin=3.deadbeefcafebabe000000000000000000000000000000000000000000000000"
+    )));
+    assert!(
+        html.find("type: 'cast:host-init'").unwrap()
+            < html.find("nativeFetch=window.fetch").unwrap()
+    );
     assert!(html.contains("sandbox=\"allow-scripts allow-popups allow-forms allow-modals\""));
     assert!(!html.contains("allow-same-origin"));
     assert!(!html.contains("</script>\"'&<>"));
@@ -454,6 +466,18 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         include_str!("../../assets/portal.js")
     );
     assert_eq!(
+        node["collectionToolbarScript"]
+            .as_str()
+            .expect("Node collection toolbar script"),
+        include_str!("../../assets/collection-toolbar.js")
+    );
+    assert_eq!(
+        node["collectionScript"]
+            .as_str()
+            .expect("Node collection script"),
+        include_str!("../../assets/collections.js")
+    );
+    assert_eq!(
         node["shellCss"].as_str().expect("Node shell CSS"),
         include_str!("../../assets/shell.css")
     );
@@ -530,8 +554,11 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             viewer: viewer.clone(),
             viewer_display_name: None,
             org_accent: None,
+            cast_enabled: false,
         })
         .expect("Rust shell parity fixture");
+    assert!(shell.contains("data-cast-enabled=\"0\""));
+    assert!(!shell.contains("type: 'cast:host-init'"));
     assert_eq!(html_attribute(&shell, "sandbox"), node["sandbox"]);
     assert_eq!(
         decode_html_attribute(&html_attribute(&shell, "src")),
@@ -605,7 +632,11 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
     assert!(gallery.contains("<option value=\"\">Uncategorized (1)</option>"));
     assert!(gallery.contains("Find every published artifact."));
     assert_eq!(
-        html_attributes_after(&gallery, "<article class=\"card", "data-id"),
+        html_attributes_after(
+            gallery.split("</main>").next().expect("gallery markup"),
+            "<article class=\"card",
+            "data-id"
+        ),
         vec!["artifact1234", "artifact5678"]
     );
     assert!(gallery.contains(&format!(

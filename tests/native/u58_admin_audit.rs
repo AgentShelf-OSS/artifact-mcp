@@ -690,3 +690,67 @@ async fn share_mutations_use_persisted_artifact_tenant_and_roll_back_with_audit(
     );
     assert!(audit_rows(&rollback).is_empty());
 }
+
+#[tokio::test]
+async fn live_action_audit_is_signed_and_correlated_before_and_after_dispatch() {
+    let db = TestDb::new("live-action-audit");
+    seed_and_seal(&db, Some("acme"));
+    let access = artifact_mcp::security::audit::AuditAccess::new(db.pool().clone(), AUDIT_KEY);
+    let audit = admin_audit().for_target_tenant("acme").unwrap();
+    access
+        .record_live_action(
+            audit.clone(),
+            "abc123def456".into(),
+            6,
+            "success",
+            "requested",
+        )
+        .await
+        .unwrap();
+    access
+        .record_live_action(audit, "abc123def456".into(), 6, "success", "dispatched")
+        .await
+        .unwrap();
+    let rows = audit_rows(&db);
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|r| r.tenant == "acme"
+        && r.actor_id == ACTOR
+        && r.operation == "artifact.action.check-live-signals"));
+    assert_eq!(rows[0].request_id, rows[1].request_id);
+    assert!(artifact_mcp::security::audit::verify(&db.conn(), &AUDIT_KEY).unwrap());
+}
+
+#[tokio::test]
+async fn advisory_action_audit_is_signed_and_distinct() {
+    let db = TestDb::new("advisory-action-audit");
+    seed_and_seal(&db, Some("acme"));
+    let access = artifact_mcp::security::audit::AuditAccess::new(db.pool().clone(), AUDIT_KEY);
+    let audit = admin_audit().for_target_tenant("acme").unwrap();
+    access
+        .record_live_action(
+            audit.clone(),
+            "abc123def456".into(),
+            6,
+            "success",
+            "analyze-differences.requested",
+        )
+        .await
+        .unwrap();
+    access
+        .record_live_action(
+            audit,
+            "abc123def456".into(),
+            6,
+            "success",
+            "analyze-differences.dispatched",
+        )
+        .await
+        .unwrap();
+    let rows = audit_rows(&db);
+    assert_eq!(rows.len(), 2);
+    assert!(rows.iter().all(|r| r.tenant == "acme"
+        && r.actor_id == ACTOR
+        && r.operation == "artifact.action.analyze-differences"));
+    assert_eq!(rows[0].request_id, rows[1].request_id);
+    assert!(artifact_mcp::security::audit::verify(&db.conn(), &AUDIT_KEY).unwrap());
+}

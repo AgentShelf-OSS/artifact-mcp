@@ -44,11 +44,12 @@ test.describe("gallery", () => {
 
     const toolbar = page.locator(".collection-tools");
     await expect(toolbar.getByRole("searchbox", { name: "Search artifacts" })).toBeVisible();
-    await expect(toolbar.locator("[data-filter-view='all']")).toBeVisible();
+    await expect(toolbar.getByLabel("Show artifacts")).toBeVisible();
     await expect(toolbar.getByLabel("Filter by organization")).toBeVisible();
     await expect(toolbar.getByLabel("Filter by category")).toBeVisible();
-    await expect(toolbar.getByLabel("Sort artifacts")).toBeVisible();
-    await expect(toolbar.getByLabel("Collection layout")).toBeVisible();
+    await expect(page.locator("#library-controls").getByLabel("Sort artifacts")).toBeVisible();
+    await page.locator('[data-library-view="all"]').click();
+    await expect(page.locator("#library-controls").getByLabel("Artifact layout", {exact:true})).toBeVisible();
     await expect(toolbar.locator("[data-reset-filters]")).toBeHidden();
     await expect(page.locator(".filter-rail")).toHaveCount(0);
   });
@@ -66,18 +67,18 @@ test.describe("gallery", () => {
     page.on("pageerror", (error) => errors.push(error.message));
     await page.goto("/");
 
-    await page.getByLabel("Filter by organization").selectOption(org);
-    await page.getByLabel("Filter by category").selectOption("Reports");
+    await page.locator("#library-controls").getByLabel("Filter by organization").selectOption(org);
+    await page.locator("#library-controls").getByLabel("Filter by category").selectOption("Reports");
     await page.getByRole("searchbox", { name: "Search artifacts" }).fill("PW Reset");
-    await page.getByLabel("Sort artifacts").selectOption("title");
+    await page.locator("#library-controls").getByLabel("Sort artifacts").selectOption("title");
     const clear = page.locator("[data-reset-filters]");
     await expect(clear).toBeVisible();
     await clear.click();
 
     await expect(page.getByRole("searchbox", { name: "Search artifacts" })).toHaveValue("");
-    await expect(page.getByLabel("Filter by organization")).toHaveValue("all");
-    await expect(page.getByLabel("Filter by category")).toHaveValue("all");
-    await expect(page.getByLabel("Sort artifacts")).toHaveValue("recent");
+    await expect(page.locator("#library-controls").getByLabel("Filter by organization")).toHaveValue("all");
+    await expect(page.locator("#library-controls").getByLabel("Filter by category")).toHaveValue("all");
+    await expect(page.locator("#library-controls").getByLabel("Sort artifacts")).toHaveValue("recent");
     await expect(page.locator('[data-filter-view="all"]')).toHaveAttribute("aria-pressed", "true");
     await expect(clear).toBeHidden();
     expect(errors).toEqual([]);
@@ -94,8 +95,8 @@ test.describe("gallery", () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await page.goto("/");
 
-    const organization = page.getByLabel("Filter by organization");
-    const category = page.getByLabel("Filter by category");
+    const organization = page.locator("#library-controls").getByLabel("Filter by organization");
+    const category = page.locator("#library-controls").getByLabel("Filter by category");
     await expect(organization).toBeVisible();
     await expect(category).toBeVisible();
     await organization.selectOption(org);
@@ -114,8 +115,8 @@ test.describe("gallery", () => {
     await publish(request, publisherKey, { title, category: "Source only", html: "<!doctype html><h1>move</h1>" });
     await page.goto("/");
 
-    const organization = page.getByLabel("Filter by organization");
-    const filterCategory = page.getByLabel("Filter by category");
+    const organization = page.locator("#library-controls").getByLabel("Filter by organization");
+    const filterCategory = page.locator("#library-controls").getByLabel("Filter by category");
     await organization.selectOption(destination);
     await expect(filterCategory.locator("option")).toHaveText([
       "All categories",
@@ -123,8 +124,8 @@ test.describe("gallery", () => {
       "+ Category",
     ]);
     await filterCategory.selectOption("__create_category__");
-    await page.getByLabel("Category name").fill("Filter created");
-    await page.getByRole("button", { name: "Create category" }).click();
+    await page.locator("#category-dialog").getByLabel("Category name").fill("Filter created");
+    await page.locator("#category-dialog").getByRole("button", { name: "Create category" }).click();
     await expect(filterCategory.locator('option[value="Filter created"]')).toHaveText("Filter created (0)");
 
     await organization.selectOption(org);
@@ -139,8 +140,8 @@ test.describe("gallery", () => {
       "+ Category",
     ]);
     await cardCategory.selectOption("__create_category__");
-    await page.getByLabel("Category name").fill("Move created");
-    await page.getByRole("button", { name: "Create category" }).click();
+    await page.locator("#category-dialog").getByLabel("Category name").fill("Move created");
+    await page.locator("#category-dialog").getByRole("button", { name: "Create category" }).click();
     await expect(cardCategory).toHaveValue("Move created");
     await expect(card.locator(".move-question")).toContainText(`to ${destination} in Move created`);
     await card.getByRole("button", { name: "Move", exact: true }).click();

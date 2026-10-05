@@ -1,0 +1,463 @@
+{
+  "id": "collections.permissions",
+  "fixture": "empty-v21",
+  "tags": [
+    "collections",
+    "issue-77",
+    "permissions"
+  ],
+  "steps": [
+    {
+      "name": "Publish ownership fixture 0",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Ownership 0",
+              "html": "<!doctype html><h1>Ownership 0</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "a0": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Publish ownership fixture 1",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Ownership 1",
+              "html": "<!doctype html><h1>Ownership 1</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "a1": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Publish ownership fixture 2",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Ownership 2",
+              "html": "<!doctype html><h1>Ownership 2</h1>"
+            }
+          }
+        }
+      },
+      "capture": {
+        "a2": "result.structuredContent.id"
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true
+      },
+      "afterSql": [
+        "UPDATE artifacts SET owner_email='charlie@acme.test' WHERE org='acme'",
+        "UPDATE artifacts SET hidden=1 WHERE id='${a1}'"
+      ]
+    },
+    {
+      "name": "Creator collects another owner readable artifact",
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "Shared study",
+          "artifactIds": [
+            "${a0}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "capture": {
+        "c0": "id"
+      }
+    },
+    {
+      "name": "Cannot collect hidden non-owner artifact",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${c0}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${a2}",
+            "${a1}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Hidden owner creates collection and sees hidden preview",
+      "request": {
+        "method": "POST",
+        "path": "/collections",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "name": "Private review",
+          "artifactIds": [
+            "${a1}"
+          ],
+          "coverArtifactId": "${a1}"
+        }
+      },
+      "expect": {
+        "status": 201,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "capture": {
+        "c1": "id"
+      },
+      "afterSql": [
+        "UPDATE collections SET created_at='2001-01-01' WHERE id='${c1}'"
+      ]
+    },
+    {
+      "name": "Reader sees collection but hidden references are omitted",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=acme",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Foreign preference scope is concealed",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences?org=beta",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Creator permission is required for removal",
+      "request": {
+        "method": "DELETE",
+        "path": "/collections/${c0}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${a0}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 403,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Set malformed artifact IDs rejected",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${c0}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": null
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Unsupported query rejected",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${c0}/memberships?unexpected=1",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${a2}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    },
+    {
+      "name": "Prepare failing audit sink",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "afterSql": [
+        "CREATE TRIGGER collection_audit_failure BEFORE INSERT ON security_audit_events WHEN NEW.target_type='collection' BEGIN SELECT RAISE(ABORT,'QA audit sink failure'); END"
+      ]
+    },
+    {
+      "name": "Audit failure rolls back membership mutation",
+      "request": {
+        "method": "POST",
+        "path": "/collections/${c0}/memberships",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "artifactIds": [
+            "${a2}"
+          ]
+        }
+      },
+      "expect": {
+        "status": 500,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      },
+      "afterSql": [
+        "DROP TRIGGER collection_audit_failure"
+      ]
+    },
+    {
+      "name": "Verify rollback projection",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=acme",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      },
+      "afterSql": [
+        "INSERT OR IGNORE INTO orgs(name) VALUES ('beta')"
+      ]
+    },
+    {
+      "name": "Real artifact organization move",
+      "request": {
+        "method": "POST",
+        "path": "/${a1}/move",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "org": "beta"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "Organization move clears membership and cover",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=acme",
+        "headers": {
+          "cf-access-authenticated-user-email": "charlie@acme.test"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    },
+    {
+      "name": "Artifact deletion clears memberships",
+      "request": {
+        "method": "DELETE",
+        "path": "/${a0}",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Viewer preference typed values rejected",
+      "request": {
+        "method": "PUT",
+        "path": "/gallery/preferences",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "collectionOrderByOrg": {
+            "acme": [
+              false
+            ]
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "message"
+          ]
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "memberships_after_cleanup",
+        "query": "SELECT collection_id,artifact_id,org FROM collection_artifacts ORDER BY collection_id,artifact_id"
+      },
+      {
+        "name": "cleared_covers",
+        "query": "SELECT id,cover_artifact_id FROM collections ORDER BY created_at,id"
+      }
+    ]
+  }
+}
