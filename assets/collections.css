@@ -87,3 +87,49 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 .collection-delete-folder{color:var(--danger)}
 .collection-sheet-card{border-top:3px solid var(--collection-color,var(--line))}.collection-ribbon{border-left:3px solid var(--collection-color,var(--line))}
 .collection-folder-heading{display:flex;align-items:center;gap:18px;flex-wrap:wrap;padding:4px 0 8px}.collection-folder-heading>div{flex:1;min-width:0}.collection-folder-heading h2{font:26px/1.15 Georgia,"Times New Roman",serif;margin:0;overflow-wrap:anywhere}.collection-folder-heading p{margin:4px 0 0;font:11px var(--font-ui);color:var(--ink-3)}.collection-folder-heading button{min-height:36px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink);padding:8px 10px;font:600 11px var(--font-ui);cursor:pointer}@media(max-width:760px){.collection-folder-heading button{min-height:44px}}
+
+/* Reel shelf composition: the shelf owns its heading, four-up faces, and the
+   compact creation tile. The reel itself keeps its controls in one header. */
+.collection-shelf-heading{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 .25rem;padding:.1rem 0 .35rem}
+.collection-shelf-heading h2{margin:0;font:600 .67rem var(--font-mono);letter-spacing:.06em;text-transform:uppercase;color:var(--ink-2)}
+.collection-shelf-tools{display:flex;align-items:center;justify-content:flex-end;gap:.4rem;min-width:0}
+.collection-shelf-tools p{margin:0;color:var(--ink-3);font:.62rem var(--font-mono);white-space:nowrap}
+.collection-shelf-nav{display:block;min-width:0}
+.collection-shelf-nav>.collection-grid{display:flex;gap:.85rem;overflow-x:auto;overflow-y:visible;padding:1.8rem .15rem .3rem;scroll-snap-type:x proximity;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.collection-surface[data-view="reel"] .collection-face,.collection-surface[data-view="reel"] .collection-new-tile{flex:0 0 calc((100% - 2.55rem)/4);min-width:0;scroll-snap-align:start}
+.collection-new-tile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.35rem;min-height:108px;padding:.75rem;border:1px dashed var(--line);border-radius:5px;background:transparent;color:var(--ink-2);text-align:center;cursor:pointer}
+.collection-new-tile:hover,.collection-new-tile:focus-visible{border-color:var(--brass);background:var(--ground-2);color:var(--ink);outline:none}
+.collection-new-tile .icon{width:1.25rem;height:1.25rem;color:var(--brass)}
+.collection-new-tile strong{font:1.15rem/1.15 var(--font-display)}
+.collection-new-tile small{color:var(--ink-3);font:.6rem var(--font-mono)}
+.collection-shelf-tools .shelf-arrow{width:1.8rem;height:1.8rem}
+.collection-reel{display:block;padding:.8rem}
+.collection-reel-head{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin:0 0 .7rem}
+.collection-reel-title{min-width:0;margin:0;color:var(--ink-2);font:600 .67rem/1.35 var(--font-mono)}
+.collection-reel-tools{display:flex;align-items:center;justify-content:flex-end;gap:.35rem;flex-wrap:wrap;grid-column:auto}
+.collection-reel-paging{display:flex;align-items:center;gap:.25rem}
+.collection-reel-tools button,.collection-reel-tools .pager{min-height:2rem}
+.collection-reel-track{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.65rem;min-width:0}
+.collection-reel>[data-reel-close]{order:initial}
+@media(max-width:1100px){.collection-surface[data-view="reel"] .collection-face,.collection-surface[data-view="reel"] .collection-new-tile{flex-basis:calc((100% - 1.7rem)/3)}}
+@media(max-width:760px){.collection-shelf-heading{align-items:flex-start;flex-wrap:wrap}.collection-shelf-tools{width:100%;justify-content:space-between}.collection-shelf-tools p{flex:1;min-width:0;font-size:.58rem;white-space:normal}.collection-shelf-nav>.collection-grid{gap:.65rem;padding-top:1.5rem}.collection-surface[data-view="reel"] .collection-face,.collection-surface[data-view="reel"] .collection-new-tile{flex-basis:calc((100% - .65rem)/2)}.collection-reel-head{align-items:flex-start;flex-wrap:wrap}.collection-reel-title{flex:1 1 100%}.collection-reel-tools{width:100%;justify-content:flex-start}.collection-reel-track{grid-template-columns:1fr}.collection-reel-card:not(:first-child){display:none}.collection-new-tile strong{font-size:1rem}}
+@media(max-width:480px){.collection-surface[data-view="reel"] .collection-face,.collection-surface[data-view="reel"] .collection-new-tile{flex-basis:100%;min-width:280px}.collection-shelf-nav>.collection-grid{margin:0;scroll-padding-inline:.1rem}.collection-reel-tools{gap:.25rem}.collection-reel-tools button,.collection-reel-tools .pager{min-height:44px}}
+
+/* Inline folder membership control inside the artifact More menu. */
+.collection-folder-field{display:grid;gap:.3rem;margin-bottom:.55rem;color:var(--ink-3);font:700 .57rem var(--font-mono);letter-spacing:.04em;text-transform:uppercase}
+.collection-folder-select{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:2.15rem;padding:.35rem .45rem;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--ink);font:.68rem var(--font-mono);text-align:left;cursor:pointer}
+.collection-folder-select:hover,.collection-folder-select:focus-visible{border-color:var(--brass);background:var(--ground-2)}
+.collection-folder-panel{display:grid;gap:.45rem;margin-top:.35rem;padding:.45rem;border:1px solid var(--line-2);border-radius:5px;background:var(--ground-2)}
+.collection-folder-panel[hidden]{display:none}
+.collection-folder-panel .picker-list{display:grid;gap:.15rem;max-height:11.25rem;overflow:auto}
+.collection-folder-panel .picker-row{display:flex;align-items:center;gap:.45rem;min-height:2.75rem;margin:0;padding:.35rem .4rem;border:1px solid transparent;border-radius:4px;color:var(--ink-2);font:600 .65rem var(--font-mono);text-transform:none;letter-spacing:0;cursor:pointer}
+.collection-folder-panel .picker-row:hover,.collection-folder-panel .picker-row:focus-within{border-color:var(--line);background:var(--paper)}
+.collection-folder-panel .picker-row input{width:1.15rem;height:1.15rem;flex:none;accent-color:var(--brass)}
+.collection-folder-panel .picker-row small{margin-left:auto;color:var(--ink-3);font:inherit;text-transform:none;white-space:nowrap}
+.collection-folder-panel [data-picker-new]{min-height:2.35rem;padding:.45rem .55rem;border:1px dashed var(--line);border-radius:4px;background:var(--paper);color:var(--ink-2);font:600 .63rem var(--font-mono);text-align:left;cursor:pointer}
+.collection-folder-panel [data-picker-new]:hover,.collection-folder-panel [data-picker-new]:focus-visible{border-color:var(--brass);color:var(--ink)}
+
+/* Keep the format badge beside the selection control, with both readable. */
+.preview:has(>.collection-artifact-select) .format-badge{left:40px}
+.collection-folder-select>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+@media(max-width:760px){.collection-shelf-tools .shelf-arrow{min-width:44px;min-height:44px}}
