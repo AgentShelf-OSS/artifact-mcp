@@ -118,15 +118,27 @@ continues through local gallery access, organization setup, and a production Clo
 
 | Artifact library | Anchored review |
 |---|---|
-| [![Administrator artifact library](docs/screenshots/01-gallery-admin-grid.png)](docs/screenshots/01-gallery-admin-grid.png) | [![Artifact feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) |
+| [![Reel Shelf with a pinned folder preview](docs/screenshots/09-library-reel-shelf.png)](docs/screenshots/09-library-reel-shelf.png) | [![Artifact feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) |
 | Search, filter, sort, and switch layouts without losing the collection context. | Leave threaded feedback on a point or region and copy its revision context for an agent. |
+
+The three folder views share the same memberships. Switch views without copying artifacts.
+
+| Contact Sheets | Gallery Ribbons |
+|---|---|
+| [![Contact Sheets with artifact previews](docs/screenshots/10-library-contact-sheets.png)](docs/screenshots/10-library-contact-sheets.png) | [![Gallery Ribbons with expanded and collapsed folders](docs/screenshots/11-library-gallery-ribbons.png)](docs/screenshots/11-library-gallery-ribbons.png) |
+| Scan several previews on each folder cover, then open a collection. | Collapse a ribbon into a preview fan. Drag ribbons to change their order, or use the arrow controls. |
+
+| Create a folder | Delete a folder |
+|---|---|
+| [![Create a folder with a live preview and color swatches](docs/screenshots/12-folder-create.png)](docs/screenshots/12-folder-create.png) | [![Delete folder confirmation that preserves artifacts](docs/screenshots/13-folder-delete.png)](docs/screenshots/13-folder-delete.png) |
+| See the name, organization, and color before creating a folder. [Mobile example](docs/screenshots/14-folder-create-mobile.png). | Confirm the specific folder. Its artifacts stay in the library and in their other folders. |
 
 | Version history | Organization settings |
 |---|---|
 | [![Artifact version history](docs/screenshots/06-viewer-history.png)](docs/screenshots/06-viewer-history.png) | [![Organization administration](docs/screenshots/07-admin-organizations.png)](docs/screenshots/07-admin-organizations.png) |
 | Open retained revisions or restore one as a new revision at the same stable URL. | Manage tenant membership, routing, categories, colors, and delivery settings. |
 
-[View all eight product screenshots](docs/screenshots/README.md).
+[View the full screenshot gallery](docs/screenshots/README.md).
 
 ## How it works
 
