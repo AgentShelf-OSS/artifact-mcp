@@ -19,14 +19,24 @@ test.describe("collection gestures", () => {
     const targetBody = await target.json();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
-    const sourceFace = page.locator("[data-collection-peek]").filter({ hasText: `Gesture source ${org}` });
+    const sourceFace = page.locator(`[data-collection-peek="${sourceBody.id}"]`);
     await sourceFace.hover();
+    await page.locator("[data-reel-pin]").click();
+    await page.locator(`[data-collection-id="${targetBody.id}"]`).scrollIntoViewIfNeeded();
+    await page.locator("[data-reel-pin]").click();
+    await expect(page.locator(".collection-reel:not([hidden])")).not.toHaveClass(/is-pinned/);
     const card = page.locator(`.collection-reel-card [data-collection-artifact="${artifact.id}"]`);
     const targetFace = page.locator(`[data-collection-id="${targetBody.id}"]`);
     await expect(card).toBeVisible();
     const preview = card.locator('.preview a[aria-label^="Open "]');
     const sourceBox = await preview.boundingBox();
     const destinationBox = await targetFace.boundingBox();
+    expect(destinationBox.x).toBeGreaterThanOrEqual(0);
+    expect(destinationBox.x + destinationBox.width).toBeLessThanOrEqual(1440);
+    expect(await targetFace.evaluate(node => {
+      const box = node.getBoundingClientRect();
+      return document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2)?.closest("[data-collection-id]")?.dataset.collectionId;
+    })).toBe(targetBody.id);
     await page.mouse.move(sourceBox.x + sourceBox.width / 2, sourceBox.y + sourceBox.height / 2);
     await page.mouse.down();
     await page.mouse.move(sourceBox.x + sourceBox.width / 2 + 10, sourceBox.y + sourceBox.height / 2 + 10, {steps: 3});
