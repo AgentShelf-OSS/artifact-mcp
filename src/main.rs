@@ -2529,7 +2529,7 @@ fn is_healthcheck(args: &[String]) -> Result<bool, RuntimeError> {
         [] => Ok(false),
         [command] if command == "healthcheck" => Ok(true),
         _ => Err(RuntimeError::Healthcheck(
-            "usage: artifact-mcp [healthcheck]".to_owned(),
+            "usage: artifact-mcp [healthcheck | check-action-grants FILE]".to_owned(),
         )),
     }
 }
@@ -2538,6 +2538,22 @@ fn is_healthcheck(args: &[String]) -> Result<bool, RuntimeError> {
 async fn main() -> ExitCode {
     init_tracing();
     let args = std::env::args().skip(1).collect::<Vec<_>>();
+    // Validate the exact reviewed grants before a deployment stops the live server.
+    // This path does not load application config, open storage, or contact a worker.
+    if let [command, path] = args.as_slice()
+        && command == "check-action-grants"
+    {
+        return match artifact_mcp::actions::load_grants(Some(path)) {
+            Ok(_) => {
+                println!("{{\"status\":\"ok\",\"check\":\"action-grants\"}}");
+                ExitCode::SUCCESS
+            }
+            Err(_) => {
+                eprintln!("Invalid action grants");
+                ExitCode::FAILURE
+            }
+        };
+    }
     let result = match is_healthcheck(&args) {
         Ok(true) => healthcheck().await,
         Ok(false) => match AppConfig::from_env() {

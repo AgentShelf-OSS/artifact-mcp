@@ -45,6 +45,7 @@ Use this index when you need the complete API, deployment, security, or maintena
 
 - [Connector readiness](ops/connector-readiness.md)
 - [MCP observability](ops/mcp-observability.md)
+- [Dashboard actions pilot](ops/dashboard-actions-pilot.md)
 - [Discord durable delivery](ops/discord-durable-delivery.md)
 - [Discord Gateway boundary decision](adr/0006-discord-gateway-client-boundary.md)
 - [Anthropic MCP Tunnel](ops/anthropic-mcp-tunnel.md)

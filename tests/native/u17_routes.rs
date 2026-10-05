@@ -2139,3 +2139,50 @@ async fn advisory_actions_preserve_owner_revision_csrf_and_fixed_body() {
         StatusCode::NOT_FOUND
     );
 }
+#[tokio::test]
+async fn investigation_action_reaches_only_literal_ticket_worker_path() {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let upstream = axum::Router::new().route(
+        "/investigation/SFD-842/start",
+        axum::routing::post(|axum::Json(v): axum::Json<Value>| async move {
+            assert_eq!(v["action"], "investigate-SFD-842");
+            assert_eq!(v["artifact_id"], ID);
+            assert_eq!(v["request_id"], "investigation-1");
+            axum::Json(json!({
+                "schemaVersion":"org-intelligence/investigation-run/v1",
+                "ticketId":"SFD-842","current":null,"latest":null,"history":[],
+                "availableAt":null,"workerCheckedAt":"2026-10-05T02:00:00Z","teamBusy":false
+            }))
+        }),
+    );
+    let task = tokio::spawn(async move {
+        axum::serve(listener, upstream).await.unwrap();
+    });
+    let fake = Fake::standard();
+    fake.lock().meta.as_mut().unwrap().owner_email = Some("member@acme.test".into());
+    let mut config = AppConfig::default();
+    config
+        .action_grants
+        .push(artifact_mcp::actions::ActionGrant {
+            artifact_id: ID.into(),
+            org: "acme".into(),
+            revision: fake.lock().meta.as_ref().unwrap().revision,
+            action: "investigate-SFD-842".into(),
+            worker_url: format!("http://127.0.0.1:{port}/"),
+        });
+    let request = Request::builder()
+        .method(Method::POST)
+        .uri(format!("/{ID}/actions/investigate-SFD-842"))
+        .header(header::CONTENT_TYPE, "application/json")
+        .header("x-artifact-mutation", "1")
+        .header("sec-fetch-site", "same-origin")
+        .body(Body::from(r#"{"request_id":"investigation-1"}"#))
+        .unwrap();
+    let result = build_router(deps_with_config(&fake, config))
+        .oneshot(request)
+        .await
+        .unwrap();
+    assert_eq!(result.status(), StatusCode::ACCEPTED);
+    task.abort();
+}
