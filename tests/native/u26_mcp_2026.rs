@@ -1591,6 +1591,9 @@ async fn durable_preview_tasks_recover_after_restart_and_enforce_ownership() {
     let renderer = super::u16_support::StubRenderer::rendering(super::u16_support::sample_png());
     let mut config = config_for(temp.path());
     config.preview = renderer.config();
+    // This recovery test permits 200 bounded polls on a slower CI worker.
+    config.ingress.mcp_per_window = 256;
+    config.ingress.reads_per_window = 256;
     let task_id = task.task_id.clone();
     runtime::run_with_bind(
         config,
@@ -1621,7 +1624,7 @@ async fn durable_preview_tasks_recover_after_restart_and_enforce_ownership() {
                     completed = Some(response);
                     break;
                 }
-                tokio::time::sleep(std::time::Duration::from_millis(5)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(25)).await;
             }
             let completed = completed.expect("recovered task completed");
             assert_eq!(
