@@ -2,7 +2,7 @@ import { test, expect, api, publish } from "../fixtures.mjs";
 
 async function fixture(page, request, org, publisherKey) {
   const artifact = await publish(request, publisherKey, { title: `Inline folders ${Date.now()}`, html: "<!doctype html><h1>Inline folders</h1>" });
-  const created = await api(request, "post", "/collections", { org, name: `Inline destination ${Date.now()}` });
+  const created = await api(request, "post", "/collections", { org, name: `Inline destination ${Date.now()} with a longer name to verify picker wrapping` });
   expect(created.ok()).toBeTruthy();
   const folder = await created.json();
   await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
@@ -104,12 +104,18 @@ test.describe("inline folder memberships", () => {
 
   test("expanded folder controls remain within the mobile viewport", async ({ page, request, org, publisherKey }) => {
     await page.setViewportSize({ width: 320, height: 568 });
-    const { card, panel } = await fixture(page, request, org, publisherKey);
+    const { card, panel, folder } = await fixture(page, request, org, publisherKey);
     await expect(panel).toBeVisible();
+    const selected = card.locator(`[data-collection-folder-option="${folder.id}"]`);
+    await selected.check();
+    await expect(selected).toBeEnabled();
     const box = await card.locator(".card-menu").boundingBox();
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.y).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(320);
     expect(box.y + box.height).toBeLessThanOrEqual(568);
+    const overflow = await panel.evaluate(node => node.scrollWidth - node.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    expect(await card.locator(".card-menu").evaluate(node => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(1);
   });
 });

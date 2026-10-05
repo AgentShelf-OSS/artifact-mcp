@@ -132,4 +132,7 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 /* Keep the format badge beside the selection control, with both readable. */
 .preview:has(>.collection-artifact-select) .format-badge{left:40px}
 .collection-folder-select>span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collection-folder-field{min-width:0;grid-template-columns:minmax(0,1fr)}
+.collection-folder-panel,.collection-folder-panel .picker-list{min-width:0}
+.collection-folder-panel .picker-row>span{min-width:0;white-space:normal;overflow-wrap:anywhere;line-height:1.4}
 @media(max-width:760px){.collection-shelf-tools .shelf-arrow{min-width:44px;min-height:44px}}
