@@ -3,6 +3,71 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{path::Path, time::Duration};
 
+const INVESTIGATION_ACTIONS: &[(&str, &str, &str, &str)] = &[
+    (
+        "investigate-OS-5082",
+        "OS-5082",
+        "investigation/OS-5082/latest",
+        "investigation/OS-5082/start",
+    ),
+    (
+        "investigate-SFD-686",
+        "SFD-686",
+        "investigation/SFD-686/latest",
+        "investigation/SFD-686/start",
+    ),
+    (
+        "investigate-SFD-703",
+        "SFD-703",
+        "investigation/SFD-703/latest",
+        "investigation/SFD-703/start",
+    ),
+    (
+        "investigate-SFD-709",
+        "SFD-709",
+        "investigation/SFD-709/latest",
+        "investigation/SFD-709/start",
+    ),
+    (
+        "investigate-SFD-724",
+        "SFD-724",
+        "investigation/SFD-724/latest",
+        "investigation/SFD-724/start",
+    ),
+    (
+        "investigate-SFD-757",
+        "SFD-757",
+        "investigation/SFD-757/latest",
+        "investigation/SFD-757/start",
+    ),
+    (
+        "investigate-SFD-842",
+        "SFD-842",
+        "investigation/SFD-842/latest",
+        "investigation/SFD-842/start",
+    ),
+    (
+        "investigate-SFD-887",
+        "SFD-887",
+        "investigation/SFD-887/latest",
+        "investigation/SFD-887/start",
+    ),
+    (
+        "investigate-SFD-978",
+        "SFD-978",
+        "investigation/SFD-978/latest",
+        "investigation/SFD-978/start",
+    ),
+];
+
+fn investigation_action(action: &str) -> Option<(&'static str, &'static str, &'static str)> {
+    INVESTIGATION_ACTIONS
+        .iter()
+        .find_map(|(name, ticket, latest, start)| {
+            (*name == action).then_some((*ticket, *latest, *start))
+        })
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ActionGrant {
@@ -34,10 +99,10 @@ pub fn load_grants(path: Option<&str>) -> Result<Vec<ActionGrant>, crate::error:
         if !valid_name(&g.artifact_id)
             || !valid_name(&g.org)
             || g.revision == 0
-            || !matches!(
+            || (!matches!(
                 g.action.as_str(),
                 "check-live-signals" | "analyze-differences"
-            )
+            ) && investigation_action(&g.action).is_none())
             || !seen.insert((&g.artifact_id, &g.action))
             || u.scheme() != "http"
             || u.host_str() != Some("127.0.0.1")
@@ -77,14 +142,16 @@ pub async fn dispatch(g: &ActionGrant, request_id: Option<&str>) -> Result<Value
         .timeout(Duration::from_secs(5))
         .build()
         .map_err(|_| ())?;
-    let prefix = if g.action == "analyze-differences" {
-        "advisory/"
+    let (latest_path, start_path, max_bytes) = if g.action == "analyze-differences" {
+        ("advisory/latest", "advisory/start", 65536usize)
+    } else if let Some((_, latest, start)) = investigation_action(&g.action) {
+        (latest, start, 65536usize)
     } else {
-        ""
+        ("latest", "start", 16384usize)
     };
     let request = if let Some(id) = request_id {
         client
-            .post(format!("{}{prefix}start", g.worker_url))
+            .post(format!("{}{}", g.worker_url, start_path))
             .json(&Start {
                 request_id: id,
                 artifact_id: &g.artifact_id,
@@ -92,7 +159,7 @@ pub async fn dispatch(g: &ActionGrant, request_id: Option<&str>) -> Result<Value
                 action: &g.action,
             })
     } else {
-        client.get(format!("{}{prefix}latest", g.worker_url))
+        client.get(format!("{}{}", g.worker_url, latest_path))
     };
     let mut response = request.send().await.map_err(|_| ())?;
     if !response.status().is_success() {
@@ -100,13 +167,7 @@ pub async fn dispatch(g: &ActionGrant, request_id: Option<&str>) -> Result<Value
     }
     let mut bytes = Vec::new();
     while let Some(chunk) = response.chunk().await.map_err(|_| ())? {
-        if bytes.len() + chunk.len()
-            > if g.action == "analyze-differences" {
-                65536
-            } else {
-                16384
-            }
-        {
+        if bytes.len() + chunk.len() > max_bytes {
             return Err(());
         }
         bytes.extend_from_slice(&chunk);
@@ -114,6 +175,10 @@ pub async fn dispatch(g: &ActionGrant, request_id: Option<&str>) -> Result<Value
     let value: Value = serde_json::from_slice(&bytes).map_err(|_| ())?;
     if g.action == "analyze-differences" {
         validate_advisory_reply(&value)?;
+        return Ok(value);
+    }
+    if let Some((ticket, _, _)) = investigation_action(&g.action) {
+        validate_investigation_reply(&value, ticket, &g.action)?;
         return Ok(value);
     }
     if !value.is_object()
@@ -395,6 +460,264 @@ fn validate_advisory_result(r: &Value) -> Result<(), ()> {
     Ok(())
 }
 
+fn investigation_run_keys() -> [&'static str; 16] {
+    [
+        "id",
+        "action",
+        "state",
+        "startedAt",
+        "finishedAt",
+        "reason",
+        "successful",
+        "failed",
+        "checkedAt",
+        "captureRevision",
+        "stages",
+        "result",
+        "ticketId",
+        "originReviewId",
+        "originHead",
+        "originEvidenceHash",
+    ]
+}
+
+fn safe_ticket_path(path: &str, ticket: &str) -> bool {
+    let parts: Vec<&str> = path.split('/').collect();
+    if parts.iter().any(|part| part.is_empty() || *part == "..") || path.contains('\\') {
+        return false;
+    }
+    let ticket = ticket.to_ascii_uppercase();
+    if parts.len() >= 4
+        && parts[0] == "JIRA"
+        && parts[1] == "workspaces"
+        && parts[3].eq_ignore_ascii_case(&ticket)
+    {
+        return true;
+    }
+    path.starts_with("Projects/Active/")
+}
+
+fn validate_investigation_source_ids(result: &Value, ticket: &str) -> Result<(), ()> {
+    let sources = result["sources"].as_array().ok_or(())?;
+    let mut ids = std::collections::HashSet::new();
+    for source in sources {
+        if !source.is_object() || !keys(source, &["id", "path", "line", "sha256"]) {
+            return Err(());
+        }
+        let id = source["id"].as_str().ok_or(())?;
+        let path = source["path"].as_str().ok_or(())?;
+        if !ids.insert(id)
+            || !text(&source["id"], 100)
+            || path.len() > 320
+            || path.chars().any(|c| c.is_control())
+            || !safe_ticket_path(path, ticket)
+        {
+            return Err(());
+        }
+    }
+    let item = &result["items"][0];
+    let refs = item["sourceIds"].as_array().ok_or(())?;
+    if refs
+        .iter()
+        .any(|id| !id.as_str().is_some_and(|id| ids.contains(id)))
+    {
+        return Err(());
+    }
+    let proposal = &result["proposal"];
+    let changes = proposal["changes"].as_array().ok_or(())?;
+    for change in changes {
+        let refs = change["sourceIds"].as_array().ok_or(())?;
+        if refs
+            .iter()
+            .any(|id| !id.as_str().is_some_and(|id| ids.contains(id)))
+            || !refs.iter().any(|id| {
+                id.as_str().is_some_and(|id| {
+                    sources
+                        .iter()
+                        .any(|source| source["id"] == id && source["path"] == change["path"])
+                })
+            })
+        {
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
+fn validate_investigation_result(result: &Value, ticket: &str) -> Result<(), ()> {
+    let object = result.as_object().ok_or(())?;
+    if object.len() != 10 || !object.contains_key("proposal") {
+        return Err(());
+    }
+    let mut advisory = result.clone();
+    advisory.as_object_mut().ok_or(())?.remove("proposal");
+    validate_advisory_result(&advisory)?;
+    let items = advisory["items"].as_array().ok_or(())?;
+    if items.len() != 1 || items[0]["ticketId"] != ticket {
+        return Err(());
+    }
+    let proposal = &result["proposal"];
+    if !keys(
+        proposal,
+        &["outcome", "changes", "questions", "limitations"],
+    ) || !matches!(
+        proposal["outcome"].as_str(),
+        Some("proposed_correction" | "expected_difference" | "needs_input")
+    ) {
+        return Err(());
+    }
+    let changes = proposal["changes"].as_array().ok_or(())?;
+    if changes.len() > 4 {
+        return Err(());
+    }
+    for change in changes {
+        if !keys(
+            change,
+            &[
+                "target",
+                "path",
+                "current",
+                "proposed",
+                "reason",
+                "sourceIds",
+            ],
+        ) || !matches!(
+            change["target"].as_str(),
+            Some("workspace_record" | "jira_status" | "baseline_review")
+        ) || !text(&change["path"], 320)
+            || !safe_ticket_path(change["path"].as_str().ok_or(())?, ticket)
+            || !text(&change["current"], 400)
+            || !text(&change["proposed"], 600)
+            || !text(&change["reason"], 400)
+        {
+            return Err(());
+        }
+        let refs = change["sourceIds"].as_array().ok_or(())?;
+        if refs.is_empty() || refs.len() > 6 {
+            return Err(());
+        }
+    }
+    let questions = proposal["questions"].as_array().ok_or(())?;
+    if questions.len() > 6 || questions.iter().any(|q| !text(q, 400)) {
+        return Err(());
+    }
+    let limitations = proposal["limitations"].as_array().ok_or(())?;
+    if limitations.is_empty() || limitations.len() > 6 || limitations.iter().any(|q| !text(q, 300))
+    {
+        return Err(());
+    }
+    validate_investigation_source_ids(result, ticket)
+}
+
+fn validate_investigation_run(run: &Value, ticket: &str, action: &str) -> Result<(), ()> {
+    if !keys(run, &investigation_run_keys())
+        || run["action"] != action
+        || run["ticketId"] != ticket
+        || !hash(&run["id"], 32)
+        || !timestamp(&run["startedAt"], false)
+        || !timestamp(&run["finishedAt"], true)
+        || !timestamp(&run["checkedAt"], true)
+        || !count(&run["successful"])
+        || !count(&run["failed"])
+        || !matches!(
+            run["state"].as_str(),
+            Some("queued" | "running" | "succeeded" | "failed")
+        )
+        || !matches!(
+            run["reason"].as_str(),
+            None | Some("worker_restarted" | "investigation_unavailable" | "no_current_difference")
+        )
+        || !(run["reason"].is_null() || run["reason"].is_string())
+        || !(run["captureRevision"].is_null() || hash(&run["captureRevision"], 64))
+        || !(run["originReviewId"].is_null() || hash(&run["originReviewId"], 32))
+        || !(run["originHead"].is_null() || hash(&run["originHead"], 40))
+        || !(run["originEvidenceHash"].is_null() || hash(&run["originEvidenceHash"], 64))
+    {
+        return Err(());
+    }
+    let stages = run["stages"].as_array().ok_or(())?;
+    if stages.len() != 4 {
+        return Err(());
+    }
+    for (stage, expected) in stages
+        .iter()
+        .zip(["evidence", "specialists", "review", "save"])
+    {
+        if !keys(
+            stage,
+            &["id", "state", "completed", "total", "successful", "failed"],
+        ) || stage["id"] != expected
+            || !matches!(
+                stage["state"].as_str(),
+                Some("waiting" | "running" | "completed" | "failed" | "skipped")
+            )
+            || ["completed", "total", "successful", "failed"]
+                .iter()
+                .any(|k| !count(&stage[*k]))
+            || stage["completed"].as_u64() > stage["total"].as_u64()
+            || stage["successful"].as_u64().unwrap() + stage["failed"].as_u64().unwrap()
+                != stage["completed"].as_u64().unwrap()
+        {
+            return Err(());
+        }
+    }
+    if let Some(result) = (!run["result"].is_null()).then_some(&run["result"]) {
+        validate_investigation_result(result, ticket)?;
+        if run["originReviewId"].is_null()
+            || run["originHead"].is_null()
+            || run["originEvidenceHash"].is_null()
+        {
+            return Err(());
+        }
+    }
+    if run["action"] != action || action != format!("investigate-{ticket}") {
+        return Err(());
+    }
+    Ok(())
+}
+
+// Keep the same binary validation result for the fixed investigation reply contract.
+#[allow(clippy::result_unit_err)]
+pub fn validate_investigation_reply(v: &Value, ticket: &str, action: &str) -> Result<(), ()> {
+    if !keys(
+        v,
+        &[
+            "schemaVersion",
+            "ticketId",
+            "current",
+            "latest",
+            "history",
+            "availableAt",
+            "workerCheckedAt",
+            "teamBusy",
+        ],
+    ) || v["schemaVersion"] != "org-intelligence/investigation-run/v1"
+        || v["ticketId"] != ticket
+        || !timestamp(&v["availableAt"], true)
+        || !timestamp(&v["workerCheckedAt"], false)
+        || !v["teamBusy"].is_boolean()
+    {
+        return Err(());
+    }
+    let history = v["history"].as_array().ok_or(())?;
+    if history.len() > 5 {
+        return Err(());
+    }
+    if !v["current"].is_null() {
+        validate_investigation_run(&v["current"], ticket, action)?;
+    }
+    for run in history {
+        validate_investigation_run(run, ticket, action)?;
+    }
+    if !v["latest"].is_null() {
+        validate_investigation_run(&v["latest"], ticket, action)?;
+        if v["latest"]["state"] != "succeeded" || v["latest"]["result"].is_null() {
+            return Err(());
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -439,6 +762,31 @@ mod tests {
         let mut g = serde_json::json!({"artifact_id":"abc123def456","org":"homelab","revision":6,"action":"check-live-signals","worker_url":"http://127.0.0.1:8766/"});
         std::fs::write(&path, serde_json::to_vec(&vec![&g]).unwrap()).unwrap();
         assert!(load_grants(path.to_str()).is_ok());
+        let grants: Vec<Value> = ["check-live-signals", "analyze-differences"]
+            .into_iter()
+            .chain(
+                INVESTIGATION_ACTIONS
+                    .iter()
+                    .map(|(action, _, _, _)| *action),
+            )
+            .map(|action| {
+                let mut grant = g.clone();
+                grant["action"] = serde_json::json!(action);
+                grant
+            })
+            .collect();
+        std::fs::write(&path, serde_json::to_vec(&grants).unwrap()).unwrap();
+        assert_eq!(load_grants(path.to_str()).unwrap().len(), 11);
+        for action in [
+            "investigate-SFD-999",
+            "investigate-SFD-703/../start",
+            "arbitrary",
+        ] {
+            let mut grant = g.clone();
+            grant["action"] = serde_json::json!(action);
+            std::fs::write(&path, serde_json::to_vec(&vec![grant]).unwrap()).unwrap();
+            assert!(load_grants(path.to_str()).is_err());
+        }
         for u in [
             "http://example.com:8766/",
             "http://127.0.0.1:8766/path",
@@ -451,5 +799,90 @@ mod tests {
             assert!(load_grants(path.to_str()).is_err());
         }
         std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn investigation_actions_use_literal_ticket_paths() {
+        assert_eq!(
+            investigation_action("investigate-SFD-842"),
+            Some((
+                "SFD-842",
+                "investigation/SFD-842/latest",
+                "investigation/SFD-842/start"
+            ))
+        );
+        assert!(investigation_action("investigate-SFD-999").is_none());
+    }
+
+    #[test]
+    fn investigation_reply_requires_ticket_owned_proposal_evidence() {
+        let source = serde_json::json!({
+            "id":"workspace:SFD-703",
+            "path":"JIRA/workspaces/SFD/SFD-703/workspace.json",
+            "line":1,
+            "sha256":null
+        });
+        let result = serde_json::json!({
+            "summary":"Review the current ticket evidence.",
+            "items":[{"ticketId":"SFD-703","explanation":"The saved and observed records differ.","nextStep":"Review the proposed correction.","sourceIds":["workspace:SFD-703"]}],
+            "engine":"codex","model":"gpt-6.1-sol","head":"a".repeat(40),
+            "checkedAt":"2026-10-05T02:00:00Z","evidenceHash":"b".repeat(64),
+            "sources":[source],
+            "team":[
+                {"role":"ticket-manager","summary":"Jira review.","definitionHash":"c".repeat(64)},
+                {"role":"org-analyst","summary":"Metadata review.","definitionHash":"c".repeat(64)},
+                {"role":"reflection-agent","summary":"Evidence review.","definitionHash":"c".repeat(64)}
+            ],
+            "proposal":{"outcome":"needs_input","changes":[{"target":"workspace_record","path":"JIRA/workspaces/SFD/SFD-703/workspace.json","current":"Saved value","proposed":"Review value","reason":"The records differ.","sourceIds":["workspace:SFD-703"]}],"questions":["Which record is authoritative?"],"limitations":["No write was performed."]}
+        });
+        let run = serde_json::json!({
+            "id":"d".repeat(32),"action":"investigate-SFD-703","state":"succeeded",
+            "startedAt":"2026-10-05T02:00:00Z","finishedAt":"2026-10-05T02:00:00Z","reason":null,
+            "successful":3,"failed":0,"checkedAt":"2026-10-05T02:00:00Z","captureRevision":"e".repeat(64),
+            "stages":[
+                {"id":"evidence","state":"completed","completed":1,"total":1,"successful":1,"failed":0},
+                {"id":"specialists","state":"completed","completed":2,"total":2,"successful":2,"failed":0},
+                {"id":"review","state":"completed","completed":1,"total":1,"successful":1,"failed":0},
+                {"id":"save","state":"completed","completed":1,"total":1,"successful":1,"failed":0}
+            ],
+            "result":result,"ticketId":"SFD-703","originReviewId":"f".repeat(32),
+            "originHead":"a".repeat(40),"originEvidenceHash":"b".repeat(64)
+        });
+        let reply = serde_json::json!({"schemaVersion":"org-intelligence/investigation-run/v1","ticketId":"SFD-703","current":null,"latest":run,"history":[],"availableAt":null,"workerCheckedAt":"2026-10-05T02:00:00Z","teamBusy":false});
+        assert!(validate_investigation_reply(&reply, "SFD-703", "investigate-SFD-703").is_ok());
+        let mut compact = reply.clone();
+        compact["current"] = compact["latest"].clone();
+        compact["current"]["result"] = Value::Null;
+        compact["history"] = serde_json::json!([compact["current"].clone()]);
+        assert!(validate_investigation_reply(&compact, "SFD-703", "investigate-SFD-703").is_ok());
+        let mut wrong_action = reply.clone();
+        wrong_action["latest"]["action"] = Value::from("investigate-SFD-842");
+        assert!(
+            validate_investigation_reply(&wrong_action, "SFD-703", "investigate-SFD-703").is_err()
+        );
+        let mut missing_origin = reply.clone();
+        missing_origin["latest"]["originReviewId"] = Value::Null;
+        assert!(
+            validate_investigation_reply(&missing_origin, "SFD-703", "investigate-SFD-703")
+                .is_err()
+        );
+        let mut wrong_source = reply.clone();
+        wrong_source["latest"]["result"]["sources"][0]["path"] =
+            Value::from("JIRA/workspaces/SFD/SFD-842/workspace.json");
+        assert!(
+            validate_investigation_reply(&wrong_source, "SFD-703", "investigate-SFD-703").is_err()
+        );
+        let mut wrong_path = reply.clone();
+        wrong_path["latest"]["result"]["proposal"]["changes"][0]["path"] =
+            Value::from("Projects/Active/Other/README.md");
+        assert!(
+            validate_investigation_reply(&wrong_path, "SFD-703", "investigate-SFD-703").is_err()
+        );
+        let mut wrong = reply.clone();
+        wrong["latest"]["ticketId"] = Value::from("SFD-842");
+        assert!(validate_investigation_reply(&wrong, "SFD-703", "investigate-SFD-703").is_err());
+        let mut extra = reply;
+        extra["latest"]["result"]["proposal"]["command"] = Value::from("write");
+        assert!(validate_investigation_reply(&extra, "SFD-703", "investigate-SFD-703").is_err());
     }
 }

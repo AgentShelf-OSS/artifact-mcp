@@ -397,7 +397,9 @@ impl AuditAccess {
         let key = self.key;
         let result = result.to_owned();
         let classification = classification.to_owned();
-        let action_operation = if classification.starts_with("analyze-differences.") {
+        let action_operation = if classification.starts_with("investigate-finding.") {
+            "artifact.action.investigate-finding"
+        } else if classification.starts_with("analyze-differences.") {
             "artifact.action.analyze-differences"
         } else {
             "artifact.action.check-live-signals"

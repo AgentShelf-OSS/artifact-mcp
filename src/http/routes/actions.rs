@@ -23,6 +23,14 @@ pub(crate) fn router() -> Router<AppDeps> {
 fn response(code: StatusCode, value: serde_json::Value) -> Response {
     (code, [(header::CACHE_CONTROL, "no-store")], Json(value)).into_response()
 }
+
+fn audit_classification(action: &str, phase: &str) -> String {
+    if action.starts_with("investigate-") {
+        format!("investigate-finding.{phase}")
+    } else {
+        format!("{action}.{phase}")
+    }
+}
 async fn grant(
     deps: &AppDeps,
     headers: &axum::http::HeaderMap,
@@ -139,7 +147,7 @@ async fn start(
                 id.clone(),
                 g.revision,
                 "success",
-                &format!("{}.requested", g.action),
+                &audit_classification(&g.action, "requested"),
             )
             .await
             .is_err()
@@ -157,7 +165,7 @@ async fn start(
                 id,
                 g.revision,
                 if result.is_ok() { "success" } else { "failure" },
-                &format!("{}.dispatched", g.action),
+                &audit_classification(&g.action, "dispatched"),
             )
             .await
             .is_err()
