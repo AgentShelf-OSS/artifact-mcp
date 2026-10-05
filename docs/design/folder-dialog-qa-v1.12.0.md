@@ -22,7 +22,7 @@ in place. Draft-loss safeguards in the anchored-comment workflow retain their ex
 ## Verification
 
 - Node suite: 517 passed.
-- Rust rendering checks and Node oracle comparison: 33 checks passed.
+- Rust rendering checks and Node oracle comparison: 7 checks passed.
 - Focused collection/browser cases: 52 per runtime passed on isolated Node and Rust instances.
 - Shared-confirmation cases: 5 per runtime passed, including cancellation, key revocation with
   its CSRF header, and restoring an earlier revision without losing history.
