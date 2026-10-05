@@ -251,6 +251,21 @@ fn every_mcp_operation_maps_to_the_intended_least_privilege_scope() {
         required_scope("tools/call", Some("delete_artifact")),
         Some(SCOPE_DELETE)
     );
+    for name in ["list_collections", "get_collection"] {
+        assert_eq!(required_scope("tools/call", Some(name)), Some(SCOPE_READ));
+    }
+    for name in [
+        "create_collection",
+        "update_collection",
+        "delete_collection",
+        "add_artifacts_to_collection",
+        "remove_artifacts_from_collection",
+    ] {
+        assert_eq!(
+            required_scope("tools/call", Some(name)),
+            Some(SCOPE_PUBLISH)
+        );
+    }
     assert_eq!(required_scope("resources/read", None), Some(SCOPE_READ));
     assert_eq!(required_scope("server/discover", None), None);
 }

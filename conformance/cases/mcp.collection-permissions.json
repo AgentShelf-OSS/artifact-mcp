@@ -1,0 +1,595 @@
+{
+  "id": "mcp.collection-permissions",
+  "fixture": "empty-v21",
+  "tags": [
+    "mcp",
+    "collections",
+    "issue-86",
+    "permissions"
+  ],
+  "steps": [
+    {
+      "name": "Publish Alpha",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Alpha",
+              "html": "<!doctype html><h1>Alpha</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "a": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Publish Beta",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Beta",
+              "html": "<!doctype html><h1>Beta</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "b": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Publish Foreign",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "Foreign",
+              "html": "<!doctype html><h1>Foreign</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "c": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Create author folder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "create_collection",
+            "arguments": {
+              "name": "Author folder",
+              "artifact_ids": [
+                "${a}"
+              ],
+              "cover_artifact_id": "${a}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "f": "result.structuredContent.collection.id"
+      }
+    },
+    {
+      "name": "Hide author artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "set_visibility",
+            "arguments": {
+              "id": "${a}",
+              "hidden": true
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "afterSql": [
+        "UPDATE api_keys SET role='collaborator' WHERE client_id='pub-acme2'"
+      ]
+    },
+    {
+      "name": "Collaborator cannot discover hidden count or cover",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${f}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Non-creator cannot rename",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "update_collection",
+            "arguments": {
+              "id": "${f}",
+              "name": "Forbidden rename"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Only the collection creator or an administrator can edit this collection"
+      }
+    },
+    {
+      "name": "Author cannot add other publisher artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "add_artifacts_to_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${b}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Not found"
+      }
+    },
+    {
+      "name": "Mixed foreign batch is atomic",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "add_artifacts_to_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${a}",
+                "${c}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Not found"
+      }
+    },
+    {
+      "name": "Foreign folder and missing folder concealed",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${f}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Not found"
+      }
+    },
+    {
+      "name": "Missing folder concealed",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "does-not-exist"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Not found"
+      }
+    },
+    {
+      "name": "Locked org cannot override",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "list_collections",
+            "arguments": {
+              "org": "beta"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Not found"
+      }
+    },
+    {
+      "name": "Collaborator can curate readable artifacts",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "create_collection",
+            "arguments": {
+              "name": "Collaborator folder",
+              "artifact_ids": [
+                "${a}",
+                "${b}"
+              ],
+              "cover_artifact_id": "${a}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "g": "result.structuredContent.collection.id"
+      }
+    },
+    {
+      "name": "Discovery omits foreign hidden member",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${g}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Administrator sees hidden references",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_admin}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${g}",
+              "org": "acme"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Administrator can edit another principal folder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_admin}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "update_collection",
+            "arguments": {
+              "id": "${f}",
+              "org": "acme",
+              "description": "Admin curation"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "afterSql": [
+        "UPDATE api_keys SET role='reader' WHERE client_id='pub-acme2'"
+      ]
+    },
+    {
+      "name": "Reader cannot mutate its earlier folder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "create_collection",
+            "arguments": {
+              "name": "Reader forbidden"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpError": "Permission denied: reader keys cannot manage collections"
+      }
+    },
+    {
+      "name": "Reader sees only discoverable references",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${g}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "memberships",
+        "query": "SELECT c.name,m.artifact_id FROM collection_artifacts m JOIN collections c ON c.id=m.collection_id JOIN artifacts a ON a.id=m.artifact_id ORDER BY c.name,a.title"
+      },
+      {
+        "name": "metadata",
+        "query": "SELECT id,title,revision,hidden,org FROM artifacts ORDER BY title"
+      },
+      {
+        "name": "principal_kinds",
+        "query": "SELECT name,created_by_kind,created_by FROM collections ORDER BY name"
+      }
+    ]
+  }
+}

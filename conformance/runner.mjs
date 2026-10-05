@@ -222,6 +222,9 @@ function evalStepAssertions(step, res, captures, label) {
     if (parsed) {
       const isError = parsed.result?.isError === true;
       const actual = parsed.result?.content?.[0]?.text;
+      if (step.expect.mcpSuccess && (parsed.error || !parsed.result)) {
+        failures.push(label + ": expected MCP success, got " + (parsed.error?.message ?? "no result"));
+      }
       if (step.expect.mcpSuccess && isError) {
         failures.push(label + ": expected MCP success, got " + (actual ?? "tool error"));
       }

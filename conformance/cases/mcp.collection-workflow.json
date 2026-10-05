@@ -1,0 +1,607 @@
+{
+  "id": "mcp.collection-workflow",
+  "fixture": "empty-v21",
+  "tags": [
+    "mcp",
+    "collections",
+    "issue-86"
+  ],
+  "steps": [
+    {
+      "name": "Publish artifact A",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "MCP folder Alpha",
+              "html": "<!doctype html><h1>Alpha</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "a": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Publish artifact B",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "MCP folder Beta",
+              "html": "<!doctype html><h1>Beta</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "b": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Publish artifact C",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "title": "MCP folder Gamma",
+              "html": "<!doctype html><h1>Gamma</h1>"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "c": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "Create folder with initial reference",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "create_collection",
+            "arguments": {
+              "name": "MCP folder",
+              "artifact_ids": [
+                "${a}"
+              ],
+              "cover_artifact_id": "${a}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "f": "result.structuredContent.collection.id"
+      }
+    },
+    {
+      "name": "Create another folder sharing artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "create_collection",
+            "arguments": {
+              "name": "MCP secondary",
+              "artifact_ids": [
+                "${a}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "g": "result.structuredContent.collection.id"
+      }
+    },
+    {
+      "name": "List bounded summaries",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "list_collections",
+            "arguments": {
+              "limit": 1
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "cursor": "result.structuredContent.next_cursor"
+      }
+    },
+    {
+      "name": "Continue folder summaries",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "list_collections",
+            "arguments": {
+              "limit": 1,
+              "cursor": "${cursor}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Add batch",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "add_artifacts_to_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${a}",
+                "${b}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Retry add",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "add_artifacts_to_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${a}",
+                "${b}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Inspect folder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${f}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Update metadata",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "update_collection",
+            "arguments": {
+              "id": "${f}",
+              "description": "Research references",
+              "color": "#c4d8cd",
+              "cover_artifact_id": "${b}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Clear optional metadata",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "update_collection",
+            "arguments": {
+              "id": "${f}",
+              "description": "",
+              "color": "",
+              "cover_artifact_id": ""
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Browser sees shared folder references",
+      "request": {
+        "method": "GET",
+        "path": "/collections?org=acme&include=projection",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Remove membership",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "remove_artifacts_from_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${a}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Retry membership removal",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "remove_artifacts_from_collection",
+            "arguments": {
+              "id": "${f}",
+              "artifact_ids": [
+                "${a}"
+              ]
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Delete primary folder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "delete_collection",
+            "arguments": {
+              "id": "${f}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Other folder retains shared artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "get_collection",
+            "arguments": {
+              "id": "${g}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Underlying artifact remains readable",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${a}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "Preferences are unchanged",
+      "request": {
+        "method": "GET",
+        "path": "/gallery/preferences?org=acme",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": []
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "artifact_metadata",
+        "query": "SELECT id,title,revision,category,hidden,org FROM artifacts ORDER BY title"
+      },
+      {
+        "name": "memberships",
+        "query": "SELECT collection_id,artifact_id,org FROM collection_artifacts ORDER BY collection_id,artifact_id"
+      },
+      {
+        "name": "principals",
+        "query": "SELECT id,org,created_by,created_by_kind FROM collections ORDER BY id"
+      },
+      {
+        "name": "preferences",
+        "query": "SELECT count(*) AS count FROM gallery_preferences"
+      },
+      {
+        "name": "audit",
+        "query": "SELECT operation,source,actor_id,actor_type FROM security_audit_events WHERE target_type='collection' ORDER BY sequence"
+      }
+    ]
+  }
+}

@@ -533,6 +533,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
             37,
             "artifact-collections-and-gallery-preferences".to_owned(),
         ),
+        (38, "collection-principals".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert_eq!(
@@ -669,5 +670,62 @@ fn populated_schema_31_databases_upgrade_to_the_latest_version_and_reopen_cleanl
         ),
         0,
         "the anchor-v2 columns remain null after the reopen"
+    );
+}
+
+#[test]
+fn collection_principal_migration_preserves_legacy_email_ownership() {
+    let dir = TempDataDir::new("v37-collection-principals");
+    let source = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("conformance/fixtures/historical/boundary-v37/artifacts.db");
+    std::fs::copy(source, db::database_path(dir.path())).expect("copy immutable schema 37");
+    {
+        let conn = Connection::open(db::database_path(dir.path())).unwrap();
+        assert_eq!(migrations::current_version(&conn).unwrap(), 37);
+        conn.execute("INSERT INTO orgs(name) VALUES ('migration-org')", [])
+            .unwrap();
+        conn.execute("INSERT INTO collections(id,org,name,name_key,created_by) VALUES ('legacyemail','migration-org','Legacy folder','legacy folder','Alice@example.test')", []).unwrap();
+    }
+    let pool = migrate(&dir, &MigrationContext::empty());
+    {
+        let conn = db::checkout(&pool).unwrap();
+        let creator: (String, String, String) = conn
+            .query_row(
+                "SELECT name,created_by,created_by_kind FROM collections WHERE id='legacyemail'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            creator,
+            (
+                "Legacy folder".into(),
+                "Alice@example.test".into(),
+                "email".into()
+            )
+        );
+        assert_eq!(foreign_key_violations(&conn), 0);
+        assert_eq!(quick_check(&conn), "ok");
+        assert!(
+            conn.execute(
+                "UPDATE collections SET created_by_kind='unknown' WHERE id='legacyemail'",
+                []
+            )
+            .is_err()
+        );
+    }
+    drop(pool);
+    let mut conn = db::open_bootstrap_connection(&db::database_path(dir.path())).unwrap();
+    assert!(
+        migrations::apply(&mut conn, &MigrationContext::empty())
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        scalar::<String>(
+            &conn,
+            "SELECT created_by FROM collections WHERE id='legacyemail'"
+        ),
+        "Alice@example.test"
     );
 }

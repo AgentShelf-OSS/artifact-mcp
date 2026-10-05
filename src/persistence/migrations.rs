@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 37;
+pub const LATEST_SCHEMA_VERSION: i64 = 38;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -276,6 +276,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 37,
         name: "artifact-collections-and-gallery-preferences",
         up: m037_artifact_collections_and_viewer_preferences,
+    },
+    Migration {
+        version: 38,
+        name: "collection-principals",
+        up: m038_collection_principals,
     },
 ];
 
@@ -1862,6 +1867,15 @@ fn m037_artifact_collections_and_viewer_preferences(
 ) -> rusqlite::Result<()> {
     tx.execute_batch(include_str!(
         "../../migrations/037-artifact-collections.sql"
+    ))
+}
+
+fn m038_collection_principals(
+    tx: &Transaction<'_>,
+    _ctx: &MigrationContext,
+) -> rusqlite::Result<()> {
+    tx.execute_batch(include_str!(
+        "../../migrations/038-collection-principals.sql"
     ))
 }
 

@@ -31,6 +31,10 @@ use tower::ServiceExt;
 static NEXT_AUDIT_ROUTE_TEMP: AtomicU64 = AtomicU64::new(0);
 const AUDIT_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
 
+pub(super) fn collection_test_deps(config: AppConfig) -> AppDeps {
+    Harness::admin().deps_with_config(config)
+}
+
 struct AuditStartupObserver;
 
 impl super::u20_runtime::runtime::StartupObserver for AuditStartupObserver {

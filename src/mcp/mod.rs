@@ -1,6 +1,7 @@
 //! MCP declarations frozen by U01; protocol implementation is owned by U13.
 
 pub mod apps;
+pub mod collections;
 pub mod dispatch;
 pub mod protocol;
 pub mod resources;

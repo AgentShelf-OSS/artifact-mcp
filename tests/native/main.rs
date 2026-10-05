@@ -10,6 +10,7 @@
 //! owns and edits nothing else here. Concurrent legs each produce a one-line add/add conflict; the
 //! integrator resolves it by taking the union. Keep the list alphabetical.
 
+mod mcp_collections;
 mod u02_config;
 mod u03_bootstrap;
 mod u03_cross_runtime;

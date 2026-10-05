@@ -291,7 +291,8 @@ pub fn required_scope(method: &str, name: Option<&str>) -> Option<&'static str> 
         "tools/call" => match name {
             Some(
                 "list_artifacts" | "read_artifact" | "list_categories" | "list_revisions"
-                | "list_shares" | "artifact_stats" | "list_data_sources" | "get_data_bindings",
+                | "list_collections" | "get_collection" | "list_shares" | "artifact_stats"
+                | "list_data_sources" | "get_data_bindings",
             ) => Some(SCOPE_READ),
             Some("set_data_bindings" | "set_artifact_data" | "append_artifact_events") => {
                 Some(SCOPE_PUBLISH)
@@ -306,6 +307,13 @@ pub fn required_scope(method: &str, name: Option<&str>) -> Option<&'static str> 
                 | "delete_category"
                 | "restore_artifact"
                 | "regenerate_artifact_preview",
+            ) => Some(SCOPE_PUBLISH),
+            Some(
+                "create_collection"
+                | "update_collection"
+                | "delete_collection"
+                | "add_artifacts_to_collection"
+                | "remove_artifacts_from_collection",
             ) => Some(SCOPE_PUBLISH),
             Some("list_feedback" | "resolve_feedback" | "reopen_feedback" | "submit_feedback") => {
                 Some(SCOPE_REVIEW)

@@ -4,7 +4,7 @@ use artifact_mcp::{
     error::AppError,
     model::{EmailAddress, OrgId, Viewer},
     persistence::{
-        collections::{CollectionActor, CollectionStore, GalleryPreferences},
+        collections::{CollectionActor, CollectionPrincipal, CollectionStore, GalleryPreferences},
         db::{self, Database},
     },
     security::audit::MutationAudit,
@@ -58,6 +58,8 @@ fn actor(email: &str, org: &str) -> CollectionActor {
         email: email.to_owned(),
         org: org.to_owned(),
         is_admin: false,
+        principal: CollectionPrincipal::HumanEmail(email.to_owned()),
+        publisher: None,
     }
 }
 
