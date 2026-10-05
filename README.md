@@ -29,7 +29,9 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 - Search and organize artifacts by organization, category, owner, review state, and visibility.
 - Organize readable artifacts into reusable organization folders through MCP. Reel Shelf, Contact
   Sheets, and Gallery Ribbons share the same folder memberships, so one folder can be explored in
-  each library presentation without copying artifact content.
+  each library presentation without copying artifact content. Create and edit use a live folder
+  preview with named color swatches. In-app confirmations explain destructive actions before
+  you continue.
 - Attach threaded feedback to a point or region and copy the exact revision context back to an
   agent.
 - Keep organizations isolated with scoped publisher keys and verified viewer identity.

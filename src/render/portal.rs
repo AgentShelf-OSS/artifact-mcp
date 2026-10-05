@@ -311,8 +311,16 @@ struct MoveOptionTemplate {
     selected: bool,
 }
 
-const SHELL_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/shell.css"));
-const SHELL_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/shell.js"));
+const SHELL_CSS: TrustedStatic = TrustedStatic::new(concat!(
+    include_str!("../../assets/dialogs.css"),
+    "\n",
+    include_str!("../../assets/shell.css")
+));
+const SHELL_SCRIPT: TrustedStatic = TrustedStatic::new(concat!(
+    include_str!("../../assets/dialogs.js"),
+    "\n",
+    include_str!("../../assets/shell.js")
+));
 const ACTION_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/actions.js"));
 const CAST_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/cast.js"));
 

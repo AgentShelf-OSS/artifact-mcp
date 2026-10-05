@@ -479,13 +479,18 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
     );
     assert_eq!(
         node["shellCss"].as_str().expect("Node shell CSS"),
-        include_str!("../../assets/shell.css")
+        concat!(
+            include_str!("../../assets/dialogs.css"),
+            "\n",
+            include_str!("../../assets/shell.css")
+        )
     );
     assert_eq!(
         node["settingsCss"].as_str().expect("Node settings CSS"),
         format!(
-            "{}{}{}",
+            "{}{}\n{}{}",
             include_str!("../../assets/portal.css"),
+            include_str!("../../assets/dialogs.css"),
             include_str!("../../assets/settings.css"),
             include_str!("../../assets/connections.css")
         )
@@ -494,7 +499,11 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         node["settingsScript"]
             .as_str()
             .expect("Node settings script"),
-        include_str!("../../assets/settings.js")
+        concat!(
+            include_str!("../../assets/dialogs.js"),
+            "\n",
+            include_str!("../../assets/settings.js")
+        )
     );
     assert_eq!(
         node["connectionsScript"]

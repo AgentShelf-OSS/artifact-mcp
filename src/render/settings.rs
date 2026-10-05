@@ -13,8 +13,16 @@ use crate::{
     },
 };
 
-const SETTINGS_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/settings.css"));
-const SETTINGS_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/settings.js"));
+const SETTINGS_CSS: TrustedStatic = TrustedStatic::new(concat!(
+    include_str!("../../assets/dialogs.css"),
+    "\n",
+    include_str!("../../assets/settings.css")
+));
+const SETTINGS_SCRIPT: TrustedStatic = TrustedStatic::new(concat!(
+    include_str!("../../assets/dialogs.js"),
+    "\n",
+    include_str!("../../assets/settings.js")
+));
 
 const CONNECTIONS_CSS: TrustedStatic =
     TrustedStatic::new(include_str!("../../assets/connections.css"));

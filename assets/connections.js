@@ -308,7 +308,7 @@
   });
   $("conn-toggle").addEventListener("click", () => action($("conn-toggle"), async () => {
     if (!selected) return;
-    if (selected.enabled && selected.artifact_count && !confirm("Disable " + selected.id + " for " + selected.artifact_count + " artifacts? Their other sources will continue.")) return;
+    if (selected.enabled && selected.artifact_count && !await window.ArtifactDialogs.confirm({title:"Disable connection",subject:selected.id,message:selected.artifact_count + " artifacts use this connection. Their other sources will continue.",action:"Disable connection",danger:true})) return;
     const saved = await request(api + "/" + encodeURIComponent(selected.id) + (selected.enabled ? "/disable" : "/enable"), "POST", { expected_version: selected.version });
     await load(); await open(saved.id); notify(saved.enabled ? "Connection enabled." : "Connection disabled. Existing bindings are retained.");
   }));
@@ -331,7 +331,7 @@
   });
   $("conn-delete").addEventListener("click", () => action($("conn-delete"), async () => {
     if (!selected || !await impact()) return;
-    if (!confirm("Delete saved connection " + selected.id + "? No artifacts are bound to it.")) return;
+    if (!await window.ArtifactDialogs.confirm({title:"Delete saved connection",subject:selected.id,message:"No artifacts are bound to this connection. Its saved definition will be removed.",action:"Delete connection",danger:true})) return;
     await request(api + "/" + encodeURIComponent(selected.id), "DELETE", { expected_version: selected.version });
     selected = null; $("conn-detail").hidden = true; $("conn-empty").hidden = false; await load(); notify("Connection deleted.");
   }));

@@ -426,35 +426,100 @@
       status(error.message, "error");
     });
   }
+  function folderEditor(collection, initialArtifactIds, restoreTarget, onClose) {
+    var editing = Boolean(collection);
+    var cards = Array.from(document.querySelectorAll("#artifact-grid .card"));
+    var selectedOrg = initialArtifactIds.length ? cards.find(function(card){return card.dataset.id === initialArtifactIds[0];})?.dataset.org : null;
+    // The admin identity is an access role, not a registered organization.
+    var orgs = Array.from(new Set(Array.from(document.querySelectorAll("#org-filter option")).map(function(option){return option.value;}).filter(function(org){return org && org !== "all";}))).sort();
+    var initialOrg = editing ? collection.org : selectedOrg || (state.org === "all" ? (isAdmin ? "" : viewerOrg) : state.org);
+    var orgField = !editing && isAdmin && state.org === "all" ? '<label>Organization<select name="org" required' + (selectedOrg ? ' disabled' : '') + '><option value="">Choose an organization…</option>' + orgs.map(function(org){return '<option value="'+escapeHtml(org)+'">'+escapeHtml(org)+'</option>';}).join("") + '</select></label>' : '';
+    var colors = [{value:"#e4d3b4",label:"Sand"},{value:"#c8d8cf",label:"Sage"},{value:"#cbd7e5",label:"Slate"},{value:"#e2c9ce",label:"Rose"}];
+    var initialColor = collection?.color || colors[0].value;
+    if (!colors.some(function(color){return color.value.toLowerCase() === initialColor.toLowerCase();})) colors.push({value:initialColor,label:"Custom"});
+    var colorMarkup = colors.map(function(color){return '<label class="collection-color-option"><input type="radio" name="color" value="'+escapeHtml(color.value)+'"'+(color.value.toLowerCase() === initialColor.toLowerCase() ? ' checked' : '')+'><span class="collection-color-swatch" style="--swatch:'+escapeHtml(color.value)+'" aria-hidden="true"></span><span>'+color.label+'</span></label>';}).join("");
+    var dialog = document.createElement("dialog");
+    dialog.className = "category-dialog collection-create-dialog";
+    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">A place for related ideas</p><h2>'+(editing ? 'Edit folder' : 'Create a folder')+'</h2></div><button type="button" data-dialog-close aria-label="Close">×</button></div><div class="collection-create-layout"><div class="collection-create-fields">'+orgField+'<label>Folder name <span class="collection-field-note">Up to 80 characters</span><input name="name" maxlength="80" required autocomplete="off" placeholder="e.g. Interface experiments"></label><label>A little context <span class="collection-field-note">Optional</span><textarea name="description" aria-label="'+(editing ? 'Description' : 'A little context')+'" maxlength="500" placeholder="What belongs here?"></textarea></label><fieldset class="collection-color-field"><legend>Folder color</legend><div class="collection-color-options">'+colorMarkup+'</div></fieldset><label class="collection-cover-field">Cover preview<select name="coverArtifactId"><option value="">First artifact</option></select></label><p class="category-error" role="alert"></p></div><aside class="collection-create-preview" data-folder-live-preview aria-live="polite"><p class="collection-preview-kicker">Your folder, as it will look</p><div class="collection-preview-face"><div class="collection-preview-papers"></div><div class="collection-preview-face-content"><strong>Your new folder</strong><span></span></div></div><p class="collection-preview-help">The first collected artifact becomes the cover. A chosen cover stays fixed until you change it.</p></aside></div><div class="category-actions">'+(editing ? '<button type="button" class="collection-delete-folder">Delete folder</button>' : '<p class="collection-create-note">Artifacts can belong to more than one folder.</p>')+'<button type="button" data-dialog-close>Cancel</button><button type="submit" class="solid" value="'+(editing ? 'save' : 'create')+'">'+(editing ? 'Save changes' : 'Create folder')+'</button></div></form>';
+    showCollectionDialog(dialog, restoreTarget || document.activeElement, onClose);
+    var form = dialog.querySelector("form");
+    var submit = form.querySelector("button[type=submit]");
+    function targetOrg(){return form.elements.org ? form.elements.org.value : initialOrg;}
+    function colorValue(){return form.elements.color.value;}
+    form.elements.name.value = collection?.name || "";
+    form.elements.description.value = collection?.description || "";
+    if(form.elements.org) form.elements.org.value = initialOrg;
+    function updatePreview(){
+      var coverId = form.elements.coverArtifactId.value;
+      var count = new Set(initialArtifactIds.concat(coverId ? [coverId] : [])).size;
+      var cover = cards.find(function(card){return card.dataset.id === (coverId || initialArtifactIds[0]);});
+      var source = cover?.querySelector(".pv, img");
+      var face = dialog.querySelector(".collection-preview-face");
+      face.style.setProperty("--collection-color",colorValue());
+      var channels = colorValue().slice(1).match(/.{2}/g).map(function(channel){var value=parseInt(channel,16)/255;return value <= .04045 ? value/12.92 : Math.pow((value+.055)/1.055,2.4);});
+      face.style.setProperty("--collection-ink",channels[0]*.2126+channels[1]*.7152+channels[2]*.0722 > .18 ? "#17232d" : "#ffffff");
+      dialog.querySelector(".collection-preview-face-content strong").textContent = form.elements.name.value.trim() || "Your new folder";
+      dialog.querySelector(".collection-preview-face-content span").textContent = count + " artifact" + (count === 1 ? "" : "s") + " · " + (targetOrg() || "Choose an organization");
+      dialog.querySelector(".collection-preview-papers").innerHTML = source?.src ? '<img src="'+escapeHtml(source.src)+'" alt="">' : '';
+    }
+    function updateCovers(){
+      var previous = form.elements.coverArtifactId.value;
+      form.elements.coverArtifactId.innerHTML = '<option value="">First artifact</option>' + cards.filter(function(card){return card.dataset.org === targetOrg() && (!editing || initialArtifactIds.indexOf(card.dataset.id) >= 0);}).map(function(card){return '<option value="'+escapeHtml(card.dataset.id)+'">'+escapeHtml(card.querySelector(".card-title")?.textContent || card.dataset.id)+'</option>';}).join("");
+      // Preserve covers outside the currently filtered artifact grid when editing.
+      if(editing && collection.coverArtifactId && !Array.from(form.elements.coverArtifactId.options).some(function(option){return option.value === collection.coverArtifactId;})) form.elements.coverArtifactId.add(new Option("Current cover",collection.coverArtifactId));
+      form.elements.coverArtifactId.value = previous || "";
+      updatePreview();
+    }
+    updateCovers();
+    form.elements.coverArtifactId.value = collection?.coverArtifactId || "";
+    updatePreview();
+    form.elements.org?.addEventListener("change",updateCovers);
+    form.elements.name.addEventListener("input",updatePreview);
+    form.elements.coverArtifactId.addEventListener("change",updatePreview);
+    form.querySelectorAll('input[name="color"]').forEach(function(input){input.addEventListener("change",updatePreview);});
+    if(!editing && isAdmin && state.org === "all" && !orgs.length){form.querySelector(".category-error").textContent = "Create an organization before adding a folder.";submit.disabled = true;}
+    if(editing) dialog.querySelector(".collection-delete-folder").addEventListener("click",function(){deleteCollection(collection.id,function(){dialog.close("deleted");});});
+    form.elements.name.focus();
+    form.addEventListener("submit",function(event){
+      event.preventDefault();
+      if(!event.submitter || event.submitter !== submit || submit.disabled) return;
+      var name = form.elements.name.value.trim();
+      if(!name){form.elements.name.setCustomValidity("Enter a folder name.");form.elements.name.reportValidity();return;}
+      var body = {org:targetOrg(),name:name,description:form.elements.description.value.trim(),color:colorValue(),coverArtifactId:form.elements.coverArtifactId.value || (editing ? null : undefined)};
+      if(!body.org) return;
+      if(!editing) body.artifactIds = Array.from(new Set(initialArtifactIds.concat(form.elements.coverArtifactId.value || [])));
+      submit.disabled = true;
+      form.querySelector(".category-error").textContent = "";
+      endpoint(editing ? "/collections/"+encodeURIComponent(collection.id) : "/collections",{method:editing ? "PATCH" : "POST",body:JSON.stringify(body)}).then(function(){dialog.close(editing ? "saved" : "created");return refresh();}).then(function(){status(editing ? "Folder updated" : "Folder created","success");}).catch(function(error){form.querySelector(".category-error").textContent = error.message;submit.disabled = false;});
+    });
+    form.elements.name.addEventListener("input",function(){form.elements.name.setCustomValidity("");});
+  }
   function createCollection(initialArtifactIds, restoreTarget, onClose) {
     initialArtifactIds = Array.isArray(initialArtifactIds) ? initialArtifactIds : Array.from(selectedArtifacts);
-    var selectedOrg = initialArtifactIds.length ? document.querySelector('#artifact-grid .card[data-id="'+CSS.escape(initialArtifactIds[0])+'"]')?.dataset.org : null;
-    if(new Set(initialArtifactIds.map(function(id){return document.querySelector('#artifact-grid .card[data-id="'+CSS.escape(id)+'"]')?.dataset.org;})).size>1){status("Select artifacts from one organization to create a folder.","error");return;}
-    var dialog = document.createElement("dialog"); dialog.className = "category-dialog collection-create-dialog";
-    var orgOptions = Array.from(document.querySelectorAll("#org-filter option")).map(function (option) { return option.value; });
-    var orgs = Array.from(new Set(state.collections.map(function (row) { return row.org; }).concat(orgOptions, viewerOrg).filter(function (org) { return org && org !== "all"; }))).sort();
-    var orgField = isAdmin && state.org === "all" ? '<label>Organization<select name="org">' + orgs.map(function (org) { return '<option value="' + escapeHtml(org) + '">' + escapeHtml(org) + '</option>'; }).join("") + '</select></label>' : '';
-    var coverOptions = Array.from(document.querySelectorAll("#artifact-grid .card")).map(function (card) { return '<option value="' + escapeHtml(card.dataset.id) + '">' + escapeHtml((card.querySelector(".card-title") || {}).textContent || card.dataset.id) + '</option>'; }).join("");
-    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Make room for an idea</p><h2>New folder</h2></div><button type="button" data-dialog-close value="cancel" aria-label="Close">×</button></div><div class="category-body">' + orgField + '<label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color" value="#e4d3b4"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button type="button" data-dialog-close value="cancel">Cancel</button><button type="submit" class="solid" value="create">Create folder</button></div></form>';
-    var restoreFocus=restoreTarget||document.activeElement; showCollectionDialog(dialog, restoreFocus, onClose); var form = dialog.querySelector("form");
-    if(form.elements.org&&selectedOrg)form.elements.org.value=selectedOrg;
-    function updateCovers(){var targetOrg=form.elements.org?form.elements.org.value:(state.org==="all"?selectedOrg||viewerOrg:state.org);var cover=form.elements.coverArtifactId;var selected=cover.value;cover.innerHTML='<option value="">First artifact</option>'+Array.from(document.querySelectorAll("#artifact-grid .card")).filter(function(card){return card.dataset.org===targetOrg;}).map(function(card){return '<option value="'+escapeHtml(card.dataset.id)+'">'+escapeHtml(card.querySelector(".card-title").textContent)+'</option>';}).join("");cover.value=selected;}
-    updateCovers();form.elements.org?.addEventListener("change",updateCovers);form.querySelector("input").focus();
-    form.addEventListener("submit", function (event) { if (event.submitter && event.submitter.value !== "create") return; event.preventDefault(); var body = { org: form.elements.org ? form.elements.org.value : (state.org === "all" ? viewerOrg : state.org), name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || undefined, artifactIds: Array.from(new Set(initialArtifactIds.concat(form.elements.coverArtifactId.value || []))) }; if (!body.name || !body.org) return; var submit = form.querySelector("button[value=create]"); submit.disabled = true; endpoint("/collections", { method: "POST", body: JSON.stringify(body) }).then(function (result) { if (result.collections) normalizeProjection(result); return refresh().then(function () { dialog.close("created"); status("Folder created", "success"); }); }).catch(function (error) { form.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); });
+    var orgs = new Set(initialArtifactIds.map(function(id){return document.querySelector('#artifact-grid .card[data-id="'+CSS.escape(id)+'"]')?.dataset.org;}));
+    if(orgs.size > 1 || orgs.has(undefined)){status("Select artifacts from one organization to create a folder.","error");return;}
+    folderEditor(null,initialArtifactIds,restoreTarget,onClose);
   }
   function editCollection(id) {
-    var collection = state.collections.find(function (row) { return row.id === id; });
-    if (!collection || !collection.editable) return;
-    var dialog = document.createElement("dialog"); dialog.className = "category-dialog collection-create-dialog";
-    var coverOptions = Array.from(document.querySelectorAll("#artifact-grid .card")).filter(function (card) { return collection.artifactIds.indexOf(card.dataset.id)>=0; }).map(function (card) { return '<option value="' + escapeHtml(card.dataset.id) + '">' + escapeHtml((card.querySelector(".card-title") || {}).textContent || card.dataset.id) + '</option>'; }).join("");
-    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Collection details</p><h2>Edit folder</h2></div><button type="button" data-dialog-close value="cancel" aria-label="Close">×</button></div><div class="category-body"><label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button type="button" data-dialog-close value="cancel">Cancel</button><button type="button" class="collection-delete-folder">Delete folder</button><button type="submit" class="solid" value="save">Save changes</button></div></form>';
-    var restoreFocus=document.activeElement; showCollectionDialog(dialog, restoreFocus); dialog.querySelector(".collection-delete-folder").addEventListener("click", function () { deleteCollection(id, function () { dialog.close("deleted"); }, function (error) { dialog.querySelector(".category-error").textContent = error.message; }); }); var form = dialog.querySelector("form"); form.elements.name.value = collection.name; form.elements.description.value = collection.description || ""; form.elements.color.value = collection.color || "#e4d3b4"; form.elements.coverArtifactId.value = collection.coverArtifactId || ""; form.elements.name.focus();
-    form.addEventListener("submit", function (event) { if (!event.submitter || event.submitter.value !== "save") return; event.preventDefault(); var submit = dialog.querySelector("button[value=save]"); submit.disabled = true; endpoint("/collections/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify({ org: collection.org, name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || null }) }).then(function () { dialog.close(); dialog.remove(); return refresh(); }).catch(function (error) { dialog.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); });
+    var collection = state.collections.find(function(row){return row.id === id;});
+    if(collection?.editable) folderEditor(collection,collection.artifactIds);
   }
-  function deleteCollection(id, onDeleted, onError) {
-    var collection = state.collections.find(function (row) { return row.id === id; });
-    if (!collection || !collection.editable || !window.confirm("Delete the folder ‘" + collection.name + "’? Its artifacts will remain.")) return;
-    endpoint("/collections/" + encodeURIComponent(id), { method: "DELETE" }).then(function () { if (onDeleted) onDeleted(); status("Folder deleted", "success"); return refresh(); }).catch(function (error) { if (onError) onError(error); else status(error.message, "error"); });
+  function deleteCollection(id, onDeleted) {
+    var collection = state.collections.find(function(row){return row.id === id;});
+    if(!collection?.editable) return;
+    var dialog = document.createElement("dialog");
+    dialog.className = "category-dialog collection-delete-dialog";
+    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Remove a collection</p><h2>Delete folder</h2></div><button type="button" data-dialog-close aria-label="Close">×</button></div><div class="category-body"><div class="collection-delete-summary"><strong>'+escapeHtml(collection.name)+'</strong><span>'+escapeHtml(collection.org)+' · '+collection.artifactIds.length+' artifacts</span></div><p>Your artifacts will stay in the library and in their other folders.</p><p class="category-error" role="alert"></p></div><div class="category-actions"><button type="button" data-dialog-close>Cancel</button><button type="submit" class="collection-confirm-delete" value="delete">Delete folder</button></div></form>';
+    showCollectionDialog(dialog,document.activeElement);
+    dialog.querySelector('.category-actions [data-dialog-close]').focus();
+    dialog.querySelector("form").addEventListener("submit",function(event){
+      event.preventDefault();
+      var submit = dialog.querySelector("button[value=delete]");
+      if(event.submitter !== submit || submit.disabled) return;
+      submit.disabled = true;
+      dialog.querySelector(".category-error").textContent = "";
+      endpoint("/collections/"+encodeURIComponent(id),{method:"DELETE"}).then(function(){dialog.close("deleted");if(onDeleted) onDeleted();status("Folder deleted","success");return refresh();}).catch(function(error){dialog.querySelector(".category-error").textContent = error.message;submit.disabled = false;});
+    });
   }
   function openFolder(collectionId) {
     var collection = state.collections.find(function (row) { return row.id === collectionId; });

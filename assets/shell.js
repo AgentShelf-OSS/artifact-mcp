@@ -1318,15 +1318,15 @@
     }).catch(function(){histLoaded=false;histList.innerHTML='<div class="vfb-empty">Could not load history.</div>';});
   }
   function histOpen(open){if(open)inspectorOpen('history',histToggle);else inspectorClosePanel();}
-  if(histList){histList.addEventListener('click',function(e){
+  if(histList){histList.addEventListener('click',async function(e){
     var b=e.target.closest('.vh-restore');if(!b)return;
     var rev=b.getAttribute('data-rev');
-    if(!confirm('Restore v'+rev+'? It becomes a NEW revision at the same URL — nothing is lost.'))return;
+    if(!await window.ArtifactDialogs.confirm({title:'Restore revision',subject:'Version '+rev,message:'This creates a new revision at the same URL. All existing revisions will remain available.',action:'Restore revision'}))return;
     b.disabled=true;b.textContent='Restoring…';
     fetch('/'+artifactId+'/restore',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({revision:Number(rev)})})
       .then(function(r){return r.json().then(function(d){if(!r.ok)throw new Error(d.error||'Restore failed');return d;});})
       .then(function(){location.reload();})
-      .catch(function(err){b.disabled=false;b.textContent='Restore';alert(err.message||'Restore failed');});
+      .catch(function(err){b.disabled=false;b.textContent='Restore';window.ArtifactDialogs.notice(err.message||'Restore failed. Try again.');});
   });}
 
   // Admin-only audience drawer. Its markup is absent for regular org viewers.

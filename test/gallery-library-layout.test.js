@@ -75,7 +75,7 @@ test("Node gallery renderer mirrors the no-rail toolbar contract", () => {
   assert.match(html, /id="sort" aria-label="Sort artifacts"/);
   assert.match(html, /data-reset-filters/);
   assert.doesNotMatch(html, /<aside[^>]*filter-rail/);
-  assert.doesNotMatch(html, /<aside/);
+  assert.doesNotMatch(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ""), /<aside/);
 });
 
 test("Node gallery cards expose configured organization colors to the shared stripe", () => {

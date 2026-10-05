@@ -71,7 +71,7 @@ test.describe("collection dialog dismissal and validation", () => {
   test("the shelf New folder tile opens and cancels the same accessible dialog", async ({ page }) => {
     const tile = page.locator(".collection-new-tile");
     await tile.click();
-    const dialog = page.getByRole("dialog", { name: "New folder", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Create a folder", exact: true });
     await expect(dialog.getByLabel("Folder name")).toBeFocused();
     await expectNoMutation(page, () => dialog.getByRole("button", { name: "Cancel", exact: true }).click());
     await expect(dialog).toHaveCount(0);
@@ -163,7 +163,7 @@ test.describe("collection dialog dismissal and validation", () => {
       if (request.method() === "POST" && new URL(request.url()).pathname === "/collections") writes.push(request);
     });
     await page.locator("#new-folder").click();
-    const dialog = page.getByRole("dialog", { name: "New folder", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Create a folder", exact: true });
     const name = `Keyboard create ${Date.now()}`;
     await dialog.getByLabel("Folder name").fill(name);
     await dialog.getByLabel("Folder name").press("Enter");
@@ -175,7 +175,7 @@ test.describe("collection dialog dismissal and validation", () => {
 
   test("failed creation retains the draft and can be cancelled without another write", async ({ page }) => {
     await page.locator("#new-folder").click();
-    const dialog = page.getByRole("dialog", { name: "New folder", exact: true });
+    const dialog = page.getByRole("dialog", { name: "Create a folder", exact: true });
     await dialog.getByLabel("Folder name").fill("Keep this draft");
     await page.route("**/collections", async route => {
       if (route.request().method() === "POST") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Folder write unavailable" }) });
@@ -189,18 +189,85 @@ test.describe("collection dialog dismissal and validation", () => {
     await expect(dialog).toHaveCount(0);
   });
 
-  test("cancelling delete confirmation retains the edit dialog and its draft", async ({ page, request, org }) => {
-    const created = await api(request, "post", "/collections", { org, name: "Delete confirmation draft" });
+  for (const method of ["Cancel", "Close"]) test(`delete confirmation ${method} retains the edit dialog and its draft`, async ({ page, request, org }) => {
+    const created = await api(request, "post", "/collections", { org, name: `Delete confirmation draft ${method}` });
     const folder = await created.json();
     await page.reload({ waitUntil: "domcontentloaded" });
     await page.locator(`[data-collection-peek="${folder.id}"]`).hover();
     await page.locator(".collection-reel [data-collection-edit]").click();
     const dialog = page.getByRole("dialog", { name: "Edit folder", exact: true });
     await dialog.getByLabel("Description").fill("Unsaved description");
-    page.once("dialog", confirmation => confirmation.dismiss());
-    await expectNoMutation(page, () => dialog.getByRole("button", { name: "Delete folder", exact: true }).click());
+    await dialog.getByRole("button", { name: "Delete folder", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete folder", exact: true });
+    await expect(confirmation).toBeVisible();
+    await expectNoMutation(page, () => confirmation.getByRole("button", { name: method, exact: true }).click());
+    await expect(confirmation).toHaveCount(0);
     await expect(dialog).toBeVisible();
     await expect(dialog.getByLabel("Description")).toHaveValue("Unsaved description");
     await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+  });
+
+  test("folder deletion confirms in an accessible dialog and preserves its artifacts", async ({ page, request, org, publisherKey }) => {
+    const artifact = await publish(request, publisherKey, { title: "Folder deletion source", html: html("Deletion source") });
+    const created = await api(request, "post", "/collections", { org, name: "Folder to delete", artifactIds: [artifact.id] });
+    const sibling = await api(request, "post", "/collections", { org, name: "Folder to keep", artifactIds: [artifact.id] });
+    expect(created.ok() && sibling.ok()).toBeTruthy();
+    const folder = await created.json();
+    const kept = await sibling.json();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator(`[data-collection-peek="${folder.id}"]`).hover();
+    await page.locator(".collection-reel [data-collection-edit]").click();
+    const edit = page.getByRole("dialog", { name: "Edit folder", exact: true });
+    await edit.getByRole("button", { name: "Delete folder", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete folder", exact: true });
+    await expect(confirmation).toContainText(folder.name);
+    await confirmation.getByRole("button", { name: "Delete folder", exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    await expect(page.locator(`[data-collection-peek="${folder.id}"]`)).toHaveCount(0);
+    await expect(page.locator(`[data-collection-peek="${kept.id}"]`)).toBeVisible();
+    await expect(page.locator(`#artifact-grid .card[data-id="${artifact.id}"]`)).toBeVisible();
+    const projection = await api(request, "get", `/collections?org=${encodeURIComponent(org)}`);
+    const rows = (await projection.json()).collections;
+    expect(rows.some(row => row.id === folder.id)).toBe(false);
+    expect(rows.some(row => row.id === kept.id && row.artifactIds.includes(artifact.id))).toBe(true);
+  });
+
+  test("Escape cancels folder deletion without a request", async ({ page, request, org }) => {
+    const created = await api(request, "post", "/collections", { org, name: "Escape deletion" });
+    const folder = await created.json();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator(`[data-collection-peek="${folder.id}"]`).hover();
+    await page.locator(".collection-reel [data-collection-edit]").click();
+    const edit = page.getByRole("dialog", { name: "Edit folder", exact: true });
+    await edit.getByRole("button", { name: "Delete folder", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete folder", exact: true });
+    await expectNoMutation(page, () => page.keyboard.press("Escape"));
+    await expect(confirmation).toHaveCount(0);
+    await expect(edit).toBeVisible();
+    const projection = await api(request, "get", `/collections?org=${encodeURIComponent(org)}`);
+    expect((await projection.json()).collections.some(row => row.id === folder.id)).toBe(true);
+  });
+
+  test("failed folder deletion keeps the confirmation open and retryable", async ({ page, request, org }) => {
+    const created = await api(request, "post", "/collections", { org, name: "Failed deletion" });
+    const folder = await created.json();
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.locator(`[data-collection-peek="${folder.id}"]`).hover();
+    await page.locator(".collection-reel [data-collection-edit]").click();
+    const edit = page.getByRole("dialog", { name: "Edit folder", exact: true });
+    await edit.getByRole("button", { name: "Delete folder", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: "Delete folder", exact: true });
+    await page.route(`**/collections/${folder.id}**`, async route => {
+      if (route.request().method() === "DELETE") await route.fulfill({ status: 503, contentType: "application/json", body: JSON.stringify({ message: "Folder delete unavailable" }) });
+      else await route.continue();
+    });
+    await confirmation.getByRole("button", { name: "Delete folder", exact: true }).click();
+    await expect(confirmation).toBeVisible();
+    await expect(confirmation).toContainText("Folder delete unavailable");
+    await expect(confirmation.getByRole("button", { name: "Delete folder", exact: true })).toBeEnabled();
+    await page.unroute(`**/collections/${folder.id}**`);
+    await confirmation.getByRole("button", { name: "Delete folder", exact: true }).click();
+    await expect(confirmation).toHaveCount(0);
+    await expect(edit).toHaveCount(0);
   });
 });
