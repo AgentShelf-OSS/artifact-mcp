@@ -18,6 +18,7 @@
   var dismissedPreviewId = null;
   var reelPinned = false;
   var dragId = null;
+  var artifactDragging = false;
   var requestSequence = 0;
   var reelPage = 0;
   var reelFace = null;
@@ -47,6 +48,19 @@
     if(message && window.ArtifactPortal?.toast)window.ArtifactPortal.toast(message);
     node.textContent = message || "";
     node.dataset.kind = kind || "";
+  }
+  function showCollectionDialog(dialog, restoreFocus, onClose) {
+    dialog.setAttribute("aria-label", dialog.querySelector("h2").textContent);
+    dialog.querySelectorAll("[data-dialog-close]").forEach(function (button) {
+      button.addEventListener("click", function () { dialog.close("cancel"); });
+    });
+    dialog.addEventListener("close", function () {
+      dialog.remove();
+      if (onClose) onClose(dialog.returnValue);
+      if (restoreFocus && restoreFocus.isConnected) restoreFocus.focus();
+    });
+    document.body.appendChild(dialog);
+    dialog.showModal();
   }
   function endpoint(path, options) {
     var opts = Object.assign({}, options || {});
@@ -142,6 +156,70 @@
     data.orgOptions = Array.isArray(data.orgOptions) ? data.orgOptions : [];
     return data;
   }
+  function folderFieldMarkup(artifactId) {
+    var names = state.collections.filter(function (row) { return row.artifactIds.indexOf(artifactId) >= 0; }).map(function (row) { return row.name; });
+    var summary = names.length ? names.join(", ") : "Choose folders";
+    return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span><span aria-hidden="true">⌄</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
+  }
+  function folderPopoverContext(trigger) {
+    var card = trigger.closest(".card");
+    var ribbon = card.closest("[data-ribbon-id]");
+    return {
+      artifactId: card.dataset.id,
+      menu: trigger.closest(".card-menu"),
+      selector: (card.closest(".collection-reel") ? ".collection-reel " : ribbon ? '[data-ribbon-id="' + CSS.escape(ribbon.dataset.ribbonId) + '"] ' : "#artifact-grid ") + '.card[data-id="' + CSS.escape(card.dataset.id) + '"]'
+    };
+  }
+  function resizeArtifactMenu(menu) {
+    document.dispatchEvent(new CustomEvent("artifact-menu:resize", { detail: { menu: menu } }));
+  }
+  function restoreFolderPopover(context, folderId) {
+    if (context.menu.hidden) return;
+    var card = document.querySelector(context.selector);
+    if (!card) return;
+    var menu = card.querySelector(".card-menu");
+    if (!menu.hidden && typeof menu.showPopover === "function" && !menu.matches(":popover-open")) menu.hidden = true;
+    if (menu.hidden) card.querySelector('[data-action="more"]').click();
+    var trigger = menu.querySelector("[data-collection-folder-picker]");
+    var panel = menu.querySelector("[data-collection-folder-panel]");
+    trigger.setAttribute("aria-expanded", "false");
+    openFolderPopover(trigger);
+    var focus = folderId ? panel.querySelector('[data-collection-folder-option="' + CSS.escape(folderId) + '"]') : trigger;
+    if (focus) focus.focus({ preventScroll: true });
+    resizeArtifactMenu(menu);
+  }
+  function openFolderPopover(trigger) {
+    var field = trigger.closest(".collection-folder-field");
+    var panel = field.querySelector("[data-collection-folder-panel]");
+    var expanded = trigger.getAttribute("aria-expanded") === "true";
+    trigger.setAttribute("aria-expanded", String(!expanded));
+    panel.hidden = expanded;
+    if (expanded) { resizeArtifactMenu(trigger.closest(".card-menu")); return; }
+    var context = folderPopoverContext(trigger);
+    var artifactOrg = trigger.closest(".card").dataset.org;
+    var folders = state.collections.filter(function (row) { return row.org === artifactOrg; });
+    panel.innerHTML = '<div class="picker-list">' + folders.map(function (row) {
+      return '<label class="picker-row"><input type="checkbox" data-collection-folder-option="' + escapeHtml(row.id) + '"' + (row.artifactIds.indexOf(context.artifactId) >= 0 ? ' checked' : '') + (row.editable ? '' : ' disabled') + '><span>' + escapeHtml(row.name) + '</span></label>';
+    }).join('') + (folders.length ? '' : '<p class="collection-folder-empty">No folders in this organization yet.</p>') + '</div><button type="button" data-picker-new>+ Create new folder</button><p class="category-error" role="status" aria-live="polite"></p>';
+    panel.querySelectorAll("[data-collection-folder-option]").forEach(function (input) {
+      input.addEventListener("change", function () {
+        var checked = input.checked;
+        input.disabled = true;
+        panel.querySelector(".category-error").textContent = "";
+        endpoint("/collections/" + encodeURIComponent(input.dataset.collectionFolderOption) + "/memberships", { method: checked ? "POST" : "DELETE", body: JSON.stringify({ artifactIds: [context.artifactId] }) }).then(function () {
+          return refresh();
+        }).then(function () { restoreFolderPopover(context, input.dataset.collectionFolderOption); }).catch(function (error) {
+          input.checked = !checked;
+          input.disabled = false;
+          panel.querySelector(".category-error").textContent = error.message;
+        });
+      });
+    });
+    panel.querySelector("[data-picker-new]").addEventListener("click", function (event) {
+      createCollection([context.artifactId], event.currentTarget, function () { restoreFolderPopover(context); });
+    });
+    resizeArtifactMenu(context.menu);
+  }
   function cardMarkup(raw, compact) {
     var a = artifactData(raw);
     var canonical = document.querySelector('#artifact-grid .card[data-id="' + CSS.escape(a.id) + '"]');
@@ -153,7 +231,13 @@
       clone.querySelectorAll("[id]").forEach(function (node) { node.removeAttribute("id"); });
       var canonicalMenu = clone.querySelector(".card-menu");
       if (canonicalMenu && !canonicalMenu.querySelector("[data-collection-folder-picker]")) {
-        var folders = document.createElement("button"); folders.type = "button"; folders.className = "menu-action collection-folders"; folders.dataset.collectionFolderPicker = a.id; folders.textContent = "Folders"; canonicalMenu.insertBefore(folders, canonicalMenu.querySelector('[data-action="delete"]') || canonicalMenu.querySelector(".move-confirm"));
+        var folders = document.createElement("div"); folders.innerHTML = folderFieldMarkup(a.id); canonicalMenu.insertBefore(folders.firstElementChild, canonicalMenu.querySelector('[data-action="delete"]') || canonicalMenu.querySelector(".move-confirm"));
+      }
+      if (canonicalMenu) {
+        canonicalMenu.hidden = true;
+        clone.classList.remove("menu-open");
+        clone.querySelector('[data-action="more"]').setAttribute("aria-expanded", "false");
+        canonicalMenu.querySelector(".collection-folder-field").outerHTML = folderFieldMarkup(a.id);
       }
       if (!clone.querySelector("[data-collection-select]")) {
         var select = document.createElement("input"); select.type = "checkbox"; select.dataset.collectionSelect = a.id; select.className = "collection-artifact-select"; select.setAttribute("aria-label", "Select " + a.title); var preview = clone.querySelector(".preview"); if (preview) preview.prepend(select);
@@ -178,7 +262,7 @@
       '<button class="act share" data-action="share" type="button" aria-label="Share ' + escapeHtml(a.title) + '">Share</button>' +
       '<button class="act icon-act more" data-action="more" type="button" aria-label="More actions for ' + escapeHtml(a.title) + '" aria-expanded="false">…</button>' +
       '<div class="card-menu" data-ui="card-menu" hidden>' +
-      '<button class="menu-action collection-folders" type="button" data-collection-folder-picker="' + escapeHtml(a.id) + '">Folders</button>' +
+      folderFieldMarkup(a.id) +
       '<label>Category<select class="category-menu" data-action="category" data-can-create="0" aria-label="Change category for ' + escapeHtml(a.title) + '"><option value="">Uncategorized</option>' + categoryOptions + '</select></label>' +
       (isAdmin ? '<label>Organization<select class="org-menu" data-action="move-org"><option value="">' + escapeHtml(a.org) + '</option>' + orgOptions + '</select></label>' : "") +
       (a.showDelete ? '<button class="menu-action del" data-action="delete" type="button">Delete artifact</button>' : "") +
@@ -194,7 +278,6 @@
   }
   function faceMarkup(collection) {
     var previews = previewRows(collection, 3).map(function (artifact) { return '<span class="collection-peek">' + previewImage(artifact) + '</span>'; }).join("");
-    if (!previews) previews = '<span class="collection-peek collection-peek-empty">Drop an artifact here</span>';
     return '<article class="collection-face" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '">' +
       '<div class="collection-face-preview">' + previews + '</div>' +
       '<div class="collection-face-head"><button type="button" data-collection-peek="' + escapeHtml(collection.id) + '" aria-expanded="' + (reelId === collection.id) + '" aria-label="Preview ' + escapeHtml(collection.name) + '"><strong class="collection-face-title">' + escapeHtml(collection.name) + '</strong><span class="collection-face-meta"><span>' + collectionArtifacts(collection).length + ' ' + (collection.artifactCount === 1 ? "artifact" : "artifacts") + '</span><span aria-hidden="true">·</span><span class="org">' + escapeHtml(collection.org) + '</span></span></button></div></article>';
@@ -202,14 +285,22 @@
   function reelPageSize() { return matchMedia("(max-width:760px)").matches ? 1 : 3; }
   function renderReel() {
     var rows = state.collections;
-    var faces = rows.map(faceMarkup).join("");
     var current = rows.find(function (row) { return row.id === reelId; });
     var currentArtifacts = current ? collectionArtifacts(current) : [];
-    if (current && reelPage > Math.max(0, Math.ceil(currentArtifacts.length / reelPageSize()) - 1)) reelPage = 0;
+    var pageCount = Math.ceil(currentArtifacts.length / reelPageSize());
+    if (current && reelPage > Math.max(0, pageCount - 1)) reelPage = 0;
     var reelItems = currentArtifacts.slice(reelPage * reelPageSize(), (reelPage + 1) * reelPageSize());
-    var reel = current ? '<section class="collection-reel" aria-label="Preview reel for ' + escapeHtml(current.name) + '">' +
-      '<button class="pager" type="button" data-reel-close aria-label="Close preview reel">' + icon("close") + '</button><div class="collection-reel-track">' + reelItems.map(function (a) { return '<div class="collection-reel-card">' + cardMarkup(a, true) + '</div>'; }).join("") + (currentArtifacts.length ? "" : '<div class="collection-empty">'+(current.artifactCount?'No artifacts match the current filters.':'This folder is ready for its first artifact.')+'</div>') + '</div><div class="collection-reel-paging"><button class="pager" type="button" data-reel-prev aria-label="Previous reel page"' + (reelPage ? "" : " disabled") + '>‹</button><small>' + (currentArtifacts.length ? (reelPage + 1) + " / " + Math.max(1, Math.ceil(currentArtifacts.length / reelPageSize())) : "0 / 0") + '</small><button class="pager" type="button" data-reel-next aria-label="Next reel page"' + (reelPage + 1 < Math.ceil(currentArtifacts.length / reelPageSize()) ? "" : " disabled") + '>›</button><button class="pager" type="button" data-reel-pin aria-label="' + (reelPinned ? "Unpin" : "Pin") + ' preview reel">' + (reelPinned ? "−" : "+") + '</button></div><div class="collection-reel-tools"><button type="button" data-collection-open="' + escapeHtml(current.id) + '">Open folder ↗</button>' + (current.editable ? '<button type="button" data-collection-edit="' + escapeHtml(current.id) + '">Edit folder</button><button type="button" data-collection-delete="' + escapeHtml(current.id) + '">Delete folder</button>' : '') + '</div></section>' : '<section class="collection-reel" hidden></section>';
-    return '<div class="collection-shelf-nav"><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><div class="collection-grid">' + faces + '</div><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div>' + reel;
+    var createTile = '<button type="button" class="collection-new-tile" data-collection-create>' + icon("plus") + '<strong>New folder</strong><small>A home for another idea</small></button>';
+    var shelf = '<header class="collection-shelf-heading"><h2>Your folders</h2><div class="collection-shelf-tools"><p>Hover to peek. Click to pin. Drop to collect.</p><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div></header>' +
+      '<div class="collection-shelf-nav"><div class="collection-grid">' + rows.map(faceMarkup).join("") + createTile + '</div></div>';
+    if (!current) return shelf + '<section class="collection-reel" hidden></section>';
+    var empty = '<div class="collection-empty">' + (current.artifactCount ? 'No artifacts match the current filters.' : 'This folder is ready for its first artifact.') + '</div>';
+    var paging = '<div class="collection-reel-paging"><button class="pager" type="button" data-reel-prev aria-label="Previous reel page"' + (reelPage ? '' : ' disabled') + '>‹</button><small>' + (currentArtifacts.length ? (reelPage + 1) + ' / ' + pageCount : '0 / 0') + '</small><button class="pager" type="button" data-reel-next aria-label="Next reel page"' + (reelPage + 1 < pageCount ? '' : ' disabled') + '>›</button></div>';
+    var tools = '<button type="button" data-collection-open="' + escapeHtml(current.id) + '">Open folder ↗</button>' +
+      '<button type="button" data-reel-pin aria-label="' + (reelPinned ? 'Unpin' : 'Pin') + ' preview reel">' + (reelPinned ? 'Unpin' : 'Pin open') + '</button>' + paging +
+      (current.editable ? '<button type="button" data-collection-edit="' + escapeHtml(current.id) + '" aria-label="Edit folder">Edit</button>' : '') +
+      '<button class="pager" type="button" data-reel-close aria-label="Close preview reel">' + icon('close') + '</button>';
+    return shelf + '<section class="collection-reel" aria-label="Preview reel for ' + escapeHtml(current.name) + '"><header class="collection-reel-head"><strong class="collection-reel-title"><span>' + (reelPinned ? 'Pinned open' : 'Peeking at') + ' / </span>' + escapeHtml(current.name) + '</strong><div class="collection-reel-tools">' + tools + '</div></header><div class="collection-reel-track">' + reelItems.map(function (artifact) { return '<div class="collection-reel-card">' + cardMarkup(artifact, true) + '</div>'; }).join('') + (currentArtifacts.length ? '' : empty) + '</div></section>';
   }
   function renderSheets() {
     return '<div class="collection-sheet">' + state.collections.map(function (collection) {
@@ -242,7 +333,7 @@
     var tabs = '<div class="collection-viewbar"><div class="collection-viewtabs" role="tablist" aria-label="Collection view"><button type="button" data-collection-view="reel" aria-pressed="' + (view === "reel") + '">Reel shelf</button><button type="button" data-collection-view="sheets" aria-pressed="' + (view === "sheets") + '">Contact sheets</button><button type="button" data-collection-view="ribbons" aria-pressed="' + (view === "ribbons") + '">Gallery ribbons</button></div><div class="collection-viewmeta"><span><strong>' + state.collections.length + '</strong> folders</span><span><strong>' + state.uncollectedCount + '</strong> uncollected</span><button class="collection-new" type="button" data-collection-create>' + icon("plus") + ' New folder</button></div></div><p class="collection-status" role="status" aria-live="polite"></p>';
     var selected=state.collections.find(function(row){return row.id===state.selected;});
     var body=selected?'<div class="collection-folder-heading"><button type="button" data-collection-back>← Collections</button><div><h2>'+escapeHtml(selected.name)+'</h2><p>'+escapeHtml(selected.org)+' · '+collectionArtifacts(selected).length+' matching artifacts</p></div>'+(selected.editable?'<button type="button" data-collection-edit="'+escapeHtml(selected.id)+'">Edit folder</button>':'')+'</div>':view === "sheets" ? renderSheets() : view === "ribbons" ? renderRibbons() : renderReel();
-    if(!selected && !state.collections.length)body='<div class="collection-empty">No folders yet. Create a folder to give your artifacts another home.</div>';
+    if(!selected && !state.collections.length && view !== "reel")body='<div class="collection-empty">No folders yet. Create a folder to give your artifacts another home.</div>';
     surface.innerHTML = tabs + body;
     surface.hidden = view === "all" && !selected;
     surface.dataset.view = view;
@@ -266,7 +357,12 @@
       }
       var menu = card.querySelector(".card-menu");
       if (menu && !menu.querySelector("[data-collection-folder-picker]")) {
-        var folders = document.createElement("button"); folders.type = "button"; folders.className = "menu-action collection-folders"; folders.dataset.collectionFolderPicker = card.dataset.id; folders.textContent = "Folders"; menu.insertBefore(folders, menu.querySelector('[data-action="delete"]') || menu.querySelector(".move-confirm"));
+        var folders = document.createElement("div"); folders.innerHTML = folderFieldMarkup(card.dataset.id); menu.insertBefore(folders.firstElementChild, menu.querySelector('[data-action="delete"]') || menu.querySelector(".move-confirm"));
+      }
+      var folderTrigger = menu && menu.querySelector("[data-collection-folder-picker]");
+      if (folderTrigger) {
+        var names = state.collections.filter(function (row) { return row.artifactIds.indexOf(card.dataset.id) >= 0; }).map(function (row) { return row.name; });
+        folderTrigger.firstElementChild.textContent = names.length ? names.join(", ") : "Choose folders";
       }
     });
   }
@@ -319,7 +415,7 @@
       state.selected = scoped ? scoped.id : null;
       if (window.ArtifactPortal && window.ArtifactPortal.setCollectionScope) window.ArtifactPortal.setCollectionScope(collectionStatus === "uncollected" ? function(id){return !state.collections.some(function(row){return row.artifactIds.indexOf(String(id))>=0;});} : scoped ? function (artifactId) { return scoped.artifactIds.indexOf(String(artifactId)) >= 0; } : null);
       document.documentElement.dataset.collectionDensity = state.preferences.previewSize || "compact";
-      document.querySelector('.layout-toggle [data-layout="'+(state.preferences.artifactLayout||"grid")+'"]').click();
+      window.ArtifactPortal?.setArtifactLayout(state.preferences.artifactLayout || "grid");
       render();
     }).catch(function (error) {
       if (sequence !== requestSequence) return;
@@ -330,7 +426,7 @@
       status(error.message, "error");
     });
   }
-  function createCollection(initialArtifactIds, restoreTarget) {
+  function createCollection(initialArtifactIds, restoreTarget, onClose) {
     initialArtifactIds = Array.isArray(initialArtifactIds) ? initialArtifactIds : Array.from(selectedArtifacts);
     var selectedOrg = initialArtifactIds.length ? document.querySelector('#artifact-grid .card[data-id="'+CSS.escape(initialArtifactIds[0])+'"]')?.dataset.org : null;
     if(new Set(initialArtifactIds.map(function(id){return document.querySelector('#artifact-grid .card[data-id="'+CSS.escape(id)+'"]')?.dataset.org;})).size>1){status("Select artifacts from one organization to create a folder.","error");return;}
@@ -339,27 +435,26 @@
     var orgs = Array.from(new Set(state.collections.map(function (row) { return row.org; }).concat(orgOptions, viewerOrg).filter(function (org) { return org && org !== "all"; }))).sort();
     var orgField = isAdmin && state.org === "all" ? '<label>Organization<select name="org">' + orgs.map(function (org) { return '<option value="' + escapeHtml(org) + '">' + escapeHtml(org) + '</option>'; }).join("") + '</select></label>' : '';
     var coverOptions = Array.from(document.querySelectorAll("#artifact-grid .card")).map(function (card) { return '<option value="' + escapeHtml(card.dataset.id) + '">' + escapeHtml((card.querySelector(".card-title") || {}).textContent || card.dataset.id) + '</option>'; }).join("");
-    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Make room for an idea</p><h2>New folder</h2></div><button value="cancel" aria-label="Close">×</button></div><div class="category-body">' + orgField + '<label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color" value="#e4d3b4"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button value="cancel">Cancel</button><button class="solid" value="create">Create folder</button></div></form>';
-    var restoreFocus=restoreTarget||document.activeElement; document.body.appendChild(dialog); dialog.showModal(); var form = dialog.querySelector("form");
+    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Make room for an idea</p><h2>New folder</h2></div><button type="button" data-dialog-close value="cancel" aria-label="Close">×</button></div><div class="category-body">' + orgField + '<label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color" value="#e4d3b4"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button type="button" data-dialog-close value="cancel">Cancel</button><button type="submit" class="solid" value="create">Create folder</button></div></form>';
+    var restoreFocus=restoreTarget||document.activeElement; showCollectionDialog(dialog, restoreFocus, onClose); var form = dialog.querySelector("form");
     if(form.elements.org&&selectedOrg)form.elements.org.value=selectedOrg;
     function updateCovers(){var targetOrg=form.elements.org?form.elements.org.value:(state.org==="all"?selectedOrg||viewerOrg:state.org);var cover=form.elements.coverArtifactId;var selected=cover.value;cover.innerHTML='<option value="">First artifact</option>'+Array.from(document.querySelectorAll("#artifact-grid .card")).filter(function(card){return card.dataset.org===targetOrg;}).map(function(card){return '<option value="'+escapeHtml(card.dataset.id)+'">'+escapeHtml(card.querySelector(".card-title").textContent)+'</option>';}).join("");cover.value=selected;}
     updateCovers();form.elements.org?.addEventListener("change",updateCovers);form.querySelector("input").focus();
-    form.addEventListener("submit", function (event) { if (event.submitter && event.submitter.value !== "create") return; event.preventDefault(); var body = { org: form.elements.org ? form.elements.org.value : (state.org === "all" ? viewerOrg : state.org), name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || undefined, artifactIds: Array.from(new Set(initialArtifactIds.concat(form.elements.coverArtifactId.value || []))) }; if (!body.name || !body.org) return; var submit = form.querySelector("button[value=create]"); submit.disabled = true; endpoint("/collections", { method: "POST", body: JSON.stringify(body) }).then(function (result) { dialog.close(); dialog.remove(); status("Folder created", "success"); if (result.collections) normalizeProjection(result); return refresh(); }).catch(function (error) { form.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); });
-    dialog.addEventListener("close", function () { dialog.remove(); if(restoreFocus?.isConnected)restoreFocus.focus(); });
+    form.addEventListener("submit", function (event) { if (event.submitter && event.submitter.value !== "create") return; event.preventDefault(); var body = { org: form.elements.org ? form.elements.org.value : (state.org === "all" ? viewerOrg : state.org), name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || undefined, artifactIds: Array.from(new Set(initialArtifactIds.concat(form.elements.coverArtifactId.value || []))) }; if (!body.name || !body.org) return; var submit = form.querySelector("button[value=create]"); submit.disabled = true; endpoint("/collections", { method: "POST", body: JSON.stringify(body) }).then(function (result) { if (result.collections) normalizeProjection(result); return refresh().then(function () { dialog.close("created"); status("Folder created", "success"); }); }).catch(function (error) { form.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); });
   }
   function editCollection(id) {
     var collection = state.collections.find(function (row) { return row.id === id; });
     if (!collection || !collection.editable) return;
     var dialog = document.createElement("dialog"); dialog.className = "category-dialog collection-create-dialog";
     var coverOptions = Array.from(document.querySelectorAll("#artifact-grid .card")).filter(function (card) { return collection.artifactIds.indexOf(card.dataset.id)>=0; }).map(function (card) { return '<option value="' + escapeHtml(card.dataset.id) + '">' + escapeHtml((card.querySelector(".card-title") || {}).textContent || card.dataset.id) + '</option>'; }).join("");
-    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Collection details</p><h2>Edit folder</h2></div><button value="cancel" aria-label="Close">×</button></div><div class="category-body"><label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button value="cancel">Cancel</button><button type="button" class="collection-delete-folder">Delete folder</button><button class="solid" value="save">Save changes</button></div></form>';
-    var restoreFocus=document.activeElement; document.body.appendChild(dialog); dialog.showModal(); dialog.querySelector(".collection-delete-folder").addEventListener("click",function(){dialog.close();deleteCollection(id);}); var form = dialog.querySelector("form"); form.elements.name.value = collection.name; form.elements.description.value = collection.description || ""; form.elements.color.value = collection.color || "#e4d3b4"; form.elements.coverArtifactId.value = collection.coverArtifactId || ""; form.elements.name.focus();
-    form.addEventListener("submit", function (event) { if (!event.submitter || event.submitter.value !== "save") return; event.preventDefault(); var submit = dialog.querySelector("button[value=save]"); submit.disabled = true; endpoint("/collections/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify({ org: collection.org, name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || null }) }).then(function () { dialog.close(); dialog.remove(); return refresh(); }).catch(function (error) { dialog.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); }); dialog.addEventListener("close", function () { dialog.remove();if(restoreFocus?.isConnected)restoreFocus.focus(); });
+    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Collection details</p><h2>Edit folder</h2></div><button type="button" data-dialog-close value="cancel" aria-label="Close">×</button></div><div class="category-body"><label>Folder name<input name="name" maxlength="80" required autocomplete="off"></label><label>Description<textarea name="description" maxlength="500"></textarea></label><label>Color<input name="color" type="color"></label><label>Cover preview<select name="coverArtifactId"><option value="">First artifact</option>' + coverOptions + '</select></label><p class="category-error"></p></div><div class="category-actions"><button type="button" data-dialog-close value="cancel">Cancel</button><button type="button" class="collection-delete-folder">Delete folder</button><button type="submit" class="solid" value="save">Save changes</button></div></form>';
+    var restoreFocus=document.activeElement; showCollectionDialog(dialog, restoreFocus); dialog.querySelector(".collection-delete-folder").addEventListener("click", function () { deleteCollection(id, function () { dialog.close("deleted"); }, function (error) { dialog.querySelector(".category-error").textContent = error.message; }); }); var form = dialog.querySelector("form"); form.elements.name.value = collection.name; form.elements.description.value = collection.description || ""; form.elements.color.value = collection.color || "#e4d3b4"; form.elements.coverArtifactId.value = collection.coverArtifactId || ""; form.elements.name.focus();
+    form.addEventListener("submit", function (event) { if (!event.submitter || event.submitter.value !== "save") return; event.preventDefault(); var submit = dialog.querySelector("button[value=save]"); submit.disabled = true; endpoint("/collections/" + encodeURIComponent(id), { method: "PATCH", body: JSON.stringify({ org: collection.org, name: form.elements.name.value.trim(), description: form.elements.description.value.trim(), color: form.elements.color.value, coverArtifactId: form.elements.coverArtifactId.value || null }) }).then(function () { dialog.close(); dialog.remove(); return refresh(); }).catch(function (error) { dialog.querySelector(".category-error").textContent = error.message; submit.disabled = false; }); });
   }
-  function deleteCollection(id) {
+  function deleteCollection(id, onDeleted, onError) {
     var collection = state.collections.find(function (row) { return row.id === id; });
     if (!collection || !collection.editable || !window.confirm("Delete the folder ‘" + collection.name + "’? Its artifacts will remain.")) return;
-    endpoint("/collections/" + encodeURIComponent(id), { method: "DELETE" }).then(function () { status("Folder deleted", "success"); return refresh(); }).catch(function (error) { status(error.message, "error"); });
+    endpoint("/collections/" + encodeURIComponent(id), { method: "DELETE" }).then(function () { if (onDeleted) onDeleted(); status("Folder deleted", "success"); return refresh(); }).catch(function (error) { if (onError) onError(error); else status(error.message, "error"); });
   }
   function openFolder(collectionId) {
     var collection = state.collections.find(function (row) { return row.id === collectionId; });
@@ -381,12 +476,15 @@
     var selected = allowedCollections.filter(function (collection) { return selectedIds.some(function (id) { return collection.artifactIds.indexOf(id) >= 0; }); }).map(function (collection) { return collection.id; });
     var restoreFocus=document.activeElement;
     var dialog = document.createElement("dialog"); dialog.className = "category-dialog collection-picker-dialog";
-    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Organize artifact</p><h2>Choose folders</h2></div><button value="cancel" aria-label="Close">×</button></div><div class="category-body"><div class="picker-list">' + allowedCollections.map(function (collection) { return '<label class="picker-row"><input type="checkbox" value="' + escapeHtml(collection.id) + '"' + (selected.indexOf(collection.id) >= 0 ? " checked" : "") + '>' + escapeHtml(collection.name) + '<small>' + escapeHtml(collection.org) + '</small></label>'; }).join("") + '</div><button type="button" data-picker-new>+ New folder</button><p class="category-error"></p></div><div class="category-actions"><button value="cancel">Cancel</button><button class="solid" value="save">Save folders</button></div></form>';
-    document.body.appendChild(dialog); dialog.showModal();
+    dialog.innerHTML = '<form method="dialog" class="category-panel"><div class="dialog-head"><div><p class="eyebrow">Organize artifact</p><h2>Choose folders</h2></div><button type="button" data-dialog-close value="cancel" aria-label="Close">×</button></div><div class="category-body"><div class="picker-list">' + allowedCollections.map(function (collection) { return '<label class="picker-row"><input type="checkbox" value="' + escapeHtml(collection.id) + '"' + (selected.indexOf(collection.id) >= 0 ? " checked" : "") + '>' + escapeHtml(collection.name) + '<small>' + escapeHtml(collection.org) + '</small></label>'; }).join("") + '</div><button type="button" data-picker-new>+ New folder</button><p class="category-error"></p></div><div class="category-actions"><button type="button" data-dialog-close value="cancel">Cancel</button><button type="submit" class="solid" value="save">Save folders</button></div></form>';
+    showCollectionDialog(dialog, restoreFocus);
     dialog.querySelectorAll('.picker-row input').forEach(function(input){var row=allowedCollections.find(function(c){return c.id===input.value;});var count=selectedIds.filter(function(id){return row.artifactIds.indexOf(id)>=0;}).length;input.checked=count===selectedIds.length;input.indeterminate=count>0&&count<selectedIds.length;input.addEventListener("change",function(){input.dataset.changed="1";});});
-    dialog.querySelector("[data-picker-new]").addEventListener("click", function () { dialog.close(); dialog.remove(); createCollection(selectedIds,restoreFocus); });
+    dialog.querySelector("[data-picker-new]").addEventListener("click", function (event) {
+      createCollection(selectedIds, event.currentTarget, function (result) {
+        if (result === "created") dialog.close("created");
+      });
+    });
     dialog.querySelector("form").addEventListener("submit", function (event) { if (!event.submitter || event.submitter.value !== "save") return; event.preventDefault(); if (!selectedIds.length) { dialog.close(); dialog.remove(); return; } var changed = Array.from(dialog.querySelectorAll('.picker-row input[data-changed="1"]')); var adds=changed.filter(function(input){return input.checked;}).map(function(input){return input.value;});var removes=changed.filter(function(input){return !input.checked;}).map(function(input){return input.value;}); var submit=dialog.querySelector("button[value=save]");submit.disabled=true;var calls = adds.map(function (id) { return endpoint("/collections/" + encodeURIComponent(id) + "/memberships", { method: "POST", body: JSON.stringify({ artifactIds: selectedIds }) }); }).concat(removes.map(function (id) { return endpoint("/collections/" + encodeURIComponent(id) + "/memberships", { method: "DELETE", body: JSON.stringify({ artifactIds: selectedIds }) }); })); Promise.all(calls).then(function () { selectedIds.forEach(function (id) { selectedArtifacts.delete(id); }); updateSelection(); dialog.close(); dialog.remove(); return refresh(); }).catch(function (error) { dialog.querySelector(".category-error").textContent = error.message;submit.disabled=false;refresh(); }); });
-    dialog.addEventListener("close", function () { dialog.remove();if(restoreFocus?.isConnected)restoreFocus.focus(); });
   }
   function reorder(id, delta) { var rows = orderedCollections(); var index = rows.findIndex(function (row) { return row.id === id; }); var next = index + delta; if (index < 0 || next < 0 || next >= rows.length) return; var order = rows.map(function (row) { return row.id; }); var moved = order.splice(index, 1)[0]; order.splice(next, 0, moved); var byOrg = Object.assign({}, state.preferences.collectionOrderByOrg || {}); byOrg[preferenceOrg()] = order; savePreferences({ collectionOrderByOrg: byOrg }); render(); status("Moved folder to position "+(next+1)+" of "+rows.length,"success"); }
   function toggleCollapse(id) { var byOrg = Object.assign({}, state.preferences.collapsedCollectionIdsByOrg || {}); var list = (byOrg[preferenceOrg()] || []).slice(); var index = list.indexOf(id); if (index < 0) list.push(id); else list.splice(index, 1); byOrg[preferenceOrg()] = list; savePreferences({ collapsedCollectionIdsByOrg: byOrg }); render(); }
@@ -401,10 +499,10 @@
     surface.querySelectorAll("[data-collection-view]").forEach(function (button) { button.addEventListener("click", function () { view = button.dataset.collectionView; savePreferences({ view: view }); reelId = null; render(); }); });
     surface.querySelectorAll("[data-collection-open]").forEach(function (button) { button.addEventListener("click", function () { openFolder(button.dataset.collectionOpen); }); });
     surface.querySelectorAll(".collection-face[data-collection-id]").forEach(function (face) {
-      face.addEventListener("mouseenter", function () { if (reelPinned || reelId === face.dataset.collectionId || dismissedPreviewId === face.dataset.collectionId) return;dismissedPreviewId=null; reelId = face.dataset.collectionId; reelPage = 0; render(); });
+      face.addEventListener("mouseenter", function () { if (artifactDragging || reelPinned || reelId === face.dataset.collectionId || dismissedPreviewId === face.dataset.collectionId) return;dismissedPreviewId=null; reelId = face.dataset.collectionId; reelPage = 0; render(); });
     });
     surface.querySelectorAll("[data-collection-peek]").forEach(function (button) {
-      button.addEventListener("mouseenter", function () { if (reelPinned || reelId === button.dataset.collectionPeek || dismissedPreviewId === button.dataset.collectionPeek) return;dismissedPreviewId=null; reelId = button.dataset.collectionPeek; reelPage = 0; render(); });
+      button.addEventListener("mouseenter", function () { if (artifactDragging || reelPinned || reelId === button.dataset.collectionPeek || dismissedPreviewId === button.dataset.collectionPeek) return;dismissedPreviewId=null; reelId = button.dataset.collectionPeek; reelPage = 0; render(); });
       button.addEventListener("focus", function () { if (suppressPreviewFocus || reelPinned || reelId === button.dataset.collectionPeek || dismissedPreviewId === button.dataset.collectionPeek) return; reelId = button.dataset.collectionPeek; reelPage = 0; reelPinned = false; render(); requestAnimationFrame(function () { var next = surface.querySelector('[data-collection-peek="' + CSS.escape(reelId) + '"]'); if (next) next.focus({ preventScroll: true }); }); });
       button.addEventListener("click", function () { var id=button.dataset.collectionPeek;var dismiss=reelId===id&&reelPinned;dismissedPreviewId=dismiss?id:null;reelId=dismiss?null:id;reelPage=0;reelPinned=!dismiss;render();requestAnimationFrame(function(){var next=surface.querySelector('[data-collection-peek="'+CSS.escape(id)+'"]');suppressPreviewFocus=true;if(next)next.focus({preventScroll:true});suppressPreviewFocus=false;}); });
       button.addEventListener("keydown", function (event) { if (event.key === "ArrowUp") { event.preventDefault(); reelId = button.dataset.collectionPeek; reelPinned = true; render(); var close = surface.querySelector("[data-reel-close]"); if (close) close.focus(); } });
@@ -413,7 +511,7 @@
     var pin = surface.querySelector("[data-reel-pin]"); if (pin) pin.addEventListener("click", function () { reelPinned = !reelPinned; render(); });
     var previous = surface.querySelector("[data-reel-prev]"); if (previous) previous.addEventListener("click", function () { if (reelPage > 0) { reelPage -= 1; render(); } });
     var next = surface.querySelector("[data-reel-next]"); if (next) next.addEventListener("click", function () { var current = state.collections.find(function (row) { return row.id === reelId; }); var total = current ? collectionArtifacts(current).length : 0; if (current && reelPage + 1 < Math.ceil(total / reelPageSize())) { reelPage += 1; render(); } });
-    var create = surface.querySelector("[data-collection-create]"); if (create) create.addEventListener("click", createCollection);
+    surface.querySelectorAll("[data-collection-create]").forEach(function (create) { create.addEventListener("click", createCollection); });
     surface.querySelectorAll("[data-collection-edit]").forEach(function (button) { button.addEventListener("click", function () { editCollection(button.dataset.collectionEdit); }); });
     surface.querySelectorAll("[data-collection-delete]").forEach(function (button) { button.addEventListener("click", function () { deleteCollection(button.dataset.collectionDelete); }); });
     surface.querySelectorAll("[data-ribbon-page]").forEach(function(button){button.addEventListener("click",function(){var id=button.closest("[data-ribbon-id]").dataset.ribbonId;ribbonPages[id]=Math.max(0,(ribbonPages[id]||0)+Number(button.dataset.ribbonPage));render();});});
@@ -423,9 +521,8 @@
     surface.querySelectorAll("[data-ribbon-id]").forEach(function (row) { row.addEventListener("dragstart", function (event) { if (event.target.closest("[data-collection-artifact]")) return; dragId = row.dataset.ribbonId; row.classList.add("is-dragging"); }); row.addEventListener("dragend", function () { dragId = null; row.classList.remove("is-dragging"); }); row.addEventListener("dragover", function (event) { if (!dragId) return; event.preventDefault(); var after=event.clientY>row.getBoundingClientRect().top+row.getBoundingClientRect().height/2;row.classList.toggle("drop-after",after);row.classList.toggle("drop-before",!after); }); row.addEventListener("dragleave", function () { row.classList.remove("drop-after","drop-before"); }); row.addEventListener("drop", function (event) { event.preventDefault(); row.classList.remove("drop-after","drop-before"); if (!dragId || dragId === row.dataset.ribbonId) return; var rows = orderedCollections().map(function (item) { return item.id; }); var from = rows.indexOf(dragId); var after=event.clientY>row.getBoundingClientRect().top+row.getBoundingClientRect().height/2;rows.splice(from,1);var to=rows.indexOf(row.dataset.ribbonId)+(after?1:0);rows.splice(to,0,dragId); var byOrg = Object.assign({}, state.preferences.collectionOrderByOrg || {}); byOrg[preferenceOrg()] = rows; savePreferences({ collectionOrderByOrg: byOrg }); render(); }); });
     surface.querySelectorAll("[data-collection-id]").forEach(function (drop) { drop.addEventListener("dragover", function (event) { if (dragId) return; event.preventDefault(); drop.classList.add("drop-ready"); }); drop.addEventListener("dragleave", function () { drop.classList.remove("drop-ready"); }); drop.addEventListener("drop", function (event) { if (dragId) return; event.preventDefault(); drop.classList.remove("drop-ready"); var ids = event.dataTransfer && event.dataTransfer.getData("text/plain"); collectArtifacts(drop.dataset.collectionId, ids ? ids.split(",") : Array.from(selectedArtifacts)); }); });
     surface.querySelectorAll("[data-collection-select]").forEach(function (input) { input.checked = selectedArtifacts.has(input.dataset.collectionSelect); input.addEventListener("change", function () { if (input.checked) selectedArtifacts.add(input.dataset.collectionSelect); else selectedArtifacts.delete(input.dataset.collectionSelect); }); });
-    surface.querySelectorAll("[data-collection-artifact]").forEach(function (card) { card.addEventListener("dragstart", function (event) { if (event.target.closest("button,a,input,select")) { event.preventDefault(); return; } event.dataTransfer.setData("text/plain", selectedArtifacts.has(card.dataset.collectionArtifact)?Array.from(selectedArtifacts).join(","):card.dataset.collectionArtifact); }); });
   }
-  document.addEventListener("click", function (event) { var picker = event.target.closest("[data-collection-folder-picker]"); if (picker) { event.preventDefault(); folderPicker(picker.dataset.collectionFolderPicker); } });
+  document.addEventListener("click", function (event) { var picker = event.target.closest("[data-collection-folder-picker]"); if (picker) { event.preventDefault(); openFolderPopover(picker); } });
   document.addEventListener("change", function (event) {
     var input = event.target.closest("[data-collection-select]");
     if (!input) return;
@@ -434,11 +531,21 @@
   });
   document.addEventListener("dragstart", function (event) {
     var card = event.target.closest("[data-collection-artifact]");
-    if (!card || event.target.closest("button,a,input,select")) return;
-    if (event.dataTransfer) event.dataTransfer.setData("text/plain", selectedArtifacts.has(card.dataset.collectionArtifact)?Array.from(selectedArtifacts).join(","):card.dataset.collectionArtifact);
+    if (!card) return;
+    var control = event.target.closest("button,input,select,textarea,a");
+    if (control && !control.matches(".preview a,.collection-artifact-preview a")) { event.preventDefault(); return; }
+    if (!event.dataTransfer) return;
+    artifactDragging = true;
+    clearTimeout(leaveTimer);
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/plain", selectedArtifacts.has(card.dataset.collectionArtifact) ? Array.from(selectedArtifacts).join(",") : card.dataset.collectionArtifact);
+  });
+  document.addEventListener("dragend", function () {
+    artifactDragging = false;
+    surface.querySelectorAll(".drop-ready").forEach(function (node) { node.classList.remove("drop-ready"); });
   });
   document.addEventListener("keydown", function (event) {
-    if (event.key !== "Escape" || !reelId || document.querySelector("dialog[open]")) return;
+    if (event.defaultPrevented || event.key !== "Escape" || !reelId || document.querySelector("dialog[open]")) return;
     var id = reelId; dismissedPreviewId=id;reelId = null; reelPinned = false; render();
     requestAnimationFrame(function () { var face = surface.querySelector('[data-collection-peek="' + CSS.escape(id) + '"]'); suppressPreviewFocus = true; if (face) face.focus({ preventScroll: true }); suppressPreviewFocus = false; });
   });
@@ -447,22 +554,22 @@
   var narrowViewport=matchMedia("(max-width:760px)");narrowViewport.addEventListener("change",function(){reelPage=0;ribbonPages={};render();});
   window.addEventListener("resize", placeReel);
   window.addEventListener("popstate", refresh);
-  function previewHasInteraction(){return !!document.querySelector("dialog[open]") || !!surface.querySelector(".card-menu:not([hidden])") || !!surface.querySelector(".collection-reel:focus-within");}
+  function previewHasInteraction(){return artifactDragging || !!document.querySelector("dialog[open]") || !!surface.querySelector(".card-menu:not([hidden])") || !!surface.querySelector(".collection-reel:focus-within");}
   var leaveTimer = 0;
   surface.addEventListener("pointerleave", function () {
-    if (reelPinned) return;
+    if (artifactDragging || !reelId || reelPinned) return;
     clearTimeout(leaveTimer);
     leaveTimer = setTimeout(function () {
-      if (surface.matches(":hover") || previewHasInteraction()) return;
+      if (!reelId || surface.matches(":hover") || previewHasInteraction()) return;
       reelId = null; reelPage = 0; render();
     }, 140);
   });
   surface.addEventListener("pointerout", function (event) {
-    if (reelPinned || !event.target.closest(".collection-grid")) return;
+    if (artifactDragging || !reelId || reelPinned || !event.target.closest(".collection-grid")) return;
     var next = event.relatedTarget;
     if (next && (next.closest && (next.closest(".collection-grid") || next.closest(".collection-reel")))) return;
     clearTimeout(leaveTimer);
-    leaveTimer = setTimeout(function () { if (!surface.querySelector(".collection-reel:hover") && !previewHasInteraction()) { reelId = null; reelPage = 0; render(); } }, 140);
+    leaveTimer = setTimeout(function () { if (reelId && !surface.querySelector(".collection-reel:hover") && !previewHasInteraction()) { reelId = null; reelPage = 0; render(); } }, 140);
   });
   document.addEventListener("collections:filters-changed", function () {
     var library = window.ArtifactPortal && window.ArtifactPortal.getLibraryState ? window.ArtifactPortal.getLibraryState() : {};

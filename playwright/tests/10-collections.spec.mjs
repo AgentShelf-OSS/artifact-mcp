@@ -114,7 +114,7 @@ test.describe("collection organization", () => {
     await expect(reel).toHaveClass(/is-pinned/);
     const card = reel.locator(".collection-reel-card").first(); await card.locator("[data-action='more']").click();
     await expect(card.locator("[data-collection-folder-picker]")).toBeVisible(); await card.locator("[data-collection-folder-picker]").click();
-    await expect(page.locator(".collection-picker-dialog")).toBeVisible(); await page.getByRole("button", { name: "Cancel" }).click();
+    await expect(card.locator("[data-collection-folder-panel]")).toBeVisible(); await page.keyboard.press("Escape");
   });
 
   test("repositions the temporary reel around the shelf and dismisses on a second click", async ({ page, request, org, publisherKey }) => {
