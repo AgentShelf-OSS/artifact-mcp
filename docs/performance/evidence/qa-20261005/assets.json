@@ -1,0 +1,622 @@
+{
+  "generatedAt": "2026-10-05T22:29:27.801Z",
+  "manifests": [
+    "portal.js",
+    "portal.css",
+    "collections.js",
+    "collections.css",
+    "collection-toolbar.js",
+    "collection-toolbar.css",
+    "shell.js",
+    "shell.css",
+    "actions.js",
+    "cast.js"
+  ],
+  "runtimes": {
+    "node": {
+      "assets": {
+        "portal.js": {
+          "url": "/assets/portal.js.0c51688b6a64002c",
+          "get": {
+            "status": 200,
+            "bytes": 44969,
+            "digest": "0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "44969"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 44969,
+            "digest": "0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "portal.css": {
+          "url": "/assets/portal.css.c74213d9f5c0cbf7",
+          "get": {
+            "status": 200,
+            "bytes": 50496,
+            "digest": "c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "50496"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 50496,
+            "digest": "c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "collections.js": {
+          "url": "/assets/collections.js.550b4905dea898d9",
+          "get": {
+            "status": 200,
+            "bytes": 69508,
+            "digest": "550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "69508"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 69508,
+            "digest": "550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "collections.css": {
+          "url": "/assets/collections.css.8fe0aad3461ab62b",
+          "get": {
+            "status": 200,
+            "bytes": 28187,
+            "digest": "8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "28187"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 28187,
+            "digest": "8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "collection-toolbar.js": {
+          "url": "/assets/collection-toolbar.js.9bdcde5a8cd871a2",
+          "get": {
+            "status": 200,
+            "bytes": 9250,
+            "digest": "9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "9250"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 9250,
+            "digest": "9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "collection-toolbar.css": {
+          "url": "/assets/collection-toolbar.css.5798b29f0c8a5baa",
+          "get": {
+            "status": 200,
+            "bytes": 7812,
+            "digest": "5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "7812"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 7812,
+            "digest": "5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "shell.js": {
+          "url": "/assets/shell.js.9383710af80f4d67",
+          "get": {
+            "status": 200,
+            "bytes": 153385,
+            "digest": "9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "153385"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 153385,
+            "digest": "9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "shell.css": {
+          "url": "/assets/shell.css.5628c61425c87940",
+          "get": {
+            "status": 200,
+            "bytes": 44039,
+            "digest": "5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "44039"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 44039,
+            "digest": "5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "actions.js": {
+          "url": "/assets/actions.js.e8bfcd146cefe576",
+          "get": {
+            "status": 200,
+            "bytes": 2335,
+            "digest": "e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "2335"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 2335,
+            "digest": "e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "cast.js": {
+          "url": "/assets/cast.js.0951db97158a9881",
+          "get": {
+            "status": 200,
+            "bytes": 29413,
+            "digest": "0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "29413"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 29413,
+            "digest": "0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        }
+      },
+      "invalid": {
+        "/assets/unknown.js.0000000000000000": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/portal.js.0000000000000000": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/%2e%2e/portal.js": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/../portal.js": {
+          "status": 404,
+          "bytes": 0
+        }
+      }
+    },
+    "rust": {
+      "assets": {
+        "portal.js": {
+          "url": "/assets/portal.js.0c51688b6a64002c",
+          "get": {
+            "status": 200,
+            "bytes": 44969,
+            "digest": "0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "44969"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 44969,
+            "digest": "0c51688b6a64002c66dfbfcc7367bb454a6078fe9d7de252b59e5abeb0dadcc2",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "portal.css": {
+          "url": "/assets/portal.css.c74213d9f5c0cbf7",
+          "get": {
+            "status": 200,
+            "bytes": 50496,
+            "digest": "c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "50496"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 50496,
+            "digest": "c74213d9f5c0cbf7931cd7ced82ec5d685e9fada1adf2b0c41eafe35a18be751",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "collections.js": {
+          "url": "/assets/collections.js.550b4905dea898d9",
+          "get": {
+            "status": 200,
+            "bytes": 69508,
+            "digest": "550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "69508"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 69508,
+            "digest": "550b4905dea898d984e479b798a25807240d3a1434a4009775702c5408d6dee6",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "collections.css": {
+          "url": "/assets/collections.css.8fe0aad3461ab62b",
+          "get": {
+            "status": 200,
+            "bytes": 28187,
+            "digest": "8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "28187"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 28187,
+            "digest": "8fe0aad3461ab62b86562dd6dc8a7b209ccd3a70b124f29b8ca809ef1f0f417c",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "collection-toolbar.js": {
+          "url": "/assets/collection-toolbar.js.9bdcde5a8cd871a2",
+          "get": {
+            "status": 200,
+            "bytes": 9250,
+            "digest": "9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "9250"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 9250,
+            "digest": "9bdcde5a8cd871a240d987b77f52584450fdf0f197efb76cfe004b329968f79e",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "collection-toolbar.css": {
+          "url": "/assets/collection-toolbar.css.5798b29f0c8a5baa",
+          "get": {
+            "status": 200,
+            "bytes": 7812,
+            "digest": "5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "7812"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 7812,
+            "digest": "5798b29f0c8a5baadfe0192430f76f2d5d77a39b9da7d3f0ce27d4d681bd3602",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "shell.js": {
+          "url": "/assets/shell.js.9383710af80f4d67",
+          "get": {
+            "status": 200,
+            "bytes": 153385,
+            "digest": "9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "153385"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 153385,
+            "digest": "9383710af80f4d67489bf31cc069204c39c66454139620b570a1ea45a7ed9cff",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "shell.css": {
+          "url": "/assets/shell.css.5628c61425c87940",
+          "get": {
+            "status": 200,
+            "bytes": 44039,
+            "digest": "5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e",
+            "contentType": "text/css; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "44039"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 44039,
+            "digest": "5628c61425c879409d82d491fe681e312a62ad379ed3cfc4ad0cafc4507b260e",
+            "contentType": "text/css; charset=utf-8"
+          }
+        },
+        "actions.js": {
+          "url": "/assets/actions.js.e8bfcd146cefe576",
+          "get": {
+            "status": 200,
+            "bytes": 2335,
+            "digest": "e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "2335"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 2335,
+            "digest": "e8bfcd146cefe576ec9c4ef067c5b21866dcc40b4f2bce902459af99fd78e7fc",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        },
+        "cast.js": {
+          "url": "/assets/cast.js.0951db97158a9881",
+          "get": {
+            "status": 200,
+            "bytes": 29413,
+            "digest": "0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163",
+            "contentType": "application/javascript; charset=utf-8",
+            "cacheControl": "public, max-age=31536000, immutable, no-transform",
+            "etag": "\"0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163\"",
+            "nosniff": "nosniff"
+          },
+          "head": {
+            "status": 200,
+            "bytes": 0,
+            "contentLength": "29413"
+          },
+          "conditional": {
+            "status": 304,
+            "bytes": 0,
+            "etag": "\"0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163\"",
+            "contentLength": null
+          },
+          "expected": {
+            "bytes": 29413,
+            "digest": "0951db97158a9881fcdd2b6a1ed27f658fe279215e22fef2b6067c53a9822163",
+            "contentType": "application/javascript; charset=utf-8"
+          }
+        }
+      },
+      "invalid": {
+        "/assets/unknown.js.0000000000000000": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/portal.js.0000000000000000": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/%2e%2e/portal.js": {
+          "status": 404,
+          "bytes": 0
+        },
+        "/assets/../portal.js": {
+          "status": 404,
+          "bytes": 0
+        }
+      }
+    }
+  },
+  "note": "Direct route checks only. See proxy-policy.json for the corrected local emulator and rollback.json for compatibility."
+}

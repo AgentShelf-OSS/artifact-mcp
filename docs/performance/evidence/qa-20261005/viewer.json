@@ -1,0 +1,70 @@
+[
+  {
+    "runtime": "node",
+    "cases": [
+      "bundle-delayed-state-anchor-scroll-resize",
+      "discussion-failure-retry-cache",
+      "reader-delayed-shell-save-resume",
+      "voice-disabled-discovery-failure"
+    ],
+    "defects": [],
+    "strictErrors": [],
+    "anchorEnvelope": {
+      "path": "html:nth-child(1)>body:nth-child(2)>main:nth-child(1)>p:nth-child(2)",
+      "nodeId": null,
+      "quote": "Page two target content.",
+      "x": 0.005555555555555556,
+      "y": 0.019045064377682403,
+      "w": 0.9888888888888889,
+      "h": 0.004291845493562232,
+      "documentWidth": 1440,
+      "documentHeight": 4194,
+      "approx": false
+    },
+    "checks": {
+      "pageErrors": [],
+      "requestFailures": [],
+      "httpErrors": [],
+      "consoleErrors": [],
+      "expectedConsoleErrors": {
+        "notFound404": 2,
+        "serviceUnavailable503": 2
+      }
+    },
+    "ok": true
+  },
+  {
+    "runtime": "rust",
+    "cases": [
+      "bundle-delayed-state-anchor-scroll-resize",
+      "discussion-failure-retry-cache",
+      "reader-delayed-shell-save-resume",
+      "voice-disabled-discovery-failure"
+    ],
+    "defects": [],
+    "strictErrors": [],
+    "anchorEnvelope": {
+      "path": "html:nth-child(1)>body:nth-child(2)>main:nth-child(1)>p:nth-child(2)",
+      "nodeId": null,
+      "quote": "Page two target content.",
+      "x": 0.005555555555555556,
+      "y": 0.019045064377682403,
+      "w": 0.9888888888888889,
+      "h": 0.004291845493562232,
+      "documentWidth": 1440,
+      "documentHeight": 4194,
+      "approx": false
+    },
+    "checks": {
+      "pageErrors": [],
+      "requestFailures": [],
+      "httpErrors": [],
+      "consoleErrors": [],
+      "expectedConsoleErrors": {
+        "notFound404": 2,
+        "serviceUnavailable503": 2
+      }
+    },
+    "ok": true
+  }
+]

@@ -327,6 +327,7 @@ const CAST_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets
 #[derive(Template)]
 #[template(path = "artifact-shell.html")]
 struct ShellTemplate<'a> {
+    viewer_boot: TrustedStatic,
     favicon: TrustedStatic,
     theme_boot: TrustedStatic,
     css: TrustedStatic,
@@ -563,6 +564,7 @@ fn shell_template<'a>(
         })
         .collect();
     Ok(ShellTemplate {
+        viewer_boot: TrustedStatic::new(include_str!("../../assets/viewer-boot.js")),
         favicon: FAVICON,
         theme_boot: THEME_BOOT,
         css: SHELL_CSS,

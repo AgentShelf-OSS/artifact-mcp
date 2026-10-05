@@ -4,10 +4,12 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { renderArtifactShell, renderGallery } from "../lib/portal.js";
 
+const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
+
 const meta = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 3, bytes: 1, category: "" };
 const nav = { prevId: null, nextId: null, index: 1, total: 1 };
 
-function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3 } = {}) {
+function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}) } = {}) {
   const created = [];
   function element(tagName = "div") {
     const listeners = new Map();
@@ -59,6 +61,11 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     "vanchor-dismiss": element("button"),
     "vanchor-summary": element("p"),
     "vanchor-status": element("p"),
+    vdiscussion: element("section"),
+    "vdiscussion-state": element("span"),
+    "vdiscussion-copy": element("p"),
+    "vdiscussion-actions": element("div"),
+    "vdiscussion-status": element("p"),
     vframe: element("iframe")
   };
   elements["shell-config"].dataset = {
@@ -79,9 +86,11 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     title: JSON.stringify("Artifact"),
     bytes: "1"
   };
-  elements.vframe.contentWindow = {};
+  const frameMessages = [];
+  elements.vframe.contentWindow = { postMessage(message) { frameMessages.push(message); } };
   const documentListeners = new Map();
   const windowListeners = new Map();
+  const animationFrames = [];
   const opens = [];
   let userActivation = false;
   const document = {
@@ -97,13 +106,14 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     location: { search: "" },
     __artifactMcpTestHooks: {},
     addEventListener(type, listener) { windowListeners.set(type, listener); },
+    requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
     open(href, target, features) { opens.push({ href, target, features, userActivation }); }
   };
   const html = renderArtifactShell(meta, nav, {}, []);
-  const script = scriptOverride || [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].at(-1)[1];
+  const script = scriptOverride || SHELL_ASSET;
   runInNewContext(script, {
     document, window, URL, URLSearchParams, JSON, Number, Array, String, Math,
-    setTimeout() {}, clearTimeout() {}, fetch() {}, localStorage: {}, navigator: {}
+    setTimeout() {}, clearTimeout() {}, fetch: fetchImpl, localStorage: {}, navigator: {}
   });
   return {
     created,
@@ -113,6 +123,10 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     markerPreviewPlacement: window.__artifactMcpTestHooks.markerPreviewPlacement,
     draftAnchorFromSelection: window.__artifactMcpTestHooks.draftAnchorFromSelection,
     feedbackPayload: window.__artifactMcpTestHooks.feedbackPayload,
+    requestRepaint: window.__artifactMcpTestHooks.requestRepaint,
+    loadDiscussion: window.__artifactMcpTestHooks.loadDiscussion,
+    frameMessages,
+    flushAnimationFrames() { while (animationFrames.length) animationFrames.shift()(); },
     message(data) {
       windowListeners.get("message")({ source: elements.vframe.contentWindow, data });
     },
@@ -168,8 +182,8 @@ test("notification rows link to a feedback deep link and the shell focuses its f
     { prevId: null, nextId: null, index: 1, total: 1 }, {},
     [{ id: "feedback-1", viewer_email: "author@acme.test", body: "Please review", parent_id: null, resolved_at: null, artifact_revision: 1 }]
   );
-  assert.match(shell, /new URLSearchParams\(window\.location\.search\)\.get\('feedback'\)/);
-  assert.match(shell, /focusFeedback\(requestedFeedback\)/);
+  assert.match(SHELL_ASSET, /new URLSearchParams\(window\.location\.search\)\.get\('feedback'\)/);
+  assert.match(SHELL_ASSET, /focusFeedback\(requestedFeedback\)/);
 });
 
 test("viewer shell includes an escaped public-share inspector", () => {
@@ -204,8 +218,8 @@ test("viewer shell gives review actions priority and keeps secondary actions in 
   assert.match(html, /id="vshare-toggle"/);
   assert.match(html, /id="vmore-toggle"/);
   assert.match(html, /id="vinspector"[^>]*aria-hidden="true"[^>]*inert/);
-  assert.match(html, /inspector\.removeAttribute\('inert'\)/);
-  assert.match(html, /inspector\.setAttribute\('inert',''\)/);
+  assert.match(SHELL_ASSET, /inspector\.removeAttribute\('inert'\)/);
+  assert.match(SHELL_ASSET, /inspector\.setAttribute\('inert',''\)/);
   assert.match(titleMenu, /data-inspector-open="details"/);
   assert.match(titleMenu, /data-inspector-open="history"/);
   assert.match(titleMenu, /data-inspector-open="audience"/);
@@ -219,12 +233,12 @@ test("viewer shell gives review actions priority and keeps secondary actions in 
   assert.match(moreMenu, /Download HTML/);
   assert.match(moreMenu, /Change theme/);
   assert.match(moreMenu, /Sign out/);
-  assert.match(html, /function bindMenu/);
-  assert.match(html, /e\.key==='ArrowDown'/);
-  assert.match(html, /closeShellMenus/);
-  assert.match(html, /input,textarea,select,\[contenteditable\],\[role="menu"\],dialog,\[role="dialog"\]/);
-  assert.doesNotMatch(html, /page\.replace\(\/\<header/);
-  assert.match(html, /commentMode\)\{e\.preventDefault\(\);setCommentMode\(false\)/);
+  assert.match(SHELL_ASSET, /function bindMenu/);
+  assert.match(SHELL_ASSET, /e\.key==='ArrowDown'/);
+  assert.match(SHELL_ASSET, /closeShellMenus/);
+  assert.match(SHELL_ASSET, /input,textarea,select,\[contenteditable\],\[role="menu"\],dialog,\[role="dialog"\]/);
+  assert.doesNotMatch(SHELL_ASSET, /page\.replace\(\/\<header/);
+  assert.match(SHELL_ASSET, /commentMode\)\{e\.preventDefault\(\);setCommentMode\(false\)/);
 });
 
 test("delete controls render only for administrators and recorded owners", () => {
@@ -281,10 +295,10 @@ test("bundle shell scopes anchors to the current page and resets bridge state on
   const html = renderArtifactShell(bundle, nav, {}, feedback);
 
   assert.match(html, /anchor_page/);
-  assert.match(html, /pin\.page===null\|\|pin\.page===currentPage/);
-  assert.match(html, /bridgeReady=false/);
-  assert.match(html, /hideAllMarkers/);
-  assert.match(html, /anchor_page:anchor&&anchor\.page/);
+  assert.match(SHELL_ASSET, /pin\.page===null\|\|pin\.page===currentPage/);
+  assert.match(SHELL_ASSET, /bridgeReady=false/);
+  assert.match(SHELL_ASSET, /hideAllMarkers/);
+  assert.match(SHELL_ASSET, /anchor_page:anchor&&anchor\.page/);
 });
 
 test("anchored-comment shell retains the v2 envelope and keeps prompt copy separate from saving", () => {
@@ -303,12 +317,12 @@ test("anchored-comment shell retains the v2 envelope and keeps prompt copy separ
   assert.match(html, /anchor_node_id/);
   assert.match(html, /anchor_quote/);
   assert.match(html, /anchor_version/);
-  assert.match(html, /Artifact MCP review handoff/);
-  assert.match(html, /list_feedback/);
-  assert.match(html, /single 65,536-byte read may be incomplete/);
-  assert.match(html, /__artifactMcpTestHooks/);
-  assert.match(html, /pin\.stale\|\|!pinOnCurrentPage/);
-  assert.match(html, /id:'__draft__'/);
+  assert.match(SHELL_ASSET, /Artifact MCP review handoff/);
+  assert.match(SHELL_ASSET, /list_feedback/);
+  assert.match(SHELL_ASSET, /single 65,536-byte read may be incomplete/);
+  assert.match(SHELL_ASSET, /__artifactMcpTestHooks/);
+  assert.match(SHELL_ASSET, /pin\.stale\|\|!pinOnCurrentPage/);
+  assert.match(SHELL_ASSET, /id:'__draft__'/);
 });
 
 test("bridge and fallback selections produce valid v2 feedback POST payloads", () => {
@@ -393,6 +407,47 @@ test("composer placement chooses a side and clamps inside each desktop viewport"
   }
 });
 
+test("anchor repaint requests coalesce into one frame", () => {
+  const shell = shellBrokerHarness();
+  shell.requestRepaint(); shell.requestRepaint(); shell.requestRepaint();
+  assert.equal(shell.frameMessages.filter((message) => message.type === "anchor:repaint").length, 0);
+  shell.flushAnimationFrames();
+  assert.equal(shell.frameMessages.filter((message) => message.type === "anchor:repaint").length, 1);
+  shell.requestRepaint(); shell.flushAnimationFrames();
+  assert.equal(shell.frameMessages.filter((message) => message.type === "anchor:repaint").length, 2);
+});
+
+test("early state handshake accepts only the artifact frame and drains once", () => {
+  const frameWindow = {}, listeners = new Map();
+  const window = {
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); }
+  };
+  runInNewContext(readFileSync(new URL("../assets/viewer-boot.js", import.meta.url), "utf8"), {
+    window, document: { getElementById: () => ({ contentWindow: frameWindow }) }, Array
+  });
+  const receive = listeners.get("message"), boot = window.__artifactMcpStateBoot;
+  receive({ source: {}, data: { type: "state:hello" } });
+  receive({ source: frameWindow, data: { type: "state:set", key: "note", value: "ignored" } });
+  receive({ source: frameWindow, data: ["state:hello"] });
+  receive({ source: frameWindow, data: { type: "state:hello", extra: "discarded" } });
+  assert.deepEqual({ ...boot.take() }, { type: "state:hello" });
+  assert.equal(boot.take(), null);
+  assert.equal(listeners.has("message"), false);
+  assert.equal(window.__artifactMcpStateBoot, undefined);
+});
+
+test("discussion status loads on demand and caches a successful response", async () => {
+  let calls = 0, resolve;
+  const shell = shellBrokerHarness(null, { fetchImpl: () => { calls += 1; return new Promise((done) => { resolve = done; }); } });
+  shell.loadDiscussion(); shell.loadDiscussion();
+  assert.equal(calls, 1);
+  resolve({ ok: true, json: async () => ({ state: "local", overrideMode: "inherit" }) });
+  await Promise.resolve(); await Promise.resolve();
+  shell.loadDiscussion();
+  assert.equal(calls, 1);
+});
+
 test("marker preview placement clamps horizontally and chooses above or below", () => {
   const shell = shellBrokerHarness();
   const stage = { width: 768, height: 1024 };
@@ -405,9 +460,9 @@ test("marker preview placement clamps horizontally and chooses above or below", 
   assert.ok(nearTop.top + 5 >= 8);
   assert.ok(nearBottom.top + 900 + 54 <= stage.height - 8);
   const html = renderArtifactShell(meta, nav, {}, []);
-  assert.match(html, /beforeunload/);
-  assert.match(html, /This discards the current draft comment/);
-  assert.match(html, /draftAnchor=null;showDraftPosition\(0,0,0,0,true\);appendFeedback\(saved\)/);
+  assert.match(SHELL_ASSET, /beforeunload/);
+  assert.match(SHELL_ASSET, /This discards the current draft comment/);
+  assert.match(SHELL_ASSET, /draftAnchor=null;showDraftPosition\(0,0,0,0,true\);appendFeedback\(saved\)/);
 });
 
 test("shell brokers an iframe outbound link only after an explicit confirm click", () => {

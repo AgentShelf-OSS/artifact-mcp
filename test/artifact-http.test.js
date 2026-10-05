@@ -9,6 +9,7 @@ const ARTIFACT_CSP = "sandbox allow-scripts allow-popups allow-forms allow-modal
 
 function anchorBridgeHarness({
   querySelector,
+  deferAnimationFrames = false,
   width = 1000,
   height = 1000,
   location = {
@@ -19,6 +20,7 @@ function anchorBridgeHarness({
 }) {
   const listeners = new Map();
   const messages = [];
+  const animationFrames = [];
   const parent = { postMessage(message) { messages.push(message); } };
   const document = {
     documentElement: { scrollWidth: width, clientWidth: width, scrollHeight: height, clientHeight: height },
@@ -35,7 +37,7 @@ function anchorBridgeHarness({
     location,
     scrollX: 0,
     scrollY: 0,
-    requestAnimationFrame(callback) { callback(); },
+    requestAnimationFrame(callback) { if (deferAnimationFrames) animationFrames.push(callback); else callback(); },
     addEventListener(type, listener) { listeners.set(type, listener); }
   };
   const source = ANCHOR_BRIDGE.replace(/^<script[^>]*>/, "").replace(/<\/script>$/, "");
@@ -54,7 +56,10 @@ function anchorBridgeHarness({
       listeners.get("message")({ source: parent, data: { type: "anchor:repaint", anchors } });
       return messages.at(-1);
     },
+    hello() { listeners.get("message")({ source: parent, data: { type: "anchor:hello" } }); },
     resize() { listeners.get("resize")(); },
+    scroll() { listeners.get("scroll")(); },
+    flushAnimationFrames() { while (animationFrames.length) animationFrames.shift()(); },
     pickOn() { listeners.get("message")({ source: parent, data: { type: "anchor:pick-on" } }); },
     pickOff() { listeners.get("message")({ source: parent, data: { type: "anchor:pick-off" } }); },
     messageFrom(source, data) { listeners.get("message")({ source, data }); },
@@ -95,6 +100,30 @@ function pointer(target, { id = 1, x = 100, y = 100 } = {}) {
     stopPropagation() {}
   };
 }
+
+test("anchor bridge replies to late parent readiness probes and rejects other senders", () => {
+  const bridge = anchorBridgeHarness({ querySelector: () => null });
+  bridge.messages.splice(0);
+  bridge.messageFrom({}, { type: "anchor:hello" });
+  assert.equal(bridge.messages.length, 0);
+  bridge.messageFrom(null, { type: "anchor:hello" });
+  assert.equal(bridge.messages.length, 0);
+  bridge.hello();
+  assert.deepEqual(bridge.messages.map(message => message.type), ["anchor:ready", "anchor:positions"]);
+  bridge.hello();
+  assert.deepEqual(bridge.messages.map(message => message.type), ["anchor:ready", "anchor:positions", "anchor:ready", "anchor:positions"]);
+});
+
+test("artifact scroll and resize bursts share one geometry update per frame", () => {
+  const bridge = anchorBridgeHarness({ querySelector: () => null, deferAnimationFrames: true });
+  bridge.messages.splice(0);
+  for (let index = 0; index < 100; index += 1) { bridge.scroll(); bridge.resize(); }
+  assert.equal(bridge.messages.length, 0);
+  bridge.flushAnimationFrames();
+  assert.deepEqual(bridge.messages.map(message => message.type), ["anchor:positions"]);
+  bridge.scroll(); bridge.flushAnimationFrames();
+  assert.equal(bridge.messages.length, 2);
+});
 
 test("anchor bridge injects before the real (last) </body>, not one inside a script string", () => {
   const html = '<html><body><script>var x = "</body>";</script><p>hi</p></body></html>';

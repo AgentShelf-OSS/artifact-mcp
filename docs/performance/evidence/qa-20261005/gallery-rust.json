@@ -1,0 +1,42 @@
+{
+  "runtime": "rust",
+  "browser": "Chromium",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "root": "/tmp/artifact-web-perf-20261005-rust.WLW9ob",
+  "durationMs": 5431,
+  "cases": [
+    {
+      "name": "inactive all view does not render collection clones",
+      "pass": true
+    },
+    {
+      "name": "rapid search then open and back preserves state before debounce",
+      "pass": true
+    },
+    {
+      "name": "held collection refresh keeps filter and sort changes",
+      "pass": true
+    },
+    {
+      "name": "membership add, remove, and folder rename stay visible",
+      "pass": true
+    },
+    {
+      "name": "favorite state is reflected in collection card clones",
+      "pass": true
+    },
+    {
+      "name": "selection and deletion remain consistent after indexed card removal",
+      "pass": true
+    }
+  ],
+  "errors": {
+    "console": [],
+    "page": [],
+    "transport": [],
+    "http": []
+  }
+}

@@ -26,6 +26,7 @@
       <div class="vmenu-group"><a role="menuitem" href="{{ raw_src }}" target="_blank" rel="noopener">Open raw artifact</a>{% if !is_bundle %}<a role="menuitem" href="{{ raw_src }}?download" download>Download HTML</a>{% else %}<span class="sr-only">Bundles open in the viewer and cannot download as one HTML file.</span>{% endif %}<button id="vtheme" type="button" role="menuitem">Change theme</button><a class="danger-link" role="menuitem" href="/cdn-cgi/access/logout">Sign out</a>{% if can_delete %}<button class="vdelete-trigger" id="vdelete-trigger" type="button" role="menuitem">Delete artifact</button>{% endif %}</div>
     </div>
   </header>
+  <script>{{ viewer_boot }}</script>
   <div class="reaction-status" id="reaction-status" role="status" aria-live="polite"></div>
   <div class="vstage" id="vstage"><iframe class="vframe" id="vframe" src="{{ anchor_raw_src }}" title="{{ title }}" sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe><div class="vanchor-overlay" id="vanchor-overlay"></div>
     <section class="vanchor-composer" id="vanchor-composer" role="dialog" aria-modal="false" aria-labelledby="vanchor-composer-title" hidden>

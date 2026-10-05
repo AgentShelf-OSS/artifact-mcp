@@ -1,0 +1,215 @@
+{
+  "started": "2026-10-05T22:37:30.462Z",
+  "source": "daf7c52",
+  "cases": [
+    {
+      "runtime": "node",
+      "engine": "firefox",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/node-firefox-1440-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/node-firefox-1440-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "firefox",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/node-firefox-390-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/node-firefox-390-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "webkit",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/node-webkit-1440-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/node-webkit-1440-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "webkit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/node-webkit-390-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/node-webkit-390-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "firefox",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-firefox-1440-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-firefox-1440-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "firefox",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-firefox-390-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-firefox-390-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "webkit",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-webkit-1440-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-webkit-1440-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "webkit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "late shell catches early state hello and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-webkit-390-gallery.png",
+        "/tmp/artifact-web-perf-qa-20261005-root/rust-webkit-390-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    }
+  ],
+  "finished": "2026-10-05T22:38:15.393Z"
+}

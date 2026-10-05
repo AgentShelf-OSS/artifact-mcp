@@ -1,0 +1,2562 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-05",
+  "productionBaseCommit": "13be8f7b4aaad0a29360a658b258969bb9ccba4d",
+  "productionBinarySha256": "02b30261b6a72f3a3732da5ec22a6f2a9104a885dffc27aa723b1f11375bd94f",
+  "candidateBinarySha256": "4e9c638c7f27a96190b17c4b75e4f9d9b6e59c976b150419e3c7ad7a13a2222a",
+  "branch": "perf/web-interface-prod-20261005",
+  "runtime": "Rust",
+  "syntheticOnly": true,
+  "deployed": false,
+  "method": {
+    "cpu": "Chromium DevTools 4x CPU slowdown",
+    "galleryViewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "viewerViewports": [
+      {
+        "width": 1440,
+        "height": 900
+      },
+      {
+        "width": 390,
+        "height": 844
+      }
+    ],
+    "fixture": {
+      "artifacts": [
+        250,
+        1000,
+        3000
+      ],
+      "collectionsAt250": 0,
+      "collectionsAbove250": 12,
+      "membershipOverlapFraction": 0.2,
+      "anchoredFeedbackInViewer": 100,
+      "artifactHtmlBytes": 25419,
+      "thumbnail": "1x1 PNG"
+    },
+    "searchQueries": [
+      "Alpha",
+      "Beta",
+      "Gamma",
+      "Alpha 000",
+      ""
+    ],
+    "sampleCounts": "250 clean: 3 cold/warm pairs, 30 search samples per build. Network and stress: 1 cold/warm pair, 10 search samples per case.",
+    "handler": "Synchronous input.dispatchEvent duration, including collection listeners.",
+    "twoFrames": "Elapsed time through two requestAnimationFrame callbacks; a rendering proxy, not field INP or proof of pixel presentation.",
+    "ready": "Navigation until gallery scripts, collection projection (stress fixtures), and two animation frames complete.",
+    "transfer": "Chromium Resource Timing HTML + /assets/ transferSize; excludes thumbnails, iframe HTML, and API traffic. Loopback is uncompressed and does not model Cloudflare compression.",
+    "coldWarm": "Cold browser context then reload in the same context. Baseline/candidate cases run serially.",
+    "percentiles": "P95 uses nearest rank over pooled lab samples; stress percentiles describe ten samples and are not production percentiles.",
+    "styleExperiment": "content-visibility added after load; startup metrics cannot measure its effect."
+  },
+  "caseOutcomes": [
+    {
+      "label": "baseline-clean",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 32571
+    },
+    {
+      "label": "candidate-clean",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 32908
+    },
+    {
+      "label": "baseline-network",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 17889
+    },
+    {
+      "label": "candidate-network",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 17578
+    },
+    {
+      "label": "baseline-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 155241
+    },
+    {
+      "label": "candidate-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 35394
+    },
+    {
+      "label": "baseline-reel-1000",
+      "status": 1,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 105286
+    },
+    {
+      "label": "candidate-reel-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 35229
+    },
+    {
+      "label": "candidate-sheets-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 29604
+    },
+    {
+      "label": "candidate-ribbons-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 31993
+    },
+    {
+      "label": "baseline-3000",
+      "status": 143,
+      "signal": null,
+      "error": "ETIMEDOUT",
+      "elapsedMs": 180377,
+      "attempt": 3,
+      "previousAttempt": {
+        "label": "baseline-3000",
+        "status": 1,
+        "signal": null,
+        "error": null,
+        "elapsedMs": 54029,
+        "attempt": 2,
+        "initialHarnessFailure": {
+          "label": "baseline-3000",
+          "status": 1,
+          "signal": null,
+          "error": null,
+          "elapsedMs": 19351
+        }
+      }
+    },
+    {
+      "label": "candidate-3000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 132257
+    },
+    {
+      "label": "candidate-contain-1000",
+      "status": 0,
+      "signal": null,
+      "error": null,
+      "elapsedMs": 27787
+    }
+  ],
+  "results": [
+    {
+      "label": "baseline-clean",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 250,
+        "view": "all",
+        "searchSampleCount": 30,
+        "searchHandlerMedianMs": 191.9,
+        "searchHandlerP95Ms": 408.6,
+        "searchTwoFrameMedianMs": 346.3,
+        "searchTwoFrameP95Ms": 686.9,
+        "coldReadyMedianMs": 2356.62,
+        "warmReadyMedianMs": 2058.76,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 1508588,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 1508588,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 2139.73,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 120.2,
+                "twoFrameMs": 233.5
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 228.5,
+                "twoFrameMs": 399.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 201.8,
+                "twoFrameMs": 343.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 113.1,
+                "twoFrameMs": 219.4
+              },
+              {
+                "query": "",
+                "handlerMs": 405.5,
+                "twoFrameMs": 665.1
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 2039.4,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 94.9,
+                "twoFrameMs": 191.4
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 230.5,
+                "twoFrameMs": 348.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 168.1,
+                "twoFrameMs": 291.3
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 100.4,
+                "twoFrameMs": 188.4
+              },
+              {
+                "query": "",
+                "handlerMs": 385.9,
+                "twoFrameMs": 659.9
+              }
+            ]
+          },
+          {
+            "run": 1,
+            "warm": false,
+            "readyMs": 2356.62,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 105.6,
+                "twoFrameMs": 207.8
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 190.1,
+                "twoFrameMs": 360.4
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 191.6,
+                "twoFrameMs": 344.4
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 128.2,
+                "twoFrameMs": 245.8
+              },
+              {
+                "query": "",
+                "handlerMs": 408.6,
+                "twoFrameMs": 686.9
+              }
+            ]
+          },
+          {
+            "run": 1,
+            "warm": true,
+            "readyMs": 2058.76,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 112.4,
+                "twoFrameMs": 221.1
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 231.8,
+                "twoFrameMs": 366.9
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 192.2,
+                "twoFrameMs": 348.2
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 167.9,
+                "twoFrameMs": 250.7
+              },
+              {
+                "query": "",
+                "handlerMs": 322.7,
+                "twoFrameMs": 602.2
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "warm": false,
+            "readyMs": 2678.95,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 115.8,
+                "twoFrameMs": 225.9
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 199.1,
+                "twoFrameMs": 364.9
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 221.8,
+                "twoFrameMs": 379.8
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 122.3,
+                "twoFrameMs": 244.1
+              },
+              {
+                "query": "",
+                "handlerMs": 388,
+                "twoFrameMs": 625.2
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "warm": true,
+            "readyMs": 2167.7,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 103.9,
+                "twoFrameMs": 208.5
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 219.8,
+                "twoFrameMs": 389.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 247.5,
+                "twoFrameMs": 396.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 139.6,
+                "twoFrameMs": 239.1
+              },
+              {
+                "query": "",
+                "handlerMs": 516,
+                "twoFrameMs": 779.2
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": [
+        {
+          "viewport": "desktop",
+          "htmlBodyBytes": 378143,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 207,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 168.8
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 191.9
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 202
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 205
+              }
+            ],
+            "layoutShiftScore": 0.000987,
+            "sharedAssetTransfers": []
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 123,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 115.1
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 117.1
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 122
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 187.9
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": []
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 100,
+            "synchronousMs": 17.8,
+            "paintMs": 131.7
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 80.3,
+            "paintMs": 97.6,
+            "messages": 100
+          },
+          "discussionGetsBeforeDetails": 1,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 1440,
+            "scrollWidth": 1440,
+            "markers": 100
+          }
+        },
+        {
+          "viewport": "phone",
+          "htmlBodyBytes": 378143,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 194.79999995231628,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 139.3
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 164.6
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 187.5
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 192.4
+              }
+            ],
+            "layoutShiftScore": 0.002949,
+            "sharedAssetTransfers": []
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 151.59999990463257,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 139.9
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 143.3
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 150.8
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 226
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": []
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 100,
+            "synchronousMs": 16,
+            "paintMs": 144.6
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 78.6,
+            "paintMs": 90.6,
+            "messages": 100
+          },
+          "discussionGetsBeforeDetails": 1,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 390,
+            "scrollWidth": 390,
+            "markers": 100
+          }
+        }
+      ]
+    },
+    {
+      "label": "candidate-clean",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 250,
+        "view": "all",
+        "searchSampleCount": 30,
+        "searchHandlerMedianMs": 6.35,
+        "searchHandlerP95Ms": 10.5,
+        "searchTwoFrameMedianMs": 340.35,
+        "searchTwoFrameP95Ms": 747.8,
+        "coldReadyMedianMs": 2108.5,
+        "warmReadyMedianMs": 2281.09,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 1514343,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 1302321,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 2108.5,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1514343,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 7.2,
+                "twoFrameMs": 208.2
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 6.4,
+                "twoFrameMs": 338.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 6.9,
+                "twoFrameMs": 366.7
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 5.2,
+                "twoFrameMs": 207.4
+              },
+              {
+                "query": "",
+                "handlerMs": 4.5,
+                "twoFrameMs": 664
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 2227.83,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1302321,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 5
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 6,
+                "twoFrameMs": 163.3
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 5.4,
+                "twoFrameMs": 267.8
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 4.6,
+                "twoFrameMs": 301.2
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 5.5,
+                "twoFrameMs": 170.2
+              },
+              {
+                "query": "",
+                "handlerMs": 4.2,
+                "twoFrameMs": 580.1
+              }
+            ]
+          },
+          {
+            "run": 1,
+            "warm": false,
+            "readyMs": 2023.2,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1514343,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 6.1,
+                "twoFrameMs": 186.5
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 5.2,
+                "twoFrameMs": 353.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 7.4,
+                "twoFrameMs": 342.1
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 5.6,
+                "twoFrameMs": 199.8
+              },
+              {
+                "query": "",
+                "handlerMs": 4.5,
+                "twoFrameMs": 609.4
+              }
+            ]
+          },
+          {
+            "run": 1,
+            "warm": true,
+            "readyMs": 2281.09,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1302321,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 8.2,
+                "twoFrameMs": 247.7
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 6.9,
+                "twoFrameMs": 422.8
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 10.1,
+                "twoFrameMs": 507.7
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 9.2,
+                "twoFrameMs": 301.4
+              },
+              {
+                "query": "",
+                "handlerMs": 6.5,
+                "twoFrameMs": 928.7
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "warm": false,
+            "readyMs": 2637.55,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1514343,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 18.5,
+                "twoFrameMs": 207.3
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 6,
+                "twoFrameMs": 402.3
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 10.5,
+                "twoFrameMs": 430.3
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 6.3,
+                "twoFrameMs": 291
+              },
+              {
+                "query": "",
+                "handlerMs": 4.9,
+                "twoFrameMs": 673.1
+              }
+            ]
+          },
+          {
+            "run": 2,
+            "warm": true,
+            "readyMs": 2364.46,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1302321,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 6.7,
+                "twoFrameMs": 210.2
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 5.6,
+                "twoFrameMs": 361.5
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 6.4,
+                "twoFrameMs": 443.8
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 10.2,
+                "twoFrameMs": 294.9
+              },
+              {
+                "query": "",
+                "handlerMs": 7,
+                "twoFrameMs": 747.8
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": [
+        {
+          "viewport": "desktop",
+          "htmlBodyBytes": 181279,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 382238,
+            "domContentLoadedMs": 142.29999995231628,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 139.6
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 253.9
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 536.8
+              }
+            ],
+            "layoutShiftScore": 0.000494,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 44339,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 153685,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 2635,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 181579,
+            "domContentLoadedMs": 123.39999997615814,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 121.2
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 183.9
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 372
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 378.5
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 0,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 0,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 0,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 1,
+            "synchronousMs": 0.2,
+            "paintMs": 20.8
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 0.3,
+            "paintMs": 4.1,
+            "messages": 1
+          },
+          "discussionGetsBeforeDetails": 0,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 1440,
+            "scrollWidth": 1440,
+            "markers": 100
+          }
+        },
+        {
+          "viewport": "phone",
+          "htmlBodyBytes": 181279,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 382238,
+            "domContentLoadedMs": 137.30000007152557,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 134.5
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 235.1
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 488.7
+              }
+            ],
+            "layoutShiftScore": 0.002949,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 44339,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 153685,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 2635,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 181579,
+            "domContentLoadedMs": 78.39999997615814,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 76.1
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 129.2
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 305.4
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 332.5
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 0,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 0,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 0,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 1,
+            "synchronousMs": 0.8,
+            "paintMs": 25.7
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 0.3,
+            "paintMs": 10.5,
+            "messages": 1
+          },
+          "discussionGetsBeforeDetails": 0,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 390,
+            "scrollWidth": 390,
+            "markers": 100
+          }
+        }
+      ]
+    },
+    {
+      "label": "baseline-network",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": {
+        "latencyMs": 60,
+        "downloadBytesPerSecond": 1250000
+      },
+      "styleExperiment": null,
+      "gallery": {
+        "count": 250,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 181.95,
+        "searchHandlerP95Ms": 423.1,
+        "searchTwoFrameMedianMs": 319.5,
+        "searchTwoFrameP95Ms": 699.3,
+        "coldReadyMedianMs": 2759.78,
+        "warmReadyMedianMs": 2584.72,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 1508588,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 1508588,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 2759.78,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 92.7,
+                "twoFrameMs": 170.3
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 172.1,
+                "twoFrameMs": 324.4
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 208.5,
+                "twoFrameMs": 362.5
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 126,
+                "twoFrameMs": 242.3
+              },
+              {
+                "query": "",
+                "handlerMs": 423.1,
+                "twoFrameMs": 699.3
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 2584.72,
+            "htmlBodyBytes": 1508288,
+            "htmlAndSharedAssetTransferBytes": 1508588,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 115.6,
+                "twoFrameMs": 212.7
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 191.8,
+                "twoFrameMs": 314.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 231.6,
+                "twoFrameMs": 362.8
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 110.1,
+                "twoFrameMs": 241.3
+              },
+              {
+                "query": "",
+                "handlerMs": 360,
+                "twoFrameMs": 616.1
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": [
+        {
+          "viewport": "desktop",
+          "htmlBodyBytes": 378143,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 432.10000002384186,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 392
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 414.3
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 417.9
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 542.3
+              }
+            ],
+            "layoutShiftScore": 0.001373,
+            "sharedAssetTransfers": []
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 394,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 375.7
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 377.6
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 380.3
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 447
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": []
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 100,
+            "synchronousMs": 23.2,
+            "paintMs": 313.2
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 81.7,
+            "paintMs": 92.5,
+            "messages": 100
+          },
+          "discussionGetsBeforeDetails": 1,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 1440,
+            "scrollWidth": 1440,
+            "markers": 100
+          }
+        },
+        {
+          "viewport": "phone",
+          "htmlBodyBytes": 378143,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 433.60000002384186,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 392.4
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 414.4
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 419.3
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 542
+              }
+            ],
+            "layoutShiftScore": 0.007237,
+            "sharedAssetTransfers": []
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 378443,
+            "domContentLoadedMs": 399,
+            "markersBeforeScroll": 0,
+            "requests": [
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 377.1
+              },
+              {
+                "endpoint": "/discussion/override",
+                "atMs": 379.5
+              },
+              {
+                "endpoint": "/actions",
+                "atMs": 382.4
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 451.9
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": []
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 100,
+            "synchronousMs": 16.7,
+            "paintMs": 181.9
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 82.6,
+            "paintMs": 95.8,
+            "messages": 100
+          },
+          "discussionGetsBeforeDetails": 1,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 390,
+            "scrollWidth": 390,
+            "markers": 100
+          }
+        }
+      ]
+    },
+    {
+      "label": "candidate-network",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": {
+        "latencyMs": 60,
+        "downloadBytesPerSecond": 1250000
+      },
+      "styleExperiment": null,
+      "gallery": {
+        "count": 250,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 7.15,
+        "searchHandlerP95Ms": 8,
+        "searchTwoFrameMedianMs": 359.8,
+        "searchTwoFrameP95Ms": 820.3,
+        "coldReadyMedianMs": 2747.92,
+        "warmReadyMedianMs": 2667.48,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 1514343,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 1302321,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 2747.92,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1514343,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 7.4,
+                "twoFrameMs": 192.9
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 7.2,
+                "twoFrameMs": 388
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 5.8,
+                "twoFrameMs": 381.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 6.9,
+                "twoFrameMs": 239.8
+              },
+              {
+                "query": "",
+                "handlerMs": 7.6,
+                "twoFrameMs": 820.3
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 2667.48,
+            "htmlBodyBytes": 1302021,
+            "htmlAndSharedAssetTransferBytes": 1302321,
+            "canonicalCards": 250,
+            "totalCards": 250,
+            "domNodes": 21211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 832,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 250,
+              "canonicalEnhancementWrites": 500,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 8,
+                "twoFrameMs": 232.4
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 7.1,
+                "twoFrameMs": 339.5
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 6.6,
+                "twoFrameMs": 380.1
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 7.4,
+                "twoFrameMs": 234.3
+              },
+              {
+                "query": "",
+                "handlerMs": 4,
+                "twoFrameMs": 687.9
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": [
+        {
+          "viewport": "desktop",
+          "htmlBodyBytes": 181279,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 382238,
+            "domContentLoadedMs": 473.60000002384186,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 470
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 566.1
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 860
+              }
+            ],
+            "layoutShiftScore": 0.000494,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 44339,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 153685,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 2635,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 181579,
+            "domContentLoadedMs": 233.30000007152557,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 231
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 281.2
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 464.4
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 0,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 0,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 0,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 1,
+            "synchronousMs": 1,
+            "paintMs": 23
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 0.3,
+            "paintMs": 10.2,
+            "messages": 1
+          },
+          "discussionGetsBeforeDetails": 0,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 1440,
+            "scrollWidth": 1440,
+            "markers": 100
+          }
+        },
+        {
+          "viewport": "phone",
+          "htmlBodyBytes": 181279,
+          "cold": {
+            "htmlAndSharedAssetTransferBytes": 382238,
+            "domContentLoadedMs": 510.5,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 507.3
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 602.8
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 831.5
+              }
+            ],
+            "layoutShiftScore": 0.002949,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 44339,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 153685,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 2635,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "warm": {
+            "htmlAndSharedAssetTransferBytes": 181579,
+            "domContentLoadedMs": 237.39999997615814,
+            "markersBeforeScroll": 100,
+            "requests": [
+              {
+                "endpoint": "/actions",
+                "atMs": 234.9
+              },
+              {
+                "endpoint": "/data",
+                "atMs": 291.9
+              },
+              {
+                "endpoint": "/speech/voices",
+                "atMs": 468.4
+              }
+            ],
+            "layoutShiftScore": null,
+            "sharedAssetTransfers": [
+              {
+                "asset": "shell.css.5628c61425c87940",
+                "transferBytes": 0,
+                "decodedBodyBytes": 44039
+              },
+              {
+                "asset": "shell.js.9383710af80f4d67",
+                "transferBytes": 0,
+                "decodedBodyBytes": 153385
+              },
+              {
+                "asset": "actions.js.e8bfcd146cefe576",
+                "transferBytes": 0,
+                "decodedBodyBytes": 2335
+              }
+            ]
+          },
+          "parentScrollBurst": {
+            "events": 100,
+            "messages": 1,
+            "synchronousMs": 1,
+            "paintMs": 26
+          },
+          "iframeScrollBurst": {
+            "events": 100,
+            "synchronousMs": 0.3,
+            "paintMs": 9.1,
+            "messages": 1
+          },
+          "discussionGetsBeforeDetails": 0,
+          "discussionGetsAfterTwoDetailsOpens": 1,
+          "dimensions": {
+            "width": 390,
+            "scrollWidth": 390,
+            "markers": 100
+          }
+        }
+      ]
+    },
+    {
+      "label": "baseline-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 1000,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 9626.65,
+        "searchHandlerP95Ms": 14477.3,
+        "searchTwoFrameMedianMs": 10379.45,
+        "searchTwoFrameP95Ms": 14800.4,
+        "coldReadyMedianMs": 28242.09,
+        "warmReadyMedianMs": 27135.81,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5383846,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5383844,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 28242.09,
+            "htmlBodyBytes": 5383546,
+            "htmlAndSharedAssetTransferBytes": 5383846,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84404,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 4611.3,
+                "twoFrameMs": 4933.2
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 9777.9,
+                "twoFrameMs": 10359.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 7200,
+                "twoFrameMs": 7744.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 6915.9,
+                "twoFrameMs": 7133.4
+              },
+              {
+                "query": "",
+                "handlerMs": 11295.4,
+                "twoFrameMs": 12710.7
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 27135.81,
+            "htmlBodyBytes": 5383544,
+            "htmlAndSharedAssetTransferBytes": 5383844,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84404,
+            "portalCounters": null,
+            "collectionCounters": null,
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 14477.3,
+                "twoFrameMs": 14800.4
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 5486.5,
+                "twoFrameMs": 5987.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 9475.4,
+                "twoFrameMs": 10399.7
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 10804.2,
+                "twoFrameMs": 10990.2
+              },
+              {
+                "query": "",
+                "handlerMs": 12170.2,
+                "twoFrameMs": 13286.9
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 1000,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 24.7,
+        "searchHandlerP95Ms": 33.7,
+        "searchTwoFrameMedianMs": 1436.35,
+        "searchTwoFrameP95Ms": 3501.7,
+        "coldReadyMedianMs": 9970.2,
+        "warmReadyMedianMs": 8660.68,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5389601,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5177579,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 9970.2,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5389601,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84210,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 31.4,
+                "twoFrameMs": 752.8
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 23.7,
+                "twoFrameMs": 1868.3
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 33.7,
+                "twoFrameMs": 1539.7
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 24.3,
+                "twoFrameMs": 473.2
+              },
+              {
+                "query": "",
+                "handlerMs": 19.3,
+                "twoFrameMs": 2965.4
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 8660.68,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5177579,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84210,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 25.1,
+                "twoFrameMs": 607.2
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 27.1,
+                "twoFrameMs": 1680.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 29.7,
+                "twoFrameMs": 1333
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 23.6,
+                "twoFrameMs": 540.1
+              },
+              {
+                "query": "",
+                "handlerMs": 22.9,
+                "twoFrameMs": 3501.7
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-reel-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 1000,
+        "view": "reel",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 863.05,
+        "searchHandlerP95Ms": 2234.5,
+        "searchTwoFrameMedianMs": 1404.6,
+        "searchTwoFrameP95Ms": 3372.5,
+        "coldReadyMedianMs": 9769.97,
+        "warmReadyMedianMs": 8610.23,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5389601,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5177579,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 9769.97,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5389601,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84404,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 7
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 26474,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 487.3,
+                "twoFrameMs": 840.1
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 898.8,
+                "twoFrameMs": 1480
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 827.3,
+                "twoFrameMs": 1329.2
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 298.2,
+                "twoFrameMs": 547.5
+              },
+              {
+                "query": "",
+                "handlerMs": 2234.5,
+                "twoFrameMs": 3372.5
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 8610.23,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5177579,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84404,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 7
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 26474,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 623.7,
+                "twoFrameMs": 1000.7
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 973.7,
+                "twoFrameMs": 1577.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 1029.6,
+                "twoFrameMs": 1549.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 314.8,
+                "twoFrameMs": 542.1
+              },
+              {
+                "query": "",
+                "handlerMs": 1998.3,
+                "twoFrameMs": 3161.9
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-sheets-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 1000,
+        "view": "sheets",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 46.3,
+        "searchHandlerP95Ms": 89.7,
+        "searchTwoFrameMedianMs": 1153.65,
+        "searchTwoFrameP95Ms": 2691,
+        "coldReadyMedianMs": 8043.38,
+        "warmReadyMedianMs": 7953.52,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5389601,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5177579,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 8043.38,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5389601,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84403,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 39711,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 45.5,
+                "twoFrameMs": 581.5
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 41.7,
+                "twoFrameMs": 1168.7
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 44.2,
+                "twoFrameMs": 1247.1
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 42.9,
+                "twoFrameMs": 510.1
+              },
+              {
+                "query": "",
+                "handlerMs": 89.7,
+                "twoFrameMs": 2691
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 7953.52,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5177579,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84403,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 39711,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 59.6,
+                "twoFrameMs": 609
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 56,
+                "twoFrameMs": 1255.8
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 47.1,
+                "twoFrameMs": 1138.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 27.1,
+                "twoFrameMs": 403
+              },
+              {
+                "query": "",
+                "handlerMs": 68.7,
+                "twoFrameMs": 2557.6
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-ribbons-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 1000,
+        "view": "ribbons",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 92.15,
+        "searchHandlerP95Ms": 183,
+        "searchTwoFrameMedianMs": 1192.05,
+        "searchTwoFrameP95Ms": 3416.9,
+        "coldReadyMedianMs": 7829.8,
+        "warmReadyMedianMs": 9057.2,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5389601,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5177579,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 7829.8,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5389601,
+            "canonicalCards": 1000,
+            "totalCards": 1036,
+            "domNodes": 87583,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 26474,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 97.3,
+                "twoFrameMs": 665
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 105.9,
+                "twoFrameMs": 1349.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 102.8,
+                "twoFrameMs": 1312
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 80.4,
+                "twoFrameMs": 670.4
+              },
+              {
+                "query": "",
+                "handlerMs": 183,
+                "twoFrameMs": 3416.9
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 9057.2,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5177579,
+            "canonicalCards": 1000,
+            "totalCards": 1036,
+            "domNodes": 87583,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 1,
+              "canonicalLookups": 26474,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 87,
+                "twoFrameMs": 555
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 69.3,
+                "twoFrameMs": 1128.6
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 73.5,
+                "twoFrameMs": 1255.5
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 57.4,
+                "twoFrameMs": 484.3
+              },
+              {
+                "query": "",
+                "handlerMs": 126.3,
+                "twoFrameMs": 2701.3
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-3000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": null,
+      "gallery": {
+        "count": 3000,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 84.7,
+        "searchHandlerP95Ms": 105.8,
+        "searchTwoFrameMedianMs": 5547.55,
+        "searchTwoFrameP95Ms": 12782.1,
+        "coldReadyMedianMs": 39043.74,
+        "warmReadyMedianMs": 33653.1,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 15723598,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 15511574,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 39043.74,
+            "htmlBodyBytes": 15511276,
+            "htmlAndSharedAssetTransferBytes": 15723598,
+            "canonicalCards": 3000,
+            "totalCards": 3000,
+            "domNodes": 252210,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 10000,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 3000,
+              "canonicalEnhancementWrites": 6000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 105.8,
+                "twoFrameMs": 2422
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 89,
+                "twoFrameMs": 5476.5
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 87.2,
+                "twoFrameMs": 5799.3
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 87.1,
+                "twoFrameMs": 1542.5
+              },
+              {
+                "query": "",
+                "handlerMs": 72.8,
+                "twoFrameMs": 12782.1
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 33653.1,
+            "htmlBodyBytes": 15511274,
+            "htmlAndSharedAssetTransferBytes": 15511574,
+            "canonicalCards": 3000,
+            "totalCards": 3000,
+            "domNodes": 252210,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 10000,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 3000,
+              "canonicalEnhancementWrites": 6000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 82.3,
+                "twoFrameMs": 2338.9
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 81,
+                "twoFrameMs": 5829.3
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 97.7,
+                "twoFrameMs": 5618.6
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 81.8,
+                "twoFrameMs": 1446
+              },
+              {
+                "query": "",
+                "handlerMs": 79.1,
+                "twoFrameMs": 12481.6
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    },
+    {
+      "label": "candidate-contain-1000",
+      "browser": "146.0.7680.71",
+      "cpuThrottle": 4,
+      "network": null,
+      "styleExperiment": "post-load content-visibility:auto on canonical cards",
+      "gallery": {
+        "count": 1000,
+        "view": "all",
+        "searchSampleCount": 10,
+        "searchHandlerMedianMs": 30.6,
+        "searchHandlerP95Ms": 38.4,
+        "searchTwoFrameMedianMs": 464.15,
+        "searchTwoFrameP95Ms": 618.4,
+        "coldReadyMedianMs": 10691.13,
+        "warmReadyMedianMs": 10321.18,
+        "coldHtmlAndSharedAssetTransferMedianBytes": 5389601,
+        "warmHtmlAndSharedAssetTransferMedianBytes": 5177579,
+        "runs": [
+          {
+            "run": 0,
+            "warm": false,
+            "readyMs": 10691.13,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5389601,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 36.2,
+                "twoFrameMs": 469.5
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 27.8,
+                "twoFrameMs": 510.2
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 32.1,
+                "twoFrameMs": 458.8
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 32.2,
+                "twoFrameMs": 433.1
+              },
+              {
+                "query": "",
+                "handlerMs": 22.1,
+                "twoFrameMs": 444.2
+              }
+            ]
+          },
+          {
+            "run": 0,
+            "warm": true,
+            "readyMs": 10321.18,
+            "htmlBodyBytes": 5177279,
+            "htmlAndSharedAssetTransferBytes": 5177579,
+            "canonicalCards": 1000,
+            "totalCards": 1000,
+            "domNodes": 84211,
+            "portalCounters": {
+              "filterRuns": 7,
+              "sortRuns": 1,
+              "cardVisibilityWrites": 3332,
+              "sortReorders": 0,
+              "stateWrites": 6
+            },
+            "collectionCounters": {
+              "renders": 7,
+              "canonicalIndexBuilds": 0,
+              "canonicalLookups": 0,
+              "canonicalEnhancements": 1000,
+              "canonicalEnhancementWrites": 2000,
+              "selectionWrites": 0
+            },
+            "searches": [
+              {
+                "query": "Alpha",
+                "handlerMs": 29.1,
+                "twoFrameMs": 498
+              },
+              {
+                "query": "Beta",
+                "handlerMs": 38.4,
+                "twoFrameMs": 618.4
+              },
+              {
+                "query": "Gamma",
+                "handlerMs": 32.6,
+                "twoFrameMs": 442.3
+              },
+              {
+                "query": "Alpha 000",
+                "handlerMs": 26.4,
+                "twoFrameMs": 346.1
+              },
+              {
+                "query": "",
+                "handlerMs": 19.3,
+                "twoFrameMs": 470.3
+              }
+            ]
+          }
+        ]
+      },
+      "viewer": []
+    }
+  ],
+  "failedProbeNotes": {
+    "baseline-reel-1000": "Script readiness wait expired (30-second wait, 105.3-second overall case); no valid timing sample.",
+    "baseline-3000": "Initial inspector response-body cache error; navigation-metadata retry missed readiness; final diagnostic exceeded the 180-second case budget, with no browser errors recorded before cleanup. No valid baseline search timing."
+  },
+  "checks": {
+    "nodePassed": 513,
+    "finalNodeFocusedPassed": 81,
+    "nativeIntegrationPassed": 653,
+    "browserParityPassed": 188,
+    "browserParityExistingNodeSkips": 2,
+    "readerExecutionsPassed": 14,
+    "readerExecutionsSkipped": 0,
+    "architectureReviewBlockers": 0
+  }
+}
