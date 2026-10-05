@@ -7,6 +7,8 @@ async function fixture(page, request, org, publisherKey) {
   const folder = await created.json();
   await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
   const card = page.locator(`#artifact-grid .card[data-id="${artifact.id}"]`);
+  // Folder controls are added after the initial collection projection loads.
+  await expect(card.locator("[data-collection-folder-picker]")).toBeAttached();
   await card.locator('[data-action="more"]').click();
   await card.locator("[data-collection-folder-picker]").click();
   const panel = card.locator("[data-collection-folder-panel]");
