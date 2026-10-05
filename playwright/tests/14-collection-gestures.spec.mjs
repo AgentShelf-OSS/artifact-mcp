@@ -17,15 +17,14 @@ test.describe("collection gestures", () => {
     expect(source.ok() && target.ok()).toBeTruthy();
     const sourceBody = await source.json();
     const targetBody = await target.json();
-    const preferences = await api(request, "put", `/gallery/preferences?org=${encodeURIComponent(org)}`, {
-      view: "reel", previewSize: "compact", artifactLayout: "grid",
-      collectionOrderByOrg: { [org]: [sourceBody.id, targetBody.id] }, collapsedCollectionIdsByOrg: {},
-    });
-    expect(preferences.ok()).toBeTruthy();
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.goto(`/?libraryView=reel&org=${encodeURIComponent(org)}`, { waitUntil: "domcontentloaded" });
-    const sourceFace = page.locator("[data-collection-peek]").filter({ hasText: `Gesture source ${org}` });
+    const sourceFace = page.locator(`[data-collection-peek="${sourceBody.id}"]`);
     await sourceFace.hover();
+    await page.locator("[data-reel-pin]").click();
+    await page.locator(`[data-collection-id="${targetBody.id}"]`).scrollIntoViewIfNeeded();
+    await page.locator("[data-reel-pin]").click();
+    await expect(page.locator(".collection-reel:not([hidden])")).not.toHaveClass(/is-pinned/);
     const card = page.locator(`.collection-reel-card [data-collection-artifact="${artifact.id}"]`);
     const targetFace = page.locator(`[data-collection-id="${targetBody.id}"]`);
     await expect(card).toBeVisible();
