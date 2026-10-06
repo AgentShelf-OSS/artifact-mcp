@@ -1,4 +1,5 @@
 # Web interface performance exploration — 2026-10-05
+This report covers the earlier five-change experiment. See the [four-change inline release QA](web-interface-inline-release-20261005.md) for the current v1.12.0-based candidate.
 
 All five experiments are implemented on `perf/web-interface-prod-20261005`. Search handlers and anchor updates do less work. Cached visits transfer less shared code. Large galleries still need a limit on rendered cards. At 250 artifacts, the faster handler did not produce a clear improvement in the time to render search results.
 

@@ -1,4 +1,5 @@
 # Web interface QA, 2026-10-05
+This report covers the earlier five-change experiment. See the [four-change inline release QA](web-interface-inline-release-20261005.md) for the current v1.12.0-based candidate.
 
 Hold promotion of the complete experiment branch. The browser checks pass, but rolling back to the current production binary breaks pending requests for all 10 versioned assets. The four changes to search, anchored feedback, optional work, and collection rendering remain good candidates for a separate release.
 
