@@ -1,0 +1,94 @@
+{
+  "purpose": "Rust collection QA failure diagnosis",
+  "conclusion": "The two reported failures were caused by the QA fixture exhausting the ordinary READS ingress bucket. They were not UI regressions.",
+  "rate_limit": {
+    "class": "READS",
+    "original_launcher": {
+      "endpoint": "/collections?org=all&include=projection",
+      "candidate_requests": 3000,
+      "statuses": {
+        "200": 1013,
+        "429": 1987
+      },
+      "first_failure": {
+        "request_index": 1006,
+        "status": 429,
+        "body": "{\"error\":\"too many requests\",\"code\":\"rate_limited\"}"
+      }
+    },
+    "baseline_original_launcher": {
+      "endpoint": "/collections?org=all&include=projection",
+      "requests": 1100,
+      "statuses": {
+        "200": 1006,
+        "429": 94
+      },
+      "first_failure": {
+        "request_index": 1007,
+        "status": 429,
+        "body": "{\"error\":\"too many requests\",\"code\":\"rate_limited\"}"
+      }
+    },
+    "candidate_corrected_launcher": {
+      "endpoint": "/collections?org=all&include=projection",
+      "requests": 1100,
+      "statuses": {
+        "200": 1100
+      }
+    }
+  },
+  "page_reload_observation": {
+    "baseline_original_launcher": {
+      "first_load_alerts": [],
+      "reload_alerts": [
+        "Collection request failed"
+      ],
+      "console_errors": [
+        "Failed to load resource: the server responded with a status of 429 (Too Many Requests)"
+      ],
+      "page_errors": [],
+      "transport_failures": [],
+      "http_errors": [
+        {
+          "path": "/collections?org=all&include=projection",
+          "status": 429
+        }
+      ]
+    },
+    "candidate_corrected_launcher": {
+      "first_load_alerts": [],
+      "reload_alerts": [],
+      "console_errors": [],
+      "page_errors": [],
+      "transport_failures": [],
+      "http_errors": []
+    }
+  },
+  "focused_suites": {
+    "candidate_corrected_run_1": {
+      "passed": 25,
+      "failed": 0,
+      "evidence": "focused-results-2"
+    },
+    "candidate_corrected_run_2": {
+      "passed": 25,
+      "failed": 0,
+      "evidence": "focused-candidate-run3"
+    },
+    "candidate_corrected_run_3": {
+      "passed": 25,
+      "failed": 0,
+      "evidence": "focused-candidate-run4"
+    },
+    "baseline_corrected_run_1": {
+      "passed": 25,
+      "failed": 0,
+      "evidence": "focused-old-results-2"
+    }
+  },
+  "full_suite_followup": {
+    "passed": 218,
+    "expected_skips": 2,
+    "failed": 0
+  }
+}

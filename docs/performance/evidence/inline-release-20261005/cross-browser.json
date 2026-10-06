@@ -1,0 +1,223 @@
+{
+  "started": "2026-10-05T23:37:20.741Z",
+  "source": "cb53977",
+  "cases": [
+    {
+      "runtime": "node",
+      "engine": "firefox",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "node-firefox-1440-gallery.png",
+        "node-firefox-1440-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "firefox",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "node-firefox-390-gallery.png",
+        "node-firefox-390-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "webkit",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "node-webkit-1440-gallery.png",
+        "node-webkit-1440-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "node",
+      "engine": "webkit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "node-webkit-390-gallery.png",
+        "node-webkit-390-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "firefox",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "rust-firefox-1440-gallery.png",
+        "rust-firefox-1440-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "firefox",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "rust-firefox-390-gallery.png",
+        "rust-firefox-390-viewer.png"
+      ],
+      "browserVersion": "150.0.2",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "webkit",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "rust-webkit-1440-gallery.png",
+        "rust-webkit-1440-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    },
+    {
+      "runtime": "rust",
+      "engine": "webkit",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "checks": [
+        "gallery search, sort, menu bounds, four collection layouts",
+        "inline viewer shell starts, catches state hello, and paints saved anchor",
+        "lazy Details, voice discovery, real streamed audio, saved resume",
+        "page UI uses inline CSS and JavaScript without external asset requests",
+        "no console, page, HTTP or transport errors"
+      ],
+      "errors": {
+        "console": [],
+        "page": [],
+        "http": [],
+        "transport": []
+      },
+      "screenshots": [
+        "rust-webkit-390-gallery.png",
+        "rust-webkit-390-viewer.png"
+      ],
+      "browserVersion": "26.4",
+      "status": "passed"
+    }
+  ],
+  "finished": "2026-10-05T23:38:12.562Z"
+}

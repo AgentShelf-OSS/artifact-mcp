@@ -15,6 +15,17 @@ The visual language is a restrained slate / paper / copper system: cool slate ap
 
 Node is the reference server-rendered implementation; Rust mirrors it through Askama templates and the native renderer. Changes to HTML structure, inline assets, escaping, or sandbox attributes require parity checks in both runtimes. Do not introduce a renderer-only visual behavior.
 
+Gallery and viewer chrome include their CSS and JavaScript in the page HTML. Keep viewer identity, permissions, feedback, and artifact configuration in the private page HTML. Keep theme startup before paint. Changes to an embedded Rust asset require a new binary build.
+
+The performance experiment tested separate cached application files. Follow-up QA found that pending file requests would fail after a rollback to the current production binary. The four-improvement release keeps files inline. See [the follow-up QA](performance/web-interface-qa-20261005.md).
+
+The viewer sends `anchor:hello` after its message listener is ready and after iframe loads. The sandboxed anchor bridge replies with its page identity and current positions. Preserve the source checks on both sides so a late application script can recover readiness without accepting messages from other frames.
+
+The small inline `assets/viewer-boot.js` bootstrap retains one early `state:hello` from the artifact frame. The shell removes that listener and replays the normalized handshake through the existing state broker. It queues no state reads or mutations and starts no requests for artifacts that do not use state. Keep this bootstrap before the iframe.
+
+
+Gallery sort metadata and collection indexes assume that canonical cards stay in place until navigation, apart from deletion and sorting. A new flow that inserts or replaces cards must invalidate those caches and the card-enhancement signatures. Preserve search checks that reject repeated sorting and repeated enhancement when the card set and collection membership have not changed.
+
 The current browser state keys are:
 
 - `localStorage["artifact-theme"]` — the selected light/dark theme, bootstrapped before paint.

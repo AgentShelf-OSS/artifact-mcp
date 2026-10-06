@@ -108,6 +108,11 @@
   var defaultOrganizationLabel = organizationLabel?.textContent || "All organizations";
   var activeCategory = "all";
   var collectionScope = null;
+  var libraryStateTimer = 0;
+  var sortDirty = true;
+  var lastSortMode = null;
+  var cardSortMeta = new Map();
+  var performanceStats = { filterRuns: 0, sortRuns: 0, cardVisibilityWrites: 0, sortReorders: 0, stateWrites: 0 };
 
   function categoryRows(org) {
     if (org !== "all") return Array.isArray(orgCategoryIndex[org]) ? orgCategoryIndex[org].slice() : [];
@@ -154,31 +159,58 @@
     return cards.filter(function (card) { return card.isConnected; });
   }
 
-  function viewCount(card) {
+  function sortMeta(card) {
+    var meta = cardSortMeta.get(card);
+    if (meta) return meta;
+    var title = card.querySelector(".card-title");
     var badge = card.querySelector(".view-badge");
-    return badge ? Number(String(badge.textContent || "").replace(/[^0-9]/g, "")) || 0 : 0;
+    meta = {
+      title: title ? title.textContent || "" : "",
+      views: badge ? Number(String(badge.textContent || "").replace(/[^0-9]/g, "")) || 0 : 0,
+      updated: String(card.dataset.updated || "")
+    };
+    cardSortMeta.set(card, meta);
+    return meta;
   }
 
   function applySort() {
     if (!grid || !sort) return;
     var mode = sort.value;
+    if (!sortDirty && mode === lastSortMode) return;
+    performanceStats.sortRuns += 1;
     var ordered = visibleCards().sort(function (left, right) {
-      if (mode === "title") return (left.querySelector(".card-title").textContent || "").localeCompare(right.querySelector(".card-title").textContent || "");
-      if (mode === "views") return viewCount(right) - viewCount(left);
-      return String(right.dataset.updated || "").localeCompare(String(left.dataset.updated || ""));
+      var leftMeta = sortMeta(left);
+      var rightMeta = sortMeta(right);
+      if (mode === "title") return leftMeta.title.localeCompare(rightMeta.title);
+      if (mode === "views") return rightMeta.views - leftMeta.views;
+      return rightMeta.updated.localeCompare(leftMeta.updated);
     });
     // Filtering does not usually change order. Avoid detaching every card (and its
     // focused controls) on each filter or collection refresh.
     var existing = Array.prototype.slice.call(grid.children);
     if (ordered.some(function (card, index) { return existing[index] !== card; })) {
+      performanceStats.sortReorders += 1;
       var fragment = document.createDocumentFragment();
       ordered.forEach(function (card) { fragment.appendChild(card); });
       grid.appendChild(fragment);
     }
+    lastSortMode = mode;
+    sortDirty = false;
     if (sortLabel && sort.selectedOptions[0]) sortLabel.textContent = sort.selectedOptions[0].textContent;
   }
 
+  function queueLibraryStateSave() {
+    clearTimeout(libraryStateTimer);
+    libraryStateTimer = setTimeout(function () {
+      libraryStateTimer = 0;
+      saveLibraryState();
+    }, 150);
+  }
+
   function saveLibraryState() {
+    clearTimeout(libraryStateTimer);
+    libraryStateTimer = 0;
+    performanceStats.stateWrites += 1;
     var state = {
       q: search && search.value || "",
       view: activeView,
@@ -205,6 +237,7 @@
   }
 
   function applyFilters() {
+    performanceStats.filterRuns += 1;
     var term = (search && search.value || "").trim().toLowerCase();
     var shown = 0;
     applySort();
@@ -221,7 +254,11 @@
       var termMatch = !term || (card.dataset.q + " " + (card.dataset.collectionNames || "")).indexOf(term) !== -1;
       var scopeMatch = !collectionScope || collectionScope(card.dataset.id);
       var visible = viewMatch && orgMatch && categoryMatch && termMatch && scopeMatch;
-      card.hidden = !visible;
+      var nextHidden = !visible;
+      if (card.hidden !== nextHidden) {
+        card.hidden = nextHidden;
+        performanceStats.cardVisibilityWrites += 1;
+      }
       if (visible) shown += 1;
     });
     if (empty) empty.hidden = shown !== 0;
@@ -230,7 +267,7 @@
     if (resetFilters) {
       resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");
     }
-    saveLibraryState();
+    queueLibraryStateSave();
     document.dispatchEvent(new CustomEvent("collections:filters-changed"));
   }
 
@@ -258,7 +295,7 @@
   });
 
   if (search) search.addEventListener("input", applyFilters);
-  if (sort) sort.addEventListener("change", applyFilters);
+  if (sort) sort.addEventListener("change", function () { sortDirty = true; applyFilters(); });
   if (orgFilter) orgFilter.addEventListener("change", function () {
     activeOrg = orgFilter.value;
     rebuildCategoryFilter(activeCategory);
@@ -792,6 +829,7 @@
           card.style.transform = "scale(.975)";
           setTimeout(function () {
             document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function(instance){instance.remove();});
+            sortDirty = true;
             applyFilters();
             document.dispatchEvent(new CustomEvent("artifact:updated",{detail:{id:card.dataset.id,deleted:true}}));
             toast("Artifact deleted");
@@ -1013,6 +1051,7 @@
     applyFilters: applyFilters,
     revealCardPreview: revealCardPreview,
     saveLibraryState: saveLibraryState,
+    getPerformanceStats: function () { return Object.assign({}, performanceStats); },
     clearFilters: function () {
       activeView = "all"; activeOrg = "all"; activeCategory = "all";
       if (search) search.value = "";

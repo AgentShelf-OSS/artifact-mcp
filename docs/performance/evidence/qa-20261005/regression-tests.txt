@@ -1,0 +1,26 @@
+[setup] throwaway org: pwtest-qa-20261005-641b4346
+
+Running 10 tests using 1 worker
+
+(node:3735741) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3735741) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   1 [node] › tests/15-web-performance.spec.mjs:3:1 › shared assets provide a strong validator and an empty conditional response (34ms)
+  ✓   2 [node] › tests/15-web-performance.spec.mjs:19:1 › search preserves sort and skips inactive collection cards (394ms)
+  ✓   3 [node] › tests/15-web-performance.spec.mjs:52:1 › Details fetches discussion status once on first open (526ms)
+  ✓   4 [node] › tests/15-web-performance.spec.mjs:76:1 › voice capability states control reader availability (215ms)
+  ✓   5 [node] › tests/15-web-performance.spec.mjs:97:1 › late shell script still paints existing anchors without a scroll event (175ms)
+(node:3735908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:3735908) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✓   6 [rust] › tests/15-web-performance.spec.mjs:3:1 › shared assets provide a strong validator and an empty conditional response (35ms)
+  ✓   7 [rust] › tests/15-web-performance.spec.mjs:19:1 › search preserves sort and skips inactive collection cards (449ms)
+  ✓   8 [rust] › tests/15-web-performance.spec.mjs:52:1 › Details fetches discussion status once on first open (538ms)
+  ✓   9 [rust] › tests/15-web-performance.spec.mjs:76:1 › voice capability states control reader availability (198ms)
+  ✓  10 [rust] › tests/15-web-performance.spec.mjs:97:1 › late shell script still paints existing anchors without a scroll event (142ms)
+[teardown] removed pwtest-qa-20261005-641b4346 and companion organizations (6 artifact(s)) on http://127.0.0.1:41633
+[teardown] removed pwtest-qa-20261005-641b4346 and companion organizations (6 artifact(s)) on http://127.0.0.1:38045
+
+  10 passed (5.2s)

@@ -26,6 +26,14 @@
   var ribbonPages = {};
   var savedPreferences = null;
   var preferenceVersion = 0;
+  var canonicalCardIndex = null;
+  var canonicalCardIndexKey = "";
+  var membershipNamesByArtifact = new Map();
+  var canonicalEnhancementSignatures = new WeakMap();
+  var membershipRevision = 0;
+  var lastCanonicalEnhancementRevision = -1;
+  var lastCanonicalEnhancementCount = -1;
+  var collectionPerformance = { renders: 0, canonicalIndexBuilds: 0, canonicalLookups: 0, canonicalEnhancements: 0, canonicalEnhancementWrites: 0, selectionWrites: 0 };
 
   function escapeHtml(value) {
     return String(value == null ? "" : value).replace(/[&<>"']/g, function (char) {
@@ -99,6 +107,15 @@
   function normalizeProjection(body) {
     var rows = Array.isArray(body.collections) ? body.collections : [];
     state.collections = rows.map(normalizeCollection);
+    membershipRevision += 1;
+    membershipNamesByArtifact = new Map();
+    state.collections.forEach(function (collection) {
+      collection.artifactIds.forEach(function (artifactId) {
+        var names = membershipNamesByArtifact.get(artifactId) || [];
+        names.push(collection.name);
+        membershipNamesByArtifact.set(artifactId, names);
+      });
+    });
     state.uncollectedCount = Number(body.uncollectedCount || 0);
     if(!saveTimer) { state.preferences = body.preferences || state.preferences || {}; savedPreferences=JSON.parse(JSON.stringify(state.preferences)); }
     state.org = body.org || state.org || defaultOrg || "all";
@@ -121,18 +138,35 @@
     state.collections.forEach(function (collection) { all = all.concat(collection.previewArtifacts || []); });
     return all.find(function (artifact) { return String(artifact.id) === wanted; }) || null;
   }
+  function canonicalCards() {
+    var grid = document.getElementById("artifact-grid");
+    var children = grid ? grid.children : [];
+    var library = window.ArtifactPortal && window.ArtifactPortal.getLibraryState ? window.ArtifactPortal.getLibraryState() : {};
+    var key = (library.sort || "recent") + ":" + children.length + ":" + (children[0] ? children[0].dataset.id : "") + ":" + (children[children.length - 1] ? children[children.length - 1].dataset.id : "");
+    if (canonicalCardIndex && canonicalCardIndexKey === key) return canonicalCardIndex;
+    canonicalCardIndexKey = key;
+    collectionPerformance.canonicalIndexBuilds += 1;
+    var cards = Array.prototype.slice.call(document.querySelectorAll("#artifact-grid .card"));
+    canonicalCardIndex = {
+      byId: new Map(cards.map(function (card) { return [card.dataset.id, card]; })),
+      order: new Map(cards.map(function (card, index) { return [card.dataset.id, index]; }))
+    };
+    return canonicalCardIndex;
+  }
   function collectionArtifacts(collection) {
     var previews = collection.previewArtifacts || [];
     var byId = new Map(previews.map(function (artifact) { return [String(artifact.id), artifact]; }));
-    var cardOrder = new Map(Array.from(document.querySelectorAll("#artifact-grid .card")).map(function (card,index) { return [card.dataset.id,index]; }));
+    var index = canonicalCards();
     return (collection.artifactIds || []).filter(function (id) {
-      var visible = document.querySelector('#artifact-grid .card[data-id="' + CSS.escape(String(id)) + '"]');
+      collectionPerformance.canonicalLookups += 1;
+      var visible = index.byId.get(String(id));
       return !visible || !visible.hidden;
     }).sort(function (a, b) {
-      return (cardOrder.get(a) || 0) - (cardOrder.get(b) || 0);
+      return (index.order.get(a) || 0) - (index.order.get(b) || 0);
     }).map(function (id) {
       var known = byId.get(String(id));
-      var canonical = document.querySelector('#artifact-grid .card[data-id="' + CSS.escape(String(id)) + '"]');
+      collectionPerformance.canonicalLookups += 1;
+      var canonical = index.byId.get(String(id));
       if (known) {
         if (canonical) return Object.assign({}, known, { title: (canonical.querySelector(".card-title") || {}).textContent || known.title, org: canonical.dataset.org || known.org, category: canonical.dataset.category || known.category, description: (canonical.querySelector(".desc") || {}).textContent || known.description, favorite: canonical.dataset.fav === "1", hidden: canonical.dataset.hidden === "1" });
         return known;
@@ -157,7 +191,7 @@
     return data;
   }
   function folderFieldMarkup(artifactId) {
-    var names = state.collections.filter(function (row) { return row.artifactIds.indexOf(artifactId) >= 0; }).map(function (row) { return row.name; });
+    var names = membershipNamesByArtifact.get(String(artifactId)) || [];
     var summary = names.length ? names.join(", ") : "Choose folders";
     return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span><span aria-hidden="true">⌄</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
   }
@@ -222,7 +256,7 @@
   }
   function cardMarkup(raw, compact) {
     var a = artifactData(raw);
-    var canonical = document.querySelector('#artifact-grid .card[data-id="' + CSS.escape(a.id) + '"]');
+    var canonical = canonicalCards().byId.get(a.id);
     if (canonical) {
       var clone = canonical.cloneNode(true);
       clone.hidden = false;
@@ -323,6 +357,7 @@
     }).join("") + '</div>';
   }
   function render() {
+    collectionPerformance.renders += 1;
     var shelf=surface.querySelector(".collection-grid"),shelfScroll=shelf?shelf.scrollLeft:0;
     var active=document.activeElement,focusSelector=null;
     if(surface.contains(active)){
@@ -332,7 +367,7 @@
     }
     var tabs = '<div class="collection-viewbar"><div class="collection-viewtabs" role="tablist" aria-label="Collection view"><button type="button" data-collection-view="reel" aria-pressed="' + (view === "reel") + '">Reel shelf</button><button type="button" data-collection-view="sheets" aria-pressed="' + (view === "sheets") + '">Contact sheets</button><button type="button" data-collection-view="ribbons" aria-pressed="' + (view === "ribbons") + '">Gallery ribbons</button></div><div class="collection-viewmeta"><span><strong>' + state.collections.length + '</strong> folders</span><span><strong>' + state.uncollectedCount + '</strong> uncollected</span><button class="collection-new" type="button" data-collection-create>' + icon("plus") + ' New folder</button></div></div><p class="collection-status" role="status" aria-live="polite"></p>';
     var selected=state.collections.find(function(row){return row.id===state.selected;});
-    var body=selected?'<div class="collection-folder-heading"><button type="button" data-collection-back>← Collections</button><div><h2>'+escapeHtml(selected.name)+'</h2><p>'+escapeHtml(selected.org)+' · '+collectionArtifacts(selected).length+' matching artifacts</p></div>'+(selected.editable?'<button type="button" data-collection-edit="'+escapeHtml(selected.id)+'">Edit folder</button>':'')+'</div>':view === "sheets" ? renderSheets() : view === "ribbons" ? renderRibbons() : renderReel();
+    var body=selected?'<div class="collection-folder-heading"><button type="button" data-collection-back>← Collections</button><div><h2>'+escapeHtml(selected.name)+'</h2><p>'+escapeHtml(selected.org)+' · '+collectionArtifacts(selected).length+' matching artifacts</p></div>'+(selected.editable?'<button type="button" data-collection-edit="'+escapeHtml(selected.id)+'">Edit folder</button>':'')+'</div>':view === "sheets" ? renderSheets() : view === "ribbons" ? renderRibbons() : view === "all" ? "" : renderReel();
     if(!selected && !state.collections.length && view !== "reel")body='<div class="collection-empty">No folders yet. Create a folder to give your artifacts another home.</div>';
     surface.innerHTML = tabs + body;
     surface.hidden = view === "all" && !selected;
@@ -349,9 +384,20 @@
     if(focusSelector){var target=surface.querySelector(focusSelector);if(target&&!target.disabled){suppressPreviewFocus=true;target.focus({preventScroll:true});suppressPreviewFocus=false;}}
   }
   function enhanceCanonicalCards() {
-    document.querySelectorAll("#artifact-grid .card").forEach(function (card) {
+    var grid = document.getElementById("artifact-grid");
+    if (!grid) return;
+    if (lastCanonicalEnhancementRevision === membershipRevision && lastCanonicalEnhancementCount === grid.children.length) return;
+    lastCanonicalEnhancementRevision = membershipRevision;
+    lastCanonicalEnhancementCount = grid.children.length;
+    Array.prototype.forEach.call(grid.children, function (card) {
+      collectionPerformance.canonicalEnhancements += 1;
+      var names = membershipNamesByArtifact.get(card.dataset.id) || [];
+      var signature = names.join("\u0001");
+      if (canonicalEnhancementSignatures.get(card) === signature) return;
+      canonicalEnhancementSignatures.set(card, signature);
       card.draggable = true; card.dataset.collectionArtifact = card.dataset.id;
-      card.dataset.collectionNames = state.collections.filter(function (row) { return row.artifactIds.indexOf(card.dataset.id) >= 0; }).map(function (row) { return row.name; }).join(" ").toLowerCase();
+      card.dataset.collectionNames = names.join(" ").toLowerCase();
+      collectionPerformance.canonicalEnhancementWrites += 2;
       if (!card.querySelector("[data-collection-select]")) {
         var checkbox = document.createElement("input"); checkbox.type = "checkbox"; checkbox.className = "collection-artifact-select"; checkbox.dataset.collectionSelect = card.dataset.id; checkbox.setAttribute("aria-label", "Select " + ((card.querySelector(".card-title") || {}).textContent || card.dataset.id)); var preview = card.querySelector(".preview"); if (preview) preview.prepend(checkbox);
       }
@@ -361,8 +407,11 @@
       }
       var folderTrigger = menu && menu.querySelector("[data-collection-folder-picker]");
       if (folderTrigger) {
-        var names = state.collections.filter(function (row) { return row.artifactIds.indexOf(card.dataset.id) >= 0; }).map(function (row) { return row.name; });
-        folderTrigger.firstElementChild.textContent = names.length ? names.join(", ") : "Choose folders";
+        var label = names.length ? names.join(", ") : "Choose folders";
+        if (folderTrigger.firstElementChild.textContent !== label) {
+          folderTrigger.firstElementChild.textContent = label;
+          collectionPerformance.canonicalEnhancementWrites += 1;
+        }
       }
     });
   }
@@ -370,7 +419,7 @@
     var node=document.getElementById("collection-selection");
     if(!node){node=document.createElement("div");node.id="collection-selection";node.className="collection-selection";node.setAttribute("aria-label","Selected artifacts");node.innerHTML='<span role="status"></span><button type="button" data-bulk-collect>Add to folders</button><button type="button" data-bulk-clear>Clear selection</button>';document.getElementById("library-controls")?.after(node);node.querySelector("[data-bulk-collect]").addEventListener("click",function(){folderPicker("collection:selection");});node.querySelector("[data-bulk-clear]").addEventListener("click",function(){selectedArtifacts.clear();updateSelection();});}
     node.hidden=selectedArtifacts.size===0;node.querySelector("span").textContent=selectedArtifacts.size+" selected";
-    document.querySelectorAll("[data-collection-select]").forEach(function(input){input.checked=selectedArtifacts.has(input.dataset.collectionSelect);});
+    document.querySelectorAll("[data-collection-select]").forEach(function(input){var checked=selectedArtifacts.has(input.dataset.collectionSelect);if(input.checked!==checked){input.checked=checked;collectionPerformance.selectionWrites+=1;}});
   }
   function placeReel() {
     var reel=surface.querySelector(".collection-reel:not([hidden])"),anchor=surface.querySelector(".collection-shelf-nav");
@@ -646,6 +695,7 @@
   window.ArtifactCollections = Object.freeze({
     refresh: refresh,
     getState: function () { var library = window.ArtifactPortal && window.ArtifactPortal.getLibraryState ? window.ArtifactPortal.getLibraryState() : {}; return { preferences: state.preferences, selected: state.selected, org: state.org, view: view, status: collectionStatus === "uncollected" ? "uncollected" : library.status || "all", query: library.q || "", category: library.category || "all", sort: library.sort || "recent", collections: state.collections.slice(), uncollectedCount: state.uncollectedCount }; },
+    getPerformanceStats: function () { return Object.assign({}, collectionPerformance); },
     setView: function (next) { if (["reel", "sheets", "ribbons", "all"].indexOf(next) < 0) return; view = next; var url = new URL(location.href); url.searchParams.set("libraryView",next); history.replaceState(history.state,"",url); savePreferences({ view: next }); reelId=null; reelPinned=false; render(); },
     setStatus: function (next) {
       collectionStatus=next;

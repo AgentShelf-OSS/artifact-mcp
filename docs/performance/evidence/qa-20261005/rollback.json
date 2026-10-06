@@ -1,0 +1,84 @@
+{
+  "candidatePage": {
+    "status": 200,
+    "bytes": 9387,
+    "extracted": [
+      "/assets/portal.css.c74213d9f5c0cbf7",
+      "/assets/collections.css.8fe0aad3461ab62b",
+      "/assets/collection-toolbar.css.5798b29f0c8a5baa",
+      "/assets/portal.js.0c51688b6a64002c",
+      "/assets/collection-toolbar.js.9bdcde5a8cd871a2",
+      "/assets/collections.js.550b4905dea898d9",
+      "/assets/shell.js.9383710af80f4d67",
+      "/assets/shell.css.5628c61425c87940",
+      "/assets/actions.js.e8bfcd146cefe576",
+      "/assets/cast.js.0951db97158a9881"
+    ]
+  },
+  "productionBinary": {
+    "path": "/tmp/artifact-web-perf-20261005-b0hjaznt/production-artifact-mcp",
+    "requests": [
+      {
+        "url": "/assets/portal.css.c74213d9f5c0cbf7",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/collections.css.8fe0aad3461ab62b",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/collection-toolbar.css.5798b29f0c8a5baa",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/portal.js.0c51688b6a64002c",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/collection-toolbar.js.9bdcde5a8cd871a2",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/collections.js.550b4905dea898d9",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/shell.js.9383710af80f4d67",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/shell.css.5628c61425c87940",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/actions.js.e8bfcd146cefe576",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      },
+      {
+        "url": "/assets/cast.js.0951db97158a9881",
+        "status": 404,
+        "bytes": 0,
+        "contentType": null
+      }
+    ]
+  },
+  "interpretation": "pending candidate versioned URLs are not served by copied production binary"
+}

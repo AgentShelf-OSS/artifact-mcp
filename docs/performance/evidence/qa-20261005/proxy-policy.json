@@ -1,0 +1,77 @@
+{
+  "honorsNoTransform": true,
+  "assets": {
+    "portal.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 44969,
+      "warmBytes": 44969,
+      "originHits": 1
+    },
+    "portal.css": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 50496,
+      "warmBytes": 50496,
+      "originHits": 2
+    },
+    "collections.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 69508,
+      "warmBytes": 69508,
+      "originHits": 3
+    },
+    "collections.css": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 28187,
+      "warmBytes": 28187,
+      "originHits": 4
+    },
+    "collection-toolbar.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 9250,
+      "warmBytes": 9250,
+      "originHits": 5
+    },
+    "collection-toolbar.css": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 7812,
+      "warmBytes": 7812,
+      "originHits": 6
+    },
+    "shell.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 153385,
+      "warmBytes": 153385,
+      "originHits": 7
+    },
+    "shell.css": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 44039,
+      "warmBytes": 44039,
+      "originHits": 8
+    },
+    "actions.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 2335,
+      "warmBytes": 2335,
+      "originHits": 9
+    },
+    "cast.js": {
+      "coldEncoding": null,
+      "warmEncoding": null,
+      "coldBytes": 29413,
+      "warmBytes": 29413,
+      "originHits": 10
+    }
+  },
+  "originHits": 10,
+  "note": "local emulation only; origin no-transform prevents Brotli/gzip"
+}

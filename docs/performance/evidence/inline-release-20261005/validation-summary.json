@@ -1,0 +1,54 @@
+{
+  "application_source": "cb53977",
+  "rebased_identical_application_source": "e2edc8f",
+  "base_production_source": "d9d10401b8c777a72e5fd4e57a294f2877ba6d6d",
+  "local_application_binary_sha256": "17ee0f4247af88834655aeb28f16ac538dbf4b2937c284ebc1f7942588daffe1",
+  "prepared_release": "v1.12.1",
+  "local_release_binary_sha256": "bdcfa7a6d600b28ebbf4bf13104e338f95c196e3aacca4db8729b75d7028c1cf",
+  "node_checks": {
+    "passed": 522,
+    "failed": 0
+  },
+  "rust_checks": {
+    "passed": 920,
+    "failed": 0
+  },
+  "chromium_checks": {
+    "passed": 218,
+    "expected_node_discussion_skips": 2,
+    "failed": 0
+  },
+  "reader_checks": {
+    "passed": 14,
+    "skipped": 0,
+    "failed": 0
+  },
+  "comment_position_checks": {
+    "passed": 60,
+    "allowed_error_css_pixels": 2
+  },
+  "firefox_webkit_cases": {
+    "passed": 8,
+    "failed": 0
+  },
+  "release_metadata_checks": {
+    "node_mcp_contract_passed": 45,
+    "node_conformance_passed": 42,
+    "rust_conformance_passed": 42,
+    "native_release_build": "passed",
+    "ci_yaml": "passed"
+  },
+  "production_modified": false,
+  "external_application_asset_delivery": "excluded",
+  "public_release_provenance": "not yet produced",
+  "isolated_backup_rollback": {
+    "result": "passed",
+    "candidate_version": "1.12.1",
+    "rollback_version": "1.12.0",
+    "schema": 38,
+    "health_gallery_viewer_raw_collection_reads": "passed",
+    "body_revision_folder_file_fingerprints": "unchanged",
+    "temporary_processes_and_plaintext": "removed",
+    "external_integrations": "not exercised"
+  }
+}

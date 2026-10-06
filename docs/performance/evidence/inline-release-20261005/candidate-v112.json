@@ -1,0 +1,1915 @@
+{
+  "label": "candidate-v112",
+  "runtime": "rust",
+  "browser": "146.0.7680.71",
+  "cpuThrottle": 4,
+  "network": null,
+  "styleExperiment": null,
+  "repeats": 2,
+  "synthetic": true,
+  "gallery": [
+    {
+      "count": 1000,
+      "view": "all",
+      "warm": false,
+      "readyMs": 7807.583312000001,
+      "htmlBytes": 5400071,
+      "samples": [
+        {
+          "query": "Alpha",
+          "synchronousMs": 28.800000071525574,
+          "paintMs": 579.9000000953674
+        },
+        {
+          "query": "Beta",
+          "synchronousMs": 21.59999990463257,
+          "paintMs": 1247.8999999761581
+        },
+        {
+          "query": "Gamma",
+          "synchronousMs": 28.199999928474426,
+          "paintMs": 1325.1000000238419
+        },
+        {
+          "query": "Alpha 000",
+          "synchronousMs": 19.300000071525574,
+          "paintMs": 476.3000000715256
+        },
+        {
+          "query": "",
+          "synchronousMs": 17.800000071525574,
+          "paintMs": 3065.100000023842
+        }
+      ],
+      "moves": 0,
+      "appends": 0,
+      "portal": {
+        "filterRuns": 7,
+        "sortRuns": 1,
+        "cardVisibilityWrites": 3332,
+        "sortReorders": 0,
+        "stateWrites": 6
+      },
+      "collections": {
+        "renders": 7,
+        "canonicalIndexBuilds": 0,
+        "canonicalLookups": 0,
+        "canonicalEnhancements": 1000,
+        "canonicalEnhancementWrites": 2000,
+        "selectionWrites": 0
+      },
+      "canonicalCards": 1000,
+      "totalCards": 1000,
+      "domNodes": 84211,
+      "longTasks": [
+        {
+          "start": 7839.899999976158,
+          "duration": 519
+        },
+        {
+          "start": 8389,
+          "duration": 1002
+        },
+        {
+          "start": 9423.099999904633,
+          "duration": 119
+        },
+        {
+          "start": 9542.899999976158,
+          "duration": 54
+        },
+        {
+          "start": 9636.299999952316,
+          "duration": 1085
+        },
+        {
+          "start": 10759,
+          "duration": 119
+        },
+        {
+          "start": 10962.299999952316,
+          "duration": 312
+        },
+        {
+          "start": 11322.899999976158,
+          "duration": 55
+        },
+        {
+          "start": 11438.399999976158,
+          "duration": 2709
+        }
+      ],
+      "layoutShifts": [
+        {
+          "start": 4945,
+          "value": 0.024439934875739453
+        },
+        {
+          "start": 7446.399999976158,
+          "value": 0.03157227667663323
+        },
+        {
+          "start": 8301.199999928474,
+          "value": 0.6675416666666667
+        },
+        {
+          "start": 11235.399999976158,
+          "value": 5.52905675315072e-06
+        },
+        {
+          "start": 13988.199999928474,
+          "value": 0.6675416666666667
+        }
+      ],
+      "resources": [
+        {
+          "path": "/thumbnails/2mgr11rd7jtf",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 37
+        },
+        {
+          "path": "/thumbnails/perf00000999",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 36.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000998",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 37.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000997",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 37.5
+        },
+        {
+          "path": "/thumbnails/perf00000996",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 37.700000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000995",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 34.89999997615814
+        },
+        {
+          "path": "/thumbnails/perf00000994",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 45
+        },
+        {
+          "path": "/thumbnails/perf00000993",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 45
+        },
+        {
+          "path": "/thumbnails/perf00000992",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 44.5
+        },
+        {
+          "path": "/thumbnails/perf00000991",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 43.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000990",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 44
+        },
+        {
+          "path": "/thumbnails/perf00000989",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 42.60000002384186
+        },
+        {
+          "path": "/collections",
+          "transferSize": 26264,
+          "encodedBodySize": 25964,
+          "decodedBodySize": 25964,
+          "duration": 12.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000988",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.5
+        },
+        {
+          "path": "/thumbnails/perf00000987",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.1999999284744263
+        },
+        {
+          "path": "/thumbnails/perf00000986",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3
+        },
+        {
+          "path": "/thumbnails/perf00000984",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.300000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000981",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000978",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.6999999284744263
+        },
+        {
+          "path": "/thumbnails/perf00000975",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000972",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000969",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000966",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7
+        },
+        {
+          "path": "/thumbnails/perf00000985",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000982",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000979",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000976",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7
+        },
+        {
+          "path": "/thumbnails/perf00000970",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.400000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000973",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.900000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000964",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000967",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000983",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000980",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.099999904632568
+        },
+        {
+          "path": "/thumbnails/perf00000977",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.900000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000974",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000971",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000968",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7
+        },
+        {
+          "path": "/thumbnails/perf00000965",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.399999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000099",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000096",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000093",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000090",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.899999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000087",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.900000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000084",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7
+        },
+        {
+          "path": "/thumbnails/perf00000081",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 11.300000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000078",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 11.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000075",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 10.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000072",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 10.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000069",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 10.399999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000066",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.700000047683716
+        }
+      ],
+      "navigation": [
+        {
+          "ttfb": 48.699999928474426,
+          "domContentLoaded": 5179.5,
+          "transferSize": 5400371,
+          "encodedBodySize": 5400071,
+          "decodedBodySize": 5400071
+        }
+      ],
+      "run": 0
+    },
+    {
+      "count": 1000,
+      "view": "all",
+      "warm": true,
+      "readyMs": 6663.537546,
+      "htmlBytes": 5400071,
+      "samples": [
+        {
+          "query": "Alpha",
+          "synchronousMs": 20.90000009536743,
+          "paintMs": 590.6000000238419
+        },
+        {
+          "query": "Beta",
+          "synchronousMs": 30.899999976158142,
+          "paintMs": 1091.8000000715256
+        },
+        {
+          "query": "Gamma",
+          "synchronousMs": 19.700000047683716,
+          "paintMs": 1043.2000000476837
+        },
+        {
+          "query": "Alpha 000",
+          "synchronousMs": 16.5,
+          "paintMs": 410.89999997615814
+        },
+        {
+          "query": "",
+          "synchronousMs": 16.800000071525574,
+          "paintMs": 2445.7000000476837
+        }
+      ],
+      "moves": 0,
+      "appends": 0,
+      "portal": {
+        "filterRuns": 7,
+        "sortRuns": 1,
+        "cardVisibilityWrites": 3332,
+        "sortReorders": 0,
+        "stateWrites": 6
+      },
+      "collections": {
+        "renders": 7,
+        "canonicalIndexBuilds": 0,
+        "canonicalLookups": 0,
+        "canonicalEnhancements": 1000,
+        "canonicalEnhancementWrites": 2000,
+        "selectionWrites": 0
+      },
+      "canonicalCards": 1000,
+      "totalCards": 1000,
+      "domNodes": 84211,
+      "longTasks": [
+        {
+          "start": 6690.699999928474,
+          "duration": 494
+        },
+        {
+          "start": 7200.600000023842,
+          "duration": 58
+        },
+        {
+          "start": 7258.799999952316,
+          "duration": 900
+        },
+        {
+          "start": 8171.100000023842,
+          "duration": 99
+        },
+        {
+          "start": 8351.299999952316,
+          "duration": 869
+        },
+        {
+          "start": 9241.899999976158,
+          "duration": 102
+        },
+        {
+          "start": 9393.699999928474,
+          "duration": 264
+        },
+        {
+          "start": 9696.399999976158,
+          "duration": 51
+        },
+        {
+          "start": 9805.199999928474,
+          "duration": 2153
+        }
+      ],
+      "layoutShifts": [
+        {
+          "start": 4226.799999952316,
+          "value": 0.024439934875739453
+        },
+        {
+          "start": 6434.600000023842,
+          "value": 0.03157227667663323
+        },
+        {
+          "start": 7121.899999976158,
+          "value": 0.6675416666666667
+        },
+        {
+          "start": 9627.899999976158,
+          "value": 5.52905675315072e-06
+        },
+        {
+          "start": 11816.600000023842,
+          "value": 0.6675416666666667
+        }
+      ],
+      "resources": [
+        {
+          "path": "/thumbnails/2mgr11rd7jtf",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000999",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000998",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000997",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000996",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000995",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000994",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000993",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000992",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000991",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000990",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000989",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000988",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000987",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000986",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000985",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000984",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000983",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000982",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000981",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000980",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000979",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000978",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000977",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000976",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000975",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000974",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000973",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000972",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000971",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000970",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000969",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000968",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000967",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000966",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000965",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000964",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000099",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000096",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000093",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000090",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000087",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000084",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000081",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000078",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000075",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000072",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000069",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000066",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/collections",
+          "transferSize": 300,
+          "encodedBodySize": 25964,
+          "decodedBodySize": 25964,
+          "duration": 13.399999976158142
+        }
+      ],
+      "navigation": [
+        {
+          "ttfb": 29.600000023841858,
+          "domContentLoaded": 3641.399999976158,
+          "transferSize": 5400371,
+          "encodedBodySize": 5400071,
+          "decodedBodySize": 5400071
+        }
+      ],
+      "run": 0
+    },
+    {
+      "count": 1000,
+      "view": "all",
+      "warm": false,
+      "readyMs": 6836.045973999997,
+      "htmlBytes": 5400071,
+      "samples": [
+        {
+          "query": "Alpha",
+          "synchronousMs": 21.199999928474426,
+          "paintMs": 503.6999999284744
+        },
+        {
+          "query": "Beta",
+          "synchronousMs": 20.300000071525574,
+          "paintMs": 1209.2000000476837
+        },
+        {
+          "query": "Gamma",
+          "synchronousMs": 23.600000023841858,
+          "paintMs": 1200.3999999761581
+        },
+        {
+          "query": "Alpha 000",
+          "synchronousMs": 20.899999976158142,
+          "paintMs": 426.60000002384186
+        },
+        {
+          "query": "",
+          "synchronousMs": 15.899999976158142,
+          "paintMs": 2981.5999999046326
+        }
+      ],
+      "moves": 0,
+      "appends": 0,
+      "portal": {
+        "filterRuns": 7,
+        "sortRuns": 1,
+        "cardVisibilityWrites": 3332,
+        "sortReorders": 0,
+        "stateWrites": 6
+      },
+      "collections": {
+        "renders": 7,
+        "canonicalIndexBuilds": 0,
+        "canonicalLookups": 0,
+        "canonicalEnhancements": 1000,
+        "canonicalEnhancementWrites": 2000,
+        "selectionWrites": 0
+      },
+      "canonicalCards": 1000,
+      "totalCards": 1000,
+      "domNodes": 84211,
+      "longTasks": [
+        {
+          "start": 6860,
+          "duration": 455
+        },
+        {
+          "start": 7340.100000023842,
+          "duration": 985
+        },
+        {
+          "start": 8353.200000047684,
+          "duration": 116
+        },
+        {
+          "start": 8549.399999976158,
+          "duration": 985
+        },
+        {
+          "start": 9560.399999976158,
+          "duration": 104
+        },
+        {
+          "start": 9749.700000047684,
+          "duration": 275
+        },
+        {
+          "start": 10066.899999976158,
+          "duration": 56
+        },
+        {
+          "start": 10176.700000047684,
+          "duration": 2685
+        }
+      ],
+      "layoutShifts": [
+        {
+          "start": 4188.600000023842,
+          "value": 0.024439934875739453
+        },
+        {
+          "start": 6451.200000047684,
+          "value": 0.03157227667663323
+        },
+        {
+          "start": 7258.700000047684,
+          "value": 0.6675416666666667
+        },
+        {
+          "start": 9996,
+          "value": 5.52905675315072e-06
+        },
+        {
+          "start": 12729.5,
+          "value": 0.6675416666666667
+        }
+      ],
+      "resources": [
+        {
+          "path": "/thumbnails/2mgr11rd7jtf",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.5
+        },
+        {
+          "path": "/thumbnails/perf00000999",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000998",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.400000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000996",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000995",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000997",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7.899999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000994",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 8.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000993",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 8.5
+        },
+        {
+          "path": "/thumbnails/perf00000992",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 10.099999904632568
+        },
+        {
+          "path": "/thumbnails/perf00000991",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 10.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000990",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 11.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000989",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 11.600000023841858
+        },
+        {
+          "path": "/collections",
+          "transferSize": 26264,
+          "encodedBodySize": 25964,
+          "decodedBodySize": 25964,
+          "duration": 11.800000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000988",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 1.899999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000987",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 2.8000000715255737
+        },
+        {
+          "path": "/thumbnails/perf00000986",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 2.8000000715255737
+        },
+        {
+          "path": "/thumbnails/perf00000984",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6
+        },
+        {
+          "path": "/thumbnails/perf00000981",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6
+        },
+        {
+          "path": "/thumbnails/perf00000978",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.5
+        },
+        {
+          "path": "/thumbnails/perf00000975",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000972",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000969",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6
+        },
+        {
+          "path": "/thumbnails/perf00000966",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7
+        },
+        {
+          "path": "/thumbnails/perf00000985",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000982",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000976",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.300000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000979",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6
+        },
+        {
+          "path": "/thumbnails/perf00000973",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.399999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000970",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000967",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000964",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 7.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000983",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 5.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000980",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000977",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000974",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 4.399999976158142
+        },
+        {
+          "path": "/thumbnails/perf00000971",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6
+        },
+        {
+          "path": "/thumbnails/perf00000968",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000965",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.600000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000096",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.3000000715255737
+        },
+        {
+          "path": "/thumbnails/perf00000099",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 3.5
+        },
+        {
+          "path": "/thumbnails/perf00000093",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.800000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000090",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.800000071525574
+        },
+        {
+          "path": "/thumbnails/perf00000087",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.100000023841858
+        },
+        {
+          "path": "/thumbnails/perf00000084",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 6.199999928474426
+        },
+        {
+          "path": "/thumbnails/perf00000081",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.900000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000078",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.200000047683716
+        },
+        {
+          "path": "/thumbnails/perf00000075",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 8.799999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000072",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9.400000095367432
+        },
+        {
+          "path": "/thumbnails/perf00000069",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 8.299999952316284
+        },
+        {
+          "path": "/thumbnails/perf00000066",
+          "transferSize": 367,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 9
+        }
+      ],
+      "navigation": [
+        {
+          "ttfb": 26.299999952316284,
+          "domContentLoaded": 4394.399999976158,
+          "transferSize": 5400371,
+          "encodedBodySize": 5400071,
+          "decodedBodySize": 5400071
+        }
+      ],
+      "run": 1
+    },
+    {
+      "count": 1000,
+      "view": "all",
+      "warm": true,
+      "readyMs": 6393.409437000002,
+      "htmlBytes": 5400071,
+      "samples": [
+        {
+          "query": "Alpha",
+          "synchronousMs": 24.5,
+          "paintMs": 555.1000000238419
+        },
+        {
+          "query": "Beta",
+          "synchronousMs": 19,
+          "paintMs": 1280
+        },
+        {
+          "query": "Gamma",
+          "synchronousMs": 24.59999990463257,
+          "paintMs": 1118.3999999761581
+        },
+        {
+          "query": "Alpha 000",
+          "synchronousMs": 24.800000071525574,
+          "paintMs": 483.5
+        },
+        {
+          "query": "",
+          "synchronousMs": 16.5,
+          "paintMs": 2347.100000023842
+        }
+      ],
+      "moves": 0,
+      "appends": 0,
+      "portal": {
+        "filterRuns": 7,
+        "sortRuns": 1,
+        "cardVisibilityWrites": 3332,
+        "sortReorders": 0,
+        "stateWrites": 6
+      },
+      "collections": {
+        "renders": 7,
+        "canonicalIndexBuilds": 0,
+        "canonicalLookups": 0,
+        "canonicalEnhancements": 1000,
+        "canonicalEnhancementWrites": 2000,
+        "selectionWrites": 0
+      },
+      "canonicalCards": 1000,
+      "totalCards": 1000,
+      "domNodes": 84211,
+      "longTasks": [
+        {
+          "start": 6427.100000023842,
+          "duration": 517
+        },
+        {
+          "start": 6955.899999976158,
+          "duration": 1068
+        },
+        {
+          "start": 8039.300000071526,
+          "duration": 136
+        },
+        {
+          "start": 8235.800000071526,
+          "duration": 906
+        },
+        {
+          "start": 9165.800000071526,
+          "duration": 118
+        },
+        {
+          "start": 9354.100000023842,
+          "duration": 327
+        },
+        {
+          "start": 9722.800000071526,
+          "duration": 56
+        },
+        {
+          "start": 9837.800000071526,
+          "duration": 2048
+        }
+      ],
+      "layoutShifts": [
+        {
+          "start": 4109.800000071526,
+          "value": 0.024439934875739453
+        },
+        {
+          "start": 6179.800000071526,
+          "value": 0.03157227667663323
+        },
+        {
+          "start": 6885.600000023842,
+          "value": 0.6675416666666667
+        },
+        {
+          "start": 9652.600000023842,
+          "value": 5.52905675315072e-06
+        },
+        {
+          "start": 11743.100000023842,
+          "value": 0.6675416666666667
+        }
+      ],
+      "resources": [
+        {
+          "path": "/thumbnails/2mgr11rd7jtf",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000999",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000998",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000997",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000996",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000995",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000994",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000993",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000992",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000991",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000990",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000989",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000988",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000987",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000986",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000985",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000984",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000983",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000982",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000981",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000980",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000979",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000978",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000977",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000976",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000975",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000974",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000973",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000972",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000971",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000970",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000969",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000968",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000967",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000966",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000965",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000964",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000099",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000096",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000093",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000090",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000087",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000084",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000081",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000078",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000075",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000072",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000069",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/thumbnails/perf00000066",
+          "transferSize": 0,
+          "encodedBodySize": 67,
+          "decodedBodySize": 67,
+          "duration": 0
+        },
+        {
+          "path": "/collections",
+          "transferSize": 300,
+          "encodedBodySize": 25964,
+          "decodedBodySize": 25964,
+          "duration": 13.699999928474426
+        }
+      ],
+      "navigation": [
+        {
+          "ttfb": 28.200000047683716,
+          "domContentLoaded": 3410.3000000715256,
+          "transferSize": 5400371,
+          "encodedBodySize": 5400071,
+          "decodedBodySize": 5400071
+        }
+      ],
+      "run": 1
+    }
+  ],
+  "viewer": [],
+  "source_revision": "cb53977",
+  "binary_sha256": "17ee0f4247af88834655aeb28f16ac538dbf4b2937c284ebc1f7942588daffe1",
+  "measurement_limitations": [
+    "Two repetitions, local synthetic content, browser CPU throttled 4x, no simulated network.",
+    "The moves/appends hook sees direct grid card appends only and misses document-fragment reordering. Do not use those counters to compare DOM moves."
+  ]
+}
