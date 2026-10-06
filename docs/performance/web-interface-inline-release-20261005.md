@@ -132,6 +132,22 @@ checks do not claim a complete restored application boot or an offsite upload. T
 v1.12.0 binary is the rollback target, and production must be checked again before installation.
 The backup must be refreshed if it exceeds the private deployment procedure's freshness limit.
 
+The same-schema rollback check also passed. The encrypted backup was restored to protected
+temporary memory storage. The exact local v1.12.1 binary started first, then the verified v1.12.0
+binary started against the same copy. Both returned successful health, gallery, viewer, raw
+artifact, and collection responses at schema 38. Artifact, revision, key registry, binding,
+source, folder, membership, preference, and artifact-file fingerprints stayed unchanged.
+Viewer reads can update view counters, which are outside these body and revision comparisons.
+
+Both processes used a private network and process namespace with only loopback connectivity.
+The copied signed audit history required its original verification key. The authorized secrets
+manager supplied that one key to the private runner, with no key values in commands, logs, or
+files. A synthetic webhook encryption key was sufficient for these reads. This check does not
+verify encrypted integration connections or external workers. The restored copy did not exercise
+service-principal folder ownership; separate synthetic MCP and conformance checks cover that
+behavior. All test processes, plaintext restore files, logs, and the temporary mount were removed.
+Production was not changed.
+
 The earlier [five-change experiment](web-interface-20261005.md) and
 [asset rollback QA](web-interface-qa-20261005.md) describe a different candidate based on v1.11.2.
 Their shared asset caching and content-visibility measurements do not describe this release.

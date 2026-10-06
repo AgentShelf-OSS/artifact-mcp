@@ -40,5 +40,15 @@
   },
   "production_modified": false,
   "external_application_asset_delivery": "excluded",
-  "public_release_provenance": "not yet produced"
+  "public_release_provenance": "not yet produced",
+  "isolated_backup_rollback": {
+    "result": "passed",
+    "candidate_version": "1.12.1",
+    "rollback_version": "1.12.0",
+    "schema": 38,
+    "health_gallery_viewer_raw_collection_reads": "passed",
+    "body_revision_folder_file_fingerprints": "unchanged",
+    "temporary_processes_and_plaintext": "removed",
+    "external_integrations": "not exercised"
+  }
 }
