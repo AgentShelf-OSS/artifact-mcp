@@ -9,7 +9,7 @@ const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url),
 const meta = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 3, bytes: 1, category: "" };
 const nav = { prevId: null, nextId: null, index: 1, total: 1 };
 
-function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}) } = {}) {
+function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false } = {}) {
   const created = [];
   function element(tagName = "div") {
     const listeners = new Map();
@@ -103,11 +103,11 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     addEventListener(type, listener) { documentListeners.set(type, listener); }
   };
   const window = {
-    location: { search: "" },
+    location: { search: "", origin },
     __artifactMcpTestHooks: {},
     addEventListener(type, listener) { windowListeners.set(type, listener); },
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
-    open(href, target, features) { opens.push({ href, target, features, userActivation }); }
+    open(href, target, features) { opens.push({ href, target, features, userActivation }); return popupBlocked ? null : {}; }
   };
   const html = renderArtifactShell(meta, nav, {}, []);
   const script = scriptOverride || SHELL_ASSET;
@@ -483,6 +483,36 @@ test("shell brokers an iframe outbound link only after an explicit confirm click
     features: "noopener",
     userActivation: true
   }]);
+});
+
+test("shell opens same-origin artifact links directly without the external-link confirmation", () => {
+  const shell = shellBrokerHarness();
+
+  shell.message({ type: "anchor:navigate", href: "https://artifacts.example.test/c4byka0s4fey" });
+  assert.equal(shell.created.some((node) => node.tagName === "ASIDE"), false, "no confirmation for a sibling artifact");
+  assert.deepEqual(shell.opens, [{
+    href: "https://artifacts.example.test/c4byka0s4fey",
+    target: "_blank",
+    features: undefined,
+    userActivation: false
+  }]);
+});
+
+test("shell falls back to the confirmation when a same-origin popup is blocked", () => {
+  const shell = shellBrokerHarness(null, { popupBlocked: true });
+
+  shell.message({ type: "anchor:navigate", href: "https://artifacts.example.test/c4byka0s4fey" });
+  assert.equal(shell.created.find((node) => node.tagName === "STRONG")?.textContent, "artifacts.example.test");
+  shell.confirm();
+  assert.equal(shell.opens.at(-1).features, "noopener");
+});
+
+test("shell still confirms links to a different origin on the same site", () => {
+  const shell = shellBrokerHarness();
+
+  shell.message({ type: "anchor:navigate", href: "http://artifacts.example.test/c4byka0s4fey" });
+  shell.message({ type: "anchor:navigate", href: "https://artifacts.example.test:8443/c4byka0s4fey" });
+  assert.deepEqual(shell.opens, []);
 });
 
 test("shell rejects non-http(s) outbound hrefs before rendering a confirmation", () => {
