@@ -70,6 +70,10 @@
           "path": "/api/runs/aggregate/daily",
           "timeout_ms": 30000
         },
+        "attention": {
+          "path": "/api/attention",
+          "timeout_ms": 30000
+        },
         "analytics": {
           "path": "/api/analytics",
           "params": {
