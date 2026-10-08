@@ -13,7 +13,9 @@ use artifact_mcp::{
     },
     ports::PageRenderer,
     render::{
-        portal::{AskamaPageRenderer, js_literal},
+        portal::{
+            AskamaPageRenderer, artifact_install_name, artifact_install_short_name, js_literal,
+        },
         view_models::{
             ArtifactNavigation, GalleryView, SettingsOrganization, SettingsView, ShellView,
         },
@@ -193,6 +195,37 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
     assert!(html.contains("markNotificationsSeen"));
     assert!(html.contains("<option value=\"Runbooks\">Runbooks (0)</option>"));
     assert!(html.contains("<option value=\"Reports\" selected>Reports</option>"));
+    // The library installs as the general app.
+    assert!(html.contains(
+        "<link rel=\"manifest\" href=\"/manifest.webmanifest\" crossorigin=\"use-credentials\">"
+    ));
+    assert!(html.contains("<meta name=\"apple-mobile-web-app-title\" content=\"Artifacts\">"));
+}
+
+#[test]
+fn artifact_install_names_match_the_node_rules() {
+    assert_eq!(artifact_install_name("  Plain title  "), "Plain title");
+    assert_eq!(
+        artifact_install_name("\u{0}Tab\tand\u{9f}C1\u{7f}"),
+        "TabandC1"
+    );
+    assert_eq!(artifact_install_name(&"x".repeat(80)), "x".repeat(60));
+    assert_eq!(artifact_install_name(" \u{1}\n\u{3000} "), "Artifact");
+    assert_eq!(
+        artifact_install_short_name("Quarterly planning board"),
+        "Quarterly pl"
+    );
+    assert_eq!(
+        artifact_install_short_name("Daily  standup"),
+        "Daily  stand"
+    );
+    assert_eq!(artifact_install_short_name("Weekly notes"), "Weekly notes");
+    assert_eq!(artifact_install_short_name("Ten chars   tail"), "Ten chars");
+    assert_eq!(
+        artifact_install_short_name(&"\u{1F600}".repeat(20)),
+        "\u{1F600}".repeat(12)
+    );
+    assert_eq!(artifact_install_short_name(""), "Artifact");
 }
 
 #[test]
@@ -351,6 +384,14 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
     );
     let html = renderer.shell(&view).expect("render viewer shell");
     assert!(html.contains("data-cast-enabled=\"1\""));
+    // Installing from the viewer page installs this artifact, named after its escaped title.
+    assert!(html.contains(
+        "<link rel=\"manifest\" href=\"/artifact1234/manifest.webmanifest\" crossorigin=\"use-credentials\">"
+    ));
+    assert!(!html.contains("href=\"/manifest.webmanifest\""));
+    assert!(html.contains(
+        "<meta name=\"apple-mobile-web-app-title\" content=\"&#60;/script&#62;&#34;&#39;&#38;&#60;&#62;\u{2028}\u{2029}🎉\">"
+    ));
     assert!(html.contains(
         "/raw/artifact1234?anchor=1&#38;reader=1&#38;cast-pin=3.deadbeefcafebabe000000000000000000000000000000000000000000000000"
     ));

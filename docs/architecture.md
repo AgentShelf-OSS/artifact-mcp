@@ -54,6 +54,7 @@ The server separates three access paths:
 | `GET /:id/push`, `PUT`/`DELETE /:id/push/optin` | Per-artifact notification opt-in. |
 | `GET /:id/reminders`, `PUT`/`DELETE /:id/reminders/:key` | Named scheduled reminders in `org` or `viewer` scope. |
 | `GET /sw.js`, `GET /manifest.webmanifest`, `GET /icons/:name` | Static service worker, Home Screen manifest, and app icons. They contain no private data. |
+| `GET /:id/manifest.webmanifest` | Per-artifact install manifest (opens `/:id`, named after the title). Same access as the viewer page. |
 | `GET /settings` and `/settings/*` | Administrator management for organizations, members, categories, webhooks, publisher keys, and live-data connections. |
 
 Bundle path handling rejects traversal, absolute paths, and configured size or file-count overages.

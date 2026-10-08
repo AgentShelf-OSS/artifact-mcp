@@ -1,0 +1,94 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":54,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 54,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"background_color\":\"#0c1117\",\"description\":\"Private artifact library and viewer.\",\"display\":\"standalone\",\"icons\":[{\"purpose\":\"any\",\"sizes\":\"192x192\",\"src\":\"/icons/app-192.png\",\"type\":\"image/png\"},{\"purpose\":\"any\",\"sizes\":\"512x512\",\"src\":\"/icons/app-512.png\",\"type\":\"image/png\"},{\"purpose\":\"maskable\",\"sizes\":\"512x512\",\"src\":\"/icons/maskable-512.png\",\"type\":\"image/png\"}],\"id\":\"/${artifact_id_1}\",\"name\":\"Quarterly planning board for the acme team, with a long \\\"tit\",\"scope\":\"/${artifact_id_1}\",\"short_name\":\"Quarterly pl\",\"start_url\":\"/${artifact_id_1}\",\"theme_color\":\"#142235\"}"
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"background_color\":\"#0c1117\",\"description\":\"Private artifact library and viewer.\",\"display\":\"standalone\",\"icons\":[{\"purpose\":\"any\",\"sizes\":\"192x192\",\"src\":\"/icons/app-192.png\",\"type\":\"image/png\"},{\"purpose\":\"any\",\"sizes\":\"512x512\",\"src\":\"/icons/app-512.png\",\"type\":\"image/png\"},{\"purpose\":\"maskable\",\"sizes\":\"512x512\",\"src\":\"/icons/maskable-512.png\",\"type\":\"image/png\"}],\"id\":\"/${artifact_id_1}\",\"name\":\"Quarterly planning board for the acme team, with a long \\\"tit\",\"scope\":\"/${artifact_id_1}\",\"short_name\":\"Quarterly pl\",\"start_url\":\"/${artifact_id_1}\",\"theme_color\":\"#142235\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    },
+    {
+      "status": 404,
+      "headers": {
+        "mode": "exact-header",
+        "headers": {
+          "cache-control": "no-transform",
+          "content-type": "application/json; charset=utf-8",
+          "etag": "W/\"15-bm7tJgu8FHlq5QU+Y6gDxOGPfRc\""
+        }
+      },
+      "body": {
+        "mode": "exact-bytes",
+        "encoding": "utf8",
+        "data": "{\"error\":\"Not found\"}"
+      }
+    }
+  ],
+  "postState": {}
+}

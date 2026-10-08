@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { renderArtifactShell, renderGallery } from "../lib/portal.js";
+import { artifactInstallName, artifactInstallShortName, renderArtifactShell, renderGallery } from "../lib/portal.js";
 
 const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
 
@@ -675,7 +675,9 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
 
 test("viewer shell links the web app manifest and touch icon and renders a hidden bell and prompt region", () => {
   const html = renderArtifactShell(meta, nav, {}, [], {}, { email: "viewer@acme.test" }, null, true);
-  assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest" crossorigin="use-credentials">/);
+  assert.match(html, /<link rel="manifest" href="\/abc123\/manifest\.webmanifest" crossorigin="use-credentials">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Artifact">/);
+  assert.doesNotMatch(html, /href="\/manifest\.webmanifest"/);
   assert.match(html, /<link rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png">/);
   assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
   assert.match(html, /<meta name="mobile-web-app-capable" content="yes">/);
@@ -684,8 +686,38 @@ test("viewer shell links the web app manifest and touch icon and renders a hidde
   assert.match(html, /<button class="vpush-enable" id="vpush-enable" type="button">Turn on notifications<\/button>/);
   assert.match(html, /id="vpush-dismiss" type="button" aria-label="Dismiss notification prompt"/);
   const template = readFileSync(new URL("../templates/artifact-shell.html", import.meta.url), "utf8");
-  for (const fragment of ['<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">', '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', 'id="vpush-toggle"', 'id="vpush-banner"', 'id="vpush-reason"', 'id="vpush-enable"', 'id="vpush-dismiss"']) {
+  for (const fragment of ['<link rel="manifest" href="/{{ artifact_id }}/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="{{ install_name }}">', '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', 'id="vpush-toggle"', 'id="vpush-banner"', 'id="vpush-reason"', 'id="vpush-enable"', 'id="vpush-dismiss"']) {
     assert.ok(template.includes(fragment), `Rust template keeps parity: ${fragment}`);
+  }
+});
+
+test("viewer shell names the per-artifact install after the escaped, bounded title", () => {
+  const html = renderArtifactShell({ ...meta, title: ' \u0007Q3 <"Board"> & Rock\'n roll plan with a title that runs well past the sixty code point limit ' }, nav, {}, [], {}, { email: "viewer@acme.test" });
+  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Q3 &lt;&quot;Board&quot;&gt; &amp; Rock&#39;n roll plan with a title that runs well">/);
+});
+
+test("artifact install names strip controls, trim, bound code points, and fall back", () => {
+  assert.equal(artifactInstallName("  Plain title  "), "Plain title");
+  assert.equal(artifactInstallName("\u0000Tab\tand\u009fC1\u007f"), "TabandC1");
+  assert.equal(artifactInstallName("x".repeat(80)), "x".repeat(60));
+  assert.equal(artifactInstallName(" \u0001\n\u3000 "), "Artifact");
+  assert.equal(artifactInstallName(null), "Artifact");
+  assert.equal(artifactInstallShortName("Quarterly planning board"), "Quarterly pl");
+  assert.equal(artifactInstallShortName("Daily  standup"), "Daily  stand");
+  assert.equal(artifactInstallShortName("Weekly notes"), "Weekly notes");
+  assert.equal(artifactInstallShortName("Ten chars  x"), "Ten chars  x");
+  assert.equal(artifactInstallShortName("Ten chars   tail"), "Ten chars");
+  assert.equal(artifactInstallShortName("\u{1F600}".repeat(20)), "\u{1F600}".repeat(12));
+  assert.equal(artifactInstallShortName(""), "Artifact");
+});
+
+test("the library links the site manifest and the generic Home Screen title", () => {
+  const gallery = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, []);
+  assert.match(gallery, /<link rel="manifest" href="\/manifest\.webmanifest" crossorigin="use-credentials">/);
+  assert.match(gallery, /<meta name="apple-mobile-web-app-title" content="Artifacts">/);
+  const template = readFileSync(new URL("../templates/gallery.html", import.meta.url), "utf8");
+  for (const fragment of ['<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="Artifacts">']) {
+    assert.ok(template.includes(fragment), `Rust gallery template keeps parity: ${fragment}`);
   }
 });
 
