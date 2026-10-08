@@ -200,6 +200,12 @@ contain no private data, and the application serves them without a viewer check.
 can fetch the manifest and icons without cookies. If Home Screen icons or the app name fail to load
 behind Cloudflare Access, add an Access bypass policy for `/manifest.webmanifest` and `/icons/*`.
 
+Installing from an artifact page gives an app for that artifact only: it uses
+`/{id}/manifest.webmanifest`, which needs a signed-in viewer of the artifact's organization. Do not
+add `/{id}/manifest.webmanifest` to an Access bypass. On iOS, open the artifact page and use
+**Share → Add to Home Screen**. Installing from the library gives the general "Artifacts" app. See
+[Install one artifact as its own app](web-push-reminders.md#install-one-artifact-as-its-own-app).
+
 ### Rotate the webhook encryption key
 
 Do not overwrite the old key while encrypted rows still need it.

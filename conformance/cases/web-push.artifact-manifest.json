@@ -1,0 +1,148 @@
+{
+  "id": "web-push.artifact-manifest",
+  "fixture": "empty-v21",
+  "tags": [
+    "web-push",
+    "install",
+    "invariant-3"
+  ],
+  "note": "Per-artifact install manifest GET /{id}/manifest.webmanifest: viewer-page access (same org, admin, concealed 404 for other org, unknown id, and unsigned visitor), exact bytes (compact JSON, recursively sorted keys), and headers. Independent of the Web Push feature flag. The 200 steps check named headers with require (not exact-header): the content-derived etag covers the random artifact id, so it differs between runs.",
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Plan</h1></body></html>",
+              "title": "  Quarterly planning board for the acme team, with a long \"title\" & more  "
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "same-org viewer gets the artifact manifest",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/manifest.webmanifest",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "application/manifest+json",
+            "cache-control": "private, no-cache, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "admin gets the same manifest",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/manifest.webmanifest",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "application/manifest+json",
+            "cache-control": "private, no-cache, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 1
+      }
+    },
+    {
+      "name": "unknown artifact is concealed",
+      "request": {
+        "method": "GET",
+        "path": "/zzzzzzzzzzzz/manifest.webmanifest",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        }
+      }
+    },
+    {
+      "name": "other org is indistinguishable from unknown",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/manifest.webmanifest",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 3
+      }
+    },
+    {
+      "name": "unsigned visitor is indistinguishable from unknown",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/manifest.webmanifest",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "headers": {
+          "mode": "exact-header"
+        },
+        "body": {
+          "mode": "exact-bytes"
+        },
+        "sameAsStep": 3
+      }
+    }
+  ]
+}

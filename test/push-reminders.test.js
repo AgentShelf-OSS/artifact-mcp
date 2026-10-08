@@ -433,6 +433,75 @@ test("the service worker and manifest are served with contract headers before ar
   }
 });
 
+test("the per-artifact manifest uses viewer-page access and installs that artifact", async () => {
+  const metas = {
+    owned: { id: "owned", org: "acme", title: "  Quarterly\u0007 planning board for the acme team, with a long title  " },
+    blank: { id: "blank", org: "acme", title: "\u0000 \t " },
+    foreign: { id: "foreign", org: "beta", title: "Beta secret" },
+    hidden: { id: "hidden", org: "acme", title: "Hidden", hidden: 1, owner_email: "someone@acme.test" }
+  };
+  const app = createApp({
+    push: createPushStore({ db: fixture().database, config: DISABLED }),
+    resolveViewer: async (req) => ({
+      email: req.headers["test-viewer-email"] ?? "viewer@acme.test",
+      org: req.headers["test-viewer-org"] ?? "acme",
+      isAdmin: req.headers["test-viewer-admin"] === "1"
+    }),
+    artifacts: { getArtifactMeta: (id) => metas[id] || null },
+    feedback: { listForArtifact: () => [] },
+    pages: { notFound: () => "not found", notSignedIn: () => "not signed in", gallery: () => "", shell: () => "", settings: () => "" },
+    logger: { error() {}, warn() {}, info() {} }
+  });
+  const site = JSON.parse(readFileSync(new URL("../assets/manifest.webmanifest", import.meta.url), "utf8"));
+  const result = await invoke(app, "get", "/owned/manifest.webmanifest");
+  assert.equal(result.status, 200);
+  assert.equal(result.headers["content-type"], "application/manifest+json");
+  assert.equal(result.headers["cache-control"], "private, no-cache");
+  assert.equal(result.headers["x-content-type-options"], "nosniff");
+  assert.deepEqual(result.body, {
+    ...site,
+    id: "/owned",
+    start_url: "/owned",
+    scope: "/owned",
+    name: "Quarterly planning board for the acme team, with a long titl",
+    short_name: "Quarterly pl",
+    display: "standalone"
+  });
+  // Compact JSON with recursively sorted keys: the Rust runtime emits the same bytes.
+  const keys = Object.keys(result.body);
+  assert.deepEqual(keys, [...keys].sort());
+  assert.deepEqual(Object.keys(result.body.icons[0]), ["purpose", "sizes", "src", "type"]);
+  assert.equal(result.raw, JSON.stringify(result.body));
+
+  const blank = await invoke(app, "get", "/blank/manifest.webmanifest");
+  assert.equal(blank.body.name, "Artifact");
+  assert.equal(blank.body.short_name, "Artifact");
+
+  // A hidden artifact is only left out of listings; like the viewer page, its direct link works.
+  assert.equal((await invoke(app, "get", "/hidden/manifest.webmanifest")).body.start_url, "/hidden");
+  // Other org, missing (or deleted), unsigned, and org-mismatched viewers are concealed.
+  for (const [path, headers] of [
+    ["/foreign/manifest.webmanifest", {}],
+    ["/missing/manifest.webmanifest", {}],
+    ["/owned/manifest.webmanifest", { "test-viewer-email": "" }],
+    ["/owned/manifest.webmanifest", { "test-viewer-org": "beta" }]
+  ]) {
+    const concealed = await invoke(app, "get", path, { headers });
+    assert.equal(concealed.status, 404, path);
+    assert.deepEqual(concealed.body, { error: "Not found" }, path);
+    assert.equal(concealed.headers["content-type"], "application/json; charset=utf-8", path);
+  }
+  // Administrators reach every org, exactly as on the viewer page.
+  for (const id of ["foreign", "hidden"]) {
+    const admin = await invoke(app, "get", `/${id}/manifest.webmanifest`, { headers: { "test-viewer-email": "admin@ops.test", "test-viewer-org": "", "test-viewer-admin": "1" } });
+    assert.equal(admin.status, 200, id);
+    assert.equal(admin.body.start_url, `/${id}`);
+  }
+  // The site manifest stays the general library app.
+  const siteResult = await invoke(app, "get", "/manifest.webmanifest");
+  assert.equal(JSON.parse(siteResult.raw).start_url, "/");
+});
+
 test("migration creates the ADR-0012 tables and cascades artifact deletion", () => {
   const { database, push } = fixture();
   for (const table of ["push_subscriptions", "artifact_push_optins", "artifact_reminders", "push_deliveries"]) {

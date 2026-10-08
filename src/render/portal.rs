@@ -361,6 +361,8 @@ struct ShellTemplate<'a> {
     threads: Vec<FeedbackThreadTemplate>,
     viewers: Vec<ViewerTemplate>,
     artifact_id: String,
+    /// Home Screen title; see [`artifact_install_name`].
+    install_name: String,
     artifact_id_literal: String,
     previous_id_literal: String,
     next_id_literal: String,
@@ -424,6 +426,37 @@ struct FeedbackScriptRow<'a> {
     anchor_quote: Option<&'a str>,
     anchor_version: u8,
     artifact_revision: u64,
+}
+
+/// Fallback install name when an artifact title has no printable text.
+const INSTALL_NAME_FALLBACK: &str = "Artifact";
+
+/// Remove control characters, trim, keep at most `limit` code points, and trim the end again.
+///
+/// Mirrors Node's `installName` in `lib/portal.js`: `char::is_control` is the Unicode `Cc`
+/// category (U+0000-U+001F and U+007F-U+009F) and `char::is_whitespace` is `White_Space`,
+/// matching `\p{White_Space}`. Counting `char`s never splits a code point.
+fn install_name(value: &str, limit: usize) -> String {
+    let clean: String = value.chars().filter(|c| !c.is_control()).collect();
+    let cut: String = clean.trim().chars().take(limit).collect();
+    let cut = cut.trim_end();
+    if cut.is_empty() {
+        INSTALL_NAME_FALLBACK.to_owned()
+    } else {
+        cut.to_owned()
+    }
+}
+
+/// Installed-app name for one artifact: at most 60 code points, fallback `Artifact`.
+#[must_use]
+pub fn artifact_install_name(title: &str) -> String {
+    install_name(title, 60)
+}
+
+/// Installed-app short name for one artifact: at most 12 code points, fallback `Artifact`.
+#[must_use]
+pub fn artifact_install_short_name(title: &str) -> String {
+    install_name(&artifact_install_name(title), 12)
 }
 
 /// Encode one JavaScript string literal for an inline-script boundary.
@@ -609,6 +642,7 @@ fn shell_template<'a>(
         threads,
         viewers,
         artifact_id: meta.id.0.clone(),
+        install_name: artifact_install_name(&meta.title),
         artifact_id_literal: js_literal(&meta.id.0),
         previous_id_literal: js_literal(&previous_id),
         next_id_literal: js_literal(&next_id),

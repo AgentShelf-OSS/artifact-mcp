@@ -1146,6 +1146,111 @@ async fn push_routes_follow_the_viewer_contract() {
     .unwrap();
 }
 
+async fn raw_get(app: &Router, path: &str, email: Option<&str>) -> (u16, HeaderMap, String) {
+    let mut builder = Request::builder().method("GET").uri(path);
+    if let Some(email) = email {
+        builder = builder.header("cf-access-authenticated-user-email", email);
+    }
+    let response = app
+        .clone()
+        .oneshot(builder.body(Body::empty()).unwrap())
+        .await
+        .unwrap();
+    let status = response.status().as_u16();
+    let headers = response.headers().clone();
+    let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    (status, headers, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
+#[test]
+fn artifact_manifest_json_is_compact_sorted_and_matches_node() {
+    let body = artifact_mcp::http::routes::push::artifact_manifest_json(
+        "abc123",
+        "  \u{7}Quarterly planning board for the acme team, with a long title  ",
+    )
+    .unwrap();
+    assert_eq!(
+        body,
+        concat!(
+            r##"{"background_color":"#0c1117","description":"Private artifact library and viewer.","display":"standalone","##,
+            r##""icons":[{"purpose":"any","sizes":"192x192","src":"/icons/app-192.png","type":"image/png"},"##,
+            r##"{"purpose":"any","sizes":"512x512","src":"/icons/app-512.png","type":"image/png"},"##,
+            r##"{"purpose":"maskable","sizes":"512x512","src":"/icons/maskable-512.png","type":"image/png"}],"##,
+            r##""id":"/abc123","name":"Quarterly planning board for the acme team, with a long titl","##,
+            r##""scope":"/abc123","short_name":"Quarterly pl","start_url":"/abc123","theme_color":"#142235"}"##
+        )
+    );
+}
+
+#[tokio::test]
+async fn artifact_manifest_follows_the_viewer_page_contract() {
+    let dir = TempDataDir::new("push-artifact-manifest");
+    // The per-artifact manifest does not depend on the Web Push feature.
+    let mut config = runtime_config(&dir, false);
+    config.access.admin_emails.insert("root@ops.test".into());
+    runtime::run_with_bind(config, Arc::new(Observer), move |_, _, app| async move {
+        let (status, _, published) = call(&app, "POST", "/mcp", None, Some(json!({"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"publish_artifact","arguments":{"html":"<h1>Log</h1>","title":"  Feeding\u{7} log for the twins  "}}})), &[("authorization", "Bearer push-test-publisher-secret")]).await;
+        assert_eq!(status, 200);
+        let id = published["result"]["structuredContent"]["id"].as_str().unwrap().to_owned();
+        let path = format!("/{id}/manifest.webmanifest");
+
+        let (status, headers, body) = raw_get(&app, &path, Some("alice@acme.test")).await;
+        assert_eq!(status, 200);
+        assert_eq!(headers["content-type"], "application/manifest+json");
+        assert_eq!(headers["cache-control"], "private, no-cache, no-transform");
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+        let manifest: Value = serde_json::from_str(&body).unwrap();
+        let site: Value = serde_json::from_str(include_str!("../../assets/manifest.webmanifest")).unwrap();
+        let mut expected = site.clone();
+        for (key, value) in [
+            ("id", format!("/{id}")),
+            ("start_url", format!("/{id}")),
+            ("scope", format!("/{id}")),
+            ("name", "Feeding log for the twins".to_owned()),
+            ("short_name", "Feeding log".to_owned()),
+        ] {
+            expected[key] = Value::String(value);
+        }
+        assert_eq!(manifest, expected);
+        assert_eq!(manifest["icons"], site["icons"]);
+        assert_eq!(body, artifact_mcp::http::routes::push::artifact_manifest_json(&id, "Feeding log for the twins").unwrap());
+
+        // Another org, an unsigned visitor, a missing id, and a reserved id are concealed.
+        for (target, email) in [
+            (path.clone(), Some("mallory@beta.test")),
+            (path.clone(), None),
+            ("/missing12345/manifest.webmanifest".to_owned(), Some("alice@acme.test")),
+            ("/settings/manifest.webmanifest".to_owned(), Some("alice@acme.test")),
+        ] {
+            let (status, headers, body) = raw_get(&app, &target, email).await;
+            assert_eq!((status, body.as_str()), (404, r#"{"error":"Not found"}"#), "{target} {email:?}");
+            assert_eq!(headers["content-type"], "application/json; charset=utf-8");
+        }
+        // Administrators read every org, as on the viewer page.
+        let (status, _, body) = raw_get(&app, &path, Some("root@ops.test")).await;
+        assert_eq!(status, 200);
+        assert_eq!(serde_json::from_str::<Value>(&body).unwrap()["start_url"], format!("/{id}"));
+
+        // The viewer page links this manifest; the library links the site manifest.
+        let (status, _, page) = raw_get(&app, &format!("/{id}"), Some("alice@acme.test")).await;
+        assert_eq!(status, 200);
+        assert!(page.contains(&format!("<link rel=\"manifest\" href=\"/{id}/manifest.webmanifest\" crossorigin=\"use-credentials\">")));
+        assert!(page.contains("<meta name=\"apple-mobile-web-app-title\" content=\"Feeding log for the twins\">"));
+        let (status, _, gallery) = raw_get(&app, "/", Some("alice@acme.test")).await;
+        assert_eq!(status, 200);
+        assert!(gallery.contains("<link rel=\"manifest\" href=\"/manifest.webmanifest\" crossorigin=\"use-credentials\">"));
+        assert!(gallery.contains("<meta name=\"apple-mobile-web-app-title\" content=\"Artifacts\">"));
+
+        // Deleting the artifact conceals its manifest.
+        let (status, _, _) = call(&app, "DELETE", &format!("/{id}"), Some("root@ops.test"), None, &[]).await;
+        assert_eq!(status, 200);
+        assert_eq!(raw_get(&app, &path, Some("alice@acme.test")).await.0, 404);
+        Ok(())
+    })
+    .await
+    .unwrap();
+}
+
 #[tokio::test]
 async fn disabled_feature_conceals_every_route_but_config() {
     let dir = TempDataDir::new("push-disabled");

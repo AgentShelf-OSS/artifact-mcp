@@ -207,6 +207,44 @@ operator adds a bypass). They are served whether or not the feature is enabled a
   `badge-72.png` returns `assets/icons/{name}` with `content-type: image/png`, `x-content-type-options: nosniff`,
   and `cache-control: public, max-age=3600`. Any other `/icons/…` path returns `404 {"error":"Not found"}`.
 
+## Install one artifact as its own app
+
+The library page links the site manifest, so installing from the library gives the general "Artifacts" app
+(start URL `/`). The artifact viewer page (`/{id}`) links a per-artifact manifest instead, so installing from
+an artifact gives an app that opens that artifact, with the artifact title as its name. Each installed
+artifact is a separate app with its own `id`.
+
+- `GET /{id}/manifest.webmanifest` returns the site manifest (`assets/manifest.webmanifest`: icons, colors,
+  `description`, `display: standalone`) with these overrides:
+  - `id`, `start_url`, and `scope`: `/{id}`.
+  - `name`: the artifact title with C0/C1 control characters removed, Unicode white space trimmed, cut to
+    60 code points, and trimmed again. If nothing remains, `Artifact`.
+  - `short_name`: `name` cut to 12 code points and trimmed again (fallback `Artifact`).
+- Serialization: compact JSON with the object keys sorted by code unit at every level (`background_color`,
+  `description`, `display`, `icons`, `id`, `name`, `scope`, `short_name`, `start_url`, `theme_color`; each
+  icon is `purpose`, `sizes`, `src`, `type`). Node and Rust emit the same bytes; the conformance case
+  `web-push.artifact-manifest` compares them.
+- Headers: `content-type: application/manifest+json` (no charset), `cache-control: private, no-cache` (the
+  listener appends `no-transform`), and `x-content-type-options: nosniff`.
+- Access is the same as the viewer page: a signed-in viewer of the artifact's organization, or an
+  administrator. An unknown, deleted, reserved, or other-organization ID and an unsigned request all get the
+  concealed `404 {"error":"Not found"}`. A hidden artifact works by direct link, as on the viewer page. Public
+  shares (`/s/*`) and historical revisions get no per-artifact manifest. The route does not depend on the
+  Web Push feature.
+- The viewer page links it with `<link rel="manifest" href="/{id}/manifest.webmanifest"
+  crossorigin="use-credentials">` and sets `<meta name="apple-mobile-web-app-title">` to the same `name`.
+  All other pages keep `/manifest.webmanifest` and the title `Artifacts`.
+- Scope `/{id}` covers only navigations. The viewer page's own requests (shell assets, the `/raw/{id}`
+  iframe, `/{id}/state`, `/{id}/push`, `/{id}/data`) are subresource and fetch loads, so scope does not
+  apply to them. Links out of the artifact (for example **Back** to `/`) open outside the app window. A
+  reminder notification opens `/{id}`, which is inside the scope.
+
+This manifest names a private artifact, so it requires a login. Do **not** add it to a Cloudflare Access
+bypass, unlike `/manifest.webmanifest` and `/icons/*`. The viewer page is already signed in, and the manifest
+link uses `crossorigin="use-credentials"`, so browsers send the Access cookie. On iPhone and iPad, open the
+artifact page in Safari and use **Share → Add to Home Screen**. iOS takes the name from
+`apple-mobile-web-app-title` and opens the artifact page.
+
 ## Shell broker (artifact ↔ viewer shell)
 
 Artifact to shell (only accepted from the artifact iframe, same checks as `state:*`):
@@ -244,7 +282,7 @@ the current viewer to be opted in.
   `PUT /{id}/push/optin`. Turning off removes the opt-in only (the device subscription stays for other artifacts).
 - `reminder:prompt` shows a small dismissible banner in the shell with the reason text and a "Turn on
   notifications" button that runs the same flow. The artifact's text is set with `textContent`.
-- The shell HTML links the manifest and an `apple-touch-icon`.
+- The shell HTML links the per-artifact manifest (see [Install one artifact as its own app](#install-one-artifact-as-its-own-app)) and an `apple-touch-icon`.
 
 ## Service worker (`assets/push-sw.js`)
 

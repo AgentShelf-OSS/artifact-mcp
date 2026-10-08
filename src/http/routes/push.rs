@@ -30,6 +30,7 @@ use crate::{
     mcp::protocol::OrderedJson,
     model::Viewer,
     persistence::push::{self, PushError, ReminderScope},
+    render::portal::{artifact_install_name, artifact_install_short_name},
 };
 
 /// Push JSON bodies are small; the contract mirrors Node's `8kb` parser limit.
@@ -47,6 +48,7 @@ pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/sw.js", get(service_worker))
         .route("/manifest.webmanifest", get(manifest))
+        .route("/{id}/manifest.webmanifest", get(artifact_manifest))
         .route("/icons/{name}", get(icon))
         .route("/push/config", get(config))
         .route(
@@ -100,6 +102,61 @@ async fn manifest() -> Response {
             ("x-content-type-options", "nosniff"),
         ],
     )
+}
+
+/// Per-artifact install manifest: the site manifest with `id`, `start_url`, and `scope` set to
+/// `/{id}` and the artifact's install names.
+///
+/// It names a private artifact, so it uses the viewer page's identity resolution, org
+/// authorization, admin handling, and concealed `404` ([`authorize`]). Public shares get no
+/// per-artifact manifest. Object keys are sorted recursively (`serde_json::Map` is ordered by
+/// key, and `sort_all_objects` keeps that true under `preserve_order`) and the JSON is compact,
+/// which is byte-identical to Node's `artifactWebManifest`.
+async fn artifact_manifest(
+    State(deps): State<AppDeps>,
+    Path(id): Path<String>,
+    headers: HeaderMap,
+) -> Response {
+    let (artifact, _viewer) = match authorize(&deps, &headers, &id).await {
+        Ok(found) => found,
+        Err(error) => return error.into_response(),
+    };
+    match artifact_manifest_json(&artifact.meta().id.0, &artifact.meta().title) {
+        Some(body) => static_file(
+            body,
+            &[
+                ("content-type", "application/manifest+json"),
+                ("cache-control", "private, no-cache"),
+                ("x-content-type-options", "nosniff"),
+            ],
+        ),
+        None => AppError::Internal.into_response(),
+    }
+}
+
+/// Build the per-artifact manifest JSON from `assets/manifest.webmanifest`.
+#[must_use]
+pub fn artifact_manifest_json(id: &str, title: &str) -> Option<String> {
+    let mut value: serde_json::Value = serde_json::from_str(MANIFEST).ok()?;
+    let fields = value.as_object_mut()?;
+    let path = format!("/{id}");
+    for key in ["id", "start_url", "scope"] {
+        fields.insert(key.to_owned(), serde_json::Value::String(path.clone()));
+    }
+    fields.insert(
+        "name".to_owned(),
+        serde_json::Value::String(artifact_install_name(title)),
+    );
+    fields.insert(
+        "short_name".to_owned(),
+        serde_json::Value::String(artifact_install_short_name(title)),
+    );
+    fields.insert(
+        "display".to_owned(),
+        serde_json::Value::String("standalone".to_owned()),
+    );
+    value.sort_all_objects();
+    serde_json::to_string(&value).ok()
 }
 
 async fn icon(Path(name): Path<String>) -> Response {
