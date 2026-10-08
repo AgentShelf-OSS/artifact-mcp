@@ -117,6 +117,118 @@
     function query(data){if(!valid(data.requestId)||pending.has(data.requestId)||!enabled||pending.size>=32||!valid(data.binding)||!valid(data.operation)||!allows(data.binding,data.operation,'operations')||!data.params||typeof data.params!=='object'||Array.isArray(data.params)){send('data:error',{requestId:data.requestId,reason:'bad_params'});return;}var controller=new AbortController();pending.set(data.requestId,{controller:controller});fetch('/'+encodeURIComponent(options.artifactId)+'/data/query',{method:'POST',credentials:'same-origin',cache:'no-store',headers:{'content-type':'application/json'},body:JSON.stringify({binding:data.binding,operation:data.operation,params:data.params}),signal:controller.signal}).then(function(response){return response.json().catch(function(){return {};}).then(function(body){if(!response.ok)throw new Error(body.error||'data_unavailable');send('data:result',{requestId:data.requestId,data:body.data});});}).catch(function(error){if(error.name!=='AbortError')send('data:error',{requestId:data.requestId,reason:['bad_params','not_found','too_large','data_unavailable'].indexOf(error.message)>=0?error.message:'data_unavailable'});}).finally(function(){pending.delete(data.requestId);});}
     return {handle:function(event){if(event.source!==options.frame())return false;var data=event.data;if(!data||typeof data!=='object'||typeof data.type!=='string'||data.type.indexOf('data:')!==0)return false;if(data.type==='data:hello'){hello();return true;}if(data.type==='data:query'){query(data);return true;}if(data.type==='data:cancel'){if(!valid(data.requestId))return true;var item=pending.get(data.requestId);if(item){item.controller.abort();pending.delete(data.requestId);}return true;}if(data.type==='data:subscribe'){if(enabled&&canSubscribe(data)&&valid(data.requestId)&&valid(data.binding)&&valid(data.subscription)&&allows(data.binding,data.subscription,'subscriptions')){var list=subscriptions.get(key(data.binding,data.subscription))||[];list.push({binding:data.binding,subscription:data.subscription,requestId:data.requestId});subscriptions.set(key(data.binding,data.subscription),list);rebuild();}else send('data:error',{requestId:data.requestId,reason:'data_unavailable'});return true;}if(data.type==='data:unsubscribe'){if(valid(data.requestId)){var subKey=key(data.binding,data.subscription),list=subscriptions.get(subKey)||[];subscriptions.set(subKey,list.filter(function(item){return item.requestId!==data.requestId;}));if(!subscriptions.get(subKey).length)subscriptions.delete(subKey);rebuild();}return true;}return true;},close:close};}
   var dataBroker=createViewerDataBroker({enabled:shellConfig.stateEnabled==='1',artifactId:artifactId,post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;}});
+  // Reminder broker (ADR-0012). The artifact asks; the shell owns permission, subscription, and opt-in.
+  // Adapters keep browser APIs injectable so tests can run the real broker.
+  function createViewerReminderBroker(options){
+    var keyPattern=/^[A-Za-z0-9._-]{1,64}$/,artifactPath='/'+encodeURIComponent(options.artifactId),readySent=false,config=null,configPromise=null,optedIn=false,busy=false,lastStatus='';
+    var mutationHeaders={'content-type':'application/json','x-artifact-mutation':'1'};
+    function send(type,fields){options.post(Object.assign({type:type},fields||{}));}
+    function requestIdOf(data){return typeof data.requestId==='string'&&data.requestId.length<=80?data.requestId:undefined;}
+    function withRequest(fields,requestId){if(requestId!==undefined)fields.requestId=requestId;return fields;}
+    function permission(){var value=options.platform.permission();return value==='granted'||value==='denied'||value==='default'?value:'unsupported';}
+    function serverEnabled(){return !!(options.enabled&&config&&config.enabled===true&&typeof config.vapid_public_key==='string'&&config.vapid_public_key);}
+    function status(){var server=serverEnabled(),needsInstall=server&&options.platform.needsInstall();return {enabled:server&&options.platform.supported(),optedIn:server&&optedIn,permission:permission(),needsInstall:needsInstall};}
+    function publish(force){var current=status(),signature=JSON.stringify(current);if(options.onStatus)options.onStatus(current,busy);if(signature===lastStatus&&!force)return current;lastStatus=signature;if(readySent)send('reminder:status',current);return current;}
+    async function json(url,init){
+      var response;
+      try{response=await options.fetch(url,Object.assign({credentials:'same-origin',cache:'no-store'},init||{}));}catch(_){var offline=new Error('network');offline.reason='network';throw offline;}
+      var body=response.status===204?{}:await response.json().catch(function(){return {};});
+      if(!response.ok){var failure=new Error('reminder request failed');failure.status=response.status;failure.body=body||{};failure.reason=reason(failure);throw failure;}
+      return body||{};
+    }
+    function reason(failure){
+      var code=failure.body&&typeof failure.body.error==='string'?failure.body.error:'';
+      if(code==='push_disabled')return 'disabled';
+      if(['bad_time','bad_text','reminder_limit','bad_key','bad_scope','bad_endpoint','bad_keys'].indexOf(code)>=0)return code;
+      if(failure.status===409)return 'reminder_limit';
+      if(failure.status===401||failure.status===403||failure.status===404)return 'forbidden';
+      if(failure.status===429)return 'rate_limited';
+      if(failure.status===400)return 'bad_request';
+      return 'network';
+    }
+    function loadConfig(){
+      if(!options.enabled)return Promise.resolve(status());
+      if(configPromise)return configPromise;
+      configPromise=json('/push/config').then(function(body){config=body&&typeof body==='object'?body:{enabled:false};}).catch(function(){config={enabled:false};}).then(function(){
+        if(!serverEnabled())return;
+        return json(artifactPath+'/push').then(function(body){optedIn=body.opted_in===true;}).catch(function(){optedIn=false;});
+      }).then(function(){return publish(false);});
+      return configPromise;
+    }
+    function base64UrlBytes(value){var text=String(value).replace(/-/g,'+').replace(/_/g,'/');while(text.length%4)text+='=';var raw=options.platform.atob(text),bytes=new Uint8Array(raw.length);for(var i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);return bytes;}
+    function sameKey(subscription,key){try{var current=subscription.options&&subscription.options.applicationServerKey;if(!current)return true;var a=new Uint8Array(current);if(a.length!==key.length)return false;for(var i=0;i<a.length;i++)if(a[i]!==key[i])return false;return true;}catch(_){return true;}}
+    // Call from a click handler: requestPermission must run before any other await to keep the user gesture.
+    async function turnOn(){
+      if(busy)return status();
+      if(!serverEnabled()||!options.platform.supported()){var unavailable=new Error('disabled');unavailable.reason=options.platform.needsInstall()?'needs_install':'disabled';throw unavailable;}
+      busy=true;publish(false);
+      try{
+        var granted=await options.platform.requestPermission();
+        if(granted!=='granted'){var blocked=new Error('permission');blocked.reason=granted==='denied'?'permission_denied':'permission_dismissed';throw blocked;}
+        var registration=await options.platform.register('/sw.js');
+        var key=base64UrlBytes(config.vapid_public_key),subscription=await registration.pushManager.getSubscription();
+        if(subscription&&!sameKey(subscription,key)){await subscription.unsubscribe();subscription=null;}
+        if(!subscription)subscription=await registration.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:key});
+        var detail=subscription.toJSON();
+        await json('/push/subscriptions',{method:'PUT',headers:mutationHeaders,body:JSON.stringify({endpoint:detail.endpoint,keys:{p256dh:detail.keys&&detail.keys.p256dh,auth:detail.keys&&detail.keys.auth},label:options.platform.label()})});
+        await json(artifactPath+'/push/optin',{method:'PUT',headers:mutationHeaders,body:'{}'});
+        optedIn=true;
+        return status();
+      }catch(error){if(!error||!error.reason){var failed=new Error('subscribe');failed.reason='subscribe_failed';throw failed;}throw error;}
+      finally{busy=false;publish(false);}
+    }
+    async function turnOff(){
+      if(busy)return status();
+      busy=true;publish(false);
+      try{await json(artifactPath+'/push/optin',{method:'DELETE',headers:{'x-artifact-mutation':'1'}});optedIn=false;return status();}
+      finally{busy=false;publish(false);}
+    }
+    function timeFields(data){
+      var hasDelay=data.delaySeconds!==undefined,hasFire=data.fireAt!==undefined;
+      if(hasDelay===hasFire)return null;
+      if(hasDelay)return Number.isSafeInteger(data.delaySeconds)?{delay_seconds:data.delaySeconds}:null;
+      return Number.isSafeInteger(data.fireAt)?{fire_at:data.fireAt}:null;
+    }
+    function set(data,key,scope,requestId){
+      var time=timeFields(data);
+      if(!time){send('reminder:error',withRequest({key:key,reason:'bad_time'},requestId));return;}
+      if(typeof data.title!=='string'||(data.body!==undefined&&typeof data.body!=='string')){send('reminder:error',withRequest({key:key,reason:'bad_text'},requestId));return;}
+      var body=Object.assign({},time,{title:data.title});if(data.body!==undefined)body.body=data.body;
+      json(artifactPath+'/reminders/'+encodeURIComponent(key)+'?scope='+scope,{method:'PUT',headers:mutationHeaders,body:JSON.stringify(body)}).then(function(saved){
+        send('reminder:saved',withRequest({key:key,scope:typeof saved.scope==='string'?saved.scope:scope,fireAt:Number.isSafeInteger(saved.fire_at)?saved.fire_at:null},requestId));
+      }).catch(function(error){send('reminder:error',withRequest({key:key,reason:error&&error.reason||'network'},requestId));});
+    }
+    function clear(key,scope,requestId){
+      json(artifactPath+'/reminders/'+encodeURIComponent(key)+'?scope='+scope,{method:'DELETE',headers:{'x-artifact-mutation':'1'}}).then(function(){
+        send('reminder:cleared',withRequest({key:key,scope:scope},requestId));
+      }).catch(function(error){send('reminder:error',withRequest({key:key,reason:error&&error.reason||'network'},requestId));});
+    }
+    function prompt(data){
+      loadConfig().then(function(current){
+        if(!serverEnabled()||!(current.enabled||current.needsInstall))return;
+        if(current.permission==='denied'||(current.optedIn&&current.permission==='granted'))return;
+        var text=typeof data.reason==='string'?Array.from(data.reason.replace(/[\u0000-\u001f\u007f]+/g,' ').trim()).slice(0,120).join(''):'';
+        if(options.showPrompt)options.showPrompt(text,current);
+      });
+    }
+    function handle(event){
+      if(event.source!==options.frame())return false;
+      var data=event.data;
+      if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string'||data.type.indexOf('reminder:')!==0)return false;
+      var type=data.type,requestId=requestIdOf(data),key=typeof data.key==='string'?data.key:undefined,scope=data.scope===undefined?'org':data.scope;
+      if(type==='reminder:hello'){loadConfig().then(function(){var current=status();lastStatus=JSON.stringify(current);readySent=true;send('reminder:ready',current);});return true;}
+      if(type==='reminder:prompt'){if(options.enabled)prompt(data);return true;}
+      if(type!=='reminder:set'&&type!=='reminder:clear')return true;
+      var errorKey=key===undefined?{}:{key:key};
+      if(!options.enabled){send('reminder:error',withRequest(Object.assign(errorKey,{reason:'disabled'}),requestId));return true;}
+      if(key===undefined||!keyPattern.test(key)){send('reminder:error',withRequest(Object.assign(errorKey,{reason:'bad_key'}),requestId));return true;}
+      if(scope!=='org'&&scope!=='viewer'){send('reminder:error',withRequest({key:key,reason:'bad_scope'},requestId));return true;}
+      if(type==='reminder:set')set(data,key,scope,requestId);else clear(key,scope,requestId);
+      return true;
+    }
+    return {handle:handle,load:loadConfig,turnOn:turnOn,turnOff:turnOff,status:status,refresh:function(){return publish(false);}};
+  }
+  // End viewer reminder broker.
   var theme=document.getElementById('vtheme');
   if(theme) theme.addEventListener('click',function(){
     var current=document.documentElement.dataset.theme;
@@ -263,6 +375,51 @@
   var castBridge=null,nativeReader=null;
   var outerRevisionQuery=new URLSearchParams(window.location.search);
   var historicalView=outerRevisionQuery.has('v')||outerRevisionQuery.has('revision');
+  var reminderBell=document.getElementById('vpush-toggle'),reminderBanner=document.getElementById('vpush-banner'),reminderReason=document.getElementById('vpush-reason'),reminderEnable=document.getElementById('vpush-enable'),reminderDismiss=document.getElementById('vpush-dismiss'),reminderPromptDismissed=false;
+  var reminderPlatform={
+    supported:function(){return !!(typeof navigator!=='undefined'&&navigator.serviceWorker&&typeof window.PushManager!=='undefined'&&typeof window.Notification!=='undefined');},
+    permission:function(){return typeof window.Notification!=='undefined'?window.Notification.permission:'unsupported';},
+    requestPermission:function(){var result=window.Notification.requestPermission();return result&&typeof result.then==='function'?result:Promise.resolve(window.Notification.permission);},
+    register:function(url){return navigator.serviceWorker.register(url,{scope:'/'}).then(function(){return navigator.serviceWorker.ready;});},
+    needsInstall:function(){if(typeof navigator==='undefined')return false;var ua=String(navigator.userAgent||''),ios=/iPad|iPhone|iPod/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1),standalone=navigator.standalone===true;try{standalone=standalone||!!(window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches);}catch(_){}return ios&&!standalone;},
+    label:function(){var ua=typeof navigator!=='undefined'?String(navigator.userAgent||''):'';if(/iPhone|iPod/.test(ua))return 'iPhone';if(/iPad/.test(ua)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1))return 'iPad';if(/Android/.test(ua))return 'Android';return 'Desktop';},
+    atob:function(value){return window.atob(value);}
+  };
+  function reminderBellState(current){if(current.needsInstall&&!current.enabled)return 'install';if(current.permission==='denied')return 'blocked';if(current.optedIn&&current.permission==='granted')return 'on';return 'off';}
+  var reminderLabels={off:'Notify me',on:'Notifications on',blocked:'Blocked in browser settings',install:'Add to Home Screen to get notifications'};
+  function paintReminderBell(current,busy){
+    if(!reminderBell)return;
+    var visible=current.enabled||current.needsInstall;reminderBell.hidden=!visible;if(!visible){hideReminderPrompt(false);return;}
+    var state=reminderBellState(current),label=reminderLabels[state],text=reminderBell.querySelector('.vpush-label');
+    reminderBell.dataset.state=state;reminderBell.setAttribute('aria-label',label);reminderBell.setAttribute('title',label);reminderBell.setAttribute('aria-pressed',state==='on'?'true':'false');reminderBell.setAttribute('aria-busy',busy?'true':'false');if(text)text.textContent=label;
+    if(state==='on'||state==='blocked')hideReminderPrompt(false);
+  }
+  function showReminderPrompt(text,current,force){
+    if(!reminderBanner||(reminderPromptDismissed&&!force))return;
+    var install=reminderBellState(current)==='install',hint=reminderBanner.querySelector('.vpush-hint');
+    if(reminderReason)reminderReason.textContent=text||'This artifact can send you reminders.';
+    if(hint){hint.textContent=install?reminderMessages.needs_install:'';hint.hidden=!install;}
+    if(reminderEnable)reminderEnable.hidden=install;
+    reminderBanner.hidden=false;
+  }
+  function hideReminderPrompt(restoreFocus){if(!reminderBanner||reminderBanner.hidden)return;var hadFocus=reminderBanner.contains&&reminderBanner.contains(document.activeElement);reminderBanner.hidden=true;if((restoreFocus||hadFocus)&&reminderBell&&!reminderBell.hidden)reminderBell.focus();}
+  var reminderMessages={needs_install:'On iPhone or iPad, tap Share, then Add to Home Screen. Open the app from your Home Screen to turn on notifications.',permission_denied:'Notifications are blocked. Allow them in your browser settings.',permission_dismissed:'Notifications were not allowed.',disabled:'Notifications are not available here.',forbidden:'You cannot turn on notifications for this artifact.',rate_limited:'Too many requests. Try again shortly.',network:'Could not reach the server. Try again.'};
+  function reminderToggle(){
+    if(!reminderBroker)return;
+    var state=reminderBellState(reminderBroker.status());
+    if(state==='install'){showReminderPrompt('',reminderBroker.status(),true);if(reminderDismiss)reminderDismiss.focus();return;}
+    if(state==='blocked'){announce(reminderMessages.permission_denied,true);return;}
+    if(state==='on'){reminderBroker.turnOff().then(function(){announce('Notifications off for this artifact');}).catch(function(error){announce(reminderMessages[error&&error.reason]||'Could not turn off notifications',true);});return;}
+    reminderBroker.turnOn().then(function(){hideReminderPrompt(true);announce('Notifications on for this artifact');}).catch(function(error){announce(reminderMessages[error&&error.reason]||'Could not turn on notifications',true);});
+  }
+  // Reminders exist only in the authenticated current-revision viewer shell, never in shares or history.
+  var reminderBroker=createViewerReminderBroker({enabled:shellConfig.stateEnabled==='1'&&!historicalView&&!!configLiteral('viewerEmail'),artifactId:artifactId,fetch:function(url,init){return window.fetch(url,init);},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},platform:reminderPlatform,onStatus:paintReminderBell,showPrompt:showReminderPrompt});
+  if(reminderBell)reminderBell.addEventListener('click',reminderToggle);
+  if(reminderEnable)reminderEnable.addEventListener('click',reminderToggle);
+  if(reminderDismiss)reminderDismiss.addEventListener('click',function(){reminderPromptDismissed=true;hideReminderPrompt(true);});
+  if(reminderBanner)reminderBanner.addEventListener('keydown',function(e){if(e.key==='Escape'){reminderPromptDismissed=true;hideReminderPrompt(true);}});
+  if(reminderBell)reminderBroker.load();
+  window.addEventListener('focus',function(){if(reminderBroker)reminderBroker.refresh();});
   if(typeof window.createArtifactCastBridge==='function'&&shellConfig.castEnabled==='1'&&!historicalView&&!isBundle&&shellConfig.stateEnabled==='1'&&!!configLiteral('viewerEmail')){
     castBridge=window.createArtifactCastBridge({frame:frame,getCurrentFrame:function(){return frame&&frame.contentWindow;},post:function(message){try{if(frame&&frame.contentWindow)frame.contentWindow.postMessage(message,'*');}catch(_){}},artifactId:artifactId,revision:Number(shellConfig.revision),serverEnabled:shellConfig.castEnabled==='1',authenticated:!!configLiteral('viewerEmail'),stateEnabled:shellConfig.stateEnabled==='1',onCaptureActive:function(active){ttsCapturePaused=active===true;if(ttsCapturePaused){ttsActive.forEach(function(controller){controller.abort();});ttsActive.clear();}if(nativeReader)nativeReader.setCaptureActive(active);}});
     if(frame)frame.addEventListener('load',function(){castBridge.onFrameLoad();});
@@ -1248,6 +1405,7 @@
     if(data.type==='tts:cancel'){ttsCancel(data);return;}
     if(dataBroker.handle(event))return;
     if(stateBroker.handle(event))return;
+    if(reminderBroker.handle(event))return;
     if(data.type!=='anchor:ready'&&data.type!=='anchor:picked'&&data.type!=='anchor:positions'&&data.type!=='anchor:navigate')return;
     if(data.type==='anchor:navigate'){var url=parseOutboundHref(data.href);if(!url)return;if(url.origin===window.location.origin){var opened=window.open(url.href,'_blank');if(opened){try{opened.opener=null;}catch(_){}return;}}showOutbound(url);return;}
     if(data.type==='anchor:ready'){var nextPage=isBundle&&typeof data.page==='string'?data.page:null;if(draftAnchor&&composerBody&&composerBody.value.trim()&&draftAnchor.page!==nextPage&&!window.confirm('Move away from this selected anchor? Your draft comment will remain.')){if(isBundle&&draftAnchor.page)frame.src=bundleRawPrefix+draftAnchor.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1&reader=1'+versionQuery;return;}currentPage=nextPage;bridgeReady=true;invalidateAnchorPayload();hideAllMarkers();if(commentMode){overlay.classList.remove('fallback');postToFrame('anchor:pick-on');}requestRepaint();return;}

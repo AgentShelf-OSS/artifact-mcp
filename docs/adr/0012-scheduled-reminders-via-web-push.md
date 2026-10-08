@@ -61,7 +61,7 @@ notification to the same webhook.
    six hours late is marked fired without delivery. A delivery expires 30 minutes after it is
    queued. Responses `404` and `410` delete the subscription. `429` and `5xx` responses retry
    with backoff until expiry. Other `4xx` responses mark the delivery dead.
-10. **Runtime split.** Both runtimes implement migration 37, the routes, the MCP tool, the
+10. **Runtime split.** Both runtimes implement migration 39, the routes, the MCP tool, the
     validation, and the static service-worker and manifest responses with identical contracts.
     Only Rust runs the sweeper and the push sender, as with the Discord delivery worker. The Node
     reference stores reminders but does not send them.

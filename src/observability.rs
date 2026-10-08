@@ -385,6 +385,7 @@ fn safe_name(method: &str, name: Option<&str>) -> &'static str {
         Some("set_data_bindings") => "set_data_bindings",
         Some("set_artifact_data") => "set_artifact_data",
         Some("append_artifact_events") => "append_artifact_events",
+        Some("set_artifact_reminder") => "set_artifact_reminder",
         Some("publish_artifact") => "publish_artifact",
         Some("publish_bundle") => "publish_bundle",
         Some("list_artifacts") => "list_artifacts",

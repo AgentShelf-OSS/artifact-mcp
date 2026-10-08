@@ -141,7 +141,7 @@ const rejectedDuplicates = {
   modernDeclarations: duplicates(modernToolDeclarations),
 };
 
-check(legacyTools.length === 33, `legacy advertised tool count is ${legacyTools.length}, expected 33`);
+check(legacyTools.length === 34, `legacy advertised tool count is ${legacyTools.length}, expected 34`);
 for (const [surface, names] of Object.entries(rejectedDuplicates)) {
   check(names.length === 0, `${surface} contain duplicate names: ${names.join(", ")}`);
 }

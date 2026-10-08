@@ -259,6 +259,18 @@
     "properties": { "id": { "type": "string" }, "accepted": { "type": "integer" }, "duplicates": { "type": "integer" } },
     "required": ["id", "accepted", "duplicates"]
   },
+  "set_artifact_reminder": {
+    "type": "object",
+    "properties": {
+      "id": { "type": "string" },
+      "key": { "type": "string" },
+      "scope": { "type": "string" },
+      "fire_at": { "type": "integer" },
+      "revision": { "type": "integer" },
+      "cleared": { "type": "boolean" }
+    },
+    "required": ["id", "key"]
+  },
   "patch_artifact": {
     "type": "object",
     "properties": {

@@ -133,6 +133,42 @@
                 "name": "append_artifact_events"
               },
               {
+                "description": "Arm, replace, or clear a named reminder for an artifact. When it fires, opted-in viewers of the artifact's organization get a Web Push notification.",
+                "inputSchema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "body": {
+                      "type": "string"
+                    },
+                    "clear": {
+                      "type": "boolean"
+                    },
+                    "delay_seconds": {
+                      "type": "integer"
+                    },
+                    "fire_at": {
+                      "description": "Epoch milliseconds.",
+                      "type": "integer"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "key": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "key"
+                  ],
+                  "type": "object"
+                },
+                "name": "set_artifact_reminder"
+              },
+              {
                 "description": "Publish a self-contained HTML document. Returns a public URL that renders it at your configured domain, /<id>. Provide a title and a short description for the artifact index.",
                 "inputSchema": {
                   "additionalProperties": false,

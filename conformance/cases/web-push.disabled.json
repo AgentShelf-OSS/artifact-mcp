@@ -1,0 +1,298 @@
+{
+  "id": "web-push.disabled",
+  "fixture": "empty-v21",
+  "tags": [
+    "web-push",
+    "adr-0012"
+  ],
+  "env": {
+    "WEBHOOK_ENC_KEY": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk="
+  },
+  "note": "ADR-0012 with no VAPID key: config reports disabled, every other push route is 404 push_disabled, static files still load.",
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Reminders</h1></body></html>",
+              "title": "Reminders"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "push config reports disabled",
+      "request": {
+        "method": "GET",
+        "path": "/push/config",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "service worker headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/sw.js",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "no-cache, no-transform",
+            "service-worker-allowed": "/",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "manifest headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/manifest.webmanifest",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "application/manifest+json",
+            "cache-control": "no-cache, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "icon headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/icons/app-192.png",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "image/png",
+            "cache-control": "public, max-age=3600, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown icon is 404",
+      "request": {
+        "method": "GET",
+        "path": "/icons/unknown.png",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "status is disabled",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "subscribe is disabled",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com/fcm/send/conformance-device",
+          "keys": {
+            "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          }
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "unsubscribe is disabled",
+      "request": {
+        "method": "DELETE",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com/fcm/send/conformance-device"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "opt-in is disabled",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/push/optin",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "reminder list is disabled",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/reminders",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "reminder set is disabled",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "reminder clear is disabled",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "MCP tool reports disabled",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "k",
+              "delay_seconds": 120,
+              "title": "x"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    }
+  ]
+}

@@ -50,9 +50,19 @@ The server separates three access paths:
 | `POST /:id/visibility` | Hide or show an artifact as its verified uploader or an administrator. |
 | `POST /:id/move` | Change category or organization. Organization moves require an administrator. |
 | `DELETE /:id` | Delete an artifact as its verified uploader or an administrator. |
+| `GET /push/config`, `PUT`/`DELETE /push/subscriptions` | Web Push status and the viewer's device subscriptions ([reminders](web-push-reminders.md)). |
+| `GET /:id/push`, `PUT`/`DELETE /:id/push/optin` | Per-artifact notification opt-in. |
+| `GET /:id/reminders`, `PUT`/`DELETE /:id/reminders/:key` | Named scheduled reminders in `org` or `viewer` scope. |
+| `GET /sw.js`, `GET /manifest.webmanifest`, `GET /icons/:name` | Static service worker, Home Screen manifest, and app icons. They contain no private data. |
 | `GET /settings` and `/settings/*` | Administrator management for organizations, members, categories, webhooks, publisher keys, and live-data connections. |
 
 Bundle path handling rejects traversal, absolute paths, and configured size or file-count overages.
+
+### Scheduled reminders
+
+Both runtimes store reminders, opt-ins, and push subscriptions with identical routes, MCP tool,
+validation, and schema (ADR-0012). Only the Rust runtime runs the reminder sweeper and the Web Push
+sender, next to the Discord delivery worker. The Node reference stores reminders but never sends them.
 
 ## Storage and lifecycle
 

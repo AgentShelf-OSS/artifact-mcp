@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><link rel="icon" href="{{ favicon }}"><title>{{ title }} &middot; {{ app_name }}</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"><meta name="color-scheme" content="light dark"><link rel="icon" href="{{ favicon }}"><link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials"><link rel="apple-touch-icon" href="/icons/apple-touch-icon.png"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="Artifacts"><meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f5f6"><meta name="theme-color" media="(prefers-color-scheme: dark)" content="#151c24"><title>{{ title }} &middot; {{ app_name }}</title>
 <script>{{ theme_boot }}</script><style>{{ css }}</style></head>
 <body>
   <header class="vbar" style="--org-k:{{ color }};--k:color-mix(in oklab,var(--org-k) 72%,var(--txt))">
@@ -13,6 +13,7 @@
     <nav class="vright" aria-label="Artifact controls">
       <button class="vreact fav vdesktop-action" data-act="fav" type="button" title="Save to favorites" aria-label="Save to favorites" aria-pressed="{{ favorite }}">{{ icons.heart }}</button>
       <button class="vcomment-toggle vdesktop-action" id="vcomment-toggle" type="button" title="Comment on a place" aria-label="Comment on a place" aria-pressed="false">{{ icons.comment }}<span>Comment</span></button>
+      <button class="vpush-toggle" id="vpush-toggle" type="button" title="Notify me" aria-label="Notify me" aria-pressed="false" data-state="off" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"></path><path d="M10 21h4"></path></svg></button>
       <button class="vprimary" id="vshare-toggle" data-inspector-open="share" type="button" aria-controls="vinspector" aria-expanded="false">{{ icons.share }}<span>Share</span></button>
       <button class="vmore-toggle" id="vmore-toggle" type="button" aria-expanded="false" aria-controls="vmore-menu" aria-label="More artifact actions">{{ icons.more }}</button>
     </nav>
@@ -28,7 +29,7 @@
   </header>
   <script>{{ viewer_boot }}</script>
   <div class="reaction-status" id="reaction-status" role="status" aria-live="polite"></div>
-  <div class="vstage" id="vstage"><iframe class="vframe" id="vframe" src="{{ anchor_raw_src }}" title="{{ title }}" sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe><div class="vanchor-overlay" id="vanchor-overlay"></div>
+  <div class="vstage" id="vstage"><iframe class="vframe" id="vframe" src="{{ anchor_raw_src }}" title="{{ title }}" sandbox="allow-scripts allow-popups allow-forms allow-modals"></iframe><div class="vpush-banner" id="vpush-banner" role="region" aria-label="Artifact notifications" hidden><div class="vpush-copy"><p class="vpush-reason" id="vpush-reason" aria-live="polite"></p><p class="vpush-hint" hidden></p></div><div class="vpush-actions"><button class="vpush-enable" id="vpush-enable" type="button">Turn on notifications</button><button class="vpush-dismiss" id="vpush-dismiss" type="button" aria-label="Dismiss notification prompt">&#10005;</button></div></div><div class="vanchor-overlay" id="vanchor-overlay"></div>
     <section class="vanchor-composer" id="vanchor-composer" role="dialog" aria-modal="false" aria-labelledby="vanchor-composer-title" hidden>
       <div class="vanchor-composer-head"><div><p class="vanchor-kicker">Pinned feedback</p><h2 id="vanchor-composer-title">Add a comment</h2></div><button class="vanchor-dismiss" id="vanchor-dismiss" type="button" aria-label="Cancel anchored comment">&#10005;</button></div>
       <p class="vanchor-summary" id="vanchor-summary" role="status"></p><p class="vanchor-identity">Commenting as <strong>{{ viewer_email }}</strong> · verified reviewer</p>

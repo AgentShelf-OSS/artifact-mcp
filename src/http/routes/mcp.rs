@@ -642,6 +642,15 @@ async fn metrics(State(deps): State<AppDeps>) -> Response {
     metrics.push_str(&deps.ingress.render_prometheus());
     metrics.push_str(&deps.delivery_telemetry.render_prometheus());
     metrics.push_str(&crate::integrations::discord_gateway_runtime::render_prometheus());
+    metrics.push_str(
+        &deps
+            .push
+            .as_ref()
+            .map(|push| push.telemetry().render_prometheus())
+            .unwrap_or_else(|| {
+                crate::integrations::push_runtime::PushTelemetry::default().render_prometheus()
+            }),
+    );
     (
         [
             (

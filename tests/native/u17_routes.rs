@@ -1019,6 +1019,7 @@ fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
             artifact_mcp::integrations::delivery_runtime::DeliveryTelemetry::default(),
         delivery_wake: artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
         audit_access: None,
+        push: None,
         config: Arc::new(config),
     }
 }

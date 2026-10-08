@@ -81,12 +81,21 @@ for required claims and scopes.
 | `set_data_bindings(id, bindings)` | Atomically replace an artifact's bindings with authorized named sources. |
 | `set_artifact_data(id, binding, key, value)` | Update a producer snapshot without changing the HTML revision. |
 | `append_artifact_events(id, binding, subscription, events)` | Append an idempotent producer event batch for subscribed viewers. |
+| `set_artifact_reminder(id, key, fire_at?, delay_seconds?, title?, body?, clear?)` | Arm, replace, or clear a named `org` reminder. Opted-in viewers of the artifact's organization get a Web Push notification when it fires. |
 
-The legacy catalog contains 33 tools. MCP 2026 adds `regenerate_artifact_preview` for 34. A client
+The legacy catalog contains 34 tools. MCP 2026 adds `regenerate_artifact_preview` for 35. A client
 that negotiates MCP Apps also receives the app-only `submit_feedback` action.
 
 Live-data discovery and binding reads require `artifacts:read`; binding and producer writes require
-`artifacts:publish` plus the existing artifact write policy. See [live data and PR Watch](live-data.md)
+`artifacts:publish` plus the existing artifact write policy.
+
+`set_artifact_reminder` requires `artifacts:publish` and the artifact write policy. Give exactly one
+of `fire_at` (epoch milliseconds) or `delay_seconds`; the time must be 60 seconds to 30 days ahead.
+`title` is 1 to 80 characters and `body` at most 240. Setting a key again replaces its time and text
+and increments `revision`. An artifact can have at most 16 armed reminders. `clear: true` deletes the
+key and ignores the other fields. The result is `{id, key, scope: "org", fire_at, revision}` or
+`{id, key, cleared: true}`. When the server has no Web Push configuration, the tool returns the error
+`Web Push reminders are not configured on this server.` See [scheduled reminders](web-push-reminders.md). See [live data and PR Watch](live-data.md)
 for source configuration, client examples, limits, and publication.
 
 ## Organization folders

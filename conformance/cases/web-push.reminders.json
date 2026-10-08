@@ -1,0 +1,886 @@
+{
+  "id": "web-push.reminders",
+  "fixture": "empty-v21",
+  "tags": [
+    "web-push",
+    "adr-0012"
+  ],
+  "env": {
+    "WEB_PUSH_VAPID_PRIVATE_KEY": "AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE",
+    "WEB_PUSH_SUBJECT": "mailto:ops@conformance.test",
+    "WEBHOOK_ENC_KEY": "CQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQkJCQk=",
+    "INGRESS_STATE_PER_WINDOW": "200"
+  },
+  "note": "ADR-0012 viewer routes, MCP tool, and static files with the feature enabled. fire_at depends on server time, so it is volatile.",
+  "steps": [
+    {
+      "name": "publish_artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html><html><body><h1>Reminders</h1></body></html>",
+              "title": "Reminders"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      },
+      "capture": {
+        "artifact_id_1": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "push config advertises the derived public key",
+      "request": {
+        "method": "GET",
+        "path": "/push/config",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "service worker headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/sw.js",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "text/javascript; charset=utf-8",
+            "cache-control": "no-cache, no-transform",
+            "service-worker-allowed": "/",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "manifest headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/manifest.webmanifest",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "application/manifest+json",
+            "cache-control": "no-cache, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "icon headers (no viewer)",
+      "request": {
+        "method": "GET",
+        "path": "/icons/app-192.png",
+        "headers": {}
+      },
+      "expect": {
+        "status": 200,
+        "headers": {
+          "require": {
+            "content-type": "image/png",
+            "cache-control": "public, max-age=3600, no-transform",
+            "x-content-type-options": "nosniff"
+          }
+        }
+      }
+    },
+    {
+      "name": "unknown icon is 404",
+      "request": {
+        "method": "GET",
+        "path": "/icons/unknown.png",
+        "headers": {}
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "status before subscribing",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "register a device",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com/fcm/send/conformance-device",
+          "keys": {
+            "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          },
+          "label": "Phone"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      },
+      "capture": {
+        "subscription_id_1": "id"
+      }
+    },
+    {
+      "name": "re-registering the endpoint keeps the id",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com/fcm/send/conformance-device",
+          "keys": {
+            "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          },
+          "expirationTime": null
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "non-allowlisted endpoint",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://evil.test/push",
+          "keys": {
+            "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "explicit non-443 port",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com:8443/x",
+          "keys": {
+            "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "invalid p256dh point",
+      "request": {
+        "method": "PUT",
+        "path": "/push/subscriptions",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "endpoint": "https://fcm.googleapis.com/fcm/send/conformance-device",
+          "keys": {
+            "p256dh": "BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ",
+            "auth": "AgICAgICAgICAgICAgICAg"
+          }
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "opt in",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/push/optin",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {}
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "status after opting in",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/push",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "arm an org reminder",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/diaper",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 7200,
+          "title": " Diaper change due ",
+          "body": "Two hours since the last change."
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "re-arm bumps the revision",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/diaper",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 3600,
+          "title": "Diaper change due"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "arm a viewer reminder",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/mine?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 600,
+          "title": "Private"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "org list excludes viewer rows",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/reminders",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "viewer list",
+      "request": {
+        "method": "GET",
+        "path": "/${artifact_id_1}/reminders?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "bad_time",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 59,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_time both fields",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "fire_at": 1,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_time null delay with fire_at",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": null,
+          "fire_at": 1800000000000,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_time null fire_at with delay",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "fire_at": null,
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_text",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "a\u0007b"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_body",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x",
+          "extra": true
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_scope",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k?scope=team",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "bad_key",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/bad%20key",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "foreign viewer is concealed",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "missing artifact is concealed",
+      "request": {
+        "method": "PUT",
+        "path": "/zzzzzzzzzzzz/reminders/k",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_beta}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "delay_seconds": 120,
+          "title": "x"
+        }
+      },
+      "expect": {
+        "status": 404,
+        "body": {
+          "mode": "canonical-json"
+        },
+        "sameAsStep": 27
+      }
+    },
+    {
+      "name": "cross-site mutation is refused",
+      "request": {
+        "method": "PUT",
+        "path": "/${artifact_id_1}/push/optin",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "cross-site"
+        },
+        "json": {}
+      },
+      "expect": {
+        "status": 403,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "MCP arms an org reminder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "night",
+              "delay_seconds": 7200,
+              "title": "Night check",
+              "body": "Line one\nLine two"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "fire_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "MCP rejects a bad time",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "night",
+              "delay_seconds": 1,
+              "title": "x"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    },
+    {
+      "name": "MCP rejects a bad key",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "bad key",
+              "clear": true
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    },
+    {
+      "name": "MCP clears the reminder",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "night",
+              "clear": true
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpSuccess": true,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    },
+    {
+      "name": "MCP foreign publisher is refused",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "set_artifact_reminder",
+            "arguments": {
+              "id": "${artifact_id_1}",
+              "key": "x",
+              "delay_seconds": 120,
+              "title": "x"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text"
+        }
+      }
+    },
+    {
+      "name": "clear the viewer reminder",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/reminders/mine?scope=viewer",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 204
+      }
+    },
+    {
+      "name": "opt out",
+      "request": {
+        "method": "DELETE",
+        "path": "/${artifact_id_1}/push/optin",
+        "headers": {
+          "cf-access-authenticated-user-email": "${viewer_acme}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "reminders",
+        "query": "SELECT artifact_id, scope, owner, key, org, title, body, state, revision, created_by, fired_at FROM artifact_reminders ORDER BY scope, owner, key",
+        "volatileFields": []
+      },
+      {
+        "name": "subscriptions",
+        "query": "SELECT id, org, viewer_email, endpoint_sha256, p256dh, auth, label, failure_count, last_success_at, substr(endpoint_ciphertext, 1, 3) AS ciphertext_version FROM push_subscriptions",
+        "volatileFields": []
+      },
+      {
+        "name": "optins",
+        "query": "SELECT * FROM artifact_push_optins",
+        "volatileFields": [
+          "created_at"
+        ]
+      },
+      {
+        "name": "deliveries",
+        "query": "SELECT COUNT(*) AS count FROM push_deliveries",
+        "volatileFields": []
+      }
+    ]
+  }
+}

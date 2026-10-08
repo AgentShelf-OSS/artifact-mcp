@@ -145,6 +145,7 @@ impl Harness {
             delivery_wake:
                 artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
             audit_access,
+            push: None,
             config: Arc::new(config),
         }
     }

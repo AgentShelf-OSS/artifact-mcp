@@ -48,6 +48,8 @@ pub struct AppDeps {
     /// A lossy, post-commit worker wake hint. Polling remains the correctness fallback.
     pub delivery_wake: DeliveryWakeSignal,
     pub audit_access: Option<Arc<AuditAccess>>,
+    /// ADR-0012 reminders and Web Push. `None` when the feature is disabled.
+    pub push: Option<Arc<crate::integrations::push_runtime::PushService>>,
     pub config: Arc<AppConfig>,
 }
 

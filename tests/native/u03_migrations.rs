@@ -534,6 +534,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
             "artifact-collections-and-gallery-preferences".to_owned(),
         ),
         (38, "collection-principals".to_owned()),
+        (39, "web-push-reminders".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert_eq!(
