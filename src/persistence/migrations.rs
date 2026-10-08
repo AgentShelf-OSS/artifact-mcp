@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 38;
+pub const LATEST_SCHEMA_VERSION: i64 = 39;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -281,6 +281,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 38,
         name: "collection-principals",
         up: m038_collection_principals,
+    },
+    Migration {
+        version: 39,
+        name: "web-push-reminders",
+        up: m039_web_push_reminders,
     },
 ];
 
@@ -1877,6 +1882,12 @@ fn m038_collection_principals(
     tx.execute_batch(include_str!(
         "../../migrations/038-collection-principals.sql"
     ))
+}
+
+/// ADR-0012 scheduled reminders and Web Push subscriptions. Both runtimes execute the same shared
+/// SQL file so `sqlite_master` stays identical.
+fn m039_web_push_reminders(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
+    tx.execute_batch(include_str!("../../migrations/039-web-push-reminders.sql"))
 }
 
 #[cfg(test)]

@@ -693,6 +693,7 @@ mod tests {
             delivery_telemetry: crate::integrations::delivery_runtime::DeliveryTelemetry::default(),
             delivery_wake: crate::integrations::delivery_runtime::DeliveryWakeSignal::default(),
             audit_access: None,
+            push: None,
             config: Arc::new(AppConfig::default()),
         }
     }

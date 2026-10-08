@@ -34,6 +34,8 @@ import {
 import { createPreviewTaskStore } from "./lib/tasks.js";
 import { assertAuditReady, createAuditLedger, createAuditMetrics, systemAuditContext } from "./lib/audit.js";
 import { createCollectionService } from "./lib/collections.js";
+import { createPushStore } from "./lib/push.js";
+import { WEB_PUSH } from "./lib/config.js";
 
 const PORT = Number(process.env.PORT || 3480);
 const PUBLIC_BASE = process.env.PUBLIC_BASE_URL || "http://localhost:3480";
@@ -168,6 +170,11 @@ const operatorDataSources = parseDataSources();
 const artifactData = createArtifactData({ db, sources: operatorDataSources });
 const dataSources = createDataSourceRegistry({ db, data: artifactData, operatorSources: operatorDataSources, orgs: { has: orgs.orgExists }, artifacts: artifactStore, audit: securityAudit });
 const collections = createCollectionService({ db, artifacts: artifactStore, audit: securityAudit });
+// ADR-0012: the Node reference stores reminders and subscriptions; only Rust sends Web Push.
+const push = createPushStore({ db, config: WEB_PUSH });
+if (String(process.env.WEB_PUSH_VAPID_PRIVATE_KEY || "").trim() && !WEB_PUSH.enabled) {
+  console.warn("[artifact-mcp] WARNING: Web Push reminders are disabled because WEBHOOK_ENC_KEY is not set.");
+}
 
 // Queue existing single-file artifacts at low priority. The serial worker starts on a
 // microtask and mutation events are always selected before remaining backfill jobs.
@@ -201,7 +208,8 @@ const app = createApp({
       preview: thumbnails,
       tasks: previewTasks,
       data: artifactData,
-      collections
+      collections,
+      reminders: push
     }),
   validateMcpHttpRequest,
   invalidMcpRequest,
@@ -251,7 +259,8 @@ const app = createApp({
     mcpJson: MCP_JSON_LIMIT,
     collectionJson: "128kb"
   },
-  collections
+  collections,
+  push
 });
 
 const LISTEN_HOST = process.env.LISTEN_HOST || "0.0.0.0";

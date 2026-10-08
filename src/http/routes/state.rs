@@ -32,7 +32,7 @@ struct KeyResponse {
     updated_at: String,
 }
 
-fn scope_query(uri: &axum::http::Uri) -> Result<StateScope, &'static str> {
+pub(crate) fn scope_query(uri: &axum::http::Uri) -> Result<StateScope, &'static str> {
     let mut found = None;
     for (key, value) in url::form_urlencoded::parse(uri.query().unwrap_or("").as_bytes()) {
         if key == "scope" {

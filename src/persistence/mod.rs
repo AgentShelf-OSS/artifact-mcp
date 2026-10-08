@@ -13,6 +13,7 @@ pub mod notifications;
 pub mod orgs;
 pub mod outbox;
 pub mod outbox_fanout;
+pub mod push;
 pub mod reactions;
 pub mod shares;
 pub mod state;

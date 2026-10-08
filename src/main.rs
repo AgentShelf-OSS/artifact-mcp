@@ -34,6 +34,7 @@ use artifact_mcp::{
         discord_recovery_runtime::DiscordRecoveryRuntime,
         notify::{DiscordNotifier, HttpTransport},
         preview_notifier::ArtifactPreviewNotifier,
+        push_runtime::{HttpPushTransport, PushRuntime, PushService},
         thumbnails::{
             PersistentThumbnailScheduler, PreviewArtifactIndex, PreviewArtifactRef, PreviewHtml,
             PreviewIntegration,
@@ -1685,6 +1686,25 @@ impl PreviewArtifactIndex for StartupPreviewIndex {
     }
 }
 
+/// Background workers owned by a serving process, stopped together after the listener closes.
+struct BackgroundRuntimes {
+    delivery: DeliveryRuntime,
+    recovery: DiscordRecoveryRuntime,
+    inbound: DiscordInboundRuntime,
+    push: Option<PushRuntime>,
+}
+
+impl BackgroundRuntimes {
+    async fn shutdown(self) {
+        self.delivery.shutdown().await;
+        self.recovery.shutdown().await;
+        if let Some(push) = self.push {
+            push.shutdown().await;
+        }
+        self.inbound.shutdown().await;
+    }
+}
+
 struct Bootstrapped {
     router: Router,
     host: String,
@@ -1692,6 +1712,7 @@ struct Bootstrapped {
     delivery_runtime: DeliveryRuntime,
     recovery_runtime: DiscordRecoveryRuntime,
     inbound_runtime: DiscordInboundRuntime,
+    push_runtime: Option<PushRuntime>,
 }
 
 #[tracing::instrument(skip_all)]
@@ -2167,6 +2188,25 @@ async fn bootstrap(
         inbound_store,
         Arc::new(organization_discord),
     );
+    // ADR-0012: the reminder sweeper and Web Push sender run only when the feature is enabled.
+    let push_service = PushService::from_config(&config, pool.clone())?;
+    let push_runtime = match &push_service {
+        Some(service) => {
+            tracing::info!("web push reminders enabled");
+            Some(PushRuntime::start(
+                Arc::clone(service),
+                Arc::new(HttpPushTransport::new()?),
+            ))
+        }
+        None => {
+            if config.web_push.vapid.is_some() {
+                tracing::warn!(
+                    "WEB_PUSH_VAPID_PRIVATE_KEY is set but WEBHOOK_ENC_KEY is not; web push reminders are disabled"
+                );
+            }
+            None
+        }
+    };
     observer.stage(StartupStage::DeliveryWorkersStarted);
     let access_sync = artifact_mcp::integrations::access_sync::AccessSync::start(
         config.access_sync.clone(),
@@ -2234,6 +2274,7 @@ async fn bootstrap(
         delivery_telemetry,
         delivery_wake,
         audit_access,
+        push: push_service,
         config,
     };
     artifact_mcp::mcp::tasks::resume_preview_tasks(deps.clone());
@@ -2245,6 +2286,7 @@ async fn bootstrap(
         delivery_runtime,
         recovery_runtime,
         inbound_runtime,
+        push_runtime,
     })
 }
 
@@ -2265,6 +2307,9 @@ where
     bootstrapped.delivery_runtime.shutdown().await;
     bootstrapped.recovery_runtime.shutdown().await;
     bootstrapped.inbound_runtime.shutdown().await;
+    if let Some(push_runtime) = bootstrapped.push_runtime {
+        push_runtime.shutdown().await;
+    }
     result
 }
 
@@ -2279,9 +2324,12 @@ async fn serve(config: AppConfig) -> Result<(), RuntimeError> {
         bootstrapped.port,
         bootstrapped.router,
         ingress,
-        bootstrapped.delivery_runtime,
-        bootstrapped.recovery_runtime,
-        bootstrapped.inbound_runtime,
+        BackgroundRuntimes {
+            delivery: bootstrapped.delivery_runtime,
+            recovery: bootstrapped.recovery_runtime,
+            inbound: bootstrapped.inbound_runtime,
+            push: bootstrapped.push_runtime,
+        },
     )
     .await
 }
@@ -2295,22 +2343,12 @@ async fn serve_listener(
     port: u16,
     router: Router,
     ingress: artifact_mcp::config::IngressConfig,
-    delivery_runtime: DeliveryRuntime,
-    recovery_runtime: DiscordRecoveryRuntime,
-    inbound_runtime: DiscordInboundRuntime,
+    runtimes: BackgroundRuntimes,
 ) -> Result<(), RuntimeError> {
     let listener = TcpListener::bind((host.as_str(), port)).await?;
     tracing::info!(listen_host = %host, port, "listener ready");
-    serve_listener_with_shutdown_inner(
-        listener,
-        router,
-        ingress,
-        Some(delivery_runtime),
-        Some(recovery_runtime),
-        Some(inbound_runtime),
-        shutdown_signal(),
-    )
-    .await
+    serve_listener_with_shutdown_inner(listener, router, ingress, Some(runtimes), shutdown_signal())
+        .await
 }
 
 /// Serve an already-bound listener until the supplied shutdown future resolves. Keeping this
@@ -2326,16 +2364,14 @@ pub(crate) async fn serve_listener_with_shutdown<F>(
 where
     F: Future<Output = ()> + Send,
 {
-    serve_listener_with_shutdown_inner(listener, router, ingress, None, None, None, shutdown).await
+    serve_listener_with_shutdown_inner(listener, router, ingress, None, shutdown).await
 }
 
 async fn serve_listener_with_shutdown_inner<F>(
     listener: TcpListener,
     router: Router,
     ingress: artifact_mcp::config::IngressConfig,
-    delivery_runtime: Option<DeliveryRuntime>,
-    recovery_runtime: Option<DiscordRecoveryRuntime>,
-    inbound_runtime: Option<DiscordInboundRuntime>,
+    runtimes: Option<BackgroundRuntimes>,
     shutdown: F,
 ) -> Result<(), RuntimeError>
 where
@@ -2407,14 +2443,8 @@ where
     // Stop accepting new sockets and ask each HTTP/1 connection to leave keep-alive mode. We
     // join rather than abort: a mutation already admitted may complete its durable work, while
     // new requests are no longer accepted on that connection.
-    if let Some(delivery_runtime) = delivery_runtime {
-        delivery_runtime.shutdown().await;
-    }
-    if let Some(recovery_runtime) = recovery_runtime {
-        recovery_runtime.shutdown().await;
-    }
-    if let Some(inbound_runtime) = inbound_runtime {
-        inbound_runtime.shutdown().await;
+    if let Some(runtimes) = runtimes {
+        runtimes.shutdown().await;
     }
     drop(listener);
     let _ = stop_send.send(());

@@ -23,4 +23,8 @@ pub mod discussion_envelope;
 pub mod notify;
 pub mod preview;
 pub mod preview_notifier;
+/// ADR-0012 reminder service, sweeper, and Web Push sender.
+pub mod push_runtime;
 pub mod thumbnails;
+/// ADR-0012 VAPID and RFC 8291 message encryption.
+pub mod web_push;

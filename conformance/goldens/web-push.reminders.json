@@ -1,0 +1,461 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"url\":\"http://conformance.test/${artifact_id_1}\",\"org\":\"acme\",\"bytes\":59,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 59,
+              "category": "",
+              "id": "${artifact_id_1}",
+              "org": "acme",
+              "url": "http://conformance.test/${artifact_id_1}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "enabled": true,
+          "vapid_public_key": "BG_wO5SSQc4drdQ1GeaWDgqFtBppoFwygQOqK84VlMoWPE91OlW_AdxT9sCwx-7ni0DG_30lqW4igrmJzvccFEo"
+        }
+      }
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "devices": 0,
+          "enabled": true,
+          "opted_in": false
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": "${subscription_id_1}"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "id": "${subscription_id_1}"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_endpoint"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_endpoint"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_keys"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "opted_in": true
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "devices": 1,
+          "enabled": true,
+          "opted_in": true
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "fire_at": "<volatile>",
+          "key": "diaper",
+          "revision": 1,
+          "scope": "org"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "fire_at": "<volatile>",
+          "key": "diaper",
+          "revision": 2,
+          "scope": "org"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "fire_at": "<volatile>",
+          "key": "mine",
+          "revision": 1,
+          "scope": "viewer"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "reminders": [
+            {
+              "body": "",
+              "fire_at": "<volatile>",
+              "key": "diaper",
+              "revision": 2,
+              "scope": "org",
+              "title": "Diaper change due"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "reminders": [
+            {
+              "body": "",
+              "fire_at": "<volatile>",
+              "key": "mine",
+              "revision": 1,
+              "scope": "viewer",
+              "title": "Private"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_time"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_time"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_time"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_time"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_text"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_body"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_scope"
+        }
+      }
+    },
+    {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "bad_key"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 404,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "Not found"
+        }
+      }
+    },
+    {
+      "status": 403,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "code": "same_origin_required",
+          "error": "forbidden"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"key\":\"night\",\"scope\":\"org\",\"fire_at\":\"<volatile>\",\"revision\":1}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "fire_at": "<volatile>",
+              "id": "${artifact_id_1}",
+              "key": "night",
+              "revision": 1,
+              "scope": "org"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Invalid reminder time: give exactly one of fire_at or delay_seconds, resolving to 60 seconds to 30 days from now.",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Invalid reminder key: use 1-64 characters from A-Z, a-z, 0-9, '.', '_', or '-'.",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 5,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${artifact_id_1}\",\"key\":\"night\",\"cleared\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "cleared": true,
+              "id": "${artifact_id_1}",
+              "key": "night"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 6,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "Unknown artifact: ${artifact_id_1}",
+                "type": "text"
+              }
+            ],
+            "isError": true
+          }
+        }
+      }
+    },
+    {
+      "status": 204
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "opted_in": false
+        }
+      }
+    }
+  ],
+  "postState": {
+    "sql": {
+      "reminders": [
+        {
+          "artifact_id": "${artifact_id_1}",
+          "body": "",
+          "created_by": "viewer",
+          "fired_at": null,
+          "key": "diaper",
+          "org": "acme",
+          "owner": "",
+          "revision": 2,
+          "scope": "org",
+          "state": "armed",
+          "title": "Diaper change due"
+        }
+      ],
+      "subscriptions": [
+        {
+          "auth": "AgICAgICAgICAgICAgICAg",
+          "ciphertext_version": "v1:",
+          "endpoint_sha256": "f17aecb863864872ee22d087eec7076eadaf3e5b4f179b2f0a0d069fcf89c0da",
+          "failure_count": 0,
+          "id": "${subscription_id_1}",
+          "label": "",
+          "last_success_at": null,
+          "org": "acme",
+          "p256dh": "BFUPRxAD89-Xw99QaseX9nIfsaH7e49vg9IkSYplyI4kE2CT1wEuUJpzcVy9CwCjzA_0tcAbP_oZarH7MnA2uOY",
+          "viewer_email": "alice@acme.test"
+        }
+      ],
+      "optins": [],
+      "deliveries": [
+        {
+          "count": 0
+        }
+      ]
+    }
+  }
+}

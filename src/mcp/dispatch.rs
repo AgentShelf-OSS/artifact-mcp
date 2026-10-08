@@ -467,6 +467,7 @@ async fn call_tool(
         "set_data_bindings" => data_bindings(arguments, auth, deps, true).await,
         "set_artifact_data" => set_artifact_data(arguments, auth, deps).await,
         "append_artifact_events" => append_artifact_events(arguments, auth, deps).await,
+        "set_artifact_reminder" => set_artifact_reminder(arguments, auth, deps).await,
         "publish_artifact" => publish_artifact(arguments, auth, deps).await,
         "publish_bundle" => publish_bundle(arguments, auth, deps).await,
         "list_artifacts" => list_artifacts(auth, deps).await,
@@ -617,6 +618,76 @@ async fn append_artifact_events(
     tool_result(
         object! {"id"=>OrderedJson::string(id),"accepted"=>OrderedJson::number_u64(accepted as u64),"duplicates"=>OrderedJson::number_u64(duplicates as u64)},
     )
+}
+
+const REMINDER_KEY_ERROR: &str =
+    "Invalid reminder key: use 1-64 characters from A-Z, a-z, 0-9, '.', '_', or '-'.";
+const REMINDER_TIME_ERROR: &str = "Invalid reminder time: give exactly one of fire_at or delay_seconds, resolving to 60 seconds to 30 days from now.";
+const REMINDER_TEXT_ERROR: &str = "Invalid reminder text: title must be 1-80 characters after trimming, body at most 240, with no control characters other than newline.";
+const REMINDER_LIMIT_ERROR: &str =
+    "Reminder limit reached: an artifact can have at most 16 armed reminders.";
+
+/// ADR-0012 `set_artifact_reminder`: org scope only, writer permission, `clear` deletes the key.
+async fn set_artifact_reminder(
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    use crate::{
+        integrations::push_runtime::ReminderInput,
+        persistence::push::{PUSH_DISABLED_MESSAGE, PushError, ReminderScope, valid_key},
+    };
+    let Some(push) = deps.push.clone() else {
+        return Err(AppError::Validation(PUSH_DISABLED_MESSAGE.to_owned()).into());
+    };
+    let id = required_string(arguments, "id")?;
+    let key = required_string(arguments, "key")?;
+    let owned = publisher_write(id, auth, deps).await?;
+    if !valid_key(key) {
+        return Err(AppError::Validation(REMINDER_KEY_ERROR.to_owned()).into());
+    }
+    let meta = owned.into_authorized().into_meta();
+    let clear = matches!(arguments.get("clear"), Some(OrderedJson::Bool(true)));
+    if clear {
+        push.clear_reminder(meta.id.0, ReminderScope::Org, String::new(), key.to_owned())
+            .await
+            .map_err(|_| AppError::Internal)?;
+        return tool_result(object! {
+            "id" => OrderedJson::string(id),
+            "key" => OrderedJson::string(key),
+            "cleared" => OrderedJson::Bool(true),
+        });
+    }
+    let saved = push
+        .set_reminder(
+            meta.id.0,
+            meta.org.0,
+            ReminderScope::Org,
+            String::new(),
+            key.to_owned(),
+            ReminderInput {
+                fire_at: arguments.get("fire_at"),
+                delay_seconds: arguments.get("delay_seconds"),
+                title: arguments.get("title"),
+                body: arguments.get("body"),
+            },
+            format!("publisher:{}", auth.client_id.0),
+        )
+        .await
+        .map_err(|failure| match failure {
+            PushError::BadKey => AppError::Validation(REMINDER_KEY_ERROR.to_owned()),
+            PushError::BadTime => AppError::Validation(REMINDER_TIME_ERROR.to_owned()),
+            PushError::BadText => AppError::Validation(REMINDER_TEXT_ERROR.to_owned()),
+            PushError::ReminderLimit => AppError::Conflict(REMINDER_LIMIT_ERROR.to_owned()),
+            _ => AppError::Internal,
+        })?;
+    tool_result(object! {
+        "id" => OrderedJson::string(id),
+        "key" => OrderedJson::string(key),
+        "scope" => OrderedJson::string("org"),
+        "fire_at" => OrderedJson::number_i64(saved.fire_at),
+        "revision" => OrderedJson::number_i64(saved.revision),
+    })
 }
 
 fn validate_tool_output(name: &str, result: &Value) -> Result<(), McpError> {

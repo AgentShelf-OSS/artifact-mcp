@@ -35,6 +35,9 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Viewer state**: JSON values belonging to an artifact in a chosen viewer state scope. State survives artifact revisions. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
 - **Viewer state scope**: The audience for a state key. `org` shares the value with viewers who can access the artifact and is the default. `viewer` restricts the value to the authenticated person who owns it, including when that person is an administrator.
 - **Viewer handle**: An opaque, stable viewer ID and a display name that an artifact can use for attribution. A handle does not grant access to another viewer's private state.
+- **Reminder**: A named, scheduled notification for an artifact in `org` or `viewer` scope. Setting the key again replaces its time and text. When it fires, the Rust runtime sends it by Web Push to opted-in viewers. An artifact can have at most 16 armed reminders.
+- **Push subscription**: One browser or device that a viewer registered for Web Push. The endpoint is stored encrypted and must belong to an allowlisted push service. A viewer can have at most 10.
+- **Push opt-in**: A viewer's per-artifact consent to receive that artifact's reminders. A reminder reaches a viewer only with an opt-in and at least one push subscription.
 - **Raw delivery** — artifact bytes served from `/raw/:id` or `/raw/:id/*`.
 - **Storage reconciliation** — inspection and recovery of interrupted staging/trash operations, plus reporting of missing or orphan bodies.
 

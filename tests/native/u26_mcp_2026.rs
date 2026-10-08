@@ -303,7 +303,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert_eq!(status, StatusCode::OK);
             assert_eq!(listed["result"]["resultType"], "complete");
             assert_eq!(listed["result"]["cacheScope"], "private");
-            assert_eq!(listed["result"]["tools"].as_array().map(Vec::len), Some(34));
+            assert_eq!(listed["result"]["tools"].as_array().map(Vec::len), Some(35));
             assert!(
                 listed["result"]["tools"]
                     .as_array()
@@ -336,7 +336,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert_eq!(status, StatusCode::OK);
             assert_eq!(
                 app_tools["result"]["tools"].as_array().map(Vec::len),
-                Some(35)
+                Some(36)
             );
             let linked_tools = app_tools["result"]["tools"]
                 .as_array()
@@ -971,7 +971,7 @@ async fn modern_and_legacy_mcp_share_one_endpoint_without_contract_leakage() {
             assert!(
                 legacy_with_version_header["result"]["tools"]
                     .as_array()
-                    .is_some_and(|tools| tools.len() == 33)
+                    .is_some_and(|tools| tools.len() == 34)
             );
 
             let (status, legacy) = post(

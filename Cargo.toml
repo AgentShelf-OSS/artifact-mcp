@@ -1,6 +1,6 @@
 [package]
 name = "artifact-mcp"
-version = "1.12.2"
+version = "1.13.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
@@ -24,10 +24,12 @@ http-body = "1"
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["http1", "server", "service", "tokio"] }
 hmac = "0.12"
+hkdf = "0.12"
 hex = "0.4"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
 ipnet = "2"
 nanoid = "0.4"
+p256 = { version = "0.13", default-features = false, features = ["arithmetic", "ecdh", "ecdsa", "std"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.34"
 rand = "0.10"

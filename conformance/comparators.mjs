@@ -71,6 +71,11 @@ function blankVolatile(value, volatileFields) {
         new RegExp(`("${field}"\\s*:\\s*)"[^"\\\\]*"`, "g"),
         '$1"<volatile>"'
       );
+      // Numeric volatile values (for example an epoch-millisecond `fire_at`) are blanked the same way.
+      out = out.replaceAll(
+        new RegExp(`("${field}"\\s*:\\s*)-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?`, "g"),
+        '$1"<volatile>"'
+      );
     }
     return out;
   };

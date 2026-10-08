@@ -11,6 +11,7 @@ pub mod gallery;
 pub mod health;
 pub mod mcp;
 pub mod public_share;
+pub mod push;
 pub mod raw;
 pub mod speech;
 pub mod state;

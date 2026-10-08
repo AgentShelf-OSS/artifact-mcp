@@ -168,6 +168,38 @@ openssl rand -base64 32
 When the key first appears, the server encrypts compatible plaintext webhook rows in place.
 Encrypted and plaintext rows can coexist during rollout.
 
+## Web Push reminders
+
+Artifacts can schedule reminders that reach opted-in viewers as Web Push notifications, also when
+the phone is locked ([ADR-0012](adr/0012-scheduled-reminders-via-web-push.md),
+[contract](web-push-reminders.md)). Only the Rust runtime sends them.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `WEB_PUSH_VAPID_PRIVATE_KEY` | unset | base64url (no padding) of the raw 32-byte P-256 VAPID private key. Unset turns the feature off. |
+| `WEB_PUSH_SUBJECT` | unset | `mailto:` or `https:` contact URL sent to push services. Required when the key is set. |
+| `WEB_PUSH_ENDPOINT_HOSTS` | Google, Mozilla, Apple, and Microsoft push hosts | Comma-separated host allowlist for subscription endpoints. `*.example.com` matches subdomains only. |
+
+The feature is enabled only when the key and subject are valid and `WEBHOOK_ENC_KEY` is also set,
+because subscription endpoints are stored encrypted with that key. An invalid key, subject, or host
+list stops startup. Generate a key pair with:
+
+```bash
+node scripts/web-push-keys.mjs
+```
+
+Put the printed `WEB_PUSH_VAPID_PRIVATE_KEY` line in the deployment's protected credentials. The
+server derives the public key. Rotating the VAPID key, or `WEBHOOK_ENC_KEY`, makes every stored
+subscription unusable; each viewer must turn notifications on again for each device.
+
+On iPhone and iPad, Web Push needs iOS 16.4 or later and the site added to the Home Screen. The
+viewer shell shows "Add to Home Screen to get notifications" in Safari outside Home Screen mode.
+
+The service worker (`/sw.js`), the manifest (`/manifest.webmanifest`), and the icons (`/icons/*`)
+contain no private data, and the application serves them without a viewer check. Browsers and iOS
+can fetch the manifest and icons without cookies. If Home Screen icons or the app name fail to load
+behind Cloudflare Access, add an Access bypass policy for `/manifest.webmanifest` and `/icons/*`.
+
 ### Rotate the webhook encryption key
 
 Do not overwrite the old key while encrypted rows still need it.

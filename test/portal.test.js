@@ -9,7 +9,7 @@ const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url),
 const meta = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 3, bytes: 1, category: "" };
 const nav = { prevId: null, nextId: null, index: 1, total: 1 };
 
-function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false } = {}) {
+function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false, stateEnabled, windowExtras = {}, navigatorImpl = {}, search = "" } = {}) {
   const created = [];
   function element(tagName = "div") {
     const listeners = new Map();
@@ -66,8 +66,15 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     "vdiscussion-copy": element("p"),
     "vdiscussion-actions": element("div"),
     "vdiscussion-status": element("p"),
-    vframe: element("iframe")
+    vframe: element("iframe"),
+    "vpush-toggle": element("button"),
+    "vpush-banner": element("div"),
+    "vpush-reason": element("p"),
+    "vpush-enable": element("button"),
+    "vpush-dismiss": element("button")
   };
+  elements["vpush-toggle"].hidden = true;
+  elements["vpush-banner"].hidden = true;
   elements["shell-config"].dataset = {
     artifactId: JSON.stringify("abc123"),
     prevId: JSON.stringify(""),
@@ -84,7 +91,8 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     feedback: JSON.stringify("[]"),
     revision: String(revision),
     title: JSON.stringify("Artifact"),
-    bytes: "1"
+    bytes: "1",
+    ...(stateEnabled === undefined ? {} : { stateEnabled })
   };
   const frameMessages = [];
   elements.vframe.contentWindow = { postMessage(message) { frameMessages.push(message); } };
@@ -103,21 +111,23 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     addEventListener(type, listener) { documentListeners.set(type, listener); }
   };
   const window = {
-    location: { search: "", origin },
+    location: { search, origin },
     __artifactMcpTestHooks: {},
     addEventListener(type, listener) { windowListeners.set(type, listener); },
     requestAnimationFrame(callback) { animationFrames.push(callback); return animationFrames.length; },
-    open(href, target, features) { opens.push({ href, target, features, userActivation }); return popupBlocked ? null : {}; }
+    open(href, target, features) { opens.push({ href, target, features, userActivation }); return popupBlocked ? null : {}; },
+    ...windowExtras
   };
   const html = renderArtifactShell(meta, nav, {}, []);
   const script = scriptOverride || SHELL_ASSET;
   runInNewContext(script, {
     document, window, URL, URLSearchParams, JSON, Number, Array, String, Math,
-    setTimeout() {}, clearTimeout() {}, fetch: fetchImpl, localStorage: {}, navigator: {}
+    setTimeout() {}, clearTimeout() {}, fetch: fetchImpl, localStorage: {}, navigator: navigatorImpl
   });
   return {
     created,
     opens,
+    elements,
     buildAnchorPrompt: window.__artifactMcpTestHooks.buildAnchorPrompt,
     composerPlacement: window.__artifactMcpTestHooks.composerPlacement,
     markerPreviewPlacement: window.__artifactMcpTestHooks.markerPreviewPlacement,
@@ -661,4 +671,116 @@ test("gallery renders a flat role-aware collection and owner-scoped eyes", () =>
   );
   assert.match(admin, />Needs review <span>/);
   assert.doesNotMatch(admin, /My needs-work votes/);
+});
+
+test("viewer shell links the web app manifest and touch icon and renders a hidden bell and prompt region", () => {
+  const html = renderArtifactShell(meta, nav, {}, [], {}, { email: "viewer@acme.test" }, null, true);
+  assert.match(html, /<link rel="manifest" href="\/manifest\.webmanifest" crossorigin="use-credentials">/);
+  assert.match(html, /<link rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png">/);
+  assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
+  assert.match(html, /<meta name="mobile-web-app-capable" content="yes">/);
+  assert.match(html, /<button class="vpush-toggle" id="vpush-toggle" type="button" title="Notify me" aria-label="Notify me" aria-pressed="false" data-state="off" hidden>/);
+  assert.match(html, /<div class="vpush-banner" id="vpush-banner" role="region" aria-label="Artifact notifications" hidden>/);
+  assert.match(html, /<button class="vpush-enable" id="vpush-enable" type="button">Turn on notifications<\/button>/);
+  assert.match(html, /id="vpush-dismiss" type="button" aria-label="Dismiss notification prompt"/);
+  const template = readFileSync(new URL("../templates/artifact-shell.html", import.meta.url), "utf8");
+  for (const fragment of ['<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">', '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', 'id="vpush-toggle"', 'id="vpush-banner"', 'id="vpush-reason"', 'id="vpush-enable"', 'id="vpush-dismiss"']) {
+    assert.ok(template.includes(fragment), `Rust template keeps parity: ${fragment}`);
+  }
+});
+
+test("manifest and service worker assets match the Web Push contract", () => {
+  const manifest = JSON.parse(readFileSync(new URL("../assets/manifest.webmanifest", import.meta.url), "utf8"));
+  assert.equal(manifest.start_url, "/");
+  assert.equal(manifest.scope, "/");
+  assert.equal(manifest.display, "standalone");
+  assert.deepEqual(manifest.icons.map((icon) => [icon.src, icon.sizes, icon.purpose]), [
+    ["/icons/app-192.png", "192x192", "any"], ["/icons/app-512.png", "512x512", "any"], ["/icons/maskable-512.png", "512x512", "maskable"]
+  ]);
+  for (const name of ["app-192.png", "app-512.png", "maskable-512.png", "apple-touch-icon.png", "badge-72.png"]) {
+    const bytes = readFileSync(new URL(`../assets/icons/${name}`, import.meta.url));
+    assert.equal(bytes.subarray(1, 4).toString("latin1"), "PNG", name);
+  }
+  const worker = readFileSync(new URL("../assets/push-sw.js", import.meta.url), "utf8");
+  for (const event of ["push", "notificationclick", "pushsubscriptionchange"]) assert.match(worker, new RegExp(`addEventListener\\("${event}"`));
+  assert.doesNotMatch(worker, /addEventListener\("(fetch|install)"|importScripts\(|caches\./);
+  assert.match(worker, /"x-artifact-mutation": "1"/);
+});
+
+function reminderShell({ supported = true, permission = "default", config = { enabled: true, vapid_public_key: "BAAA" }, optedIn = false } = {}) {
+  const requests = [];
+  const respond = (body) => Promise.resolve({ status: 200, ok: true, json: async () => body });
+  const windowExtras = {
+    fetch(url) {
+      requests.push(String(url));
+      if (url === "/push/config") return respond(config);
+      if (url === "/abc123/push") return respond({ enabled: true, opted_in: optedIn, devices: 0 });
+      return respond({});
+    },
+    ...(supported ? { PushManager: function PushManager() {}, Notification: { permission } } : {})
+  };
+  const h = shellBrokerHarness(null, { stateEnabled: "1", windowExtras, navigatorImpl: supported ? { serviceWorker: {}, userAgent: "Mozilla/5.0 (X11; Linux x86_64)" } : { userAgent: "" } });
+  return { ...h, requests };
+}
+const flushShell = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
+
+test("viewer shell reveals the bell only when the server and browser support push", async () => {
+  const on = reminderShell({ optedIn: true, permission: "granted" });
+  await flushShell();
+  assert.deepEqual(on.requests, ["/push/config", "/abc123/push"]);
+  const bell = on.elements["vpush-toggle"];
+  assert.equal(bell.hidden, false);
+  assert.equal(bell.getAttribute("aria-label"), "Notifications on");
+  assert.equal(bell.getAttribute("aria-pressed"), "true");
+  assert.equal(bell.dataset.state, "on");
+
+  const blocked = reminderShell({ permission: "denied" });
+  await flushShell();
+  assert.equal(blocked.elements["vpush-toggle"].getAttribute("aria-label"), "Blocked in browser settings");
+
+  const off = reminderShell({ config: { enabled: false, vapid_public_key: null } });
+  await flushShell();
+  assert.equal(off.elements["vpush-toggle"].hidden, true);
+
+  const unsupported = reminderShell({ supported: false });
+  await flushShell();
+  assert.equal(unsupported.elements["vpush-toggle"].hidden, true);
+});
+
+test("reminder:prompt renders artifact text as plain text in the shell banner and dismisses", async () => {
+  const h = reminderShell();
+  await flushShell();
+  const hostile = '<img src=x onerror="parent.pwned=1"><b>Turn on</b>';
+  h.message({ type: "reminder:prompt", reason: hostile });
+  await flushShell();
+  const banner = h.elements["vpush-banner"], reason = h.elements["vpush-reason"];
+  assert.equal(banner.hidden, false);
+  assert.equal(reason.textContent, hostile);
+  assert.equal(reason.innerHTML, undefined, "the shell never assigns artifact text as HTML");
+  assert.equal(h.elements["vpush-enable"].hidden, false);
+  h.elements["vpush-dismiss"].trigger("click");
+  assert.equal(banner.hidden, true);
+  h.message({ type: "reminder:prompt", reason: "again" });
+  await flushShell();
+  assert.equal(banner.hidden, true, "a dismissed prompt stays dismissed for this page view");
+});
+
+test("viewer shell routes reminder:hello through the reminder broker", async () => {
+  const h = reminderShell();
+  await flushShell();
+  h.message({ type: "reminder:hello" });
+  await flushShell();
+  assert.deepEqual(JSON.parse(JSON.stringify(h.frameMessages.filter((m) => String(m.type).startsWith("reminder:")))), [
+    { type: "reminder:ready", enabled: true, optedIn: false, permission: "default", needsInstall: false }
+  ]);
+});
+
+test("historical viewer shells never load push configuration", async () => {
+  const requests = [];
+  const h = shellBrokerHarness(null, { stateEnabled: "1", windowExtras: { fetch(url) { requests.push(url); return Promise.resolve({ ok: true, status: 200, json: async () => ({ enabled: true, vapid_public_key: "BAAA" }) }); }, PushManager() {}, Notification: { permission: "default" } }, navigatorImpl: { serviceWorker: {} }, search: "?v=2" });
+  await flushShell();
+  h.message({ type: "reminder:hello" });
+  await flushShell();
+  assert.deepEqual(requests.filter((url) => String(url).includes("push")), []);
+  assert.equal(h.frameMessages.find((m) => m.type === "reminder:ready").enabled, false);
 });

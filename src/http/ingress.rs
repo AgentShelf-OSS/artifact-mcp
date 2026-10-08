@@ -428,6 +428,21 @@ impl IngressState {
         allowed
     }
 
+    /// Spend one token of the viewer-state budget (`INGRESS_STATE_PER_WINDOW`) for the source this
+    /// middleware verified. Shares the bucket that admission uses for `/{id}/state` routes.
+    pub fn allow_state_request(&self, headers: &HeaderMap) -> bool {
+        let allowed = self.allow(
+            RequestClass::State.label(),
+            self.config.state_per_window,
+            verified_source(headers),
+        );
+        if !allowed {
+            self.metrics.record_class(RequestClass::State.label());
+            self.metrics.record("rate_limited");
+        }
+        allowed
+    }
+
     /// A public share becomes a limiter principal only after resolution and authorization prove
     /// that it exists and is live. Invalid candidates remain in the source-only pre-auth bucket.
     pub fn allow_verified_share(
@@ -575,7 +590,9 @@ pub async fn admit(
 
     let source = trusted_source(request.headers(), peer_addr(&request), &state.config);
     let rate_limit = rate_limit(&state.config, class);
-    if !state.allow(class.label(), rate_limit, source_fingerprint(&source)) {
+    if class != RequestClass::PushMutation
+        && !state.allow(class.label(), rate_limit, source_fingerprint(&source))
+    {
         // Audit reads are throttled here, before their route can authenticate a capability or
         // record route-local telemetry. Keep this signal fixed-name and route-specific so the
         // sustained-rate-limit alert covers the live audit surface without turning scope
@@ -809,6 +826,9 @@ enum RequestClass {
     Mutation,
     Feedback,
     State,
+    /// ADR-0012 push/reminder mutations. Admitted like a mutation, but the state budget is spent
+    /// by the handler after concealment and the disabled check (Node order).
+    PushMutation,
     Mcp,
     Admin,
 }
@@ -823,6 +843,7 @@ impl RequestClass {
             Self::Mutation => "mutation",
             Self::Feedback => "feedback",
             Self::State => "state",
+            Self::PushMutation => "push_mutation",
             Self::Mcp => "mcp",
             Self::Admin => "admin",
         }
@@ -830,7 +851,7 @@ impl RequestClass {
     const fn is_mutation(self) -> bool {
         matches!(
             self,
-            Self::Mutation | Self::Feedback | Self::State | Self::Admin
+            Self::Mutation | Self::Feedback | Self::State | Self::PushMutation | Self::Admin
         )
     }
 }
@@ -864,6 +885,10 @@ fn classify(method: &Method, path: &str) -> RequestClass {
     if path.split('/').nth(2) == Some("state") && matches!(path.split('/').count(), 3 | 4) {
         return RequestClass::State;
     }
+    // ADR-0012: push and reminder mutations spend the viewer-state budget in their handlers.
+    if matches!(*method, Method::PUT | Method::DELETE) && is_push_mutation_path(path) {
+        return RequestClass::PushMutation;
+    }
     if matches!(
         *method,
         Method::POST | Method::PUT | Method::PATCH | Method::DELETE
@@ -872,6 +897,17 @@ fn classify(method: &Method, path: &str) -> RequestClass {
     } else {
         RequestClass::Read
     }
+}
+
+fn is_push_mutation_path(path: &str) -> bool {
+    if path == "/push/subscriptions" {
+        return true;
+    }
+    let parts: Vec<&str> = path.split('/').collect();
+    matches!(
+        parts.as_slice(),
+        ["", _, "push", "optin"] | ["", _, "reminders", _]
+    )
 }
 
 fn is_audit_route(path: &str) -> bool {
@@ -887,7 +923,7 @@ fn body_limit(config: &BodyLimits, class: RequestClass) -> u64 {
             .category_json
             .max(config.feedback_json)
             .max(config.reaction_json),
-        RequestClass::State => config.state_json,
+        RequestClass::State | RequestClass::PushMutation => config.state_json,
         _ => 0,
     }
 }
@@ -899,6 +935,8 @@ fn rate_limit(config: &IngressConfig, class: RequestClass) -> u64 {
         RequestClass::Mutation => config.mutations_per_window,
         RequestClass::Feedback => config.feedback_per_window,
         RequestClass::State => config.state_per_window,
+        // Not consulted at admission; see `IngressState::allow_state_request`.
+        RequestClass::PushMutation => config.state_per_window,
         RequestClass::Mcp => config.mcp_per_window,
         RequestClass::Admin => config.admin_per_window,
         RequestClass::Read | RequestClass::Data => config.reads_per_window,
