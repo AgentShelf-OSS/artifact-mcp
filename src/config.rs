@@ -1610,8 +1610,13 @@ impl AppConfig {
         let body = BodyLimits::from_source(env, storage.max_bundle_bytes)?;
         // The speech module reads this lazily; reject invalid values at startup instead.
         if let Some(raw) = present(env, "TTS_WORKER_CONCURRENCY") {
-            crate::http::routes::speech::parse_worker_concurrency(Some(&raw))
-                .map_err(|_| invalid("TTS_WORKER_CONCURRENCY", raw.trim(), "an integer from 1 to 8"))?;
+            crate::http::routes::speech::parse_worker_concurrency(Some(&raw)).map_err(|_| {
+                invalid(
+                    "TTS_WORKER_CONCURRENCY",
+                    raw.trim(),
+                    "an integer from 1 to 8",
+                )
+            })?;
         }
 
         let port = match present(env, "PORT") {
