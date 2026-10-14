@@ -10,11 +10,65 @@
   let snapshot = new Map(), active = null, signature = null, timer, selection = '', selectionRange = null, playbackSelectionRange = null, point = null, pickMode = false, pickedElement = null, targetFrame = 0;
   const post = message => window.parent.postMessage(message, '*');
   const wordSources = new Map();
+  // Voice-role segments that share an element keep their own text and DOM positions.
+  let segmentSources = new Map(), sharedSegments = new Set();
   let blockOnly = new Set();
   const normalize = text => text.replace(/\s+/g, ' ').trim();
   const style = document.createElement('style');
   style.textContent = '[data-artifact-reader-target]{outline:1px dashed #9b681f!important;outline-offset:4px;background-color:rgba(181,107,44,.18)!important;border-radius:2px} [data-artifact-reader-active]{outline:2px solid #b56b2c!important;outline-offset:3px;background-color:rgba(181,107,44,.12)!important} ::highlight(artifact-reader-passage){background-color:rgba(181,107,44,.24);color:inherit} ::highlight(artifact-reader-word){background-color:rgba(255,194,74,.75);color:inherit;border-radius:2px}';
   (document.head || document.documentElement).appendChild(style);
+  function sanitizeReaderCast(text) {
+    try {
+      if (typeof text !== 'string' || new TextEncoder().encode(text).length > 16 * 1024) return null;
+      const value = JSON.parse(text);
+      if (!value || value.version !== 1 || !Array.isArray(value.roles) || value.roles.length < 1 || value.roles.length > 24) return null;
+      const clean = value => typeof value === 'string' ? value.replace(/[\u0000-\u001f\u007f]/g, '') : '';
+      const ids = new Set(), roles = [];
+      for (const role of value.roles) {
+        if (!role || typeof role !== 'object') return null;
+        const id = clean(role.id), label = clean(role.label).trim();
+        const description = clean(role.description), suggest = Array.isArray(role.suggest) ? role.suggest.map(clean) : [];
+        if (!/^[a-z][a-z0-9_-]{0,31}$/.test(id) || ids.has(id) || !label || label.length > 60 || description.length > 160 || suggest.length > 4 || suggest.some(item => !/^[a-z0-9_]+$/.test(item) || item.length > 64)) return null;
+        ids.add(id); roles.push({id, label, description, suggest});
+      }
+      const fallback = roles[0].id, defaultRole = value.default === undefined ? fallback : clean(value.default);
+      return ids.has(defaultRole) ? {version:1, default:defaultRole, roles} : null;
+    } catch (_) { return null; }
+  }
+  function readerCast() {
+    const node = document.getElementById('artifact-reader-cast');
+    return node ? sanitizeReaderCast(node.textContent || '') : null;
+  }
+  function resolveReaderRole(element, root, cast) {
+    if (!cast) return null;
+    const ids = new Set(cast.roles.map(role => role.id));
+    for (let node = element; node; node = node.parentElement) {
+      const value = node.getAttribute && node.getAttribute('data-artifact-reader-voice');
+      if (value !== null) return ids.has(value) ? value : cast.default;
+      if (node === root) break;
+    }
+    return cast.default;
+  }
+  // Kept pure so the segment contract can be tested without a browser DOM.
+  function splitReaderRoleSegments(parts) {
+    const result = [];
+    for (const part of parts) {
+      if (!part || typeof part.text !== 'string') continue;
+      const leading = part.text.match(/^\s*/)[0].length, trailing = part.text.match(/\s*$/)[0].length;
+      const text = part.text.slice(leading, part.text.length - trailing || undefined);
+      if (!text) continue;
+      const positions = part.positions ? part.positions.slice(leading, part.text.length - trailing || undefined) : undefined;
+      const value = {...part, text}; if (positions) value.positions = positions;
+      const previous = result.at(-1);
+      if (previous && previous.role === value.role) {
+        const offset = previous.text.length;
+        previous.text += ' ' + value.text;
+        if (previous.positions && value.positions) previous.positions.push(null, ...value.positions);
+        if (value.pronunciations?.length) previous.pronunciations = (previous.pronunciations || []).concat(value.pronunciations.map(hint => ({...hint,start:hint.start + offset + 1,end:hint.end + offset + 1})));
+      } else result.push(value);
+    }
+    return result;
+  }
   function allowed(element) {
     if (!element || element.closest(excluded)) return false;
     for (let node = element; node; node = node.parentElement) {
@@ -87,6 +141,7 @@
   }
   function scanRoot(root, range, mapPositions = false, literal = false, details = false) {
     const groups = []; let current = null, chars = 0, truncated = false;
+    const cast = readerCast(), keepPositions = mapPositions || !!cast;
     const consumed = new Set();
     if (!range && !literal) for (const visual of root.querySelectorAll('figure,svg,canvas,img,[role="img"],[data-artifact-reader-summary]')) {
       if (!allowed(visual) || visual.hasAttribute('data-artifact-reader-summary')) continue;
@@ -96,9 +151,10 @@
       }
     }
     function append(text, owner, node, start) {
-      if (current && current.element === owner) current.text += text;
-      else { current = { element: owner, text, positions:[] }; groups.push(current); }
-      if (mapPositions) for (let i = 0; i < text.length; i++) current.positions.push({node, offset:start + i});
+      const role = resolveReaderRole(node.parentElement, root, cast);
+      if (current && current.element === owner && current.role === role) current.text += text;
+      else { current = { element: owner, text, positions:[], role }; groups.push(current); }
+      if (keepPositions) for (let i = 0; i < text.length; i++) current.positions.push({node, offset:start + i});
       chars += text.length;
     }
     function atomic(element, text, mapped = false) {
@@ -106,7 +162,7 @@
       const remaining = MAX_CHARS - chars;
       if (text.length > remaining) truncated = true;
       const value = text.slice(0, remaining);
-      groups.push({element, text:value, blockOnly: !mapped, positions: mapPositions ? mapped ? scanRoot(element, null, true, true).groups.flatMap((group, index) => index ? [null, ...group.positions] : group.positions).slice(0, value.length) : Array(value.length).fill(null) : []});
+      groups.push({element, text:value, blockOnly: !mapped, role:resolveReaderRole(element, root, cast), positions: keepPositions ? mapped ? scanRoot(element, null, true, true).groups.flatMap((group, index) => index ? [null, ...group.positions] : group.positions).slice(0, value.length) : Array(value.length).fill(null) : []});
       chars += value.length;
     }
     function plain(element) {
@@ -174,14 +230,14 @@
     }
     walk(root, root);
     return { groups: groups.map(g => {
-      if (!mapPositions) return {element:g.element, text:normalize(g.text), blockOnly: g.blockOnly === true};
+      if (!keepPositions) return {element:g.element, text:normalize(g.text), blockOnly: g.blockOnly === true, role:g.role};
       let text = '', pending = false; const positions = [];
       for (let i = 0; i < g.text.length; i++) {
         if (/\s/.test(g.text[i])) { if (text) pending = true; continue; }
         if (pending) { text += ' '; positions.push(null); pending = false; }
         text += g.text[i]; positions.push(g.positions[i]);
       }
-      return {element:g.element, text, positions};
+      return {element:g.element, text, positions, blockOnly:g.blockOnly === true, role:g.role};
     }).filter(g => g.text), truncated };
   }
   function scan(range) {
@@ -189,7 +245,9 @@
     const adapted = window.__artifactEreader && window.__artifactEreader.scan();
     if (adapted) {
       let total = 0;
-      const groups = adapted.groups.slice(0, MAX_BLOCKS).map(g => { const text = g.text.slice(0, Math.max(0, MAX_CHARS - total)); total += text.length; return { element: g.element, text }; }).filter(g => g.text);
+      const cast = readerCast();
+      const source = cast ? adapted.groups.flatMap(group => group.heading ? [{element:group.element, text:group.text, blockOnly:true, role:resolveReaderRole(group.element, group.element, cast)}] : scanRoot(group.element, null, true, true).groups) : adapted.groups;
+      const groups = source.slice(0, MAX_BLOCKS).map(g => { const text = g.text.slice(0, Math.max(0, MAX_CHARS - total)); total += text.length; return {...g, text}; }).filter(g => g.text);
       return Object.assign({}, adapted, { groups, truncated: total >= MAX_CHARS });
     }
     const groups = []; let chars = 0, truncated = false;
@@ -203,11 +261,10 @@
     }
     return {groups, truncated};
   }
-  function pronunciationHints(element, text, range = null) {
+  function pronunciationHints(element, text, range = null, knownPositions = null) {
     if (!element || !element.querySelector('[data-artifact-pronounce]') && !element.hasAttribute('data-artifact-pronounce')) return [];
-    const groups = scanRoot(element, range, true).groups;
-    const source = {text:'', positions:[]};
-    for (const group of groups) {
+    const source = knownPositions ? {text, positions:knownPositions} : {text:'', positions:[]};
+    if (!knownPositions) for (const group of scanRoot(element, range, true).groups) {
       if (source.text) { source.text += ' '; source.positions.push(null); }
       source.text += group.text; for (const position of group.positions) source.positions.push(position);
     }
@@ -237,7 +294,7 @@
   function readingSignature(found) {
     return found.groups.map(group => {
       if (!group.pronunciations) group.pronunciations = group.blockOnly ? [] : pronunciationHints(group.element, group.text);
-      return group.text + (group.pronunciations.length ? '\u0000' + JSON.stringify(group.pronunciations) : '');
+      return group.text + (group.role ? '\u0000role:' + group.role : '') + (group.pronunciations.length ? '\u0000' + JSON.stringify(group.pronunciations) : '');
     }).join('\n');
   }
   function fingerprintText(value) {
@@ -281,11 +338,13 @@
   }
   function content(mode, full, requestedScope) {
     wordSources.clear();
-    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = readingSignature(scopedScan('selection')); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection, pronunciations:pronunciationHints(document.body, selection, playbackSelectionRange) }] : [], truncated: selection.length >= MAX_CHARS }; }
-    const found = scopedScan(mode, requestedScope); activeScope = {mode, key:found.scopeKey}; snapshot = new Map(); blockOnly = new Set();
+    const cast = readerCast();
+    if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = readingSignature(scopedScan('selection')); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection, pronunciations:pronunciationHints(document.body, selection, playbackSelectionRange) }] : [], truncated: selection.length >= MAX_CHARS, ...(cast ? {cast} : {}) }; }
+    const found = scopedScan(mode, requestedScope); activeScope = {mode, key:found.scopeKey}; snapshot = new Map(); blockOnly = new Set(); segmentSources = new Map(); sharedSegments = new Set();
+    if (cast) { const owners = new Map(); found.groups.forEach((group, ordinal) => { if (!group.blockOnly && Array.isArray(group.positions) && group.positions.length) segmentSources.set('r' + ordinal, {text:group.text, positions:group.positions}); owners.set(group.element, (owners.get(group.element) || []).concat('r' + ordinal)); }); owners.forEach(ids => { if (ids.length > 1) ids.forEach(id => sharedSegments.add(id)); }); }
     let blocks = found.groups.map((group, ordinal) => {
       const id = 'r' + ordinal; snapshot.set(id, group.element); if (group.blockOnly) blockOnly.add(id);
-      return { id, ordinal, text: group.text, pronunciations:group.blockOnly ? [] : pronunciationHints(group.element, group.text) };
+      return { id, ordinal, text: group.text, pronunciations:group.blockOnly ? [] : pronunciationHints(group.element, group.text, null, group.positions), ...(cast ? {role:group.role || cast.default} : {}) };
     });
     blocks = blocks.map((block, ordinal) => { const meta = sectionMeta(blocks, ordinal); return Object.assign(block, { sectionEndOrdinal: meta.end, sectionLabel: meta.label }); });
     if (mode === 'here') {
@@ -294,7 +353,7 @@
       blocks = blocks.slice(Math.max(0, index));
     }
     signature = readingSignature(found);
-    return { blocks, scopeKey:found.scopeKey || '', truncated: found.truncated, chapter: found.chapter || null, fingerprint: fingerprint(found), label: found.chapter && found.chapter.label || null };
+    return { blocks, scopeKey:found.scopeKey || '', truncated: found.truncated, chapter: found.chapter || null, fingerprint: fingerprint(found), label: found.chapter && found.chapter.label || null, ...(cast ? {cast} : {}) };
   }
   function outline() {
     const savedSnapshot = snapshot, found = scan();
@@ -311,13 +370,14 @@
     if (signature === null) { activeScope = {mode:'page'}; signature = readingSignature(found); }
     const adapted = window.__artifactEreader;
     const details = [...document.querySelectorAll('table,pre,[data-artifact-reader-detail]')].filter(node => allowed(node) && readingRoots().some(root => root.contains(node))).slice(0,100).map(node => ({scopeKey:scopeKey(node), label:(description(node) || (node.tagName === 'PRE' ? 'Code block' : node.tagName === 'TABLE' ? 'Table' : 'Visual details')).slice(0,120)})).filter(item => item.scopeKey.length <= 500);
-    return {details, fingerprint:fingerprint(found),sections:sections.sort((a,b)=>a.ordinal-b.ordinal).slice(0,500),chapters:adapted && adapted.outline ? adapted.outline().chapters.slice(0,500) : [],chapter:found.chapter || null};
+    return {details, fingerprint:fingerprint(found),sections:sections.sort((a,b)=>a.ordinal-b.ordinal).slice(0,500),chapters:adapted && adapted.outline ? adapted.outline().chapters.slice(0,500) : [],chapter:found.chapter || null, ...(readerCast() ? {cast:readerCast()} : {})};
   }
   function highlight(id) {
     if (active) active.removeAttribute('data-artifact-reader-active');
     clearWordHighlight();
     if (id === null) { clearPassageHighlight(); playbackSelectionRange = null; wordSources.clear(); }
     else if (id === 'selection' && playbackSelectionRange) cssHighlight('artifact-reader-passage', playbackSelectionRange);
+    else if (sharedSegments.has(id) && segmentRange(id)) cssHighlight('artifact-reader-passage', segmentRange(id));
     else clearPassageHighlight();
     active = snapshot.get(id) || null;
     if (active) {
@@ -325,6 +385,12 @@
       const box = active.getBoundingClientRect();
       if (box.top < 0 || box.bottom > innerHeight) active.scrollIntoView({ block: 'center' });
     }
+  }
+  function segmentRange(id) {
+    const source = segmentSources.get(id); if (!source) return null;
+    const first = source.positions.find(item => item?.node?.isConnected), last = source.positions.findLast(item => item?.node?.isConnected);
+    if (!first || !last) return null;
+    const range = document.createRange(); range.setStart(first.node, first.offset); range.setEnd(last.node, last.offset + 1); return range;
   }
   function cssHighlight(name, range) {
     if (typeof CSS === 'undefined' || typeof CSS.highlights?.set !== 'function' || typeof Highlight !== 'function') return false;
@@ -335,6 +401,7 @@
   function clearPassageHighlight() { cssHighlight('artifact-reader-passage', null); }
   function mappedSource(id) {
     if (blockOnly.has(id)) return null;
+    if (segmentSources.has(id)) return segmentSources.get(id);
     if (wordSources.has(id)) return wordSources.get(id);
     const root = id === 'selection' ? document.body : snapshot.get(id);
     if (!root || !root.isConnected || id === 'selection' && !playbackSelectionRange) return null;
@@ -455,6 +522,6 @@
       try { next = readingSignature(scopedScan(activeScope?.mode || 'page', activeScope?.key)); } catch (_) { next = null; }
       if (next !== signature) { targetResize.disconnect(); clearPicked(); signature = next; selection = ''; selectionRange = null; playbackSelectionRange = null; wordSources.clear(); clearPassageHighlight(); highlight(null); snapshot.clear(); post({ type: 'reader:changed', version: 1, scopeKey:activeScope?.key || '' }); }
     }, 160);
-  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable', 'data-artifact-reader-region', 'data-artifact-pronounce', 'data-artifact-reader-summary', 'data-artifact-reader-detail', 'data-artifact-reader-block', 'aria-describedby', 'aria-label', 'alt', 'role', 'open'] });
+  }).observe(document.documentElement, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ['hidden', 'aria-hidden', 'class', 'style', 'data-artifact-readable', 'data-artifact-reader-region', 'data-artifact-reader-voice', 'data-artifact-pronounce', 'data-artifact-reader-summary', 'data-artifact-reader-detail', 'data-artifact-reader-block', 'aria-describedby', 'aria-label', 'alt', 'role', 'open'] });
   post({ type: 'reader:ready', version: 1 });
 })();

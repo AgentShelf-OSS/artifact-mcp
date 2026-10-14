@@ -445,6 +445,7 @@
     // Tabler Icons player-play and player-pause, MIT, https://github.com/tabler/tabler-icons.
     box.insertAdjacentHTML('beforeend', '<button id="vreader-inline-read" class="vreader-inline-read" type="button" aria-label="Read from here" title="Read from here" hidden><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13 -8l-13 -8" /></svg><span>Read from here</span></button>');
     box.querySelector('.vreader-utility-row').insertAdjacentHTML('beforeend', '<button id="vreader-replay" type="button" class="vreader-control" disabled title="Replay the current sentence when word timings are available">Replay sentence</button>');
+    box.querySelector('#vreader-style-panel').insertAdjacentHTML('afterend', '<section id="vreader-cast" class="vreader-cast" hidden><div class="vreader-cast-head"><strong>Voices</strong><label><input id="vreader-character-voices" type="checkbox" checked> Character voices</label></div><div id="vreader-cast-roles"></div></section>');
     // Keep playback together, followed by reading position and voice preferences.
     const readerPanel = box.querySelector('.vreader-panel');
     const playbackGroup = document.createElement('div'); playbackGroup.className = 'vreader-playback';
@@ -601,11 +602,12 @@
       expressive: 'Read expressively with natural emotional variation appropriate to the text, clear phrasing, and varied emphasis.'
     };
     let previewEnd = null, previewStart = 0, previewRequested = false;
-    function supportsStyle() { return voice === 'qwen_ryan' || voice === 'qwen_aiden'; }
-    function instructions() { return supportsStyle() ? (get('style').value === 'custom' ? get('custom').value.trim() : readingStyles[get('style').value] || '') : ''; }
+    let cast = null, roleVoices = {}, characterVoices = true, availableVoices = [], preferences = {}, pendingCast;
+    function supportsStyle(chosenVoice = voice) { return chosenVoice === 'qwen_ryan' || chosenVoice === 'qwen_aiden'; }
+    function instructions(chosenVoice = voice) { return supportsStyle(chosenVoice) ? (get('style').value === 'custom' ? get('custom').value.trim() : readingStyles[get('style').value] || '') : ''; }
     function speechBody(text, chosenVoice) {
       const body = { text, voice: chosenVoice };
-      if (supportsStyle() && instructions()) body.instructions = instructions();
+      if (supportsStyle(chosenVoice) && instructions(chosenVoice)) body.instructions = instructions(chosenVoice);
       return JSON.stringify(body);
     }
     function updateStyle() {
@@ -622,11 +624,79 @@
     let savedVoice = '';
     try {
       const saved = JSON.parse(localStorage.getItem('artifact-reader-preferences') || 'null');
-      if (saved && typeof saved.voice === 'string') savedVoice = saved.voice;
+      if (saved && typeof saved === 'object') preferences = saved;
+      if (preferences && typeof preferences.voice === 'string') savedVoice = preferences.voice;
       if (saved && Array.from(get('rate').options).some(option => option.value === saved.rate)) get('rate').value = saved.rate;
     } catch (_) {}
     function savePreferences() {
-      try { localStorage.setItem('artifact-reader-preferences', JSON.stringify({ voice, rate: get('rate').value })); } catch (_) {}
+      try { localStorage.setItem('artifact-reader-preferences', JSON.stringify({...preferences, voice, rate: get('rate').value})); } catch (_) {}
+    }
+    function defaultRoleVoices(nextCast, voices, mainVoice) {
+      const ids = voices.map(item => typeof item === 'string' ? item : item.id).filter(Boolean), result = {};
+      const family = String(mainVoice || '').split('_')[0], used = new Set();
+      for (const role of nextCast.roles) {
+        if (role.id === nextCast.default) { result[role.id] = ''; continue; }
+        const suggested = (role.suggest || []).find(id => ids.includes(id));
+        if (suggested) { result[role.id] = suggested; used.add(suggested); continue; }
+        const candidates = ids.filter(id => id !== mainVoice && !used.has(id));
+        const chosen = candidates.find(id => id.split('_')[0] === family) || candidates[0] || '';
+        result[role.id] = chosen; if (chosen) used.add(chosen);
+      }
+      return result;
+    }
+    function validCast(value) {
+      if (!value || value.version !== 1 || !Array.isArray(value.roles) || value.roles.length < 1 || value.roles.length > 24 || typeof value.default !== 'string') return null;
+      const ids = new Set(), roles = [];
+      for (const role of value.roles) {
+        if (!role || !/^[a-z][a-z0-9_-]{0,31}$/.test(role.id) || ids.has(role.id) || typeof role.label !== 'string' || !role.label.trim() || role.label.length > 60 || typeof role.description !== 'string' || role.description.length > 160 || !Array.isArray(role.suggest) || role.suggest.length > 4 || role.suggest.some(id => typeof id !== 'string' || id.length > 64 || !/^[a-z0-9_]+$/.test(id))) return null;
+        ids.add(role.id); roles.push({id:role.id,label:role.label,description:role.description,suggest:role.suggest});
+      }
+      return ids.has(value.default) ? {version:1,default:value.default,roles} : null;
+    }
+    function voiceFor(entry) { return characterVoices && cast && entry?.role && roleVoices[entry.role] ? roleVoices[entry.role] : voice; }
+    function discardFutureVoiceAudio() {
+      for (const index of cache.keys()) if (index > position) cache.delete(index);
+      for (const [index, work] of streamRequests) if (index > position) { work.then(response => response.body?.cancel()).catch(() => {}); streamRequests.delete(index); }
+    }
+    function saveCastPreferences() {
+      if (!cast) return;
+      const casts = preferences.casts && typeof preferences.casts === 'object' ? preferences.casts : {};
+      casts[artifactId] = {roles:cast.roles.map(role => role.id), enabled:characterVoices, voices:roleVoices};
+      preferences = {...preferences, casts}; savePreferences();
+    }
+    function previewRole(role) {
+      const chosenVoice = voiceFor({role:role.id});
+      fetch('/' + encodeURIComponent(artifactId) + '/speech', {method:'POST',headers:{'content-type':'application/json'},body:speechBody(role.description || ('This is ' + role.label + '.'), chosenVoice)})
+        .then(response => response.ok ? response.arrayBuffer() : Promise.reject()).then(buffer => { const sample = new Audio(URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}))); sample.addEventListener('ended',()=>URL.revokeObjectURL(sample.src),{once:true}); return sample.play(); }).catch(() => status('Voice preview is unavailable.'));
+    }
+    function renderCast(nextCast) {
+      // Role defaults depend on the voice list; wait for it rather than saving empty choices.
+      if (nextCast && !availableVoices.length) { pendingCast = nextCast; return; }
+      pendingCast = undefined;
+      const signatureOf = value => value ? JSON.stringify(value) : '';
+      if (cast && signatureOf(validCast(nextCast)) === signatureOf(cast)) return;
+      cast = validCast(nextCast); const section = get('cast'), rows = get('cast-roles');
+      rows.replaceChildren(); section.hidden = !cast;
+      if (!cast) { roleVoices = {}; characterVoices = true; return; }
+      const saved = preferences.casts?.[artifactId];
+      const defaults = defaultRoleVoices(cast, availableVoices, voice);
+      roleVoices = {...defaults};
+      if (saved && Array.isArray(saved.roles) && saved.roles.join('\u0000') === cast.roles.map(role => role.id).join('\u0000')) {
+        characterVoices = saved.enabled !== false;
+        for (const role of cast.roles) if (saved.voices && (saved.voices[role.id] === '' || availableVoices.some(item => item.id === saved.voices[role.id]))) roleVoices[role.id] = saved.voices[role.id];
+      } else characterVoices = true;
+      get('character-voices').checked = characterVoices;
+      for (const role of cast.roles) {
+        const row = document.createElement('div'); row.className = 'vreader-cast-role';
+        const title = document.createElement('strong'); title.textContent = role.label;
+        const description = document.createElement('p'); description.textContent = role.description || ('This is ' + role.label + '.');
+        const select = document.createElement('select'); select.setAttribute('aria-label', role.label + ' voice'); select.appendChild(new Option('Main voice',''));
+        availableVoices.forEach(item => select.appendChild(new Option(item.name || item.id,item.id))); select.value = roleVoices[role.id] || '';
+        select.addEventListener('change', () => { roleVoices[role.id] = select.value; discardFutureVoiceAudio(); saveCastPreferences(); paint(); });
+        const preview = document.createElement('button'); preview.type = 'button'; preview.className = 'vreader-control'; preview.textContent = 'Preview'; preview.addEventListener('click', () => previewRole(role));
+        row.append(title, description, select, preview); rows.appendChild(row);
+      }
+      get('character-voices').onchange = () => { characterVoices = get('character-voices').checked; discardFutureVoiceAudio(); saveCastPreferences(); paint(); };
     }
     function styleChanged() {
       stop('Style changed. Play or preview this paragraph.', true);
@@ -645,7 +715,9 @@
     function readingMessage() {
       const entry = queue[position];
       const label = chapter?.label || entry?.sectionLabel || (entry ? 'block ' + (entry.ordinal + 1) : '');
-      return (wants ? 'Reading' : 'Paused') + (label ? ' · ' + label : '');
+      const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role) : null;
+      const roleText = role ? role.label + ' · ' + (availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry)) : '';
+      return (wants ? 'Reading' : 'Paused') + (roleText ? ' · ' + roleText : label ? ' · ' + label : '');
     }
     function paint() { get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
       const icon = wants
@@ -779,7 +851,7 @@
     function synth(index) {
       if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (cache.has(index)) return cache.get(index);
-      const signal = controller.signal, entry = queue[index], chosenVoice = voice;
+      const signal = controller.signal, entry = queue[index], chosenVoice = voiceFor(entry);
       const work = (async () => {
         for (let attempt = 0; attempt < 5; attempt++) {
           const response = await fetch('/' + encodeURIComponent(artifactId) + '/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal });
@@ -793,11 +865,13 @@
       return work;
     }
     // RAVEN trial uses complete paragraph WAVs while its live-stream buzzing is investigated.
-    function streamingVoice() { return /^(qwen_|pocket_)/.test(voice); }
+    function streamingVoice(entry = queue[position]) { return /^(qwen_|pocket_)/.test(voiceFor(entry)); }
+    // Voice roles can change engine between blocks, so prefetch the way the next block will play.
+    function prefetch(index) { if (streamingVoice(queue[index]) && ensureAudioContext()) fetchStream(index); else synth(index).catch(() => {}); }
     function fetchStream(index) {
       if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (streamRequests.has(index)) return streamRequests.get(index);
-      const signal = controller.signal, entry = queue[index], chosenVoice = voice;
+      const signal = controller.signal, entry = queue[index], chosenVoice = voiceFor(entry);
       const work = (async () => {
         for (let attempt = 0; attempt < 10; attempt++) {
           const timed = /^pocket_/.test(chosenVoice);
@@ -1032,7 +1106,7 @@
         loading = false;
         // Generation is finished, but audio is still playing: give the next
         // paragraph that remaining playback time to prepare its first frames.
-        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) fetchStream(index + 1);
+        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) prefetch(index + 1);
         if (!state.sources.size) state.finish.resolve();
         await state.finished;
         if (stream !== state || token !== epoch) return true;
@@ -1068,7 +1142,7 @@
       playbackConfig = {voice, mode, style:get('style').value, custom:get('custom').value};
       loading = true; send('reader:highlight', {id:queue[index].id}); status('Preparing audio…'); paint();
       try {
-        if (streamingVoice() && ensureAudioContext()) {
+        if (streamingVoice(queue[index]) && ensureAudioContext()) {
           const streamed = await streamCurrent(index);
           if (streamed) return;
         }
@@ -1085,7 +1159,7 @@
         status(readingMessage());
         paint(); if (wants) await playLoaded();
         // Only begin prefetch after the current synthesis completes.
-        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) synth(index + 1).catch(() => {});
+        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) prefetch(index + 1);
       } catch (error) {
         if (token !== epoch) return;
         if (error.retryable && retry < 2 && wants) {
@@ -1239,6 +1313,7 @@
         const validDetails = items => Array.isArray(items) && items.length <= 100 && items.every(item => item && typeof item.label === 'string' && item.label.length <= 120 && typeof item.scopeKey === 'string' && item.scopeKey.length <= 500);
         if (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !valid(data.sections,'ordinal') || !valid(data.chapters,'index') || !validDetails(data.details || [])) return;
         outlineFingerprint = data.fingerprint;
+        renderCast(data.cast);
         detailTargets = data.details || [];
         const select = get('outline'); select.replaceChildren(new Option('Choose a section…',''));
         for (const [items, prefix, label, key] of [[data.chapters,'chapter','Chapters','index'],[data.sections,'section',data.chapters.length ? 'On this page' : 'Sections','ordinal']]) {
@@ -1261,6 +1336,7 @@
       if (data.type === 'reader:error') { stop(typeof data.message === 'string' ? data.message.slice(0,200) : 'Could not read this page.'); clearTarget(); refreshOutline(); return; }
       let total = 0;
       if (!Array.isArray(data.blocks) || data.blocks.length > 5000 || data.blocks.some(b => !b || typeof b.id !== 'string' || b.id.length > 80 || typeof b.text !== 'string' || (total += b.text.length) > 500000)) { stop('This page returned too much text.'); return; }
+      renderCast(data.cast);
       const saved = restoring; restoring = null;
       queue = data.blocks.flatMap((b, index) => {
         let cursor = 0;
@@ -1270,7 +1346,7 @@
           cursor = textOffset < 0 ? pronunciation.text.length : textOffset + text.length;
           const source = pronunciationRange(pronunciation,textOffset,textOffset+text.length);
           const sourceOffset = source?.start || 0, sourceText = source ? b.text.slice(source.start,source.end) : '';
-          return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
+          return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, role:cast && typeof b.role === 'string' && cast.roles.some(role => role.id === b.role) ? b.role : cast?.default || '', sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
         });
       });
       if (queue.reduce((size,entry)=>size+entry.text.length,0) > 500000) { stop('This page returned too much spoken text.'); return; }
@@ -1294,6 +1370,8 @@
     });
     function loadVoices() { return fetch('/' + encodeURIComponent(artifactId) + '/speech/voices').then(r => r.ok ? r.json() : null).then(data => {
       if (!data || !data.enabled || !Array.isArray(data.voices) || !data.voices.length) { box.hidden = true; return; }
+      availableVoices = data.voices.filter(item => item && typeof item.id === 'string');
+      if (pendingCast) renderCast(pendingCast);
       const groups = new Map();
       for (const item of data.voices) { const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /^raven_/.test(item.id) ? 'RAVEN trial' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); if (!groups.has(label)) groups.set(label, document.createElement('optgroup')); const option = document.createElement('option'); option.value = item.id; option.textContent = item.name.replace(/ · (Kokoro|Pocket|RAVEN|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, ''); groups.get(label).label = label; groups.get(label).appendChild(option); }
       groups.forEach(group => get('voice').appendChild(group));

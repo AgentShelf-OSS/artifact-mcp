@@ -107,6 +107,7 @@ Checkpoint checks use the current version-2 `current.offset` field.
 | `reader-prefetch` | Node + Rust | Prefetch before playback ends; bounded lookahead; actual scheduled audio buffers; transition gap below 100 ms; Stop aborts current and prefetched requests. |
 | `reader-pronunciation` | Node + Rust | Enabled real voices; spoken replacements without changing source DOM; source-word highlights; first-audio diagnostics; sentence replay; pronunciation mutation invalidation; partial literal and whole-word overridden selections. |
 | `reader-wav` | Node + Rust | First-click WAV playback and Reading state; pause offset; rewind and checkpoint offset; reload resume; paused state; completion and checkpoint deletion. |
+| `reader-voice-cast` | Node + Rust | Cast-declared Voices section; per-role voice on tagged blocks; inline dialogue split into role segments; ereader heading summary and intro read once in the narrator voice; untagged artifacts show no Voices section. |
 
 Every program also asserts that Chromium reports no uncaught page errors. The fixture probes
 enabled voices, WAV, PCM and timed PCM through the application routes, and checks reader injection

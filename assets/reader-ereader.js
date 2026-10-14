@@ -48,8 +48,13 @@
       if (!current) return null;
       var groups = [];
       var header = current.article.querySelector(".ch-head");
-      var headerText = textOf(header && header.querySelector(".part")) + " " + textOf(header && header.querySelector("h1"));
-      if (headerText.trim()) groups.push({ element: header, text: headerText.trim() });
+      var summary = header && header.getAttribute("data-artifact-reader-summary");
+      var headerText = summary ? textOf({ textContent: summary }) : textOf(header && header.querySelector(".part")) + " " + textOf(header && header.querySelector("h1"));
+      if (headerText.trim()) groups.push({ element: header, text: headerText.trim(), heading: true });
+      Array.prototype.forEach.call(header ? header.querySelectorAll("[data-artifact-reader-intro]") : [], function (intro) {
+        var text = textOf(intro);
+        if (visible(intro) && text) groups.push({ element: intro, text: text });
+      });
       current.paragraphs.forEach(function (paragraph) {
         var text = textOf(paragraph);
         if (text) groups.push({ element: paragraph, text: text });
