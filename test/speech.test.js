@@ -56,7 +56,7 @@ test("speech service rejects concurrent synthesis and resets after worker errors
   await writeFile(tokenPath, "test-token\n");
   let release;
   const pending = new Promise((resolve) => { release = resolve; });
-  const service = createSpeechService({ env: { TTS_WORKER_URL: "http://worker:8788", TTS_WORKER_TOKEN_FILE: tokenPath }, fetchImpl: async () => pending });
+  const service = createSpeechService({ env: { TTS_WORKER_URL: "http://worker:8788", TTS_WORKER_TOKEN_FILE: tokenPath, TTS_WORKER_CONCURRENCY: "1" }, fetchImpl: async () => pending });
   try {
     assert.ok(service);
     const first = service.synthesize("one", "af_heart");
@@ -64,6 +64,20 @@ test("speech service rejects concurrent synthesis and resets after worker errors
     release(new Response("failure", { status: 500 }));
     assert.equal((await first).error, "speech unavailable");
     assert.equal((await service.synthesize("three", "af_heart")).error, "speech unavailable");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("speech service permits configured concurrent requests and rejects invalid limits", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artifact-speech-concurrency-"));
+  const tokenPath = join(dir, "token"); await writeFile(tokenPath, "test-token\n");
+  let release; const pending = new Promise(resolve => { release = resolve; });
+  const service = createSpeechService({ env: { TTS_WORKER_URL: "http://worker:8788", TTS_WORKER_TOKEN_FILE: tokenPath, TTS_WORKER_CONCURRENCY: "3" }, fetchImpl: async () => (await pending)() });
+  try {
+    const requests = [service.synthesize("one", "af_heart"), service.synthesize("two", "af_heart"), service.synthesize("three", "af_heart")];
+    assert.equal((await service.synthesize("four", "af_heart")).error, "busy");
+    release(() => new Response(new Uint8Array([1]), { headers: { "content-type": "audio/wav" } }));
+    assert.deepEqual((await Promise.all(requests)).map(result => result.status), [200, 200, 200]);
+    assert.throws(() => createSpeechService({ env: { TTS_WORKER_URL: "http://worker:8788", TTS_WORKER_TOKEN_FILE: tokenPath, TTS_WORKER_CONCURRENCY: "9" } }), /TTS_WORKER_CONCURRENCY/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -154,7 +168,7 @@ test("Qwen stream exposes gated preset voices and returns upstream bytes before 
   });
   const calls = [];
   const service = createSpeechService({
-    env: { QWEN_TTS_WORKER_URL: "http://qwen:8125", QWEN_TTS_CUSTOM_VOICES_ENABLED: "1", TTS_WORKER_TOKEN_FILE: tokenPath },
+    env: { QWEN_TTS_WORKER_URL: "http://qwen:8125", QWEN_TTS_CUSTOM_VOICES_ENABLED: "1", TTS_WORKER_TOKEN_FILE: tokenPath, TTS_WORKER_CONCURRENCY: "1" },
     fetchImpl: async (...args) => { calls.push(args); return new Response(upstream, { headers: { "content-type": "application/vnd.artifact.pcm" } }); }
   });
   try {

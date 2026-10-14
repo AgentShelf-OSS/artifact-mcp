@@ -1,5 +1,8 @@
 
 (function(){
+  // Gain (dB) that brings each Pocket preset to about -19 LUFS integrated, measured on one
+  // shared passage (October 2026) and capped at +12 dB; the limiter catches peaks. Unknown voices use 0 dB.
+  const VOICE_GAIN_DB=Object.freeze({pocket_alba:0,pocket_marius:8.5,pocket_javert:7,pocket_jean:0,pocket_cosette:11.5,pocket_eponine:1.5,pocket_fantine:1,pocket_azelma:1.5,pocket_anna:1,pocket_bill_boerst:8,pocket_caro_davy:7,pocket_charles:3.5,pocket_eve:2,pocket_george:1,pocket_jane:1.5,pocket_mary:1.5,pocket_michael:2.5,pocket_paul:0.5,pocket_peter_yearsley:10.5,pocket_stuart_bell:12,pocket_vera:2.5});
   var stateBoot=window.__artifactMcpStateBoot,pendingStateHello=stateBoot?stateBoot.take():null;
   // See `assets/portal.js`: portal mutations use a non-simple header as a stateless CSRF signal.
   var nativeFetch=window.fetch;
@@ -461,13 +464,16 @@
     readerPanel.insertBefore(finishRow,box.querySelector('audio'));
     const share = document.getElementById('vshare-toggle'); share.parentNode.insertBefore(box, share);
     const get = name => box.querySelector('#vreader-' + name), audio = get('audio');
+    const pauseLabel = document.createElement('label'); pauseLabel.textContent = 'Pauses ';
+    const pauseSelect = document.createElement('select'); pauseSelect.id = 'vreader-pauses'; pauseSelect.innerHTML = '<option value="natural">Natural</option><option value="short">Short</option><option value="off">Off</option>';
+    pauseLabel.appendChild(pauseSelect); box.querySelector('.vreader-settings').appendChild(pauseLabel);
     const readerMeasurements = [];
     window.artifactReaderDiagnostics = () => readerMeasurements.map(item => ({...item}));
     let previousAudioEnd = null;
     let ready = false, enabled = false, captureActive = false, epoch = 0, serial = 0, extraction = '', extractionTimer;
     let queue = [], position = 0, wants = false, loading = false, currentUrl = null, loaded = -1, chapter = null;
     let controller = new AbortController(), cache = new Map(), voice = '', mode = 'page';
-    let audioContext = null, stream = null;
+    let audioContext = null, stream = null, limiter = null, pauseTimer = null, continuationPause = false;
     const streamRequests = new Map();
     let playbackConfig = null;
     let contentFingerprint = '', readerScopeKey = '', restartScopeKey = '', queueKey = '', scopeStart = 0, scopeEnd = 0, restoring = null, pendingSeek = 0;
@@ -627,9 +633,10 @@
       if (saved && typeof saved === 'object') preferences = saved;
       if (preferences && typeof preferences.voice === 'string') savedVoice = preferences.voice;
       if (saved && Array.from(get('rate').options).some(option => option.value === saved.rate)) get('rate').value = saved.rate;
+      if (saved && ['natural','short','off'].includes(saved.pauses)) get('pauses').value = saved.pauses;
     } catch (_) {}
     function savePreferences() {
-      try { localStorage.setItem('artifact-reader-preferences', JSON.stringify({...preferences, voice, rate: get('rate').value})); } catch (_) {}
+      try { localStorage.setItem('artifact-reader-preferences', JSON.stringify({...preferences, voice, rate: get('rate').value, pauses:get('pauses').value})); } catch (_) {}
     }
     function defaultRoleVoices(nextCast, voices, mainVoice) {
       const ids = voices.map(item => typeof item === 'string' ? item : item.id).filter(Boolean), result = {};
@@ -719,7 +726,19 @@
       const roleText = role ? role.label + ' · ' + (availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry)) : '';
       return (wants ? 'Reading' : 'Paused') + (roleText ? ' · ' + roleText : label ? ' · ' + label : '');
     }
-    function paint() { get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
+    function updateMediaSession(clear) {
+      const session = navigator.mediaSession; if (!session) return;
+      try {
+        if (clear) { session.metadata = null; session.playbackState = 'none'; ['play','pause','stop','seekbackward','seekforward','previoustrack','nexttrack'].forEach(action => { try { session.setActionHandler(action, null); } catch (_) {} }); return; }
+        const entry = queue[position], voiceName = availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry) || 'Listen';
+        const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role)?.label : '';
+        session.metadata = new MediaMetadata({title:chapter?.label || entry?.sectionLabel || document.title,artist:role ? role + ' · ' + voiceName : voiceName,album:document.title,artwork:[{src:'/icons/app-192.png',sizes:'192x192',type:'image/png'},{src:'/icons/app-512.png',sizes:'512x512',type:'image/png'}]});
+        session.playbackState = wants ? 'playing' : 'paused';
+        const handlers={play:()=>get('play').click(),pause:()=>{if(wants)get('play').click();},stop:()=>get('stop').click(),seekbackward:()=>get('rewind').click(),seekforward:()=>skip(1),previoustrack:()=>skip(-1),nexttrack:()=>skip(1)};
+        Object.entries(handlers).forEach(([action,handler]) => { try { session.setActionHandler(action,handler); } catch (_) {} });
+      } catch (_) {}
+    }
+    function paint() { updateMediaSession(!queue.length && !loading); get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
       const icon = wants
         ? '<path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" /><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />'
         : '<path d="M7 4v16l13 -8l-13 -8" />';
@@ -771,20 +790,20 @@
     }
     function ensureAudioContext() {
       if (!window.AudioContext && !window.webkitAudioContext) return null;
-      if (!audioContext) { try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) { return null; } }
+      if (!audioContext) { try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); limiter = audioContext.createDynamicsCompressor(); limiter.threshold.value=-3; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=.003; limiter.release.value=.25; limiter.connect(audioContext.destination); } catch (_) { return null; } }
       return audioContext;
     }
     function stop(message, preserve) {
       savePlace(); pendingSeek = 0; restoring = null;
       epoch++; wants = false; loading = false; extraction = ''; previewEnd = null; previewRequested = false; clearTimeout(extractionTimer);
-      controller.abort(); controller = new AbortController(); cache.clear();
+      controller.abort(); controller = new AbortController(); clearTimeout(pauseTimer); pauseTimer = null; cache.clear();
       streamRequests.forEach(work => { work.then(response => response.body?.cancel()).catch(() => {}); });
       streamRequests.clear();
       clearStream();
       audio.onended = null; audio.pause(); audio.removeAttribute('src'); audio.load(); loaded = -1;
       if (currentUrl) URL.revokeObjectURL(currentUrl); currentUrl = null;
       if (!preserve) { previousAudioEnd = null; queue = []; position = 0; chapter = null; durations.clear(); contentFingerprint = ''; readerScopeKey = ''; queueKey = ''; const option = get('sleep').querySelector('[value=chapter]'); option.hidden = option.disabled = true; }
-      send('reader:highlight', { id: null }); status(message || 'Ready'); paint();
+      send('reader:highlight', { id: null }); updateMediaSession(!preserve); status(message || 'Ready'); paint();
     }
     function pronunciationPlan(text, hints) {
       const segments = []; let spoken = '', cursor = 0;
@@ -823,9 +842,9 @@
       }
       return result;
     }
-    function chunks(text) {
-      const limit = /^moss_/.test(voice) ? 300 : 600;
-      if (!/^(pocket_|raven_)/.test(voice) || typeof Intl.Segmenter !== 'function') return splitLongText(text, limit);
+    function chunks(text, selectedVoice) {
+      const limit = /^moss_/.test(selectedVoice) ? 300 : 600;
+      if (!/^(pocket_|raven_)/.test(selectedVoice) || typeof Intl.Segmenter !== 'function') return splitLongText(text, limit);
       // Keep complete sentences together. Only split within a sentence when it
       // exceeds the worker chunk limit, including text without punctuation.
       const result = []; let pending = '';
@@ -840,6 +859,13 @@
       if (pending) result.push(pending);
       return result;
     }
+    function pauseBefore(entry, previous, chapterContinuation) {
+      if (entry.chunk > 0 || !previous && !chapterContinuation) return 0;
+      const base = chapterContinuation ? 1500 : entry.pause === 'none' ? 0 : entry.pause === 'scene' ? 1800 : entry.pause === 'long' || entry.pause === 'heading' ? 1200 : entry.pause === 'short' ? 300 : previous.pause === 'heading' ? 900 : entry.pause === 'segment' ? 150 : 600;
+      const setting = get('pauses').value;
+      return (setting === 'off' ? 0 : setting === 'short' ? base / 2 : base) / Number(get('rate').value);
+    }
+    function voiceGain(voiceId) { return Number(VOICE_GAIN_DB[voiceId] || 0); }
     function delay(ms, signal) {
       return new Promise((resolve, reject) => {
         if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
@@ -921,7 +947,8 @@
       const timed = (response.headers.get('content-type') || '').toLowerCase().split(';')[0].trim() === 'application/vnd.artifact.pcm-timed';
       const reader = response.body.getReader();
       const seek = pendingSeek; pendingSeek = 0;
-      const state = stream = { words:[], wordCursor:0, wordMapping:true, highlightedWord:-1, highlightFrame:0, baseOffset:seek, received:0, token, index, reader, sources: new Set(), frames: [], pending: new Uint8Array(0), done: false, started: false, bytes: 0, total: 0, played: 0, buffered: 0, cursor: context.currentTime + startup, rate: Number(get('rate').value), finished: null, finish: null };
+      const pauseMs = pauseBefore(entry, queue[index - 1], index === 0 && continuationPause); if (index === 0) continuationPause = false;
+      const state = stream = { words:[], wordCursor:0, wordMapping:true, highlightedWord:-1, highlightFrame:0, baseOffset:seek, received:0, token, index, reader, sources: new Set(), frames: [], pending: new Uint8Array(0), done: false, started: false, bytes: 0, total: 0, played: 0, buffered: 0, cursor: context.currentTime + startup + pauseMs / 1000, rate: Number(get('rate').value), finished: null, finish: null, pauseMs };
       state.finished = new Promise((resolve, reject) => { state.finish = { resolve, reject }; });
       state.finished.catch(() => {}); // A processor failure can precede the network terminator.
       function acceptWord(bytes) {
@@ -989,7 +1016,7 @@
         };
         node.onprocessorerror = fail;
         node.port.onmessage = event => { if (event.data?.type === 'error') fail(); };
-        node.connect(context.destination);
+        node.connect(limiter || context.destination);
         // Keep feeding silence between frames and after EOS to drain the DSP tail.
         state.silence = context.createConstantSource(); state.silence.offset.value = 0;
         state.silence.connect(node); state.silence.start();
@@ -1003,7 +1030,7 @@
       if (!wants && context.state === 'running') context.suspend().catch(() => {});
       function scheduleBuffer(frame, rate, start) {
         const source = context.createBufferSource(); source.buffer = frame.buffer; source.playbackRate.value = rate;
-        source.connect(state.pitch || context.destination); frame.source = source; frame.rate = rate; frame.start = start; state.sources.add(source);
+        const gain = context.createGain(); gain.gain.value = Math.pow(10, voiceGain(voiceFor(entry)) / 20); source.connect(gain); gain.connect(state.pitch || limiter || context.destination); frame.source = source; frame.rate = rate; frame.start = start; state.sources.add(source);
         const marker = state.latency ? context.createBufferSource() : source;
         if (marker !== source) {
           marker.buffer = context.createBuffer(1, 1, context.sampleRate);
@@ -1124,6 +1151,10 @@
     }
     async function playLoaded() {
       if (captureActive) return;
+      audio.volume = Math.min(1, Math.pow(10, voiceGain(voiceFor(queue[position])) / 20));
+      const pause = pauseBefore(queue[position], queue[position - 1], position === 0 && continuationPause); if (position === 0) continuationPause = false;
+      if (pause && !audio.currentTime) await new Promise(resolve => { pauseTimer = setTimeout(() => { pauseTimer = null; resolve(); }, pause); });
+      if (!wants || captureActive) return;
       try { await audio.play(); }
       catch (_) { wants = false; status('Press Play to start audio.'); paint(); }
     }
@@ -1177,7 +1208,7 @@
     function requestContent(nextChapter, preview = false) {
       if (captureActive) return;
       const scopeKey = !nextChapter && ['view','detail','section'].includes(mode) ? restartScopeKey : '';
-      const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview;
+      const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview; continuationPause = !!nextChapter;
       extraction = 'read-' + (++serial);
       send(nextChapter ? 'reader:next' : 'reader:extract', { requestId: extraction, mode: nextChapter ? 'page' : mode, scopeKey });
       extractionTimer = setTimeout(() => { if (extraction) stop('Could not read this page. Press Play to retry.'); }, 5000); paint();
@@ -1218,6 +1249,7 @@
     document.addEventListener('keydown', event => { if (event.key === 'Escape' && !get('panel').hidden) { setPlayerView(queue.length || extraction ? 'compact' : 'closed'); get('toggle').focus(); } });
     get('play').onclick = () => {
       if (captureActive) return;
+      try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
       if (checkSleep()) return; armSleep();
       if (wants) { savePlace(); wants = false; audio.pause(); if (audioContext && audioContext.state === 'running' && streamingVoice()) audioContext.suspend().catch(() => {}); if (stream) { stream.boxState = 'paused'; box.dataset.streamState = 'paused'; } status(readingMessage()); paint(); return; }
       wants = true; if (loaded >= 0 || stream) status(readingMessage()); paint();
@@ -1279,6 +1311,7 @@
         stop('Preparing preview…', true); preparePreview(); wants = true; loadCurrent();
       } else { wants = true; requestContent(false, true); }
     };
+    get('pauses').onchange = () => savePreferences();
     get('rate').onchange = () => { savePreferences(); const value = Number(get('rate').value); audio.playbackRate = value; if (stream && !pitchReady && value !== 1) {
         const offset = mediaOffset(), playing = wants; stop('Preparing audio…', true); pendingSeek = offset; wants = playing; loadCurrent();
       } else if (stream && stream.changeRate) stream.changeRate(value); paint(); };
@@ -1341,12 +1374,12 @@
       queue = data.blocks.flatMap((b, index) => {
         let cursor = 0;
         const pronunciation = pronunciationPlan(b.text,b.pronunciations);
-        return chunks(pronunciation.text).map((text, chunk) => {
+        return chunks(pronunciation.text, voiceFor({role:b.role})).map((text, chunk) => {
           const textOffset = pronunciation.text.indexOf(text, cursor);
           cursor = textOffset < 0 ? pronunciation.text.length : textOffset + text.length;
           const source = pronunciationRange(pronunciation,textOffset,textOffset+text.length);
           const sourceOffset = source?.start || 0, sourceText = source ? b.text.slice(source.start,source.end) : '';
-          return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, role:cast && typeof b.role === 'string' && cast.roles.some(role => role.id === b.role) ? b.role : cast?.default || '', sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
+          return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, pause:['heading','scene','segment','none','short','long'].includes(b.pause) ? b.pause : '', role:cast && typeof b.role === 'string' && cast.roles.some(role => role.id === b.role) ? b.role : cast?.default || '', sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
         });
       });
       if (queue.reduce((size,entry)=>size+entry.text.length,0) > 500000) { stop('This page returned too much spoken text.'); return; }

@@ -45,6 +45,7 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 The authenticated viewer can read visible text from HTML artifacts without requiring each artifact
 to embed a player. **Listen** opens a compact player; **Expand** exposes the selected voice,
 playback speed, and reading scope. The compact player shows the current scope, voice, and speed.
+Natural pauses separate paragraphs, headings, dialogue segments, scene breaks and chapters; Expand also offers Short and Off. Per-voice loudness matching keeps cast changes even, and lock-screen and headset controls work where the browser supports the Media Session API. See [Pacing](docs/readable-artifacts.md#pacing).
 The expanded player groups playback, reading position, and voice settings, with playback controls
 kept visible while scrolling. Speed changes preserve the voice’s pitch. Non-default speeds use a 120 ms audio
 buffer to reduce paragraph handoff delays while keeping word timing aligned. The reader supports the current page, selected text, a clicked

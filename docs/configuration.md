@@ -274,6 +274,7 @@ ereader format](../ops/tts/README.md). Restart the service after changing these 
 | `POCKET_TTS_WORKER_TOKEN_FILE` | Optional separate Pocket token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
 | `MOSS_TTS_WORKER_URL` | Optional private MOSS-TTS Nano ONNX worker URL. Adds its configured English voices alongside the other engines. |
 | `MOSS_TTS_WORKER_TOKEN_FILE` | Optional separate MOSS worker token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
+| `TTS_WORKER_CONCURRENCY` | Concurrent requests allowed for each configured worker. Integer 1–8; defaults to `3`. Requests beyond the limit receive `429` and `Retry-After: 2`. |
 
 See [Pocket deployment and comparison](../ops/pocket-tts/README.md).
 

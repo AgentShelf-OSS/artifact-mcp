@@ -259,7 +259,7 @@ fn artifact_urls_use_the_public_base_without_doubling_slashes() {
 
 #[test]
 fn present_but_invalid_values_fail_closed_with_validation_errors() {
-    let cases: [(&str, &str); 14] = [
+    let cases: [(&str, &str); 17] = [
         ("PORT", "not-a-port"),
         ("PORT", "0"),
         ("PORT", "70000"),
@@ -274,6 +274,9 @@ fn present_but_invalid_values_fail_closed_with_validation_errors() {
         ("PREVIEW_RENDERER_URL", "ftp://renderer.internal"),
         ("PUBLIC_BASE_URL", "not-a-url"),
         ("ACCESS_CLOCK_TOLERANCE_S", "soon"),
+        ("TTS_WORKER_CONCURRENCY", "0"),
+        ("TTS_WORKER_CONCURRENCY", "9"),
+        ("TTS_WORKER_CONCURRENCY", "many"),
     ];
 
     for (key, value) in cases {
@@ -1035,4 +1038,12 @@ fn deterministic_random_sources_replay_identical_streams() {
     let mut cycled = [0_u8; 7];
     scripted.fill_bytes(&mut cycled).expect("fill");
     assert_eq!(cycled, [1, 2, 3, 1, 2, 3, 1]);
+}
+
+#[test]
+fn tts_worker_concurrency_accepts_the_documented_range() {
+    // lib/speech.js: absent or blank means 3; 1-8 are accepted.
+    for value in ["", " ", "1", "3", " 8 "] {
+        parse_ok(&[("TTS_WORKER_CONCURRENCY", value)]);
+    }
 }
