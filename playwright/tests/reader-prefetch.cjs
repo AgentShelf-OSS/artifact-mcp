@@ -39,6 +39,8 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await page.locator('#vreader-toggle').waitFor({ state: 'visible' });
     await page.locator('#vreader-toggle').click(); await page.locator('#vreader-expand').click();
     await page.locator('#vreader-voice').selectOption('qwen_reference');
+    // This spec measures prefetch seamlessness; authored pacing is covered by reader-pacing.
+    await page.locator('#vreader-pauses').selectOption('off');
     await page.locator('#vreader-play').click();
     await page.waitForFunction(() => document.querySelector('#vreader-status')?.textContent?.includes('Reading'), null, { timeout: 5000 });
     const prefetchDeadline = Date.now() + 5000;

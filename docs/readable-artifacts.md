@@ -118,6 +118,33 @@ Each original term and replacement is limited to 200 UTF-16 code units, with at 
 per block. Use plain text, not SSML, phoneme markup, or instructions to a model. Nested or
 ambiguous hints may be ignored. Spellings are suggestions to Pocket, not guaranteed phonetics.
 
+## Pacing
+
+Listen inserts silence between spoken blocks because Pocket cannot synthesize pauses. Natural
+pauses are 150 ms between inline voice segments of one paragraph, 600 ms between paragraphs,
+1200 ms before a heading, 900 ms after a heading, 1800 ms at a scene break, and 1500 ms when
+reading continues into the next ereader chapter. Chunks of one long paragraph join without a
+pause. The expanded player offers Natural, Short (half) and Off, saved with the other reader
+preferences; playback speed scales the pauses.
+
+A visible `<hr>` or an element with `data-artifact-reader-break` between two blocks starts a
+scene. Ereader `break` blocks count as scene breaks. Put
+`data-artifact-reader-pause="none|short|long|scene"` on a readable block to override the pause
+before it.
+
+## Loudness and lock-screen controls
+
+Pocket presets differ by up to 15 dB in loudness. The player applies a fixed gain per voice,
+measured once to bring each preset to about -19 LUFS (capped at +12 dB), and a limiter on the
+Web Audio path so boosted voices cannot clip. WAV playback can only attenuate.
+
+Where the browser supports the Media Session API, Listen publishes the chapter or section,
+current voice (and role), artifact title and app icon, and responds to play, pause, stop,
+seek backward (15 seconds) and previous or next block from lock-screen, notification and headset
+controls. On WebKit, Listen requests the `playback` audio session before starting. Whether
+audio continues after the screen locks still depends on the browser and operating system;
+leaving the page stops playback.
+
 ## Playback diagnostics
 
 `window.artifactReaderDiagnostics()` in the viewer's browser console returns the latest 50

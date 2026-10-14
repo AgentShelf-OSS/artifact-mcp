@@ -177,8 +177,26 @@ fn build_client(raw_endpoint: &str, token_path: Option<String>) -> Option<TtsCli
         timed_stream_endpoint,
         token,
         http,
-        permits: Semaphore::new(1),
+        permits: Semaphore::new(worker_concurrency().expect("invalid TTS_WORKER_CONCURRENCY")),
     })
+}
+
+/// Each configured worker has its own bounded lane. Keep this parser small and
+/// shared so an invalid deployment value fails during client initialization.
+fn worker_concurrency() -> Result<usize, &'static str> {
+    parse_worker_concurrency(std::env::var("TTS_WORKER_CONCURRENCY").ok().as_deref())
+}
+
+/// Absent or blank means the default of 3. Startup configuration validation
+/// rejects other invalid values before the first speech request.
+pub(crate) fn parse_worker_concurrency(raw: Option<&str>) -> Result<usize, &'static str> {
+    match raw.map(str::trim).filter(|value| !value.is_empty()) {
+        None => Ok(3),
+        Some(value) => match value.parse::<usize>() {
+            Ok(value @ 1..=8) => Ok(value),
+            _ => Err("TTS_WORKER_CONCURRENCY must be an integer from 1 to 8"),
+        },
+    }
 }
 
 fn voices_for_request() -> Vec<Voice> {
@@ -800,6 +818,18 @@ mod tests {
                 .chain(MOSS_VOICES.iter())
                 .all(|(id, _)| { id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') })
         );
+    }
+
+    #[test]
+    fn worker_concurrency_validation_has_a_safe_default_and_bounds() {
+        let parse = super::parse_worker_concurrency;
+        assert_eq!(parse(None), Ok(3));
+        assert_eq!(parse(Some("  ")), Ok(3));
+        assert_eq!(parse(Some(" 8 ")), Ok(8));
+        assert_eq!(parse(Some("3")), Ok(3));
+        assert!(parse(Some("0")).is_err());
+        assert!(parse(Some("9")).is_err());
+        assert!(parse(Some("many")).is_err());
     }
     #[test]
     fn speech_validation_rejects_unknown_fields_and_bad_voice() {

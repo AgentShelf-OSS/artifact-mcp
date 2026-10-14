@@ -55,9 +55,11 @@
         var text = textOf(intro);
         if (visible(intro) && text) groups.push({ element: intro, text: text });
       });
+      var sourceBlocks = chapters[current.index].blocks || [], sourceIndex = 0, sceneBefore = false;
       current.paragraphs.forEach(function (paragraph) {
+        while (sourceIndex < sourceBlocks.length && sourceBlocks[sourceIndex] && sourceBlocks[sourceIndex].t === 'break') { sceneBefore = true; sourceIndex++; }
         var text = textOf(paragraph);
-        if (text) groups.push({ element: paragraph, text: text });
+        if (text) { groups.push({ element: paragraph, text: text, sceneBreak: sceneBefore }); sceneBefore = false; sourceIndex++; }
       });
       return { groups: groups, truncated: false, chapter: { index: current.index, label: current.label, hasNext: current.hasNext } };
     };

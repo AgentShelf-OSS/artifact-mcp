@@ -106,6 +106,7 @@ Checkpoint checks use the current version-2 `current.offset` field.
 | `reader-player-scopes` | Node + Rust | Viewer injection and current-view scope; outside and inside mutations; literal code detail playback; scoped checkpoints and detail resume; keyboard chart navigation; desktop and mobile overflow. |
 | `reader-prefetch` | Node + Rust | Prefetch before playback ends; bounded lookahead; actual scheduled audio buffers; transition gap below 100 ms; Stop aborts current and prefetched requests. |
 | `reader-pronunciation` | Node + Rust | Enabled real voices; spoken replacements without changing source DOM; source-word highlights; first-audio diagnostics; sentence replay; pronunciation mutation invalidation; partial literal and whole-word overridden selections. |
+| `reader-pacing` | Node + Rust | Scheduled silences after a heading, between paragraphs and at an `<hr>` scene break; Pauses Off; Media Session metadata and artwork while reading; an overlapping speech request accepted under worker concurrency. |
 | `reader-wav` | Node + Rust | First-click WAV playback and Reading state; pause offset; rewind and checkpoint offset; reload resume; paused state; completion and checkpoint deletion. |
 | `reader-voice-cast` | Node + Rust | Cast-declared Voices section; per-role voice on tagged blocks; inline dialogue split into role segments; ereader heading summary and intro read once in the narrator voice; untagged artifacts show no Voices section. |
 

@@ -311,6 +311,32 @@
   function isHeading(element) {
     return !!(element && (/^H[1-6]$/.test(element.tagName) || element.classList && element.classList.contains('ch-head')));
   }
+  function visibleBreakBetween(previous, next) {
+    if (!previous || !next || previous === next || !(previous.compareDocumentPosition(next) & Node.DOCUMENT_POSITION_FOLLOWING)) return false;
+    let node = previous;
+    while ((node = node.nextElementSibling)) {
+      if (node === next) return false;
+      if ((node.tagName === 'HR' || node.hasAttribute('data-artifact-reader-break')) && !node.hidden && getComputedStyle(node).display !== 'none' && getComputedStyle(node).visibility !== 'hidden') return true;
+    }
+    // Paragraphs can have different parents. Walk forward in document order from the previous block only.
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_ELEMENT);
+    walker.currentNode = previous;
+    let nodeInOrder;
+    while ((nodeInOrder = walker.nextNode())) {
+      if (nodeInOrder === next) break;
+      if ((nodeInOrder.tagName === 'HR' || nodeInOrder.hasAttribute('data-artifact-reader-break')) && !nodeInOrder.hidden && getComputedStyle(nodeInOrder).display !== 'none' && getComputedStyle(nodeInOrder).visibility !== 'hidden') return true;
+    }
+    return false;
+  }
+  function pauseHint(group, previous) {
+    const authored = group.element?.getAttribute?.('data-artifact-reader-pause');
+    if (authored && /^(none|short|long|scene)$/.test(authored)) return authored;
+    if (isHeading(group.element) || group.heading) return 'heading';
+    if (!previous) return undefined;
+    if (group.sceneBreak || visibleBreakBetween(previous.element, group.element)) return 'scene';
+    if (group.element === previous.element && group.role && previous.role && group.role !== previous.role) return 'segment';
+    return undefined;
+  }
   function sectionSlice(blocks) {
     if (!blocks.length) return blocks;
     let anchor = point ? blocks.findLastIndex(b => snapshot.get(b.id) === point || snapshot.get(b.id).contains && snapshot.get(b.id).contains(point)) : -1;
@@ -342,9 +368,11 @@
     if (mode === 'selection') { playbackSelectionRange = selectionRange?.cloneRange() || null; activeScope = {mode:'selection'}; signature = readingSignature(scopedScan('selection')); return { scopeKey:'', blocks: selection ? [{ id: 'selection', text: selection, pronunciations:pronunciationHints(document.body, selection, playbackSelectionRange) }] : [], truncated: selection.length >= MAX_CHARS, ...(cast ? {cast} : {}) }; }
     const found = scopedScan(mode, requestedScope); activeScope = {mode, key:found.scopeKey}; snapshot = new Map(); blockOnly = new Set(); segmentSources = new Map(); sharedSegments = new Set();
     if (cast) { const owners = new Map(); found.groups.forEach((group, ordinal) => { if (!group.blockOnly && Array.isArray(group.positions) && group.positions.length) segmentSources.set('r' + ordinal, {text:group.text, positions:group.positions}); owners.set(group.element, (owners.get(group.element) || []).concat('r' + ordinal)); }); owners.forEach(ids => { if (ids.length > 1) ids.forEach(id => sharedSegments.add(id)); }); }
+    let previousGroup = null;
     let blocks = found.groups.map((group, ordinal) => {
       const id = 'r' + ordinal; snapshot.set(id, group.element); if (group.blockOnly) blockOnly.add(id);
-      return { id, ordinal, text: group.text, pronunciations:group.blockOnly ? [] : pronunciationHints(group.element, group.text, null, group.positions), ...(cast ? {role:group.role || cast.default} : {}) };
+      const pause = pauseHint(group, previousGroup); previousGroup = group;
+      return { id, ordinal, text: group.text, pronunciations:group.blockOnly ? [] : pronunciationHints(group.element, group.text, null, group.positions), ...(pause ? {pause} : {}), ...(cast ? {role:group.role || cast.default} : {}) };
     });
     blocks = blocks.map((block, ordinal) => { const meta = sectionMeta(blocks, ordinal); return Object.assign(block, { sectionEndOrdinal: meta.end, sectionLabel: meta.label }); });
     if (mode === 'here') {

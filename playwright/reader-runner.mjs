@@ -19,6 +19,7 @@ const cases = [
   ["reader-player-scopes", "both"],
   ["reader-prefetch", "both"],
   ["reader-pronunciation", "both"],
+  ["reader-pacing", "both"],
   ["reader-wav", "both"],
   ["reader-voice-cast", "both"],
 ];
