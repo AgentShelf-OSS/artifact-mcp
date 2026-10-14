@@ -58,6 +58,9 @@ Authors can supply short `data-artifact-pronounce` hints for names and abbreviat
 the replacement while highlighting the original displayed term. See the
 [pronunciation examples](docs/readable-artifacts.md#pronunciation-hints).
 
+Artifacts can also declare named character voice roles and tag dialogue or whole passages. Listen
+lets each viewer choose voices for those roles; see [Voice roles](docs/readable-artifacts.md#voice-roles).
+
 The expanded player also offers Replay sentence when Pocket word timings are available. It reuses
 the current paragraph audio without another synthesis request or an additional persistent cache.
 The existing streamed-audio limit bounds decoded samples to 8 MiB per chunk; stopping, leaving the

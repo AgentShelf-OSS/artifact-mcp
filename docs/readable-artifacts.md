@@ -25,6 +25,45 @@ The existing supported ebook adapter still owns chapter order and continuation.
 </main>
 ```
 
+## Voice roles
+
+An artifact can declare character voice roles for Listen. Put one JSON cast declaration in the
+document, then mark a block or inline element with `data-artifact-reader-voice`. The nearest
+marked ancestor wins. Unmarked and unknown roles use the cast default. Inline roles split a
+paragraph into spoken segments, so dialogue can use a different selected voice while text and
+pronunciation highlighting stay aligned.
+
+The declaration must be JSON text of 16 KiB or less. It has version `1`, one to 24 unique role
+IDs (`[a-z][a-z0-9_-]{0,31}`), labels of one to 60 characters, optional descriptions of at most
+160 characters, and up to four suggested voice IDs per role (`[a-z0-9_]+`, 64 characters each).
+The `default` must name a declared role. Invalid declarations are ignored completely.
+
+```html
+<script type="application/json" id="artifact-reader-cast">
+{"version":1,"default":"narrator","roles":[
+  {"id":"narrator","label":"Narrator","description":"Guides the story."},
+  {"id":"victor","label":"Victor","description":"Writes formal letters.","suggest":["pocket_alba"]},
+  {"id":"mara","label":"Mara","description":"Speaks plainly."}
+]}
+</script>
+<main>
+  <p>The rain began before dawn.</p>
+  <section data-artifact-reader-voice="victor">
+    <p>Dear Mara, I will arrive on Thursday.</p>
+  </section>
+  <p>She read the letter. <span data-artifact-reader-voice="mara">"Then I will wait,"</span> she said.</p>
+</main>
+```
+
+Listen presents the roles as choices in its Voices section. Suggestions are only defaults. The
+artifact cannot select a voice or send reading instructions.
+
+Ereaders recognised by the ebook adapter can also shape each chapter opening. A
+`data-artifact-reader-summary` attribute on the chapter heading (`.ch-head`) replaces the spoken
+part and title, for example `Chapter Five. Victor's story.`, and the heading's metadata line is
+not read. Visible `[data-artifact-reader-intro]` elements inside the heading, such as a short
+recap, are read once after it. Both use the heading's role, normally the narrator.
+
 ## Reading scopes and details
 
 The expanded Read selector offers Document / chapter, Current view, This section, selected text,

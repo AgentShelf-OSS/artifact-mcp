@@ -20,6 +20,7 @@ const cases = [
   ["reader-prefetch", "both"],
   ["reader-pronunciation", "both"],
   ["reader-wav", "both"],
+  ["reader-voice-cast", "both"],
 ];
 const caseTimeoutMs = 90_000;
 const runTimeoutMs = 10 * 60_000;
