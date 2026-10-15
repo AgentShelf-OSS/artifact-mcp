@@ -11,12 +11,14 @@ services:
       DO_NOT_TRACK: "1"
       TOKEN_FILE: /run/secrets/tts_token
       POCKET_TTS_QUANTIZE: "${POCKET_TTS_QUANTIZE:-0}"
+      POCKET_TTS_VOICE_DIR: /voices
       OMP_NUM_THREADS: "1"
       OPENBLAS_NUM_THREADS: "1"
     secrets: [tts_token]
     volumes:
       - ./models:/models
       - ./cache:/cache
+      - ./voices:/voices:ro
     read_only: true
     tmpfs: ["/tmp:size=128m,mode=1777"]
     cap_drop: [ALL]

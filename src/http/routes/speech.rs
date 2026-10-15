@@ -38,29 +38,111 @@ const VOICES: &[(&str, &str)] = &[
     ("bf_emma", "Emma · Kokoro (British)"),
     ("af_heart", "Heart · Kokoro (American)"),
 ];
-const POCKET_VOICES: &[(&str, &str)] = &[
-    ("pocket_alba", "Alba · Pocket"),
-    ("pocket_marius", "Marius · Pocket"),
-    ("pocket_javert", "Javert · Pocket"),
-    ("pocket_jean", "Jean · Pocket"),
-    ("pocket_cosette", "Cosette · Pocket"),
-    ("pocket_eponine", "Eponine · Pocket"),
-    ("pocket_fantine", "Fantine · Pocket"),
-    ("pocket_azelma", "Azelma · Pocket"),
-    ("pocket_anna", "Anna · Pocket"),
-    ("pocket_bill_boerst", "Bill Boerst · Pocket"),
-    ("pocket_caro_davy", "Caro Davy · Pocket"),
-    ("pocket_charles", "Charles · Pocket"),
-    ("pocket_eve", "Eve · Pocket"),
-    ("pocket_george", "George · Pocket"),
-    ("pocket_jane", "Jane · Pocket"),
-    ("pocket_mary", "Mary · Pocket"),
-    ("pocket_michael", "Michael · Pocket"),
-    ("pocket_paul", "Paul · Pocket"),
-    ("pocket_peter_yearsley", "Peter Yearsley · Pocket"),
-    ("pocket_stuart_bell", "Stuart Bell · Pocket"),
-    ("pocket_vera", "Vera · Pocket"),
+const POCKET_VOICES: &[(&str, &str, f64)] = &[
+    ("pocket_alba", "Alba · Pocket", 0.0),
+    ("pocket_marius", "Marius · Pocket", 8.5),
+    ("pocket_javert", "Javert · Pocket", 7.0),
+    ("pocket_jean", "Jean · Pocket", 0.0),
+    ("pocket_cosette", "Cosette · Pocket", 11.5),
+    ("pocket_eponine", "Eponine · Pocket", 1.5),
+    ("pocket_fantine", "Fantine · Pocket", 1.0),
+    ("pocket_azelma", "Azelma · Pocket", 1.5),
+    ("pocket_anna", "Anna · Pocket", 1.0),
+    ("pocket_bill_boerst", "Bill Boerst · Pocket", 8.0),
+    ("pocket_caro_davy", "Caro Davy · Pocket", 7.0),
+    ("pocket_charles", "Charles · Pocket", 3.5),
+    ("pocket_eve", "Eve · Pocket", 2.0),
+    ("pocket_george", "George · Pocket", 1.0),
+    ("pocket_jane", "Jane · Pocket", 1.5),
+    ("pocket_mary", "Mary · Pocket", 1.5),
+    ("pocket_michael", "Michael · Pocket", 2.5),
+    ("pocket_paul", "Paul · Pocket", 0.5),
+    ("pocket_peter_yearsley", "Peter Yearsley · Pocket", 10.5),
+    ("pocket_stuart_bell", "Stuart Bell · Pocket", 12.0),
+    ("pocket_vera", "Vera · Pocket", 2.5),
 ];
+
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct ExtraPocketVoice {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) gain_db: Option<f64>,
+}
+
+/// Parse operator supplied Pocket voices. The result is shared by startup validation and
+/// request handling so the accepted IDs cannot differ from the advertised IDs.
+pub(crate) fn parse_extra_pocket_voices(
+    raw: Option<&str>,
+) -> Result<Vec<ExtraPocketVoice>, &'static str> {
+    let Some(raw) = raw.map(str::trim).filter(|value| !value.is_empty()) else {
+        return Ok(Vec::new());
+    };
+    let mut voices = Vec::new();
+    for entry in raw.split(',') {
+        if voices.len() == 32 || entry.trim().is_empty() {
+            return Err("POCKET_TTS_EXTRA_VOICES must contain at most 32 nonempty entries");
+        }
+        let parts: Vec<_> = entry.trim().split(':').collect();
+        if !(2..=3).contains(&parts.len()) {
+            return Err("POCKET_TTS_EXTRA_VOICES entries must be id:Label[:gainDb]");
+        }
+        let (id, label) = (parts[0], parts[1]);
+        if id.len() > 32
+            || !id.as_bytes().first().is_some_and(u8::is_ascii_lowercase)
+            || !id
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_')
+            || POCKET_VOICES
+                .iter()
+                .any(|(built_in, _, _)| *built_in == format!("pocket_{id}"))
+            || voices
+                .iter()
+                .any(|voice: &ExtraPocketVoice| voice.id == format!("pocket_{id}"))
+        {
+            return Err("POCKET_TTS_EXTRA_VOICES contains an invalid or duplicate id");
+        }
+        if !(1..=40).contains(&label.chars().count())
+            || !label
+                .bytes()
+                .all(|byte| (b' '..=b'~').contains(&byte) && byte != b',' && byte != b':')
+        {
+            return Err(
+                "POCKET_TTS_EXTRA_VOICES labels must be 1 to 40 printable ASCII characters",
+            );
+        }
+        let gain_db = if parts.len() == 3 {
+            let gain = parts[2];
+            let unsigned = gain.strip_prefix('-').unwrap_or(gain);
+            let mut segments = unsigned.split('.');
+            let integer = segments.next().unwrap_or_default();
+            let fraction = segments.next();
+            if integer.is_empty()
+                || !integer.bytes().all(|byte| byte.is_ascii_digit())
+                || fraction.is_some_and(|value| {
+                    value.is_empty() || !value.bytes().all(|byte| byte.is_ascii_digit())
+                })
+                || segments.next().is_some()
+            {
+                return Err("POCKET_TTS_EXTRA_VOICES gainDb must be a decimal from -12 to 12");
+            }
+            let value: f64 = gain
+                .parse()
+                .map_err(|_| "POCKET_TTS_EXTRA_VOICES gainDb must be a decimal from -12 to 12")?;
+            if !(-12.0..=12.0).contains(&value) {
+                return Err("POCKET_TTS_EXTRA_VOICES gainDb must be a decimal from -12 to 12");
+            }
+            Some(value)
+        } else {
+            None
+        };
+        voices.push(ExtraPocketVoice {
+            id: format!("pocket_{id}"),
+            name: format!("{label} · Pocket"),
+            gain_db,
+        });
+    }
+    Ok(voices)
+}
 const RAVEN_VOICES: &[(&str, &str)] = &[
     ("raven_alba", "Alba · RAVEN (trial)"),
     ("raven_marius", "Marius · RAVEN (trial)"),
@@ -203,23 +285,37 @@ fn voices_for_request() -> Vec<Voice> {
     let mut voices = Vec::new();
     if client().is_some() {
         voices.extend(VOICES.iter().map(|&(id, name)| Voice {
-            id,
-            name,
+            id: id.to_owned(),
+            name: name.to_owned(),
             streaming: false,
+            gain_db: None,
         }));
     }
     if pocket_client().is_some() {
-        voices.extend(POCKET_VOICES.iter().map(|&(id, name)| Voice {
-            id,
-            name,
+        voices.extend(POCKET_VOICES.iter().map(|&(id, name, gain_db)| Voice {
+            id: id.to_owned(),
+            name: name.to_owned(),
             streaming: true,
+            gain_db: Some(json_number(gain_db)),
         }));
+        voices.extend(
+            parse_extra_pocket_voices(std::env::var("POCKET_TTS_EXTRA_VOICES").ok().as_deref())
+                .unwrap_or_default()
+                .into_iter()
+                .map(|voice| Voice {
+                    id: voice.id,
+                    name: voice.name,
+                    streaming: true,
+                    gain_db: voice.gain_db.map(json_number),
+                }),
+        );
     }
     if raven_client().is_some() {
         voices.extend(RAVEN_VOICES.iter().map(|&(id, name)| Voice {
-            id,
-            name,
+            id: id.to_owned(),
+            name: name.to_owned(),
             streaming: false,
+            gain_db: None,
         }));
     }
     if qwen_client().is_some() {
@@ -228,17 +324,19 @@ fn voices_for_request() -> Vec<Voice> {
                 .iter()
                 .filter(|(id, _)| qwen_voice_enabled(id))
                 .map(|&(id, name)| Voice {
-                    id,
-                    name,
+                    id: id.to_owned(),
+                    name: name.to_owned(),
                     streaming: true,
+                    gain_db: None,
                 }),
         );
     }
     if moss_client().is_some() {
         voices.extend(MOSS_VOICES.iter().map(|&(id, name)| Voice {
-            id,
-            name,
+            id: id.to_owned(),
+            name: name.to_owned(),
             streaming: false,
+            gain_db: None,
         }));
     }
     voices
@@ -343,10 +441,20 @@ async fn reader_pitch_worklet() -> Response {
 
 #[derive(Serialize)]
 struct Voice {
-    id: &'static str,
-    name: &'static str,
+    id: String,
+    name: String,
     #[serde(skip_serializing_if = "is_false")]
     streaming: bool,
+    #[serde(rename = "gainDb", skip_serializing_if = "Option::is_none")]
+    gain_db: Option<serde_json::Number>,
+}
+
+fn json_number(value: f64) -> serde_json::Number {
+    if value.fract() == 0.0 {
+        serde_json::Number::from(value as i64)
+    } else {
+        serde_json::Number::from_f64(value).expect("finite voice gain")
+    }
 }
 
 fn is_false(value: &bool) -> bool {
@@ -703,7 +811,9 @@ fn is_kokoro_voice(voice: &str) -> bool {
 }
 
 fn is_pocket_voice(voice: &str) -> bool {
-    POCKET_VOICES.iter().any(|(id, _)| *id == voice)
+    POCKET_VOICES.iter().any(|(id, _, _)| *id == voice)
+        || parse_extra_pocket_voices(std::env::var("POCKET_TTS_EXTRA_VOICES").ok().as_deref())
+            .is_ok_and(|voices| voices.iter().any(|extra| extra.id == voice))
 }
 
 fn is_raven_voice(voice: &str) -> bool {
@@ -812,12 +922,15 @@ mod tests {
         assert!(
             VOICES
                 .iter()
-                .chain(POCKET_VOICES.iter())
                 .chain(RAVEN_VOICES.iter())
                 .chain(QWEN_VOICES.iter())
                 .chain(MOSS_VOICES.iter())
-                .all(|(id, _)| { id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') })
+                .all(|(id, _)| id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
         );
+        assert!(POCKET_VOICES.iter().all(|(id, _, gain)| {
+            id.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                && (-12.0..=12.0).contains(gain)
+        }));
     }
 
     #[test]
@@ -830,6 +943,41 @@ mod tests {
         assert!(parse(Some("0")).is_err());
         assert!(parse(Some("9")).is_err());
         assert!(parse(Some("many")).is_err());
+    }
+
+    #[test]
+    fn extra_pocket_voices_follow_the_configuration_contract() {
+        let parsed = parse_extra_pocket_voices(Some("estelle:Estelle:2.5,lola:Lola"))
+            .expect("valid configured voices");
+        assert_eq!(parsed[0].id, "pocket_estelle");
+        assert_eq!(parsed[0].name, "Estelle · Pocket");
+        assert_eq!(parsed[0].gain_db, Some(2.5));
+        assert_eq!(parsed[1].gain_db, None);
+        for invalid in [
+            "Bad:Voice",
+            "alba:Built in",
+            "lola:Lola,lola:Again",
+            "lola:Lola:12.1",
+            "lola:Lola:1e2",
+            "lola:Lola:+1",
+            "lola:Lola:.5",
+            "lola:Lola:1.",
+            ",lola:Lola",
+            "lola:Lola,",
+            "lola:Lola,,estelle:Estelle",
+            "lola:",
+        ] {
+            assert!(
+                parse_extra_pocket_voices(Some(invalid)).is_err(),
+                "{invalid}"
+            );
+        }
+        let too_many = (0..33)
+            .map(|index| format!("extra_{index}:Voice"))
+            .collect::<Vec<_>>()
+            .join(",");
+        assert!(parse_extra_pocket_voices(Some(&too_many)).is_err());
+        assert!(parse_extra_pocket_voices(Some("  ")).unwrap().is_empty());
     }
     #[test]
     fn speech_validation_rejects_unknown_fields_and_bad_voice() {

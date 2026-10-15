@@ -10,6 +10,27 @@ Michael, Paul, Peter Yearsley, Stuart Bell, and Vera: 21 English voices in total
 All are supported by the pinned Pocket TTS 3.1.0 package; the model is unchanged.
 No voice recordings or cloning setup are needed for these presets.
 
+## Operator-supplied voices
+
+Place a `.safetensors` voice state in `voices/` and restart the worker. The
+worker loads regular files with lowercase IDs matching
+`^[a-z][a-z0-9_]{0,31}$`; for example, `quiet_reader.safetensors` is exposed as
+`pocket_quiet_reader` and displayed as “Quiet Reader · Pocket”. Names that
+match built-in presets are skipped. Symlinks and files larger than 16 MiB are
+also skipped and logged. A bad file does not prevent the worker from starting.
+The directory is mounted read-only in Compose. Removing a file and restarting
+the worker removes that voice. Each file's content hash is part of its audio
+cache key, so updated voice states do not reuse stale cached audio.
+
+The current public extra states are `estelle`, `giovanni`, `juergen`, `lola`,
+and `rafael`. Add each matching state file and the corresponding
+`POCKET_TTS_EXTRA_VOICES` entry in artifact-mcp before exposing it in Listen.
+
+For cloned voices, keep written consent from the speaker that explicitly
+permits creation and use of the clone. Public-domain recordings do not count as
+speaker consent. Do not add a cloned voice without that explicit written
+permission.
+
 ## Deployment
 
 The tested host is VM310, directory `/opt/docker/artifact-pocket-tts`, with private
@@ -18,7 +39,8 @@ user, read-only root filesystem, and persistent model/audio caches. It joins the
 existing `artifact-tts-trial_default` Docker network. The first start downloads
 public model assets; subsequent starts reuse `/models/huggingface`.
 
-Copy this directory to the host, create `models` and `cache` owned by UID 65532,
+Copy this directory to the host, create `models`, `cache`, and `voices` (the
+voice directory may be empty) owned by UID 65532,
 and install a bearer token of at least 32 characters as `tts-token`, mode 0400,
 owned by UID 65532. Set `TTS_BIND_HOST` in `.env` to the private interface address.
 Run `docker compose up -d --build` and wait for the container health check.

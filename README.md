@@ -72,7 +72,7 @@ resume, and chapter continuation where the artifact exposes a supported ereader 
 Interrupted streams retry twice from the last played position; Pause and Stop cancel automatic
 recovery, and Play can resume after a longer outage. The default server installation does not require a speech worker. Deployments that want local CPU
 narration can use the [Pocket TTS worker](ops/pocket-tts/README.md), which provides 21 preset
-English voices and streamed audio; the [TTS operations guide](ops/tts/README.md) documents worker
+English voices, operator-configured extra voices, and streamed audio; the [TTS operations guide](ops/tts/README.md) documents worker
 configuration, authorization, limits, and rollback. An optional [RAVEN trial](ops/pocket-tts/trials/raven/README.md) adds two CPU voices to the same player with passage highlighting. Pocket remains the default when both are configured.
 
 The reader preserves document order around embedded prototypes, groups list items and labelled

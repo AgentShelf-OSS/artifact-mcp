@@ -272,6 +272,7 @@ ereader format](../ops/tts/README.md). Restart the service after changing these 
 | `TTS_WORKER_TOKEN_FILE` | Path to the worker bearer token, readable by the artifact service account. Never include the token itself in HTML or environment settings. |
 | `POCKET_TTS_WORKER_URL` | Optional private Pocket TTS worker URL. Adds 21 preset English Pocket voices. It can be the only configured worker. |
 | `POCKET_TTS_WORKER_TOKEN_FILE` | Optional separate Pocket token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
+| `POCKET_TTS_EXTRA_VOICES` | Optional comma-separated Pocket voice entries: `id:Label[:gainDb]`. `id` uses lowercase letters, digits, and underscores; it cannot duplicate a built-in Pocket preset. Label is 1–40 printable characters without commas or colons. `gainDb` is optional and must be a decimal from `-12` to `12`. At most 32 entries are allowed. The worker must have a matching `id.safetensors` voice file. Invalid values stop startup. |
 | `MOSS_TTS_WORKER_URL` | Optional private MOSS-TTS Nano ONNX worker URL. Adds its configured English voices alongside the other engines. |
 | `MOSS_TTS_WORKER_TOKEN_FILE` | Optional separate MOSS worker token file; defaults to `TTS_WORKER_TOKEN_FILE`. |
 | `TTS_WORKER_CONCURRENCY` | Concurrent requests allowed for each configured worker. Integer 1–8; defaults to `3`. Requests beyond the limit receive `429` and `Retry-After: 2`. |

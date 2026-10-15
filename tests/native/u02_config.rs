@@ -1047,3 +1047,39 @@ fn tts_worker_concurrency_accepts_the_documented_range() {
         parse_ok(&[("TTS_WORKER_CONCURRENCY", value)]);
     }
 }
+
+#[test]
+fn pocket_extra_voices_validate_at_startup() {
+    for value in [
+        "",
+        " ",
+        "estelle:Estelle:2.5,lola:Lola",
+        "voice_2:A Label:-12",
+    ] {
+        parse_ok(&[("POCKET_TTS_EXTRA_VOICES", value)]);
+    }
+    for value in [
+        "Bad:Name",
+        "alba:Duplicate",
+        "lola:Lola,lola:Again",
+        "lola:Lola:12.1",
+        "lola:Lola:1e2",
+        "lola:Lola:+1",
+        "lola:Lola:.5",
+        "lola:Lola:1.",
+        ",lola:Lola",
+        "lola:Lola,",
+        "lola:Lola,,estelle:Estelle",
+        "lola:",
+    ] {
+        let error = parse(&[("POCKET_TTS_EXTRA_VOICES", value)])
+            .expect_err("invalid Pocket voice configuration must fail startup");
+        assert!(error.to_string().contains("POCKET_TTS_EXTRA_VOICES"));
+    }
+    let too_many = (0..33)
+        .map(|index| format!("extra_{index}:Voice"))
+        .collect::<Vec<_>>()
+        .join(",");
+    let env = MapEnv::empty().with("POCKET_TTS_EXTRA_VOICES", &too_many);
+    assert!(AppConfig::from_source(&env).is_err());
+}

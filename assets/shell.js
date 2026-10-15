@@ -608,7 +608,7 @@
       expressive: 'Read expressively with natural emotional variation appropriate to the text, clear phrasing, and varied emphasis.'
     };
     let previewEnd = null, previewStart = 0, previewRequested = false;
-    let cast = null, roleVoices = {}, characterVoices = true, availableVoices = [], preferences = {}, pendingCast;
+    let cast = null, roleVoices = {}, characterVoices = true, availableVoices = [], voiceGains = new Map(), preferences = {}, pendingCast;
     function supportsStyle(chosenVoice = voice) { return chosenVoice === 'qwen_ryan' || chosenVoice === 'qwen_aiden'; }
     function instructions(chosenVoice = voice) { return supportsStyle(chosenVoice) ? (get('style').value === 'custom' ? get('custom').value.trim() : readingStyles[get('style').value] || '') : ''; }
     function speechBody(text, chosenVoice) {
@@ -865,7 +865,11 @@
       const setting = get('pauses').value;
       return (setting === 'off' ? 0 : setting === 'short' ? base / 2 : base) / Number(get('rate').value);
     }
-    function voiceGain(voiceId) { return Number(VOICE_GAIN_DB[voiceId] || 0); }
+    function voiceGain(voiceId) {
+      const supplied = voiceGains.get(voiceId);
+      const gain = Number.isFinite(supplied) ? supplied : Number(VOICE_GAIN_DB[voiceId] || 0);
+      return Math.max(-12, Math.min(12, gain));
+    }
     function delay(ms, signal) {
       return new Promise((resolve, reject) => {
         if (signal.aborted) return reject(new DOMException('Cancelled', 'AbortError'));
@@ -1404,6 +1408,7 @@
     function loadVoices() { return fetch('/' + encodeURIComponent(artifactId) + '/speech/voices').then(r => r.ok ? r.json() : null).then(data => {
       if (!data || !data.enabled || !Array.isArray(data.voices) || !data.voices.length) { box.hidden = true; return; }
       availableVoices = data.voices.filter(item => item && typeof item.id === 'string');
+      voiceGains = new Map(availableVoices.filter(item => Number.isFinite(item.gainDb)).map(item => [item.id, item.gainDb]));
       if (pendingCast) renderCast(pendingCast);
       const groups = new Map();
       for (const item of data.voices) { const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /^raven_/.test(item.id) ? 'RAVEN trial' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); if (!groups.has(label)) groups.set(label, document.createElement('optgroup')); const option = document.createElement('option'); option.value = item.id; option.textContent = item.name.replace(/ · (Kokoro|Pocket|RAVEN|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, ''); groups.get(label).label = label; groups.get(label).appendChild(option); }

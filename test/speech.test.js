@@ -3,7 +3,22 @@ import assert from "node:assert/strict";
 import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createSpeechService, speechEnabledFor } from "../lib/speech.js";
+import { createSpeechService, parsePocketExtraVoices, speechEnabledFor } from "../lib/speech.js";
+
+test("Pocket extra voice parser accepts labels and optional gains", () => {
+  assert.deepEqual(parsePocketExtraVoices("estelle:Estelle:2.5,lola:Lola"), [
+    { id: "pocket_estelle", name: "Estelle · Pocket", streaming: true, gainDb: 2.5 },
+    { id: "pocket_lola", name: "Lola · Pocket", streaming: true }
+  ]);
+  assert.deepEqual(parsePocketExtraVoices(""), []);
+});
+
+test("Pocket extra voice parser rejects invalid, duplicate, empty, out-of-range, and excessive entries", () => {
+  for (const value of [
+    "Bad:Label", "alba:Collision", "extra:Label,extra:Again", "extra:Label:nope", "extra:Label:12.1",
+    "extra::2", "extra:Label,", Array.from({ length: 33 }, (_, index) => `voice${index}:Voice`).join(",")
+  ]) assert.throws(() => parsePocketExtraVoices(value), /POCKET_TTS_EXTRA_VOICES/);
+});
 
 test("speech enablement supports global, allowlist, legacy, and disabled modes", () => {
   assert.equal(speechEnabledFor("book", { enabled: true, allowlist: "" }), true);
@@ -106,6 +121,44 @@ test("speech service exposes Pocket presets only when its worker is configured a
     const kokoroOnly = createSpeechService({ env: { TTS_WORKER_URL: "http://kokoro:8788", TTS_WORKER_TOKEN_FILE: tokenPath }, fetchImpl: async () => new Response(new Uint8Array([82, 73, 70, 70]), { headers: { "content-type": "audio/wav" } }) });
     assert.ok(kokoroOnly);
     assert.equal(kokoroOnly.voices.some(({ id }) => id.startsWith("pocket_")), false);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("configured Pocket extra voices are listed and accepted by WAV, stream, and timed routes", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "artifact-speech-pocket-extra-"));
+  const tokenPath = join(dir, "token");
+  await writeFile(tokenPath, "shared-token\n");
+  const calls = [];
+  const service = createSpeechService({
+    env: { POCKET_TTS_WORKER_URL: "http://pocket:8790", TTS_WORKER_TOKEN_FILE: tokenPath, POCKET_TTS_EXTRA_VOICES: "estelle:Estelle:2.5,lola:Lola" },
+    fetchImpl: async (...args) => {
+      calls.push(args);
+      const timed = args[0].endsWith("stream-timed");
+      const stream = new ReadableStream({ start(controller) { controller.enqueue(new Uint8Array([1, 2, 3])); controller.close(); } });
+      return new Response(stream, { headers: { "content-type": timed ? "application/vnd.artifact.pcm-timed" : args[0].endsWith("/stream") ? "application/vnd.artifact.pcm" : "audio/wav" } });
+    }
+  });
+  try {
+    assert.deepEqual(service.voices.filter(({ id }) => ["pocket_estelle", "pocket_lola"].includes(id)), [
+      { id: "pocket_estelle", name: "Estelle · Pocket", streaming: true, gainDb: 2.5 },
+      { id: "pocket_lola", name: "Lola · Pocket", streaming: true }
+    ]);
+    assert.equal((await service.synthesize("hello", "pocket_estelle")).status, 200);
+    const streamed = await service.streamSynthesize("hello", "pocket_lola");
+    assert.equal(streamed.status, 200);
+    await streamed.stream.getReader().read();
+    streamed.release();
+    const timed = await service.streamTimedSynthesize("hello", "pocket_estelle");
+    assert.equal(timed.status, 200);
+    await timed.stream.getReader().read();
+    timed.release();
+    assert.deepEqual(calls.map(([url, options]) => [url, JSON.parse(options.body).voice]), [
+      ["http://pocket:8790/speech", "pocket_estelle"],
+      ["http://pocket:8790/speech/stream", "pocket_lola"],
+      ["http://pocket:8790/speech/stream-timed", "pocket_estelle"]
+    ]);
+    const noPocketWorker = createSpeechService({ env: { TTS_WORKER_URL: "http://kokoro:8788", TTS_WORKER_TOKEN_FILE: tokenPath, POCKET_TTS_EXTRA_VOICES: "estelle:Estelle" } });
+    assert.equal(noPocketWorker.voices.some(({ id }) => id === "pocket_estelle"), false);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
