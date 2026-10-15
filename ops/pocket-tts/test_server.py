@@ -108,6 +108,67 @@ class ServerCacheTests(unittest.TestCase):
             self.assertFalse(active.cancelled.is_set())
             server.ACTIVE_BUDGET = None
 
+    def test_voice_directory_loads_valid_file_and_hashes_its_contents(self):
+        server = self.server
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "quiet_voice.safetensors"
+            path.write_bytes(b"test-state")
+            states, names = {}, {}
+            calls = []
+
+            class Loader:
+                def get_state_for_audio_prompt(self, prompt):
+                    calls.append(prompt)
+                    return "loaded-state"
+
+            server.VOICE_CONTENT_HASHES.clear()
+            server.load_voice_directory(directory, Loader(), states, names)
+            self.assertEqual(states, {"pocket_quiet_voice": "loaded-state"})
+            self.assertEqual(names, {"pocket_quiet_voice": "Quiet Voice · Pocket"})
+            self.assertEqual(calls, [path])
+            self.assertEqual(server.VOICE_CONTENT_HASHES["pocket_quiet_voice"],
+                             server.hashlib.sha256(b"test-state").hexdigest())
+
+    def test_voice_directory_skips_builtin_collision_and_bad_name(self):
+        server = self.server
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "alba.safetensors").write_bytes(b"collision")
+            (root / "Bad-Name.safetensors").write_bytes(b"bad-name")
+            states, names, calls = {}, {}, []
+
+            class Loader:
+                def get_state_for_audio_prompt(self, prompt):
+                    calls.append(prompt)
+                    return "loaded"
+
+            server.load_voice_directory(directory, Loader(), states, names)
+            self.assertEqual(states, {})
+            self.assertEqual(names, {})
+            self.assertEqual(calls, [])
+
+    def test_voice_directory_skips_symlink_and_oversize_file(self):
+        server = self.server
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source.state"
+            source.write_bytes(b"source")
+            (root / "linked.safetensors").symlink_to(source)
+            oversized = root / "oversized.safetensors"
+            with oversized.open("wb") as output:
+                output.truncate(server.MAX_VOICE_FILE_BYTES + 1)
+            states, names, calls = {}, {}, []
+
+            class Loader:
+                def get_state_for_audio_prompt(self, prompt):
+                    calls.append(prompt)
+                    return "loaded"
+
+            server.load_voice_directory(directory, Loader(), states, names)
+            self.assertEqual(states, {})
+            self.assertEqual(names, {})
+            self.assertEqual(calls, [])
+
 
 if __name__ == "__main__":
     unittest.main()

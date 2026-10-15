@@ -8,6 +8,7 @@ import io
 import json
 import os
 from pathlib import Path
+import re
 import resource
 import select
 import socket
@@ -30,6 +31,8 @@ PRESETS = ['alba', 'marius', 'javert', 'jean', 'cosette', 'eponine', 'fantine', 
            'anna', 'bill_boerst', 'caro_davy', 'charles', 'eve', 'george', 'jane',
            'mary', 'michael', 'paul', 'peter_yearsley', 'stuart_bell', 'vera']
 VOICES = {'pocket_' + name: name.replace('_', ' ').title() + ' · Pocket' for name in PRESETS}
+VOICE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+MAX_VOICE_FILE_BYTES = 16 * 1024 * 1024
 MAX_CHARS = 1500
 MAX_BODY = 8192
 MAX_CACHE_BYTES = 512 * 1024 * 1024
@@ -68,6 +71,47 @@ started = time.monotonic()
 os.environ["KPOCKET_TTS_ERROR_WITHOUT_EOS"] = "1"
 model = TTSModel.load_model("english_2026-04", quantize=QUANTIZE)
 voices = {"pocket_" + name: model.get_state_for_audio_prompt(name) for name in PRESETS}
+VOICE_CONTENT_HASHES = {}
+
+
+def load_voice_directory(voice_dir, loaded_model, voice_states, voice_names):
+    """Load valid operator-supplied voice states without failing worker startup."""
+    if voice_dir is None:
+        return
+    directory = Path(voice_dir)
+    try:
+        candidates = sorted(directory.glob("*.safetensors"))
+    except OSError as error:
+        logging.warning("Could not list Pocket voice directory %s: %s", directory, error)
+        return
+    for path in candidates:
+        stem = path.stem
+        voice_id = "pocket_" + stem
+        try:
+            if path.is_symlink():
+                raise ValueError("symlinks are not allowed")
+            if not VOICE_NAME_PATTERN.fullmatch(stem):
+                raise ValueError("invalid voice name")
+            if stem in PRESETS or voice_id in voice_names:
+                raise ValueError("voice name collides with a built-in preset")
+            if not path.is_file():
+                raise ValueError("not a regular file")
+            if path.stat().st_size > MAX_VOICE_FILE_BYTES:
+                raise ValueError("file exceeds 16 MiB")
+            content = path.read_bytes()
+            if len(content) > MAX_VOICE_FILE_BYTES:
+                raise ValueError("file exceeds 16 MiB")
+            state = loaded_model.get_state_for_audio_prompt(path)
+        except Exception as error:
+            logging.warning("Skipping Pocket voice file %s: %s", path.name, error)
+            continue
+        voice_states[voice_id] = state
+        voice_names[voice_id] = stem.replace("_", " ").title() + " · Pocket"
+        VOICE_CONTENT_HASHES[voice_id] = hashlib.sha256(content).hexdigest()
+
+
+VOICE_DIR = os.environ.get("POCKET_TTS_VOICE_DIR")
+load_voice_directory(VOICE_DIR if VOICE_DIR else None, model, voices, VOICES)
 MODEL_ID = "pocket-tts-timestamped-65037e84-english_2026-04" + ("-int8" if QUANTIZE else "")
 MODEL_LOAD_SECONDS = time.monotonic() - started
 GATE = InferenceGate(MAX_QUEUED_REQUESTS)
@@ -123,7 +167,11 @@ def emit_metrics(event, voice, queue_wait=0.0, cache_hit=False, first_audio=None
 
 
 def synthesize(text, voice, allow_generate=True, queue_wait=0.0):
-    key = cache_key(MODEL_ID, "pocket-tts-3.1.0", voice, text)
+    content_hash = VOICE_CONTENT_HASHES.get(voice)
+    if content_hash is None:
+        key = cache_key(MODEL_ID, "pocket-tts-3.1.0", voice, text)
+    else:
+        key = cache_key(MODEL_ID, "pocket-tts-3.1.0", voice, content_hash, text)
     path = CACHE / (key + ".wav")
     started = time.monotonic()
     cached_payload = read_cache(path, MAX_AUDIO_BYTES)
@@ -153,7 +201,10 @@ def synthesize(text, voice, allow_generate=True, queue_wait=0.0):
 
 def stream_synthesize(handler, text, voice, allow_generate=True, queue_wait=0.0, budget=None):
     """Stream framed PCM and cache only a complete successful generation."""
-    path = CACHE / (cache_key(MODEL_ID, voice, text) + ".pcm")
+    content_hash = VOICE_CONTENT_HASHES.get(voice)
+    key = (cache_key(MODEL_ID, voice, text) if content_hash is None else
+           cache_key(MODEL_ID, voice, content_hash, text))
+    path = CACHE / (key + ".pcm")
     began = time.monotonic()
     cached_payload = read_cache(path, MAX_AUDIO_BYTES)
     cached = cached_payload is not None
@@ -216,7 +267,9 @@ def stream_synthesize(handler, text, voice, allow_generate=True, queue_wait=0.0,
 
 
 def _timed_cache_path(text, voice):
-    key = cache_key(MODEL_ID, "timed-v1", voice, text)
+    content_hash = VOICE_CONTENT_HASHES.get(voice)
+    key = (cache_key(MODEL_ID, "timed-v1", voice, text) if content_hash is None else
+           cache_key(MODEL_ID, "timed-v1", voice, content_hash, text))
     return CACHE / (key + ".timed")
 
 

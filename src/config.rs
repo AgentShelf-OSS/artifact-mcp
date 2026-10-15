@@ -1618,6 +1618,15 @@ impl AppConfig {
                 )
             })?;
         }
+        if let Some(raw) = present(env, "POCKET_TTS_EXTRA_VOICES") {
+            crate::http::routes::speech::parse_extra_pocket_voices(Some(&raw)).map_err(|_| {
+                invalid(
+                    "POCKET_TTS_EXTRA_VOICES",
+                    "<invalid>",
+                    "a comma-separated list of up to 32 valid id:Label[:gainDb] entries",
+                )
+            })?;
+        }
 
         let port = match present(env, "PORT") {
             None => DEFAULT_PORT,
