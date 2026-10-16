@@ -1,0 +1,337 @@
+{
+  "id": "mcp.stale-base-guard",
+  "tags": [
+    "mcp",
+    "tools",
+    "adr-0016",
+    "stale-base-guard",
+    "artifact-key",
+    "parity"
+  ],
+  "fixture": "empty-v21",
+  "note": "ADR-0016 stale-base guard in the default warn mode: normal edits and keyed republishes have no warnings; a body based on an older revision is written with the fixed warning; discard_newer true suppresses it; a non-boolean discard_newer is invalid params.",
+  "steps": [
+    {
+      "name": "keyed publish creates revision 1",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "title": "Guarded report",
+              "artifact_key": "proj/guarded"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      },
+      "capture": {
+        "gid": "result.structuredContent.id"
+      }
+    },
+    {
+      "name": "keyed publish adds a section: revision 2, no warnings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<section id=\"alpha\">\n  <p class=\"row\">alpha line 0 value 1510</p>\n  <p class=\"row\">alpha line 1 value 9411</p>\n  <p class=\"row\">alpha line 2 value 5626</p>\n  <p class=\"row\">alpha line 3 value 4275</p>\n  <p class=\"row\">alpha line 4 value 8553</p>\n  <p class=\"row\">alpha line 5 value 5823</p>\n  <p class=\"row\">alpha line 6 value 3023</p>\n  <p class=\"row\">alpha line 7 value 4331</p>\n  <p class=\"row\">alpha line 8 value 8506</p>\n  <p class=\"row\">alpha line 9 value 8697</p>\n  <p class=\"row\">alpha line 10 value 6779</p>\n  <p class=\"row\">alpha line 11 value 1424</p>\n  <p class=\"row\">alpha line 12 value 8365</p>\n  <p class=\"row\">alpha line 13 value 4268</p>\n  <p class=\"row\">alpha line 14 value 9140</p>\n  <p class=\"row\">alpha line 15 value 7495</p>\n  <p class=\"row\">alpha line 16 value 1187</p>\n  <p class=\"row\">alpha line 17 value 2775</p>\n  <p class=\"row\">alpha line 18 value 5430</p>\n  <p class=\"row\">alpha line 19 value 5641</p>\n  <p class=\"row\">alpha line 20 value 4434</p>\n  <p class=\"row\">alpha line 21 value 1108</p>\n  <p class=\"row\">alpha line 22 value 6502</p>\n  <p class=\"row\">alpha line 23 value 6507</p>\n  <p class=\"row\">alpha line 24 value 9398</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "artifact_key": "proj/guarded"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "keyed publish adds another section: revision 3, no warnings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<section id=\"alpha\">\n  <p class=\"row\">alpha line 0 value 1510</p>\n  <p class=\"row\">alpha line 1 value 9411</p>\n  <p class=\"row\">alpha line 2 value 5626</p>\n  <p class=\"row\">alpha line 3 value 4275</p>\n  <p class=\"row\">alpha line 4 value 8553</p>\n  <p class=\"row\">alpha line 5 value 5823</p>\n  <p class=\"row\">alpha line 6 value 3023</p>\n  <p class=\"row\">alpha line 7 value 4331</p>\n  <p class=\"row\">alpha line 8 value 8506</p>\n  <p class=\"row\">alpha line 9 value 8697</p>\n  <p class=\"row\">alpha line 10 value 6779</p>\n  <p class=\"row\">alpha line 11 value 1424</p>\n  <p class=\"row\">alpha line 12 value 8365</p>\n  <p class=\"row\">alpha line 13 value 4268</p>\n  <p class=\"row\">alpha line 14 value 9140</p>\n  <p class=\"row\">alpha line 15 value 7495</p>\n  <p class=\"row\">alpha line 16 value 1187</p>\n  <p class=\"row\">alpha line 17 value 2775</p>\n  <p class=\"row\">alpha line 18 value 5430</p>\n  <p class=\"row\">alpha line 19 value 5641</p>\n  <p class=\"row\">alpha line 20 value 4434</p>\n  <p class=\"row\">alpha line 21 value 1108</p>\n  <p class=\"row\">alpha line 22 value 6502</p>\n  <p class=\"row\">alpha line 23 value 6507</p>\n  <p class=\"row\">alpha line 24 value 9398</p>\n</section>\n<section id=\"beta\">\n  <p class=\"row\">beta line 0 value 5329</p>\n  <p class=\"row\">beta line 1 value 6733</p>\n  <p class=\"row\">beta line 2 value 8609</p>\n  <p class=\"row\">beta line 3 value 3298</p>\n  <p class=\"row\">beta line 4 value 1955</p>\n  <p class=\"row\">beta line 5 value 7017</p>\n  <p class=\"row\">beta line 6 value 7454</p>\n  <p class=\"row\">beta line 7 value 3056</p>\n  <p class=\"row\">beta line 8 value 1611</p>\n  <p class=\"row\">beta line 9 value 3622</p>\n  <p class=\"row\">beta line 10 value 7529</p>\n  <p class=\"row\">beta line 11 value 5850</p>\n  <p class=\"row\">beta line 12 value 1037</p>\n  <p class=\"row\">beta line 13 value 9925</p>\n  <p class=\"row\">beta line 14 value 1997</p>\n  <p class=\"row\">beta line 15 value 6796</p>\n  <p class=\"row\">beta line 16 value 4592</p>\n  <p class=\"row\">beta line 17 value 7238</p>\n  <p class=\"row\">beta line 18 value 1494</p>\n  <p class=\"row\">beta line 19 value 5530</p>\n  <p class=\"row\">beta line 20 value 1940</p>\n  <p class=\"row\">beta line 21 value 2750</p>\n  <p class=\"row\">beta line 22 value 3580</p>\n  <p class=\"row\">beta line 23 value 1527</p>\n  <p class=\"row\">beta line 24 value 5310</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "artifact_key": "proj/guarded"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "a normal edit of the current body has no warnings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "update_artifact",
+            "arguments": {
+              "id": "${gid}",
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<section id=\"alpha\">\n  <p class=\"row\">alpha line 0 value 1510</p>\n  <p class=\"row\">alpha line 1 value 9411</p>\n  <p class=\"row\">alpha line 2 value 5626</p>\n  <p class=\"row\">alpha line 3 value 4275</p>\n  <p class=\"row\">alpha line 4 value 8553</p>\n  <p class=\"row\">alpha line 5 value 5823</p>\n  <p class=\"row\">alpha line 6 value 3023</p>\n  <p class=\"row\">alpha line 7 value 4331</p>\n  <p class=\"row\">alpha line 8 value 8506</p>\n  <p class=\"row\">alpha line 9 value 8697</p>\n  <p class=\"row\">alpha line 10 value 6779</p>\n  <p class=\"row\">alpha line 11 value 1424</p>\n  <p class=\"row\">alpha line 12 value 8365</p>\n  <p class=\"row\">alpha line 13 value 4268</p>\n  <p class=\"row\">alpha line 14 value 9140</p>\n  <p class=\"row\">alpha line 15 value 7495</p>\n  <p class=\"row\">alpha line 16 value 1187</p>\n  <p class=\"row\">alpha line 17 value 2775</p>\n  <p class=\"row\">alpha line 18 value 5430</p>\n  <p class=\"row\">alpha line 19 value 5641</p>\n  <p class=\"row\">alpha line 20 value 4434</p>\n  <p class=\"row\">alpha line 21 value 1108</p>\n  <p class=\"row\">alpha line 22 value 6502</p>\n  <p class=\"row\">alpha line 23 value 6507</p>\n  <p class=\"row\">alpha line 24 value 9398</p>\n</section>\n<section id=\"beta\">\n  <p class=\"row\">beta line 0 value 5329</p>\n  <p class=\"row\">beta line 1 value 6733</p>\n  <p class=\"row\">beta line 2 tuned value 8609</p>\n  <p class=\"row\">beta line 3 value 3298</p>\n  <p class=\"row\">beta line 4 value 1955</p>\n  <p class=\"row\">beta line 5 value 7017</p>\n  <p class=\"row\">beta line 6 value 7454</p>\n  <p class=\"row\">beta line 7 value 3056</p>\n  <p class=\"row\">beta line 8 value 1611</p>\n  <p class=\"row\">beta line 9 value 3622</p>\n  <p class=\"row\">beta line 10 value 7529</p>\n  <p class=\"row\">beta line 11 value 5850</p>\n  <p class=\"row\">beta line 12 value 1037</p>\n  <p class=\"row\">beta line 13 value 9925</p>\n  <p class=\"row\">beta line 14 value 1997</p>\n  <p class=\"row\">beta line 15 value 6796</p>\n  <p class=\"row\">beta line 16 value 4592</p>\n  <p class=\"row\">beta line 17 value 7238</p>\n  <p class=\"row\">beta line 18 value 1494</p>\n  <p class=\"row\">beta line 19 value 5530</p>\n  <p class=\"row\">beta line 20 value 1940</p>\n  <p class=\"row\">beta line 21 value 2750</p>\n  <p class=\"row\">beta line 22 value 3580</p>\n  <p class=\"row\">beta line 23 value 1527</p>\n  <p class=\"row\">beta line 24 value 5310</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "a stale body with discard_newer true is written with no warnings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "update_artifact",
+            "arguments": {
+              "id": "${gid}",
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 edited value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "discard_newer": true
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "a keyed republish of the newer body is based on revision 4 and has no warnings",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<section id=\"alpha\">\n  <p class=\"row\">alpha line 0 value 1510</p>\n  <p class=\"row\">alpha line 1 value 9411</p>\n  <p class=\"row\">alpha line 2 value 5626</p>\n  <p class=\"row\">alpha line 3 value 4275</p>\n  <p class=\"row\">alpha line 4 value 8553</p>\n  <p class=\"row\">alpha line 5 value 5823</p>\n  <p class=\"row\">alpha line 6 value 3023</p>\n  <p class=\"row\">alpha line 7 value 4331</p>\n  <p class=\"row\">alpha line 8 value 8506</p>\n  <p class=\"row\">alpha line 9 value 8697</p>\n  <p class=\"row\">alpha line 10 value 6779</p>\n  <p class=\"row\">alpha line 11 value 1424</p>\n  <p class=\"row\">alpha line 12 value 8365</p>\n  <p class=\"row\">alpha line 13 value 4268</p>\n  <p class=\"row\">alpha line 14 value 9140</p>\n  <p class=\"row\">alpha line 15 value 7495</p>\n  <p class=\"row\">alpha line 16 value 1187</p>\n  <p class=\"row\">alpha line 17 value 2775</p>\n  <p class=\"row\">alpha line 18 value 5430</p>\n  <p class=\"row\">alpha line 19 value 5641</p>\n  <p class=\"row\">alpha line 20 value 4434</p>\n  <p class=\"row\">alpha line 21 value 1108</p>\n  <p class=\"row\">alpha line 22 value 6502</p>\n  <p class=\"row\">alpha line 23 value 6507</p>\n  <p class=\"row\">alpha line 24 value 9398</p>\n</section>\n<section id=\"beta\">\n  <p class=\"row\">beta line 0 value 5329</p>\n  <p class=\"row\">beta line 1 value 6733</p>\n  <p class=\"row\">beta line 2 tuned value 8609</p>\n  <p class=\"row\">beta line 3 value 3298</p>\n  <p class=\"row\">beta line 4 value 1955</p>\n  <p class=\"row\">beta line 5 value 7017</p>\n  <p class=\"row\">beta line 6 value 7454</p>\n  <p class=\"row\">beta line 7 value 3056</p>\n  <p class=\"row\">beta line 8 value 1611</p>\n  <p class=\"row\">beta line 9 value 3622</p>\n  <p class=\"row\">beta line 10 value 7529</p>\n  <p class=\"row\">beta line 11 value 5850</p>\n  <p class=\"row\">beta line 12 value 1037</p>\n  <p class=\"row\">beta line 13 value 9925</p>\n  <p class=\"row\">beta line 14 value 1997</p>\n  <p class=\"row\">beta line 15 value 6796</p>\n  <p class=\"row\">beta line 16 value 4592</p>\n  <p class=\"row\">beta line 17 value 7238</p>\n  <p class=\"row\">beta line 18 value 1494</p>\n  <p class=\"row\">beta line 19 value 5530</p>\n  <p class=\"row\">beta line 20 value 1940</p>\n  <p class=\"row\">beta line 21 value 2750</p>\n  <p class=\"row\">beta line 22 value 3580</p>\n  <p class=\"row\">beta line 23 value 1527</p>\n  <p class=\"row\">beta line 24 value 5310</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "artifact_key": "proj/guarded"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "warn mode: a stale update is written and returns the fixed warning",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "update_artifact",
+            "arguments": {
+              "id": "${gid}",
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 edited value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "a non-boolean discard_newer is an invalid-params error",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "update_artifact",
+            "arguments": {
+              "id": "${gid}",
+              "html": "<!doctype html>\n<html lang=\"en\">\n<head><title>Synthetic report</title></head>\n<body>\n<section id=\"intro\">\n  <p class=\"row\">intro line 0 value 8750</p>\n  <p class=\"row\">intro line 1 value 1838</p>\n  <p class=\"row\">intro line 2 value 5226</p>\n  <p class=\"row\">intro line 3 value 7884</p>\n  <p class=\"row\">intro line 4 value 2749</p>\n  <p class=\"row\">intro line 5 value 8839</p>\n  <p class=\"row\">intro line 6 value 2013</p>\n  <p class=\"row\">intro line 7 value 1082</p>\n  <p class=\"row\">intro line 8 value 5155</p>\n  <p class=\"row\">intro line 9 value 8032</p>\n  <p class=\"row\">intro line 10 value 4288</p>\n  <p class=\"row\">intro line 11 value 6129</p>\n  <p class=\"row\">intro line 12 value 2656</p>\n  <p class=\"row\">intro line 13 value 1929</p>\n  <p class=\"row\">intro line 14 value 8544</p>\n  <p class=\"row\">intro line 15 value 7501</p>\n  <p class=\"row\">intro line 16 value 7810</p>\n  <p class=\"row\">intro line 17 value 4039</p>\n  <p class=\"row\">intro line 18 value 2599</p>\n  <p class=\"row\">intro line 19 value 5649</p>\n  <p class=\"row\">intro line 20 value 7134</p>\n  <p class=\"row\">intro line 21 value 3554</p>\n  <p class=\"row\">intro line 22 value 1107</p>\n  <p class=\"row\">intro line 23 value 5337</p>\n  <p class=\"row\">intro line 24 value 9056</p>\n  <p class=\"row\">intro line 25 value 5057</p>\n  <p class=\"row\">intro line 26 value 4906</p>\n  <p class=\"row\">intro line 27 value 5527</p>\n  <p class=\"row\">intro line 28 value 4432</p>\n  <p class=\"row\">intro line 29 value 3767</p>\n</section>\n<section id=\"alpha\">\n  <p class=\"row\">alpha line 0 value 1510</p>\n  <p class=\"row\">alpha line 1 value 9411</p>\n  <p class=\"row\">alpha line 2 value 5626</p>\n  <p class=\"row\">alpha line 3 value 4275</p>\n  <p class=\"row\">alpha line 4 value 8553</p>\n  <p class=\"row\">alpha line 5 value 5823</p>\n  <p class=\"row\">alpha line 6 value 3023</p>\n  <p class=\"row\">alpha line 7 value 4331</p>\n  <p class=\"row\">alpha line 8 value 8506</p>\n  <p class=\"row\">alpha line 9 value 8697</p>\n  <p class=\"row\">alpha line 10 value 6779</p>\n  <p class=\"row\">alpha line 11 value 1424</p>\n  <p class=\"row\">alpha line 12 value 8365</p>\n  <p class=\"row\">alpha line 13 value 4268</p>\n  <p class=\"row\">alpha line 14 value 9140</p>\n  <p class=\"row\">alpha line 15 value 7495</p>\n  <p class=\"row\">alpha line 16 value 1187</p>\n  <p class=\"row\">alpha line 17 value 2775</p>\n  <p class=\"row\">alpha line 18 value 5430</p>\n  <p class=\"row\">alpha line 19 value 5641</p>\n  <p class=\"row\">alpha line 20 value 4434</p>\n  <p class=\"row\">alpha line 21 value 1108</p>\n  <p class=\"row\">alpha line 22 value 6502</p>\n  <p class=\"row\">alpha line 23 value 6507</p>\n  <p class=\"row\">alpha line 24 value 9398</p>\n</section>\n<section id=\"beta\">\n  <p class=\"row\">beta line 0 value 5329</p>\n  <p class=\"row\">beta line 1 value 6733</p>\n  <p class=\"row\">beta line 2 tuned value 8609</p>\n  <p class=\"row\">beta line 3 value 3298</p>\n  <p class=\"row\">beta line 4 value 1955</p>\n  <p class=\"row\">beta line 5 value 7017</p>\n  <p class=\"row\">beta line 6 value 7454</p>\n  <p class=\"row\">beta line 7 value 3056</p>\n  <p class=\"row\">beta line 8 value 1611</p>\n  <p class=\"row\">beta line 9 value 3622</p>\n  <p class=\"row\">beta line 10 value 7529</p>\n  <p class=\"row\">beta line 11 value 5850</p>\n  <p class=\"row\">beta line 12 value 1037</p>\n  <p class=\"row\">beta line 13 value 9925</p>\n  <p class=\"row\">beta line 14 value 1997</p>\n  <p class=\"row\">beta line 15 value 6796</p>\n  <p class=\"row\">beta line 16 value 4592</p>\n  <p class=\"row\">beta line 17 value 7238</p>\n  <p class=\"row\">beta line 18 value 1494</p>\n  <p class=\"row\">beta line 19 value 5530</p>\n  <p class=\"row\">beta line 20 value 1940</p>\n  <p class=\"row\">beta line 21 value 2750</p>\n  <p class=\"row\">beta line 22 value 3580</p>\n  <p class=\"row\">beta line 23 value 1527</p>\n  <p class=\"row\">beta line 24 value 5310</p>\n</section>\n<script>const total = 42; function show() { return total * 2; }</script>\n</body>\n</html>\n",
+              "discard_newer": "yes"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        }
+      }
+    },
+    {
+      "name": "read_artifact shows the stale body was written in warn mode",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 9,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${gid}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "guarded_revisions",
+        "query": "SELECT revision, bytes FROM artifact_revisions WHERE artifact_id = '${gid}' ORDER BY revision"
+      },
+      {
+        "name": "guarded_row",
+        "query": "SELECT revision, artifact_key FROM artifacts WHERE artifact_key = 'proj/guarded'"
+      }
+    ]
+  }
+}
