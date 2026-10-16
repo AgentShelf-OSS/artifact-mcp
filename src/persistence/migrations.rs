@@ -18,7 +18,7 @@ use rusqlite::{Connection, Transaction};
 use crate::error::AppError;
 
 /// Latest schema version. The ledger is append-only and must match Node exactly.
-pub const LATEST_SCHEMA_VERSION: i64 = 39;
+pub const LATEST_SCHEMA_VERSION: i64 = 40;
 
 /// `String.prototype.trim`'s character set, which is **not** Rust's `char::is_whitespace`.
 ///
@@ -286,6 +286,11 @@ pub static MIGRATIONS: &[Migration] = &[
         version: 39,
         name: "web-push-reminders",
         up: m039_web_push_reminders,
+    },
+    Migration {
+        version: 40,
+        name: "artifact-keys",
+        up: m040_artifact_keys,
     },
 ];
 
@@ -1888,6 +1893,12 @@ fn m038_collection_principals(
 /// SQL file so `sqlite_master` stays identical.
 fn m039_web_push_reminders(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
     tx.execute_batch(include_str!("../../migrations/039-web-push-reminders.sql"))
+}
+
+/// ADR-0015 per-organization artifact keys for publish upsert. Shared SQL keeps `sqlite_master`
+/// identical across runtimes.
+fn m040_artifact_keys(tx: &Transaction<'_>, _ctx: &MigrationContext) -> rusqlite::Result<()> {
+    tx.execute_batch(include_str!("../../migrations/040-artifact-keys.sql"))
 }
 
 #[cfg(test)]

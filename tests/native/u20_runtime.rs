@@ -671,6 +671,7 @@ async fn disabled_preview_renderer_is_a_clean_startup_and_render_noop() {
         category: String::new(),
         hidden: false,
         body_sha256: "0".repeat(64),
+        artifact_key: None,
     };
     assert_eq!(
         previews

@@ -91,6 +91,7 @@ impl Fixture {
                 category: "Docs".into(),
                 hidden: false,
                 body_sha256: "a".repeat(64),
+                artifact_key: None,
             },
         }
     }

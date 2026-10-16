@@ -188,6 +188,7 @@ impl Fixture {
                     category: row.get(13)?,
                     hidden: row.get::<_, i64>(14)? != 0,
                     body_sha256: row.get(15)?,
+                    artifact_key: None,
                 })
             },
         )
@@ -292,6 +293,7 @@ pub fn publish_request(content: ArtifactContent) -> PublishArtifact {
         description: Some("Fixture artifact".to_owned()),
         category: Some("docs".to_owned()),
         content,
+        artifact_key: None,
     }
 }
 

@@ -85,6 +85,7 @@ mod u79_outbox_bridge;
 mod u80_discord_inbound;
 mod u81_organization_discord;
 mod u90_web_push;
+mod u91_artifact_key;
 mod viewer_state;
 
 /// Fails loudly if a file in `tests/native/` is not declared above.

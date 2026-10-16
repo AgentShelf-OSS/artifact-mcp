@@ -806,6 +806,7 @@ fn artifact_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactMeta> 
         category: row.get(13)?,
         hidden: row.get::<_, i64>(14)? != 0,
         body_sha256: row.get(15)?,
+        artifact_key: None,
     })
 }
 

@@ -5,7 +5,7 @@ use serde_json::{Value, json};
 use crate::{
     AppDeps,
     artifacts::{
-        lifecycle::normalize_category,
+        lifecycle::{ARTIFACT_KEY_TAKEN, normalize_category},
         validation::{js_trim, sanitize_relative_path},
     },
     error::{AppError, JsonRpcError, McpError},
@@ -783,8 +783,20 @@ async fn publish_artifact(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
+    let artifact_key = artifact_key_argument(arguments)?;
     ensure_can_publish(auth)?;
     let target_org = target_org(arguments, auth, deps).await?;
+    if let Some(artifact_key) = artifact_key {
+        return keyed_publish(
+            PublishKind::Single,
+            arguments,
+            auth,
+            deps,
+            target_org,
+            artifact_key,
+        )
+        .await;
+    }
     let published = deps
         .artifacts
         .publish(
@@ -797,6 +809,7 @@ async fn publish_artifact(
                 content: ArtifactContent::SingleHtml(
                     required_string(arguments, "html")?.to_owned(),
                 ),
+                artifact_key: None,
             },
             MutationAudit::publisher(auth)?,
         )
@@ -816,8 +829,20 @@ async fn publish_bundle(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
+    let artifact_key = artifact_key_argument(arguments)?;
     ensure_can_publish(auth)?;
     let target_org = target_org(arguments, auth, deps).await?;
+    if let Some(artifact_key) = artifact_key {
+        return keyed_publish(
+            PublishKind::Bundle,
+            arguments,
+            auth,
+            deps,
+            target_org,
+            artifact_key,
+        )
+        .await;
+    }
     let files = bundle_files(arguments.get("files"))?;
     let published = deps
         .artifacts
@@ -832,6 +857,7 @@ async fn publish_bundle(
                     files,
                     entry: optional_string(arguments, "entry"),
                 },
+                artifact_key: None,
             },
             MutationAudit::publisher(auth)?,
         )
@@ -849,6 +875,257 @@ async fn publish_bundle(
     })
 }
 
+/// ADR-0015 artifact key grammar: `^[a-z0-9][a-z0-9._/-]{0,127}$`, as in `lib/mcp.js`.
+pub const ARTIFACT_KEY_INVALID: &str = "artifact_key must be 1-128 characters of a-z, 0-9, '.', '_', '/', or '-', starting with a letter or digit";
+const UPDATE_CONFLICT_ERROR: &str =
+    "Artifact changed during update; fetch its current revision and retry";
+const UPDATE_UNAVAILABLE_ERROR: &str = "Artifact not found or you are not authorized to update it";
+
+#[must_use]
+pub fn is_valid_artifact_key(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    let allowed = |byte: &u8| {
+        byte.is_ascii_lowercase()
+            || byte.is_ascii_digit()
+            || matches!(byte, b'.' | b'_' | b'/' | b'-')
+    };
+    matches!(bytes.first(), Some(first) if first.is_ascii_lowercase() || first.is_ascii_digit())
+        && bytes.len() <= 128
+        && bytes.iter().all(allowed)
+}
+
+fn artifact_key_argument(arguments: &OrderedJson) -> Result<Option<String>, McpError> {
+    let Some(value) = arguments.get("artifact_key") else {
+        return Ok(None);
+    };
+    match value.as_str() {
+        Some(key) if is_valid_artifact_key(key) => Ok(Some(key.to_owned())),
+        _ => Err(JsonRpcError::InvalidParams(ARTIFACT_KEY_INVALID.to_owned()).into()),
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PublishKind {
+    Single,
+    Bundle,
+}
+
+/// Create-or-update by `(org, artifact_key)`. An existing artifact is updated under exactly the
+/// `update_artifact` policy and semantics. A concurrent create that wins the unique index makes
+/// this call re-resolve the key once and update the winner instead of failing.
+async fn keyed_publish(
+    kind: PublishKind,
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+    target_org: OrgId,
+    artifact_key: String,
+) -> Result<Value, McpError> {
+    for _attempt in 0..2 {
+        let existing = deps
+            .artifacts
+            .find_meta_by_key(&target_org, &artifact_key)
+            .await?;
+        let Some(existing) = existing else {
+            match keyed_create(kind, arguments, auth, deps, &target_org, &artifact_key).await {
+                Err(McpError::Tool(AppError::Conflict(message)))
+                    if message == ARTIFACT_KEY_TAKEN =>
+                {
+                    continue;
+                }
+                other => return other,
+            }
+        };
+        return keyed_update(kind, arguments, auth, deps, existing, &artifact_key).await;
+    }
+    Err(
+        AppError::Conflict("artifact_key is being published by another request; retry".to_owned())
+            .into(),
+    )
+}
+
+async fn keyed_create(
+    kind: PublishKind,
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+    target_org: &OrgId,
+    artifact_key: &str,
+) -> Result<Value, McpError> {
+    let content = match kind {
+        PublishKind::Single => {
+            ArtifactContent::SingleHtml(required_string(arguments, "html")?.to_owned())
+        }
+        PublishKind::Bundle => ArtifactContent::Bundle {
+            files: bundle_files(arguments.get("files"))?,
+            entry: optional_string(arguments, "entry"),
+        },
+    };
+    let published = deps
+        .artifacts
+        .publish(
+            crate::model::PublishArtifact {
+                publisher: auth.clone(),
+                target_org: target_org.clone(),
+                title: optional_string(arguments, "title"),
+                description: optional_string(arguments, "description"),
+                category: optional_string(arguments, "category"),
+                content,
+                artifact_key: Some(artifact_key.to_owned()),
+            },
+            MutationAudit::publisher(auth)?,
+        )
+        .await?;
+    deps.delivery_wake.wake();
+    let meta = published.meta;
+    let mut payload = vec![
+        ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
+        (
+            "url".to_owned(),
+            OrderedJson::string(artifact_url(deps, &meta.id)),
+        ),
+        ("org".to_owned(), OrderedJson::string(target_org.0.clone())),
+    ];
+    if kind == PublishKind::Bundle {
+        let file_count = u64::try_from(published.file_count.unwrap_or(0)).unwrap_or(u64::MAX);
+        payload.push(("entry".to_owned(), OrderedJson::string(meta.entry.clone())));
+        payload.push(("files".to_owned(), OrderedJson::number_u64(file_count)));
+    }
+    payload.extend([
+        ("bytes".to_owned(), OrderedJson::number_u64(meta.bytes)),
+        ("category".to_owned(), OrderedJson::string(meta.category)),
+        (
+            "revision".to_owned(),
+            OrderedJson::number_u64(meta.revision),
+        ),
+        ("artifact_key".to_owned(), OrderedJson::string(artifact_key)),
+        ("created".to_owned(), OrderedJson::Bool(true)),
+    ]);
+    tool_result(OrderedJson::Object(payload))
+}
+
+async fn keyed_update(
+    kind: PublishKind,
+    arguments: &OrderedJson,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+    existing: ArtifactMeta,
+    artifact_key: &str,
+) -> Result<Value, McpError> {
+    let id = existing.id.0.clone();
+    let owned = AccessPolicy::authorize_publisher_write(auth, Some(existing), &id, "")?;
+    let pre = owned.meta().clone();
+    if pre.is_bundle != (kind == PublishKind::Bundle) {
+        let message = if pre.is_bundle {
+            format!(
+                "artifact_key \"{artifact_key}\" belongs to a bundle artifact; use publish_bundle"
+            )
+        } else {
+            format!(
+                "artifact_key \"{artifact_key}\" belongs to a single-file artifact; use publish_artifact"
+            )
+        };
+        return Err(AppError::Validation(message).into());
+    }
+    let (content, file_count) = match kind {
+        PublishKind::Single => (
+            ArtifactContent::SingleHtml(required_string(arguments, "html")?.to_owned()),
+            None,
+        ),
+        PublishKind::Bundle => {
+            let files = bundle_files(arguments.get("files"))?;
+            // An empty bundle is the entry-only update sentinel; Node rejects an empty snapshot.
+            if files.is_empty() {
+                return Err(AppError::Validation("files is empty".to_owned()).into());
+            }
+            let count = u64::try_from(files.len()).unwrap_or(u64::MAX);
+            (
+                ArtifactContent::Bundle {
+                    files,
+                    entry: optional_string(arguments, "entry"),
+                },
+                Some(count),
+            )
+        }
+    };
+    let update = ArtifactUpdate {
+        expected_revision: pre.revision,
+        acting_client_id: Some(auth.client_id.clone()),
+        title: optional_string(arguments, "title"),
+        description: optional_string(arguments, "description"),
+        category: optional_string(arguments, "category"),
+        content: Some(content),
+    };
+    let result = run_update(owned, update, auth, deps).await?;
+    let meta = result.meta;
+    let mut payload = vec![
+        ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
+        (
+            "url".to_owned(),
+            OrderedJson::string(artifact_url(deps, &meta.id)),
+        ),
+        ("org".to_owned(), OrderedJson::string(pre.org.0)),
+    ];
+    if let Some(file_count) = file_count {
+        payload.push(("entry".to_owned(), OrderedJson::string(meta.entry.clone())));
+        payload.push(("files".to_owned(), OrderedJson::number_u64(file_count)));
+    }
+    payload.extend([
+        ("bytes".to_owned(), OrderedJson::number_u64(meta.bytes)),
+        ("category".to_owned(), OrderedJson::string(meta.category)),
+        (
+            "revision".to_owned(),
+            OrderedJson::number_u64(meta.revision),
+        ),
+        ("artifact_key".to_owned(), OrderedJson::string(artifact_key)),
+        ("created".to_owned(), OrderedJson::Bool(false)),
+    ]);
+    tool_result(OrderedJson::Object(payload))
+}
+
+/// Shared `update_artifact` execution and error mapping, also used by keyed publish.
+async fn run_update(
+    owned: OwnedArtifact,
+    update: ArtifactUpdate,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Result<crate::model::UpdateArtifactResult, McpError> {
+    let result = match deps
+        .artifacts
+        .update(
+            owned.into_authorized(),
+            update,
+            MutationAudit::publisher(auth)?,
+        )
+        .await
+    {
+        Ok(result) => result,
+        Err(AppError::Conflict(_)) => {
+            return Err(AppError::Conflict(UPDATE_CONFLICT_ERROR.to_owned()).into());
+        }
+        Err(AppError::NotFound(_) | AppError::Forbidden(_)) => {
+            return Err(AppError::NotFound(UPDATE_UNAVAILABLE_ERROR.to_owned()).into());
+        }
+        Err(error) => return Err(error.into()),
+    };
+    if result.changed {
+        deps.delivery_wake.wake();
+    }
+    Ok(result)
+}
+
+/// Append `artifact_key` to a metadata object only when the artifact has one, so unkeyed
+/// output stays byte-for-byte unchanged.
+fn with_artifact_key(payload: OrderedJson, artifact_key: Option<&str>) -> OrderedJson {
+    match (payload, artifact_key) {
+        (OrderedJson::Object(mut entries), Some(key)) => {
+            entries.push(("artifact_key".to_owned(), OrderedJson::string(key)));
+            OrderedJson::Object(entries)
+        }
+        (payload, _) => payload,
+    }
+}
+
 async fn list_artifacts(auth: &PublisherIdentity, deps: &AppDeps) -> Result<Value, McpError> {
     let rows = if !auth.is_admin() && matches!(auth.role.as_str(), "reader" | "collaborator") {
         deps.artifacts.list_org_artifacts(&auth.org, true).await?
@@ -859,7 +1136,8 @@ async fn list_artifacts(auth: &PublisherIdentity, deps: &AppDeps) -> Result<Valu
     let artifacts = rows
         .into_iter()
         .map(|row| {
-            object! {
+            let artifact_key = row.artifact_key.clone();
+            let entry = object! {
                 "id" => OrderedJson::string(row.id.0.clone()),
                 "url" => OrderedJson::string(artifact_url(deps, &row.id)),
                 "title" => OrderedJson::string(row.title),
@@ -874,7 +1152,8 @@ async fn list_artifacts(auth: &PublisherIdentity, deps: &AppDeps) -> Result<Valu
                 "entry" => OrderedJson::string(row.entry),
                 "hidden" => OrderedJson::number_i64(i64::from(row.hidden)),
                 "uploader_label" => OrderedJson::string(row.uploader_label),
-            }
+            };
+            with_artifact_key(entry, artifact_key.as_deref())
         })
         .collect();
     tool_result(object! {
@@ -907,6 +1186,7 @@ async fn read_artifact(
     // Invariant 3: authorize the metadata before any body, history, or bundle-directory read.
     let owned = publisher_read(id, auth, deps).await?;
     let current = owned.meta().clone();
+    let artifact_key = current.artifact_key.clone();
     let artifact = owned.into_authorized();
 
     let historical = requested_revision.filter(|revision| *revision != current.revision);
@@ -956,19 +1236,22 @@ async fn read_artifact(
                     }
                 })
                 .collect();
-            return tool_result(object! {
-                "id" => OrderedJson::string(id),
-                "org" => OrderedJson::string(current.org.0),
-                "is_bundle" => OrderedJson::Bool(true),
-                "entry" => OrderedJson::string(entry),
-                "revision" => OrderedJson::number_u64(revision),
-                "content_type" => OrderedJson::string("application/json"),
-                "bytes_total" => OrderedJson::number_u64(aggregate_bytes),
-                "offset" => OrderedJson::number_u64(0),
-                "bytes_returned" => OrderedJson::number_u64(0),
-                "truncated" => OrderedJson::Bool(false),
-                "files" => OrderedJson::Array(files),
-            });
+            return tool_result(with_artifact_key(
+                object! {
+                    "id" => OrderedJson::string(id),
+                    "org" => OrderedJson::string(current.org.0),
+                    "is_bundle" => OrderedJson::Bool(true),
+                    "entry" => OrderedJson::string(entry),
+                    "revision" => OrderedJson::number_u64(revision),
+                    "content_type" => OrderedJson::string("application/json"),
+                    "bytes_total" => OrderedJson::number_u64(aggregate_bytes),
+                    "offset" => OrderedJson::number_u64(0),
+                    "bytes_returned" => OrderedJson::number_u64(0),
+                    "truncated" => OrderedJson::Bool(false),
+                    "files" => OrderedJson::Array(files),
+                },
+                artifact_key.as_deref(),
+            ));
         }
 
         let path = required_string(arguments, "path")?;
@@ -981,19 +1264,22 @@ async fn read_artifact(
         }
         .ok_or_else(|| AppError::NotFound(format!("Unknown bundle file: {path}")))?;
         let page = page_utf8(&file.content, requested_offset, limit);
-        return tool_result(object! {
-            "id" => OrderedJson::string(id),
-            "org" => OrderedJson::string(current.org.0),
-            "is_bundle" => OrderedJson::Bool(true),
-            "entry" => OrderedJson::string(entry),
-            "revision" => OrderedJson::number_u64(revision),
-            "content_type" => OrderedJson::string(file.content_type),
-            "bytes_total" => OrderedJson::number_u64(page.bytes_total),
-            "offset" => OrderedJson::number_u64(page.offset),
-            "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
-            "truncated" => OrderedJson::Bool(page.truncated),
-            "content" => OrderedJson::string(page.content),
-        });
+        return tool_result(with_artifact_key(
+            object! {
+                "id" => OrderedJson::string(id),
+                "org" => OrderedJson::string(current.org.0),
+                "is_bundle" => OrderedJson::Bool(true),
+                "entry" => OrderedJson::string(entry),
+                "revision" => OrderedJson::number_u64(revision),
+                "content_type" => OrderedJson::string(file.content_type),
+                "bytes_total" => OrderedJson::number_u64(page.bytes_total),
+                "offset" => OrderedJson::number_u64(page.offset),
+                "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
+                "truncated" => OrderedJson::Bool(page.truncated),
+                "content" => OrderedJson::string(page.content),
+            },
+            artifact_key.as_deref(),
+        ));
     }
 
     if arguments.get("path").is_some() {
@@ -1016,18 +1302,21 @@ async fn read_artifact(
         }
     })?;
     let page = page_utf8(&file.content, requested_offset, limit);
-    tool_result(object! {
-        "id" => OrderedJson::string(id),
-        "org" => OrderedJson::string(current.org.0),
-        "is_bundle" => OrderedJson::Bool(false),
-        "revision" => OrderedJson::number_u64(revision),
-        "content_type" => OrderedJson::string(file.content_type),
-        "bytes_total" => OrderedJson::number_u64(page.bytes_total),
-        "offset" => OrderedJson::number_u64(page.offset),
-        "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
-        "truncated" => OrderedJson::Bool(page.truncated),
-        "content" => OrderedJson::string(page.content),
-    })
+    tool_result(with_artifact_key(
+        object! {
+            "id" => OrderedJson::string(id),
+            "org" => OrderedJson::string(current.org.0),
+            "is_bundle" => OrderedJson::Bool(false),
+            "revision" => OrderedJson::number_u64(revision),
+            "content_type" => OrderedJson::string(file.content_type),
+            "bytes_total" => OrderedJson::number_u64(page.bytes_total),
+            "offset" => OrderedJson::number_u64(page.offset),
+            "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
+            "truncated" => OrderedJson::Bool(page.truncated),
+            "content" => OrderedJson::string(page.content),
+        },
+        artifact_key.as_deref(),
+    ))
 }
 
 async fn delete_artifact(
@@ -1181,7 +1470,6 @@ async fn update_artifact(
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
     let id = nonempty_protocol_string(arguments, "id")?;
-    let unavailable = "Artifact not found or you are not authorized to update it";
     let owned = publisher_write(id, auth, deps).await?;
     let pre = owned.meta().clone();
     let expected_revision = match arguments.get("expected_revision") {
@@ -1232,30 +1520,7 @@ async fn update_artifact(
         category: optional_string(arguments, "category"),
         content,
     };
-    let result = match deps
-        .artifacts
-        .update(
-            owned.into_authorized(),
-            update,
-            MutationAudit::publisher(auth)?,
-        )
-        .await
-    {
-        Ok(result) => result,
-        Err(AppError::Conflict(_)) => {
-            return Err(AppError::Conflict(
-                "Artifact changed during update; fetch its current revision and retry".to_owned(),
-            )
-            .into());
-        }
-        Err(AppError::NotFound(_) | AppError::Forbidden(_)) => {
-            return Err(AppError::NotFound(unavailable.to_owned()).into());
-        }
-        Err(error) => return Err(error.into()),
-    };
-    if result.changed {
-        deps.delivery_wake.wake();
-    }
+    let result = run_update(owned, update, auth, deps).await?;
     tool_result(object! {
         "id" => OrderedJson::string(result.meta.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),

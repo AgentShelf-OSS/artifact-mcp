@@ -481,7 +481,12 @@ fn normalize_label(value: &str) -> String {
 
 /// Every v21 `artifacts` column, in the order [`meta_from_row`] reads them.
 const META_COLUMNS: &str = "id, client_id, org, title, description, bytes, created_at, updated_at, \
-     uploader_label, owner_email, is_bundle, entry, revision, category, hidden, body_sha256";
+     uploader_label, owner_email, is_bundle, entry, revision, category, hidden, body_sha256, \
+     artifact_key";
+
+/// Conflict message for an `(org, artifact_key)` unique-index violation during publish
+/// (ADR-0015). The MCP layer re-resolves the key once when it sees exactly this conflict.
+pub const ARTIFACT_KEY_TAKEN: &str = "artifact_key is already in use";
 
 /// Columns of `artifact_revisions`, in the order [`revision_from_row`] reads them.
 const REVISION_COLUMNS: &str = "artifact_id, org, revision, title, description, category, bytes, \
@@ -510,6 +515,7 @@ fn meta_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactMeta> {
         category: row.get(13)?,
         hidden: row.get::<_, i64>(14)? != 0,
         body_sha256: row.get(15)?,
+        artifact_key: row.get(16)?,
     })
 }
 
@@ -545,6 +551,35 @@ fn load_meta(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppErr
         return Ok(None);
     }
     load_meta_unchecked(conn, id)
+}
+
+/// `getArtifactMetaByKey(org, key)` — ready rows only, exactly like [`load_meta`].
+fn load_meta_by_key(
+    conn: &Connection,
+    org: &str,
+    artifact_key: &str,
+) -> Result<Option<ArtifactMeta>, AppError> {
+    let id: Option<String> = conn
+        .query_row(
+            "SELECT id FROM artifacts WHERE org = ?1 AND artifact_key = ?2",
+            params![org, artifact_key],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|error| sql_error("load artifact by key", &error))?;
+    match id {
+        Some(id) => load_meta(conn, &id),
+        None => Ok(None),
+    }
+}
+
+fn is_artifact_key_conflict(error: &rusqlite::Error) -> bool {
+    matches!(
+        error,
+        rusqlite::Error::SqliteFailure(failure, Some(message))
+            if failure.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE
+                && message.contains("artifact_key")
+    )
 }
 
 fn load_meta_unchecked(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppError> {
@@ -1508,8 +1543,8 @@ impl StoreContext {
         transaction.execute(
             "INSERT INTO artifacts \
              (id, client_id, org, owner_email, uploader_label, title, description, bytes, is_bundle, entry, \
-              category, body_sha256) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+              category, body_sha256, artifact_key) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             params![
                 plan.id.as_str(),
                 request.publisher.client_id.0,
@@ -1523,9 +1558,16 @@ impl StoreContext {
                 plan.entry,
                 normalize_category(request.category.as_deref().unwrap_or_default()),
                 plan.body_sha256,
+                request.artifact_key,
             ],
         )
-        .map_err(|error| Interrupt::from(sql_error("insert artifact", &error)))?;
+        .map_err(|error| {
+            if is_artifact_key_conflict(&error) {
+                Interrupt::from(AppError::Conflict(ARTIFACT_KEY_TAKEN.to_owned()))
+            } else {
+                Interrupt::from(sql_error("insert artifact", &error))
+            }
+        })?;
         let meta = load_meta_unchecked(&transaction, plan.id.as_str())?
             .ok_or_else(|| Interrupt::from(AppError::Internal))?;
         record_revision_row(&transaction, &meta, Some(&request.publisher.client_id))?;
@@ -2712,6 +2754,14 @@ impl StoreContext {
                     .execute(&format!("DELETE FROM {table} WHERE artifact_id = ?1"), [id])
                     .map_err(|error| sql_error(operation, &error))?;
             }
+            // Artifact keys are an organization namespace (ADR-0015); a key does not follow a
+            // re-tenant, so it can never collide with a destination artifact.
+            transaction
+                .execute(
+                    "UPDATE artifacts SET artifact_key = NULL WHERE id = ?1",
+                    [id],
+                )
+                .map_err(|error| sql_error("clear artifact key on move", &error))?;
         }
         transaction
             .execute(
@@ -3132,6 +3182,21 @@ impl ArtifactService for ArtifactStore {
                 return Ok(None);
             }
             db::interact(&self.pool, move |conn| load_meta(conn, &id)).await
+        })
+    }
+
+    fn find_meta_by_key<'a>(
+        &'a self,
+        org: &'a OrgId,
+        artifact_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
+        let org = org.0.clone();
+        let artifact_key = artifact_key.to_owned();
+        Box::pin(async move {
+            db::interact(&self.pool, move |conn| {
+                load_meta_by_key(conn, &org, &artifact_key)
+            })
+            .await
         })
     }
 

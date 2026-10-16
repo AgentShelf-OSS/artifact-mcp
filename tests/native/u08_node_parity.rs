@@ -522,6 +522,7 @@ async fn metadata_normalization_matches_the_node_oracle() {
             description: case.description.map(ToOwned::to_owned),
             category: case.category.map(ToOwned::to_owned),
             content: ArtifactContent::SingleHtml(case.html.to_owned()),
+            artifact_key: None,
         };
         let meta = fixture
             .try_publish_request(request)
@@ -604,6 +605,7 @@ async fn long_metadata_is_truncated_exactly_like_node() {
             description: Some(description),
             category: Some(category),
             content: ArtifactContent::SingleHtml("<p>long</p>".to_owned()),
+            artifact_key: None,
         })
         .await
         .expect("publish succeeds")

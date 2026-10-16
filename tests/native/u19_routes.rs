@@ -904,6 +904,7 @@ fn meta(org: &str) -> ArtifactMeta {
         category: "Reports".to_owned(),
         hidden: false,
         body_sha256: "0".repeat(64),
+        artifact_key: None,
     }
 }
 

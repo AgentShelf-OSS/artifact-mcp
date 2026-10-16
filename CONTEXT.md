@@ -14,6 +14,7 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Single-page artifact** — an artifact whose body is one self-contained `.html` file.
 - **Bundle** — an artifact whose body is a directory of relative-path files and one HTML entry file.
 - **Artifact record** — the SQLite metadata row for an artifact.
+- **Artifact key** — an optional, publisher-chosen name such as `project/topic` that is unique within one organization. Publishing again with the same key updates that artifact in place, under the `update_artifact` policy, instead of creating a duplicate. Deletion frees the key; a move to another organization removes it. See `docs/adr/0015-publish-upsert-by-artifact-key.md`.
 - **Artifact body** — the file or directory containing the artifact’s bytes.
 - **Organization (org)** — the tenant key shared by publisher credentials, viewers, and artifacts.
 - **Publisher** — an AI agent using a bearer key to call MCP tools. `client_id` identifies the key that published an artifact.
@@ -92,6 +93,7 @@ The main real seam is `createApp()`: production adapters are assembled in `serve
 1. Authenticate the publisher key.
 2. Validate the JSON-RPC call against the advertised tool schema.
 3. Resolve the target organization from the key.
+   With an artifact key that already names an artifact in that organization, apply the update policy and update that artifact in place instead (ADR-0015).
 4. Write the artifact body to a staging path.
 5. Insert the artifact record and rename the staged body to its final path.
 6. Return the stable viewer URL.

@@ -169,10 +169,14 @@
                 "name": "set_artifact_reminder"
               },
               {
-                "description": "Publish a self-contained HTML document. Returns a public URL that renders it at your configured domain, /<id>. Provide a title and a short description for the artifact index.",
+                "description": "Publish a self-contained HTML document. Returns a public URL that renders it at your configured domain, /<id>. Provide a title and a short description for the artifact index. If you may republish this artifact later, pass a stable artifact_key (e.g. '<project>/<topic>'): publishing again with the same key updates the existing artifact in place instead of creating a duplicate.",
                 "inputSchema": {
                   "additionalProperties": false,
                   "properties": {
+                    "artifact_key": {
+                      "description": "Optional stable key for this artifact within its org, e.g. 'my-project/weekly-report' (1-128 characters: a-z, 0-9, '.', '_', '/', '-'; starts with a letter or digit). If an artifact with this key exists, it is updated in place exactly like update_artifact (same id and URL, new revision; omitted title/description/category are kept). Otherwise a new artifact is created with this key.",
+                      "type": "string"
+                    },
                     "category": {
                       "description": "Optional category to group the artifact within its org (e.g. 'Dashboards'). Blank = Uncategorized.",
                       "type": "string"
@@ -202,10 +206,14 @@
                 "name": "publish_artifact"
               },
               {
-                "description": "Publish a multi-file artifact (e.g. several HTML pages that link to each other and a shared stylesheet). Provide files as a map of relative-path -> file contents; relative links between files resolve. Returns a public URL. Use this instead of publish_artifact when the HTML references other files like _shared.css or additional pages.",
+                "description": "Publish a multi-file artifact (e.g. several HTML pages that link to each other and a shared stylesheet). Provide files as a map of relative-path -> file contents; relative links between files resolve. Returns a public URL. Use this instead of publish_artifact when the HTML references other files like _shared.css or additional pages. If you may republish this bundle later, pass a stable artifact_key (e.g. '<project>/<topic>'): publishing again with the same key replaces the existing bundle in place instead of creating a duplicate.",
                 "inputSchema": {
                   "additionalProperties": false,
                   "properties": {
+                    "artifact_key": {
+                      "description": "Optional stable key for this artifact within its org, e.g. 'my-project/weekly-report' (1-128 characters: a-z, 0-9, '.', '_', '/', '-'; starts with a letter or digit). If an artifact with this key exists, it is updated in place exactly like update_artifact (same id and URL, new revision; omitted title/description/category are kept). Otherwise a new artifact is created with this key. The files map is a complete snapshot; omitted files are removed.",
+                      "type": "string"
+                    },
                     "category": {
                       "description": "Optional category to group the artifact within its org. Blank = Uncategorized.",
                       "type": "string"
