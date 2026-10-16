@@ -29,7 +29,8 @@
       "category": { "type": "string" },
       "revision": { "type": "integer" },
       "artifact_key": { "type": "string" },
-      "created": { "type": "boolean" }
+      "created": { "type": "boolean" },
+      "warnings": { "type": "array", "items": { "type": "string" } }
     },
     "required": ["id", "url", "org", "bytes", "category"]
   },
@@ -45,7 +46,8 @@
       "category": { "type": "string" },
       "revision": { "type": "integer" },
       "artifact_key": { "type": "string" },
-      "created": { "type": "boolean" }
+      "created": { "type": "boolean" },
+      "warnings": { "type": "array", "items": { "type": "string" } }
     },
     "required": ["id", "url", "org", "entry", "files", "bytes", "category"]
   },
@@ -73,7 +75,8 @@
       "revision": { "type": "integer" },
       "bytes": { "type": "integer" },
       "entry": { "type": "string" },
-      "category": { "type": "string" }
+      "category": { "type": "string" },
+      "warnings": { "type": "array", "items": { "type": "string" } }
     },
     "required": ["id", "url", "revision", "bytes", "entry", "category"]
   },
