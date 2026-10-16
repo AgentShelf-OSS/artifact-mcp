@@ -47,8 +47,8 @@ for required claims and scopes.
 
 | Tool | Purpose |
 |---|---|
-| `publish_artifact(html, title, description, category, org)` | Publish one self-contained HTML page. |
-| `publish_bundle(files, entry, title, description, category, org)` | Publish a multi-file artifact. `files` maps paths to content. |
+| `publish_artifact(html, title, description, category, org, artifact_key?)` | Publish one self-contained HTML page. With `artifact_key`, update the existing keyed artifact in place. |
+| `publish_bundle(files, entry, title, description, category, org, artifact_key?)` | Publish a multi-file artifact. `files` maps paths to content. With `artifact_key`, replace the existing keyed bundle in place. |
 | `list_artifacts()` | List artifacts published by the current key, including their URLs. |
 | `read_artifact(id, path?, revision?, offset?, limit?)` | Read an artifact, retained revision, or bundle file with bounded UTF-8 paging. |
 | `update_artifact(id, html\|files, entry, title, description, category)` | Replace content or metadata at the same URL and create a revision. |
@@ -97,6 +97,34 @@ key and ignores the other fields. The result is `{id, key, scope: "org", fire_at
 `{id, key, cleared: true}`. When the server has no Web Push configuration, the tool returns the error
 `Web Push reminders are not configured on this server.` See [scheduled reminders](web-push-reminders.md). See [live data and PR Watch](live-data.md)
 for source configuration, client examples, limits, and publication.
+
+## Republishing by artifact key
+
+Agents often publish the same logical artifact again without its `id`. To prevent duplicates, pass
+a stable `artifact_key` to `publish_artifact` or `publish_bundle`, for example
+`<project>/<topic>`. The key is 1 to 128 characters from `a-z`, `0-9`, `.`, `_`, `/`, and `-`,
+and it starts with a letter or digit. Any other value is a JSON-RPC invalid-params error.
+
+A key is unique in one organization. Keys in different organizations never match.
+
+- No artifact in the target organization has the key: the server creates a new artifact and
+  stores the key. The result adds `revision: 1`, `artifact_key`, and `created: true`.
+- An artifact has the key: the server updates it exactly as `update_artifact` does. The same
+  write policy applies. The `id` and URL stay the same, the revision increments when something
+  changes, omitted `title`, `description`, and `category` stay, and a bundle `files` map replaces
+  the complete snapshot. The result has the normal publish fields plus `revision`, `artifact_key`,
+  and `created: false`.
+- A key that belongs to a bundle cannot be used with `publish_artifact`, and the reverse. The
+  server returns an error and changes nothing.
+- A key that belongs to an artifact the caller cannot modify returns the same permission error as
+  `update_artifact`.
+
+Deleting an artifact frees its key. An administrator move to another organization removes the
+key. `list_artifacts` and `read_artifact` include `artifact_key` only for artifacts that have one.
+Results of a publish without `artifact_key` do not change. When two requests create the same key
+at the same time, one creates the artifact and the other updates it. A concurrent update that
+reads a stale revision fails with the `update_artifact` conflict error. See
+[ADR-0015](adr/0015-publish-upsert-by-artifact-key.md).
 
 ## Organization folders
 

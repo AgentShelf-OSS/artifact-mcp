@@ -103,6 +103,7 @@ fn meta(id: &str, bytes: u64) -> ArtifactMeta {
         category: String::new(),
         hidden: false,
         body_sha256: DIGEST.to_owned(),
+        artifact_key: None,
     }
 }
 

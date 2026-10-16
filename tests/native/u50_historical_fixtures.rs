@@ -384,6 +384,7 @@ async fn every_frozen_historical_database_boots_recovers_and_serves_without_muta
                     description: None,
                     category: Some("fixtures".to_owned()),
                     content: ArtifactContent::SingleHtml("<main>new write</main>".to_owned()),
+                    artifact_key: None,
                 },
                 audit,
             )

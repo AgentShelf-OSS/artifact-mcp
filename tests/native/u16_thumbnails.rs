@@ -49,6 +49,7 @@ fn meta(id: &str, digest: &str, is_bundle: bool) -> ArtifactMeta {
         category: String::new(),
         hidden: false,
         body_sha256: digest.to_owned(),
+        artifact_key: None,
     }
 }
 

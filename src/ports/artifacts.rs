@@ -22,6 +22,17 @@ pub trait ArtifactService: Send + Sync {
         id: &'a ArtifactId,
     ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>>;
 
+    /// Resolve a ready artifact by its per-organization key (ADR-0015). Callers must still apply
+    /// the publisher write policy before using the result. Adapters without key support report
+    /// no match.
+    fn find_meta_by_key<'a>(
+        &'a self,
+        _org: &'a OrgId,
+        _artifact_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
+        Box::pin(async { Ok(None) })
+    }
+
     fn publish(
         &self,
         request: PublishArtifact,

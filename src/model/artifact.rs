@@ -24,6 +24,9 @@ pub struct ArtifactMeta {
     pub category: String,
     pub hidden: bool,
     pub body_sha256: String,
+    /// Optional publisher-chosen key, unique per organization (ADR-0015).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +56,8 @@ pub struct PublishArtifact {
     pub description: Option<String>,
     pub category: Option<String>,
     pub content: ArtifactContent,
+    /// Optional `(org, artifact_key)` to record on the new artifact (ADR-0015).
+    pub artifact_key: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

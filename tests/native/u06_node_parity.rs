@@ -193,6 +193,7 @@ fn rust_artifact(org: &str, client_id: &str) -> ArtifactMeta {
         category: String::new(),
         hidden: false,
         body_sha256: "a".repeat(64),
+        artifact_key: None,
     }
 }
 

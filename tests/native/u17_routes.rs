@@ -142,6 +142,7 @@ fn artifact(is_bundle: bool) -> ArtifactMeta {
         category: String::new(),
         hidden: false,
         body_sha256: DIGEST.to_owned(),
+        artifact_key: None,
     }
 }
 

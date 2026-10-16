@@ -1,0 +1,606 @@
+{
+  "id": "mcp.publish-artifact-key",
+  "tags": [
+    "CONF-MCP",
+    "mcp",
+    "publisher",
+    "artifact-key",
+    "ADR-0015",
+    "invariant-3"
+  ],
+  "fixture": "empty-v21",
+  "note": "ADR-0015 publish upsert by artifact_key: create, in-place update with revision bump and preserved metadata, invalid keys, type mismatch, same-org author refusal, per-org namespace, bundle snapshot replacement, and delete freeing the key.",
+  "steps": [
+    {
+      "name": "keyed publish creates a new artifact and records the key",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 1,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>one</p>",
+              "title": "Weekly report",
+              "description": "First cut",
+              "category": "Reports",
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "capture": {
+        "keyed_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "keyed_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "same key updates in place: same id and URL, revision 2, omitted metadata preserved",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 2,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>two</p>",
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "read_artifact exposes the key and the new body",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 3,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${keyed_id}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "list_artifacts exposes the key and the preserved title/description/category",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 4,
+          "method": "tools/call",
+          "params": {
+            "name": "list_artifacts",
+            "arguments": {}
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "an invalid key is a JSON-RPC invalid-params error",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 5,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>bad</p>",
+              "artifact_key": "Proj/Weekly Report"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "an overlong key is rejected",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 6,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>bad</p>",
+              "artifact_key": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "canonical-json"
+        }
+      }
+    },
+    {
+      "name": "publish_bundle with a single-file key is a type mismatch and changes nothing",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 7,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_bundle",
+            "arguments": {
+              "files": {
+                "index.html": "<p>bundle</p>"
+              },
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpError": "artifact_key \"proj/weekly-report\" belongs to a single-file artifact; use publish_artifact"
+      }
+    },
+    {
+      "name": "another author key in the same org may not update the keyed artifact",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme2}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 8,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>hijack</p>",
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpError": "Permission denied: this API key cannot modify this artifact"
+      }
+    },
+    {
+      "name": "the same key in another org is a separate namespace",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_beta}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 9,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>beta</p>",
+              "title": "Beta report",
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "capture": {
+        "beta_keyed_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "beta_keyed_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "keyed bundle publish creates a bundle",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 10,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_bundle",
+            "arguments": {
+              "files": {
+                "index.html": "<link rel=stylesheet href=a.css><p>v1</p>",
+                "a.css": "p{color:red}"
+              },
+              "title": "Site",
+              "artifact_key": "proj/site"
+            }
+          }
+        }
+      },
+      "capture": {
+        "keyed_bundle_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "keyed_bundle_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "keyed bundle republish replaces the snapshot in place",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 11,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_bundle",
+            "arguments": {
+              "files": {
+                "index.html": "<p>v2</p>"
+              },
+              "artifact_key": "proj/site"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "publish_artifact with a bundle key is a type mismatch",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 12,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>x</p>",
+              "artifact_key": "proj/site"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "mcpError": "artifact_key \"proj/site\" belongs to a bundle artifact; use publish_bundle"
+      }
+    },
+    {
+      "name": "read_artifact on the keyed bundle lists only the new snapshot",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 13,
+          "method": "tools/call",
+          "params": {
+            "name": "read_artifact",
+            "arguments": {
+              "id": "${keyed_bundle_id}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "deleting the keyed artifact frees its key",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 14,
+          "method": "tools/call",
+          "params": {
+            "name": "delete_artifact",
+            "arguments": {
+              "id": "${keyed_id}"
+            }
+          }
+        }
+      },
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "publishing the freed key creates a new artifact at revision 1",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 15,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>three</p>",
+              "title": "Weekly report again",
+              "artifact_key": "proj/weekly-report"
+            }
+          }
+        }
+      },
+      "capture": {
+        "rekeyed_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "rekeyed_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    },
+    {
+      "name": "unkeyed publish output is unchanged",
+      "request": {
+        "method": "POST",
+        "path": "/mcp",
+        "headers": {
+          "authorization": "Bearer ${key_acme}",
+          "content-type": "application/json"
+        },
+        "json": {
+          "jsonrpc": "2.0",
+          "id": 16,
+          "method": "tools/call",
+          "params": {
+            "name": "publish_artifact",
+            "arguments": {
+              "html": "<p>plain</p>",
+              "title": "Plain"
+            }
+          }
+        }
+      },
+      "capture": {
+        "plain_id": "result.structuredContent.id"
+      },
+      "assertSymbols": [
+        {
+          "symbol": "plain_id",
+          "length": 12,
+          "alphabet": "0123456789abcdefghijkmnpqrstuvwxyz"
+        }
+      ],
+      "expect": {
+        "status": 200,
+        "body": {
+          "mode": "exact-json-text",
+          "volatileFields": [
+            "created_at",
+            "updated_at"
+          ]
+        },
+        "mcpSuccess": true
+      }
+    }
+  ],
+  "postState": {
+    "sql": [
+      {
+        "name": "keyed_rows",
+        "query": "SELECT id, org, artifact_key, revision, title, description, category, is_bundle, entry FROM artifacts WHERE artifact_key IS NOT NULL ORDER BY org, artifact_key"
+      },
+      {
+        "name": "plain_rows",
+        "query": "SELECT id, artifact_key FROM artifacts WHERE artifact_key IS NULL ORDER BY id"
+      },
+      {
+        "name": "key_index",
+        "query": "SELECT name, sql FROM sqlite_master WHERE name = 'artifacts_org_artifact_key'"
+      }
+    ],
+    "dirEntries": [
+      {
+        "path": "artifacts/${keyed_bundle_id}"
+      }
+    ]
+  }
+}

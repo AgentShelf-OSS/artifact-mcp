@@ -93,6 +93,7 @@ impl Fixture {
                 category: "Stale".to_owned(),
                 hidden: false,
                 body_sha256: "b".repeat(64),
+                artifact_key: None,
             },
         }
     }

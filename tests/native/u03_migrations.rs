@@ -535,6 +535,7 @@ fn migration_ledger_records_the_frozen_versions_and_names() {
         ),
         (38, "collection-principals".to_owned()),
         (39, "web-push-reminders".to_owned()),
+        (40, "artifact-keys".to_owned()),
     ];
     assert_eq!(recorded_migrations(&conn), expected);
     assert_eq!(

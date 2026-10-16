@@ -1,0 +1,425 @@
+{
+  "steps": [
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 1,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_id}\",\"url\":\"http://conformance.test/${keyed_id}\",\"org\":\"acme\",\"bytes\":10,\"category\":\"Reports\",\"revision\":1,\"artifact_key\":\"proj/weekly-report\",\"created\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/weekly-report",
+              "bytes": 10,
+              "category": "Reports",
+              "created": true,
+              "id": "${keyed_id}",
+              "org": "acme",
+              "revision": 1,
+              "url": "http://conformance.test/${keyed_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 2,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_id}\",\"url\":\"http://conformance.test/${keyed_id}\",\"org\":\"acme\",\"bytes\":10,\"category\":\"Reports\",\"revision\":2,\"artifact_key\":\"proj/weekly-report\",\"created\":false}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/weekly-report",
+              "bytes": 10,
+              "category": "Reports",
+              "created": false,
+              "id": "${keyed_id}",
+              "org": "acme",
+              "revision": 2,
+              "url": "http://conformance.test/${keyed_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 3,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_id}\",\"org\":\"acme\",\"is_bundle\":false,\"revision\":2,\"content_type\":\"text/html; charset=utf-8\",\"bytes_total\":10,\"offset\":0,\"bytes_returned\":10,\"truncated\":false,\"content\":\"<p>two</p>\",\"artifact_key\":\"proj/weekly-report\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/weekly-report",
+              "bytes_returned": 10,
+              "bytes_total": 10,
+              "content": "<p>two</p>",
+              "content_type": "text/html; charset=utf-8",
+              "id": "${keyed_id}",
+              "is_bundle": false,
+              "offset": 0,
+              "org": "acme",
+              "revision": 2,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 4,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"count\":1,\"artifacts\":[{\"id\":\"${keyed_id}\",\"url\":\"http://conformance.test/${keyed_id}\",\"title\":\"Weekly report\",\"description\":\"First cut\",\"created_at\":\"<volatile>\",\"org\":\"acme\",\"category\":\"Reports\",\"revision\":2,\"updated_at\":\"<volatile>\",\"bytes\":10,\"is_bundle\":0,\"entry\":\"\",\"hidden\":0,\"uploader_label\":\"\",\"artifact_key\":\"proj/weekly-report\"}]}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifacts": [
+                {
+                  "artifact_key": "proj/weekly-report",
+                  "bytes": 10,
+                  "category": "Reports",
+                  "created_at": "<volatile>",
+                  "description": "First cut",
+                  "entry": "",
+                  "hidden": 0,
+                  "id": "${keyed_id}",
+                  "is_bundle": 0,
+                  "org": "acme",
+                  "revision": 2,
+                  "title": "Weekly report",
+                  "updated_at": "<volatile>",
+                  "uploader_label": "",
+                  "url": "http://conformance.test/${keyed_id}"
+                }
+              ],
+              "count": 1
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32602,
+            "message": "artifact_key must be 1-128 characters of a-z, 0-9, '.', '_', '/', or '-', starting with a letter or digit"
+          },
+          "id": 5,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": {
+            "code": -32602,
+            "message": "artifact_key must be 1-128 characters of a-z, 0-9, '.', '_', '/', or '-', starting with a letter or digit"
+          },
+          "id": 6,
+          "jsonrpc": "2.0"
+        }
+      }
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 9,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${beta_keyed_id}\",\"url\":\"http://conformance.test/${beta_keyed_id}\",\"org\":\"beta\",\"bytes\":11,\"category\":\"\",\"revision\":1,\"artifact_key\":\"proj/weekly-report\",\"created\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/weekly-report",
+              "bytes": 11,
+              "category": "",
+              "created": true,
+              "id": "${beta_keyed_id}",
+              "org": "beta",
+              "revision": 1,
+              "url": "http://conformance.test/${beta_keyed_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 10,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_bundle_id}\",\"url\":\"http://conformance.test/${keyed_bundle_id}\",\"org\":\"acme\",\"entry\":\"index.html\",\"files\":2,\"bytes\":53,\"category\":\"\",\"revision\":1,\"artifact_key\":\"proj/site\",\"created\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/site",
+              "bytes": 53,
+              "category": "",
+              "created": true,
+              "entry": "index.html",
+              "files": 2,
+              "id": "${keyed_bundle_id}",
+              "org": "acme",
+              "revision": 1,
+              "url": "http://conformance.test/${keyed_bundle_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 11,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_bundle_id}\",\"url\":\"http://conformance.test/${keyed_bundle_id}\",\"org\":\"acme\",\"entry\":\"index.html\",\"files\":1,\"bytes\":9,\"category\":\"\",\"revision\":2,\"artifact_key\":\"proj/site\",\"created\":false}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/site",
+              "bytes": 9,
+              "category": "",
+              "created": false,
+              "entry": "index.html",
+              "files": 1,
+              "id": "${keyed_bundle_id}",
+              "org": "acme",
+              "revision": 2,
+              "url": "http://conformance.test/${keyed_bundle_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 13,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_bundle_id}\",\"org\":\"acme\",\"is_bundle\":true,\"entry\":\"index.html\",\"revision\":2,\"content_type\":\"application/json\",\"bytes_total\":9,\"offset\":0,\"bytes_returned\":0,\"truncated\":false,\"files\":[{\"path\":\"index.html\",\"bytes\":9,\"entry\":true}],\"artifact_key\":\"proj/site\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/site",
+              "bytes_returned": 0,
+              "bytes_total": 9,
+              "content_type": "application/json",
+              "entry": "index.html",
+              "files": [
+                {
+                  "bytes": 9,
+                  "entry": true,
+                  "path": "index.html"
+                }
+              ],
+              "id": "${keyed_bundle_id}",
+              "is_bundle": true,
+              "offset": 0,
+              "org": "acme",
+              "revision": 2,
+              "truncated": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 14,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${keyed_id}\",\"deleted\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "deleted": true,
+              "id": "${keyed_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 15,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${rekeyed_id}\",\"url\":\"http://conformance.test/${rekeyed_id}\",\"org\":\"acme\",\"bytes\":12,\"category\":\"\",\"revision\":1,\"artifact_key\":\"proj/weekly-report\",\"created\":true}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "artifact_key": "proj/weekly-report",
+              "bytes": 12,
+              "category": "",
+              "created": true,
+              "id": "${rekeyed_id}",
+              "org": "acme",
+              "revision": 1,
+              "url": "http://conformance.test/${rekeyed_id}"
+            }
+          }
+        }
+      }
+    },
+    {
+      "status": 200,
+      "body": {
+        "mode": "exact-json-text",
+        "json": {
+          "id": 16,
+          "jsonrpc": "2.0",
+          "result": {
+            "content": [
+              {
+                "text": "{\"id\":\"${plain_id}\",\"url\":\"http://conformance.test/${plain_id}\",\"org\":\"acme\",\"bytes\":12,\"category\":\"\"}",
+                "type": "text"
+              }
+            ],
+            "structuredContent": {
+              "bytes": 12,
+              "category": "",
+              "id": "${plain_id}",
+              "org": "acme",
+              "url": "http://conformance.test/${plain_id}"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "postState": {
+    "dirEntries": {
+      "artifacts/${keyed_bundle_id}": [
+        "index.html"
+      ]
+    },
+    "sql": {
+      "keyed_rows": [
+        {
+          "artifact_key": "proj/site",
+          "category": "",
+          "description": "",
+          "entry": "index.html",
+          "id": "${keyed_bundle_id}",
+          "is_bundle": 1,
+          "org": "acme",
+          "revision": 2,
+          "title": "Site"
+        },
+        {
+          "artifact_key": "proj/weekly-report",
+          "category": "",
+          "description": "",
+          "entry": "",
+          "id": "${rekeyed_id}",
+          "is_bundle": 0,
+          "org": "acme",
+          "revision": 1,
+          "title": "Weekly report again"
+        },
+        {
+          "artifact_key": "proj/weekly-report",
+          "category": "",
+          "description": "",
+          "entry": "",
+          "id": "${beta_keyed_id}",
+          "is_bundle": 0,
+          "org": "beta",
+          "revision": 1,
+          "title": "Beta report"
+        }
+      ],
+      "plain_rows": [
+        {
+          "artifact_key": null,
+          "id": "${plain_id}"
+        }
+      ],
+      "key_index": [
+        {
+          "name": "artifacts_org_artifact_key",
+          "sql": "CREATE UNIQUE INDEX artifacts_org_artifact_key\n  ON artifacts(org, artifact_key) WHERE artifact_key IS NOT NULL"
+        }
+      ]
+    }
+  }
+}

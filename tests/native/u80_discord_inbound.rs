@@ -348,6 +348,7 @@ async fn resolving_discord_origin_feedback_never_enqueues_provider_delivery() {
             category: String::new(),
             hidden: false,
             body_sha256: String::new(),
+            artifact_key: None,
         };
         assert!(
             feedback_delivery::resolve_as_publisher(

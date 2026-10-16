@@ -147,6 +147,7 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
         category: "Reports".to_owned(),
         hidden: false,
         body_sha256: "deadbeefcafebabe".to_owned(),
+        artifact_key: None,
     };
     let notification = ViewerNotification {
         id: FeedbackId::from("feedback-1"),
@@ -321,6 +322,7 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         category: attack.to_owned(),
         hidden: false,
         body_sha256: "deadbeefcafebabe000000000000000000000000000000000000000000000000".to_owned(),
+        artifact_key: None,
     };
     let authorized =
         AccessPolicy::authorize_viewer(&viewer, Some(meta)).expect("same-org authorization");
@@ -732,6 +734,7 @@ fn parity_meta(attack: &str) -> ArtifactMeta {
         category: "Reports".to_owned(),
         hidden: false,
         body_sha256: "deadbeefcafebabe".to_owned(),
+        artifact_key: None,
     }
 }
 

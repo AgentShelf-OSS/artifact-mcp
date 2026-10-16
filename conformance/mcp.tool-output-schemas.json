@@ -26,7 +26,10 @@
       "url": { "type": "string" },
       "org": { "type": "string" },
       "bytes": { "type": "integer" },
-      "category": { "type": "string" }
+      "category": { "type": "string" },
+      "revision": { "type": "integer" },
+      "artifact_key": { "type": "string" },
+      "created": { "type": "boolean" }
     },
     "required": ["id", "url", "org", "bytes", "category"]
   },
@@ -39,7 +42,10 @@
       "entry": { "type": "string" },
       "files": { "type": "integer" },
       "bytes": { "type": "integer" },
-      "category": { "type": "string" }
+      "category": { "type": "string" },
+      "revision": { "type": "integer" },
+      "artifact_key": { "type": "string" },
+      "created": { "type": "boolean" }
     },
     "required": ["id", "url", "org", "entry", "files", "bytes", "category"]
   },
@@ -220,7 +226,8 @@
       "bytes_returned": { "type": "integer" },
       "truncated": { "type": "boolean" },
       "content": { "type": "string" },
-      "files": { "type": "array", "items": { "type": "object" } }
+      "files": { "type": "array", "items": { "type": "object" } },
+      "artifact_key": { "type": "string" }
     },
     "required": [
       "id",

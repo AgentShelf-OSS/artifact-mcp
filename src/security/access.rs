@@ -533,6 +533,7 @@ mod tests {
             category: String::new(),
             hidden: false,
             body_sha256: "0".repeat(64),
+            artifact_key: None,
         }
     }
 

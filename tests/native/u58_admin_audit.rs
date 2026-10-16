@@ -142,6 +142,7 @@ fn artifact_meta() -> ArtifactMeta {
         category: String::new(),
         hidden: false,
         body_sha256: String::new(),
+        artifact_key: None,
     }
 }
 
