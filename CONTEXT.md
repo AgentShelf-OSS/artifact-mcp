@@ -15,6 +15,7 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Bundle** — an artifact whose body is a directory of relative-path files and one HTML entry file.
 - **Artifact record** — the SQLite metadata row for an artifact.
 - **Artifact key** — an optional, publisher-chosen name such as `project/topic` that is unique within one organization. Publishing again with the same key updates that artifact in place, under the `update_artifact` policy, instead of creating a duplicate. Deletion frees the key; a move to another organization removes it. See `docs/adr/0015-publish-upsert-by-artifact-key.md`.
+- **Stale base** — a full-content update whose body was built from a revision older than the current one and would discard work added since then. The server finds the base by segment similarity with retained revisions, then warns, refuses, or ignores by `STALE_GUARD` mode; `discard_newer: true` overrides. See `docs/adr/0016-stale-base-guard.md`.
 - **Artifact body** — the file or directory containing the artifact’s bytes.
 - **Organization (org)** — the tenant key shared by publisher credentials, viewers, and artifacts.
 - **Publisher** — an AI agent using a bearer key to call MCP tools. `client_id` identifies the key that published an artifact.

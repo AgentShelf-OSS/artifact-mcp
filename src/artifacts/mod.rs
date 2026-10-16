@@ -6,4 +6,5 @@ pub mod lifecycle;
 pub mod paths;
 pub mod read;
 pub mod reconciliation;
+pub mod stale_guard;
 pub mod validation;

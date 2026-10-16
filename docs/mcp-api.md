@@ -47,11 +47,11 @@ for required claims and scopes.
 
 | Tool | Purpose |
 |---|---|
-| `publish_artifact(html, title, description, category, org, artifact_key?)` | Publish one self-contained HTML page. With `artifact_key`, update the existing keyed artifact in place. |
-| `publish_bundle(files, entry, title, description, category, org, artifact_key?)` | Publish a multi-file artifact. `files` maps paths to content. With `artifact_key`, replace the existing keyed bundle in place. |
+| `publish_artifact(html, title, description, category, org, artifact_key?, discard_newer?)` | Publish one self-contained HTML page. With `artifact_key`, update the existing keyed artifact in place. |
+| `publish_bundle(files, entry, title, description, category, org, artifact_key?, discard_newer?)` | Publish a multi-file artifact. `files` maps paths to content. With `artifact_key`, replace the existing keyed bundle in place. |
 | `list_artifacts()` | List artifacts published by the current key, including their URLs. |
 | `read_artifact(id, path?, revision?, offset?, limit?)` | Read an artifact, retained revision, or bundle file with bounded UTF-8 paging. |
-| `update_artifact(id, html\|files, entry, title, description, category)` | Replace content or metadata at the same URL and create a revision. |
+| `update_artifact(id, html\|files, entry, title, description, category, expected_revision?, discard_newer?)` | Replace content or metadata at the same URL and create a revision. |
 | `patch_artifact(id, expected_revision, edits, path?)` | Apply an atomic, revision-guarded batch of UTF-8-safe partial edits. |
 | `set_visibility(id, hidden)` | Unlist or relist an artifact. |
 | `list_collections(org?, limit?, cursor?)` | List accessible folder summaries. |
@@ -125,6 +125,51 @@ Results of a publish without `artifact_key` do not change. When two requests cre
 at the same time, one creates the artifact and the other updates it. A concurrent update that
 reads a stale revision fails with the `update_artifact` conflict error. See
 [ADR-0015](adr/0015-publish-upsert-by-artifact-key.md).
+
+## Stale-base guard
+
+A full-content update replaces the whole body. Before such an update, the server finds the retained
+revision that the new body is most similar to. This is the **base**. If the base is older than the
+current revision, and the new body removes enough of the work added after the base, the update is
+**stale**: it was probably built from an old local copy.
+
+The guard applies to `update_artifact` with `html` or `files`, and to `publish_artifact` and
+`publish_bundle` with an `artifact_key` that updates an existing artifact. It does not apply to
+metadata-only or entry-only updates, `patch_artifact`, `restore_artifact`, or a publish that
+creates an artifact. It runs after the write policy, so a caller that cannot update the artifact
+gets the usual error. When `update_artifact` sends an `expected_revision` that is not current, the
+usual revision-conflict error is returned and the guard does not run.
+
+The text for a stale update is:
+
+```text
+Update is based on revision {base}, but the artifact is at revision {current}. It would discard changes from {range}. Read the current revision and apply your change to it, use restore_artifact to roll back on purpose, or pass discard_newer: true.
+```
+
+`{range}` is `revision {current}` when the base is the previous revision, otherwise
+`revisions {base+1}-{current}`.
+
+| `STALE_GUARD` | Behavior for a stale update |
+|---|---|
+| `warn` (default) | The update is written. The result adds `warnings: ["<text>"]`. |
+| `enforce` | The update is refused with a tool error (`isError: true`) that has the text. Nothing changes. |
+| `off` | The guard does not run. |
+
+A result has a `warnings` field only for a stale update in `warn` mode. All other results are
+unchanged. To write a stale update on purpose, pass `discard_newer: true`; the update continues
+with no warning. `discard_newer` must be a boolean; any other value is a JSON-RPC invalid-params
+error (`discard_newer must be a boolean`). It is accepted, and has no effect, on a publish that
+creates an artifact.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `STALE_GUARD` | `warn` | `warn`, `enforce`, or `off`. Other values use `warn`. |
+| `STALE_GUARD_MIN_SEGMENTS` | `20` | Minimum count of lost segments for a stale update. Must be a positive integer. |
+| `STALE_GUARD_MIN_SHARE` | `0.10` | Minimum share of the newer segments that must be lost. Must be greater than 0 and at most 1. |
+
+Each stale detection writes one log line, `stale_base_detected id=<id> base=<n> current=<n>
+newer=<n> lost=<n> mode=<mode> discard_newer=<true|false>`. It does not log content. See
+[ADR-0016](adr/0016-stale-base-guard.md) for the segment and comparison rules.
 
 ## Organization folders
 
