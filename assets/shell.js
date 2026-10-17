@@ -104,6 +104,53 @@
     }};
   }
   // End viewer state broker.
+  // Location stays behind a consent the viewer gives in the shell for each artifact, because the
+  // browser's own permission covers the whole origin and therefore every artifact on it.
+  function createViewerGeoBroker(options) {
+    var consentKey='artifact-geo:'+options.artifactId,busy=false,asking=false,lastAt=-Infinity;
+    var idPattern=/^[A-Za-z0-9._:-]{1,64}(?![\s\S])/;
+    function send(type,fields){options.post(Object.assign({type:type},fields));}
+    function remembered(){try{return options.storage.getItem(consentKey)==='allow';}catch(_){return false;}}
+    function remember(){try{options.storage.setItem(consentKey,'allow');}catch(_){}}
+    function forget(){try{options.storage.removeItem(consentKey);}catch(_){}}
+    function ready(){send('geo:ready',{supported:!!options.geolocation,remembered:remembered()});}
+    function locate(id,high){
+      busy=true;lastAt=options.now();
+      try{
+        options.geolocation.getCurrentPosition(function(position){
+          busy=false;var coords=position&&position.coords||{};
+          if(!Number.isFinite(coords.latitude)||!Number.isFinite(coords.longitude)){send('geo:error',{requestId:id,reason:'unavailable'});return;}
+          send('geo:position',{requestId:id,lat:coords.latitude,lon:coords.longitude,accuracy:Number.isFinite(coords.accuracy)?coords.accuracy:null,timestamp:Number.isFinite(position.timestamp)?position.timestamp:options.now()});
+        },function(failure){
+          busy=false;var code=failure&&failure.code;if(code===1)forget();
+          send('geo:error',{requestId:id,reason:code===1?'denied':code===3?'timeout':'unavailable'});
+        },{enableHighAccuracy:high===true,timeout:20000,maximumAge:60000});
+      }catch(_){busy=false;send('geo:error',{requestId:id,reason:'unavailable'});}
+    }
+    function request(data){
+      var id=data.requestId;
+      if(typeof id!=='string'||!idPattern.test(id)){send('geo:error',{requestId:'',reason:'bad_request'});return;}
+      if(!options.enabled||!options.geolocation){send('geo:error',{requestId:id,reason:'unsupported'});return;}
+      if(busy||asking||options.now()-lastAt<2000){send('geo:error',{requestId:id,reason:'busy'});return;}
+      if(remembered()){locate(id,data.highAccuracy);return;}
+      asking=true;
+      Promise.resolve().then(options.ask).then(function(answer){
+        asking=false;if(answer==='always')remember();
+        if(answer==='always'||answer==='once')locate(id,data.highAccuracy);
+        else send('geo:error',{requestId:id,reason:'declined'});
+      },function(){asking=false;send('geo:error',{requestId:id,reason:'declined'});});
+    }
+    return {handle:function(event){
+      if(event.source!==options.frame())return false;
+      var data=event.data;
+      if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string'||!data.type.startsWith('geo:'))return false;
+      if(data.type==='geo:hello')ready();
+      else if(data.type==='geo:request')request(data);
+      else if(data.type==='geo:forget'){forget();ready();}
+      return true;
+    }};
+  }
+  // End viewer geolocation broker.
   var stateBroker=createViewerStateBroker({enabled:shellConfig.stateEnabled==='1',artifactId:artifactId,viewerId:configLiteral('viewerId'),viewerName:configLiteral('viewerName'),storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},fetch:function(url,init){return window.fetch(url,init);},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},setTimer:function(callback,ms){return window.setTimeout(callback,ms);},clearTimer:function(id){window.clearTimeout(id);}});
   function createViewerDataBroker(options){
     var subscriptions=new Map(),pending=new Map(),source=null,cursor='',enabled=options.enabled===true,capable=enabled,bindings={};
@@ -1513,6 +1560,22 @@
     close.addEventListener('click',closeOutbound);cancel.addEventListener('click',closeOutbound);outboundConfirm.addEventListener('click',function(){var url=outboundUrl;closeOutbound();if(url)window.open(url.href,'_blank','noopener');});
   }
   function showOutbound(url){ensureOutboundPanel();outboundUrl=url;outboundHost.textContent=url.host;outboundPanel.removeAttribute('inert');outboundPanel.classList.add('open');outboundPanel.setAttribute('aria-hidden','false');outboundConfirm.focus();}
+  var geoPanel=null,geoResolve=null;
+  function settleGeo(answer){var done=geoResolve;geoResolve=null;if(geoPanel){geoPanel.classList.remove('open');geoPanel.setAttribute('aria-hidden','true');geoPanel.setAttribute('inert','');}if(done)done(answer);}
+  function askGeoConsent(){
+    if(!geoPanel){
+      geoPanel=document.createElement('aside');geoPanel.className='vinspector vmodal';geoPanel.setAttribute('role','dialog');geoPanel.setAttribute('aria-modal','true');geoPanel.setAttribute('aria-label','Share your location');geoPanel.setAttribute('aria-hidden','true');geoPanel.setAttribute('inert','');
+      var head=document.createElement('div'),title=document.createElement('h2'),close=document.createElement('button'),content=document.createElement('div'),message=document.createElement('p'),actions=document.createElement('div'),deny=document.createElement('button'),once=document.createElement('button'),always=document.createElement('button');
+      head.className='vfb-head';title.textContent='Share your location?';close.type='button';close.className='vfb-close';close.textContent='×';close.setAttribute('aria-label','Do not share location');head.appendChild(title);head.appendChild(close);
+      content.className='vfb-list';message.textContent='This artifact asks for your current location. Only this artifact receives it.';content.appendChild(message);
+      actions.className='vfb-actions';deny.type='button';deny.textContent='Don’t allow';once.type='button';once.textContent='Allow once';always.type='button';always.className='vfb-send';always.textContent='Always allow here';
+      actions.appendChild(deny);actions.appendChild(once);actions.appendChild(always);geoPanel.appendChild(head);geoPanel.appendChild(content);geoPanel.appendChild(actions);document.body.appendChild(geoPanel);
+      close.addEventListener('click',function(){settleGeo('deny');});deny.addEventListener('click',function(){settleGeo('deny');});once.addEventListener('click',function(){settleGeo('once');});always.addEventListener('click',function(){settleGeo('always');});
+      geoPanel.addEventListener('keydown',function(event){if(event.key==='Escape')settleGeo('deny');});
+    }
+    return new Promise(function(resolve){geoResolve=resolve;geoPanel.removeAttribute('inert');geoPanel.classList.add('open');geoPanel.setAttribute('aria-hidden','false');var primary=geoPanel.querySelector('.vfb-send');if(primary)primary.focus();});
+  }
+  var geoBroker=createViewerGeoBroker({enabled:!historicalView,artifactId:artifactId,geolocation:navigator.geolocation||null,now:function(){return Date.now();},storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},ask:askGeoConsent});
   window.addEventListener('message',function(event){
     if(!frame||event.source!==frame.contentWindow)return;var data=event.data;if(!data||typeof data!=='object')return;
     if(castBridge&&castBridge.handle(event))return;
@@ -1522,6 +1585,7 @@
     if(dataBroker.handle(event))return;
     if(stateBroker.handle(event))return;
     if(reminderBroker.handle(event))return;
+    if(geoBroker.handle(event))return;
     if(data.type!=='anchor:ready'&&data.type!=='anchor:picked'&&data.type!=='anchor:positions'&&data.type!=='anchor:navigate')return;
     if(data.type==='anchor:navigate'){var url=parseOutboundHref(data.href);if(!url)return;if(url.origin===window.location.origin){var opened=window.open(url.href,'_blank');if(opened){try{opened.opener=null;}catch(_){}return;}}showOutbound(url);return;}
     if(data.type==='anchor:ready'){var nextPage=isBundle&&typeof data.page==='string'?data.page:null;if(draftAnchor&&composerBody&&composerBody.value.trim()&&draftAnchor.page!==nextPage&&!window.confirm('Move away from this selected anchor? Your draft comment will remain.')){if(isBundle&&draftAnchor.page)frame.src=bundleRawPrefix+draftAnchor.page.split('/').map(encodeURIComponent).join('/')+'?anchor=1&reader=1'+versionQuery;return;}currentPage=nextPage;bridgeReady=true;invalidateAnchorPayload();hideAllMarkers();if(commentMode){overlay.classList.remove('fallback');postToFrame('anchor:pick-on');}requestRepaint();return;}
