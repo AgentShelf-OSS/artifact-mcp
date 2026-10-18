@@ -191,6 +191,7 @@
       else if(m.type==='geo.error'){if(m.reason==='denied')forget('location');send('geo:error',{requestId:String(m.requestId||''),reason:['denied','unavailable','timeout'].indexOf(m.reason)>=0?m.reason:'unavailable'});}
       else if(m.type==='audio.state'&&str(m.id,64)&&['queued','playing','done','error'].indexOf(m.state)>=0)send('audio:state',{id:m.id,state:m.state});
       else if(m.type==='audio.played'&&str(m.id,64)){if(!pendingPlayed.some(function(p){return p.id===m.id;}))pendingPlayed.push({id:m.id,at:Number.isFinite(m.at)?m.at:Date.now()});flushPlayed();}
+      else if(m.type==='media.command'&&typeof m.action==='string'){var run=mediaHandlers&&mediaHandlers[m.action];if(typeof run==='function'){try{run();}catch(_){}}}
       else if(m.type==='error')send('native:error',{requestId:String(m.requestId||''),reason:typeof m.reason==='string'?m.reason.slice(0,40):'unavailable'});
     }
     function start(){
@@ -200,6 +201,15 @@
     }
     function whenReady(){if(ready||!host)return Promise.resolve(ready);return new Promise(function(resolve){var done=false;waiters.push(function(){if(!done){done=true;resolve(true);}});options.setTimer(function(){if(!done){done=true;resolve(ready);}},1500);});}
     function has(cap){return ready&&capabilities.indexOf(cap)>=0;}
+    var mediaHandlers=null,lastMirror='';
+    function mirrorMedia(state){
+      if(!options.enabled||!has('media.mirror')||!state)return;
+      var cut=function(v){return typeof v==='string'?v.slice(0,200):'';};
+      var message=state.state==='none'?{type:'media.session',state:'none',title:'',artist:'',album:'',actions:[]}:
+        {type:'media.session',state:state.state==='playing'?'playing':'paused',title:cut(state.title)||'Listen',artist:cut(state.artist),album:cut(state.album),actions:['play','pause','next','previous','stop']};
+      mediaHandlers=state.state==='none'?null:(state.handlers||null);
+      var key=JSON.stringify(message);if(key===lastMirror)return;lastMirror=key;toHost(message);
+    }
     function fail(requestId,reason){send('native:error',{requestId:requestId,reason:reason});}
     function handleMessage(data){
       var type=data.type,requestId=typeof data.requestId==='string'&&idPattern.test(data.requestId)?data.requestId:'';
@@ -220,7 +230,7 @@
       if(type==='notify:show'){if(!has('notify')){fail(requestId,'unsupported');return;}if(!str(data.title,120)||!str(data.body,500)){fail(requestId,'bad_request');return;}
         consent('notify').then(function(ok){if(!ok){fail(requestId,'declined');return;}toHost({type:'notify.show',requestId:requestId,title:data.title,body:data.body});});return;}
     }
-    return {start:start,handle:function(event){
+    return {start:start,mirrorMedia:mirrorMedia,hostHas:function(cap){return whenReady().then(function(){return has(cap);});},handle:function(event){
       if(event.source!==options.frame())return false;var data=event.data;
       if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string')return false;
       if(!/^(native:hello|geo:watch|geo:unwatch|audio:queue|audio:geotrigger|audio:stop|notify:show)$/.test(data.type))return false;
@@ -862,7 +872,26 @@
       const roleText = role ? role.label + ' · ' + (availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry)) : '';
       return (wants ? 'Reading' : 'Paused') + (roleText ? ' · ' + roleText : label ? ' · ' + label : '');
     }
+    // ADR-0019: inside the Android app, mirror the player so Android Auto and the media
+    // notification show it, and route their buttons back to these controls.
+    function mirrorNative(clear) {
+      if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.mirrorMedia) return;
+      if (clear) { nativeBroker.mirrorMedia({state:'none'}); return; }
+      const entry = queue[position], voiceName = availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry) || 'Listen';
+      const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role)?.label : '';
+      nativeBroker.mirrorMedia({state:wants ? 'playing' : 'paused', title:chapter?.label || entry?.sectionLabel || document.title || 'Listen', artist:role ? role + ' · ' + voiceName : voiceName, album:document.title || '',
+        handlers:{play:()=>{if(!wants)get('play').click();}, pause:()=>{if(wants)get('play').click();}, next:()=>skip(1), previous:()=>skip(-1), stop:()=>get('stop').click()}});
+    }
+    // `?listen=autoplay` starts reading once, but only inside the native host: the Android app uses
+    // it when an artifact is picked from the car's media library (ADR-0019).
+    let autoplayDone = false;
+    function maybeAutoplay() {
+      if (autoplayDone || !enabled || !ready || wants || new URLSearchParams(window.location.search).get('listen') !== 'autoplay') return;
+      if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.hostHas) return;
+      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get('play').click(); });
+    }
     function updateMediaSession(clear) {
+      mirrorNative(clear);
       const session = navigator.mediaSession; if (!session) return;
       try {
         if (clear) { session.metadata = null; session.playbackState = 'none'; ['play','pause','stop','seekbackward','seekforward','previoustrack','nexttrack'].forEach(action => { try { session.setActionHandler(action, null); } catch (_) {} }); return; }
@@ -1461,7 +1490,7 @@
       if (event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object') return;
       const data = event.data;
       if (data.type === 'anchor:ready') setTimeout(() => { if (queue.length && !queueKey) queueKey = checkpointKey(); refreshSaved(); }, 0);
-      if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); return; }
+      if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); maybeAutoplay(); return; }
       if (data.type === 'reader:changed') {
         const changedScope = typeof data.scopeKey === 'string' ? data.scopeKey : '';
         if ((!changedScope && !readerScopeKey) || (changedScope && changedScope === readerScopeKey)) { stop('Page changed. Press Play to read it.'); clearTarget(); refreshOutline(); }

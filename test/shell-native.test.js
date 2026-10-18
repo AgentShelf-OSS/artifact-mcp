@@ -55,7 +55,7 @@ test("hello handshake reports the host's capabilities", async () => {
 async function readyHarness(opts = {}) {
   const f = fakeHost();
   const h = harness({ host: f.host, ...opts });
-  f.reply({ type: "ready", app: "0.1.0", capabilities: ["geo.watch", "audio.queue", "audio.geotrigger", "notify"] });
+  f.reply({ type: "ready", app: "0.1.0", capabilities: ["geo.watch", "audio.queue", "audio.geotrigger", "notify", "media.mirror", "library"] });
   await settle();
   return { ...h, f };
 }
@@ -135,6 +135,7 @@ const APP_FIELDS = {
   "audio.stop": ["v", "type", "artifactId"],
   "notify.show": ["v", "type", "artifactId", "requestId", "title", "body"],
   "played.ack": ["v", "type", "artifactId", "ids"],
+  "media.session": ["v", "type", "artifactId", "state", "title", "artist", "album", "actions"],
 };
 const QUEUE_ITEM = ["id", "title", "text", "url", "voice"];
 const TRIGGER_ITEM = [...QUEUE_ITEM, "lat", "lon", "radius_m"];
@@ -150,6 +151,7 @@ test("every host message matches the app's field allowlist", async () => {
   await h.send({ type: "audio:stop" });
   h.f.reply({ type: "audio.played", artifactId: "trip", id: "s-1", at: 1 });
   await h.send({ type: "native:hello" });
+  h.broker.mirrorMedia({ state: "playing", title: "Chapter 1", artist: "Andrea", album: "Road trip", handlers: {} });
   const seen = new Set();
   for (const m of h.f.sent) {
     assert.ok(APP_FIELDS[m.type], "unknown host message " + m.type);
@@ -165,4 +167,34 @@ test("voices the app would reject are refused in the shell", async () => {
   const h = await readyHarness();
   await h.send({ type: "audio:queue", requestId: "q1", item: { id: "s-2", title: "Luxor", text: "x", voice: "qwen/custom voice" } });
   assert.deepEqual(h.messages.at(-1), { type: "native:error", requestId: "q1", reason: "bad_request" });
+});
+
+test("Listen state is mirrored to the app once per change and car buttons reach Listen", async () => {
+  const h = await readyHarness();
+  const calls = [];
+  const handlers = { play: () => calls.push("play"), pause: () => calls.push("pause"), next: () => calls.push("next"), previous: () => calls.push("previous"), stop: () => calls.push("stop") };
+  h.broker.mirrorMedia({ state: "playing", title: "T".repeat(300), artist: "Andrea", album: "Road trip", handlers });
+  h.broker.mirrorMedia({ state: "playing", title: "T".repeat(300), artist: "Andrea", album: "Road trip", handlers });
+  const sessions = h.f.sent.filter(m => m.type === "media.session");
+  assert.equal(sessions.length, 1, "identical state is not resent");
+  assert.deepEqual(sessions[0], { v: 1, artifactId: "trip", type: "media.session", state: "playing", title: "T".repeat(200), artist: "Andrea", album: "Road trip", actions: ["play", "pause", "next", "previous", "stop"] });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "pause" });
+  h.f.reply({ type: "media.command", artifactId: "other", action: "next" });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "next" });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "rm -rf" });
+  assert.deepEqual(calls, ["pause", "next"]);
+  h.broker.mirrorMedia({ state: "none" });
+  assert.deepEqual(h.f.sent.at(-1), { v: 1, artifactId: "trip", type: "media.session", state: "none", title: "", artist: "", album: "", actions: [] });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "play" });
+  assert.deepEqual(calls, ["pause", "next"], "no handlers after Listen stops");
+});
+
+test("hosts without media.mirror get no session messages", async () => {
+  const f = fakeHost();
+  const h = harness({ host: f.host });
+  f.reply({ type: "ready", app: "0.1.0", capabilities: ["geo.watch"] });
+  await settle();
+  h.broker.mirrorMedia({ state: "playing", title: "x", handlers: {} });
+  assert.equal(f.sent.some(m => m.type === "media.session"), false);
+  assert.equal(await h.broker.hostHas("media.mirror"), false);
 });
