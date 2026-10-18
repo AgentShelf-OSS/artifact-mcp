@@ -151,6 +151,83 @@
     }};
   }
   // End viewer geolocation broker.
+  // ADR-0018: when the Android app hosts the viewer, the shell relays consented native capabilities
+  // (background location, car audio, notifications). The artifact frame never sees the host object.
+  function createNativeBroker(options) {
+    var host=null,ready=false,capabilities=[],helloSent=false,artifactListening=false,pendingPlayed=[],waiters=[];
+    var idPattern=/^[A-Za-z0-9._:-]{1,64}(?![\s\S])/,artifact=String(options.artifactId||'');
+    var consentPrefix='artifact-native:'+artifact+':';
+    function send(type,fields){options.post(Object.assign({type:type},fields||{}));}
+    // The app rejects unknown fields; hello carries only v and type (ADR-0018 protocol v1).
+    function toHost(message){if(!host)return false;try{host.postMessage(JSON.stringify(message.type==='hello'?{v:1,type:'hello'}:Object.assign({v:1,artifactId:artifact},message)));return true;}catch(_){return false;}}
+    function allowed(kind){try{return options.storage.getItem(consentPrefix+kind)==='allow';}catch(_){return false;}}
+    function remember(kind){try{options.storage.setItem(consentPrefix+kind,'allow');}catch(_){}}
+    function forget(kind){try{options.storage.removeItem(consentPrefix+kind);}catch(_){}}
+    function consent(kind){if(allowed(kind))return Promise.resolve(true);return Promise.resolve().then(function(){return options.ask(kind);}).then(function(answer){if(answer==='always')remember(kind);return answer==='always'||answer==='once';},function(){return false;});}
+    function str(value,max){return typeof value==='string'&&value.length>0&&value.length<=max;}
+    function cleanItem(item,geo){
+      if(!item||typeof item!=='object'||Array.isArray(item))return null;
+      if(!str(item.id,64)||!idPattern.test(item.id)||!str(item.title,120))return null;
+      var out={id:item.id,title:item.title};
+      if(str(item.text,1500))out.text=item.text;
+      else if(str(item.url,2048)){try{var u=new URL(item.url,options.origin);if(u.origin!==options.origin)return null;out.url=u.href;}catch(_){return null;}}
+      else return null;
+      if(item.voice!==undefined){if(!str(item.voice,64)||!/^[A-Za-z0-9_-]{1,64}$/.test(item.voice))return null;out.voice=item.voice;}
+      if(geo){
+        if(!Number.isFinite(item.lat)||!Number.isFinite(item.lon)||Math.abs(item.lat)>90||Math.abs(item.lon)>180)return null;
+        var radius=Number.isFinite(item.radius_m)?Math.round(item.radius_m):3000;
+        if(radius<500||radius>10000)return null;
+        out.lat=item.lat;out.lon=item.lon;out.radius_m=radius;
+      }
+      return out;
+    }
+    function flushPlayed(){if(!artifactListening||!pendingPlayed.length)return;var ids=[];pendingPlayed.splice(0).forEach(function(p){send('audio:played',{id:p.id,at:p.at});ids.push(p.id);});toHost({type:'played.ack',ids:ids});}
+    function onHost(raw){
+      var m;try{m=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){return;}
+      if(!m||m.v!==1||typeof m.type!=='string')return;
+      if(m.type==='ready'){ready=true;capabilities=Array.isArray(m.capabilities)?m.capabilities.filter(function(c){return typeof c==='string';}):[];waiters.splice(0).forEach(function(w){w();});return;}
+      if(m.artifactId!==artifact)return;
+      if(m.type==='geo.position'&&Number.isFinite(m.lat)&&Number.isFinite(m.lon))send('geo:position',{requestId:String(m.requestId||''),lat:m.lat,lon:m.lon,accuracy:Number.isFinite(m.accuracy)?m.accuracy:null,timestamp:Number.isFinite(m.timestamp)?m.timestamp:Date.now()});
+      else if(m.type==='geo.error'){if(m.reason==='denied')forget('location');send('geo:error',{requestId:String(m.requestId||''),reason:['denied','unavailable','timeout'].indexOf(m.reason)>=0?m.reason:'unavailable'});}
+      else if(m.type==='audio.state'&&str(m.id,64)&&['queued','playing','done','error'].indexOf(m.state)>=0)send('audio:state',{id:m.id,state:m.state});
+      else if(m.type==='audio.played'&&str(m.id,64)){if(!pendingPlayed.some(function(p){return p.id===m.id;}))pendingPlayed.push({id:m.id,at:Number.isFinite(m.at)?m.at:Date.now()});flushPlayed();}
+      else if(m.type==='error')send('native:error',{requestId:String(m.requestId||''),reason:typeof m.reason==='string'?m.reason.slice(0,40):'unavailable'});
+    }
+    function start(){
+      host=options.host();if(!host||helloSent)return;helloSent=true;
+      try{if(typeof host.addEventListener==='function')host.addEventListener('message',function(e){onHost(e&&e.data);});else host.onmessage=function(e){onHost(e&&e.data);};}catch(_){host=null;return;}
+      toHost({type:'hello'});
+    }
+    function whenReady(){if(ready||!host)return Promise.resolve(ready);return new Promise(function(resolve){var done=false;waiters.push(function(){if(!done){done=true;resolve(true);}});options.setTimer(function(){if(!done){done=true;resolve(ready);}},1500);});}
+    function has(cap){return ready&&capabilities.indexOf(cap)>=0;}
+    function fail(requestId,reason){send('native:error',{requestId:requestId,reason:reason});}
+    function handleMessage(data){
+      var type=data.type,requestId=typeof data.requestId==='string'&&idPattern.test(data.requestId)?data.requestId:'';
+      if(type==='native:hello'){artifactListening=true;whenReady().then(function(){send('native:ready',{available:!!(options.enabled&&ready),capabilities:options.enabled&&ready?capabilities.slice():[]});flushPlayed();});return;}
+      if(!options.enabled||!ready){if(type!=='audio:stop')fail(requestId,'unsupported');return;}
+      if(type==='audio:stop'){toHost({type:'audio.stop'});return;}
+      if(!requestId){fail('','bad_request');return;}
+      if(type==='geo:watch'){if(!has('geo.watch')){fail(requestId,'unsupported');return;}
+        var interval=Number.isFinite(data.intervalMs)?Math.max(15000,Math.min(600000,Math.round(data.intervalMs))):60000;
+        consent('location').then(function(ok){if(!ok){send('geo:error',{requestId:requestId,reason:'declined'});return;}toHost({type:'geo.watch',requestId:requestId,intervalMs:interval,highAccuracy:data.highAccuracy===true});});return;}
+      if(type==='geo:unwatch'){toHost({type:'geo.unwatch',requestId:requestId});return;}
+      if(type==='audio:queue'){if(!has('audio.queue')){fail(requestId,'unsupported');return;}var item=cleanItem(data.item,false);if(!item){fail(requestId,'bad_request');return;}toHost({type:'audio.queue',requestId:requestId,item:item});return;}
+      if(type==='audio:geotrigger'){if(!has('audio.geotrigger')){fail(requestId,'unsupported');return;}
+        if(!Array.isArray(data.items)||data.items.length>50){fail(requestId,'bad_request');return;}
+        var items=data.items.map(function(i){return cleanItem(i,true);});if(items.some(function(i){return !i;})){fail(requestId,'bad_request');return;}
+        if(!items.length){toHost({type:'audio.geotrigger',requestId:requestId,items:[]});return;}
+        consent('location').then(function(ok){if(!ok){fail(requestId,'declined');return;}toHost({type:'audio.geotrigger',requestId:requestId,items:items});});return;}
+      if(type==='notify:show'){if(!has('notify')){fail(requestId,'unsupported');return;}if(!str(data.title,120)||!str(data.body,500)){fail(requestId,'bad_request');return;}
+        consent('notify').then(function(ok){if(!ok){fail(requestId,'declined');return;}toHost({type:'notify.show',requestId:requestId,title:data.title,body:data.body});});return;}
+    }
+    return {start:start,handle:function(event){
+      if(event.source!==options.frame())return false;var data=event.data;
+      if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string')return false;
+      if(!/^(native:hello|geo:watch|geo:unwatch|audio:queue|audio:geotrigger|audio:stop|notify:show)$/.test(data.type))return false;
+      handleMessage(data);return true;
+    },receive:onHost};
+  }
+  // End native broker.
   var stateBroker=createViewerStateBroker({enabled:shellConfig.stateEnabled==='1',artifactId:artifactId,viewerId:configLiteral('viewerId'),viewerName:configLiteral('viewerName'),storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},fetch:function(url,init){return window.fetch(url,init);},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},setTimer:function(callback,ms){return window.setTimeout(callback,ms);},clearTimer:function(id){window.clearTimeout(id);}});
   function createViewerDataBroker(options){
     var subscriptions=new Map(),pending=new Map(),source=null,cursor='',enabled=options.enabled===true,capable=enabled,bindings={};
@@ -1574,20 +1651,24 @@
   function showOutbound(url){ensureOutboundPanel();outboundUrl=url;outboundHost.textContent=url.host;outboundPanel.removeAttribute('inert');outboundPanel.classList.add('open');outboundPanel.setAttribute('aria-hidden','false');outboundConfirm.focus();}
   var geoPanel=null,geoResolve=null;
   function settleGeo(answer){var done=geoResolve;geoResolve=null;if(geoPanel){geoPanel.classList.remove('open');geoPanel.setAttribute('aria-hidden','true');geoPanel.setAttribute('inert','');}if(done)done(answer);}
-  function askGeoConsent(){
+  function askGeoConsent(question,detail){
     if(!geoPanel){
       geoPanel=document.createElement('aside');geoPanel.className='vinspector vmodal';geoPanel.setAttribute('role','dialog');geoPanel.setAttribute('aria-modal','true');geoPanel.setAttribute('aria-label','Share your location');geoPanel.setAttribute('aria-hidden','true');geoPanel.setAttribute('inert','');
       var head=document.createElement('div'),title=document.createElement('h2'),close=document.createElement('button'),content=document.createElement('div'),message=document.createElement('p'),actions=document.createElement('div'),deny=document.createElement('button'),once=document.createElement('button'),always=document.createElement('button');
-      head.className='vfb-head';title.textContent='Share your location?';close.type='button';close.className='vfb-close';close.textContent='×';close.setAttribute('aria-label','Do not share location');head.appendChild(title);head.appendChild(close);
-      content.className='vfb-list';message.textContent='This artifact asks for your current location. Only this artifact receives it.';content.appendChild(message);
+      head.className='vfb-head';title.className='vgeo-title';close.type='button';close.className='vfb-close';close.textContent='×';close.setAttribute('aria-label','Do not share location');head.appendChild(title);head.appendChild(close);
+      content.className='vfb-list';message.className='vgeo-detail';content.appendChild(message);
       actions.className='vfb-actions';deny.type='button';deny.textContent='Don’t allow';once.type='button';once.textContent='Allow once';always.type='button';always.className='vfb-send';always.textContent='Always allow here';
       actions.appendChild(deny);actions.appendChild(once);actions.appendChild(always);geoPanel.appendChild(head);geoPanel.appendChild(content);geoPanel.appendChild(actions);document.body.appendChild(geoPanel);
       close.addEventListener('click',function(){settleGeo('deny');});deny.addEventListener('click',function(){settleGeo('deny');});once.addEventListener('click',function(){settleGeo('once');});always.addEventListener('click',function(){settleGeo('always');});
       geoPanel.addEventListener('keydown',function(event){if(event.key==='Escape')settleGeo('deny');});
     }
+    geoPanel.querySelector('.vgeo-title').textContent=question||'Share your location?';geoPanel.querySelector('.vgeo-detail').textContent=detail||'This artifact asks for your current location. Only this artifact receives it.';geoPanel.setAttribute('aria-label',question||'Share your location');
     return new Promise(function(resolve){geoResolve=resolve;geoPanel.removeAttribute('inert');geoPanel.classList.add('open');geoPanel.setAttribute('aria-hidden','false');var primary=geoPanel.querySelector('.vfb-send');if(primary)primary.focus();});
   }
-  var geoBroker=createViewerGeoBroker({enabled:!historicalView,artifactId:artifactId,geolocation:navigator.geolocation||null,now:function(){return Date.now();},storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},ask:askGeoConsent});
+  var geoBroker=createViewerGeoBroker({enabled:!historicalView,artifactId:artifactId,geolocation:navigator.geolocation||null,now:function(){return Date.now();},storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},ask:function(){return askGeoConsent();}});
+  var NATIVE_CONSENT={location:['Use your location in the background?','This artifact asks the app to follow your location, even with the screen off, for example to play stories near places you pass. The app shows a notification while it does.'],notify:['Allow notifications?','This artifact asks to show notifications from the app.']};
+  var nativeBroker=createNativeBroker({enabled:!historicalView,artifactId:artifactId,origin:window.location.origin,host:function(){return window.ArtifactNative||null;},storage:{getItem:function(key){return localStorage.getItem(key);},setItem:function(key,value){localStorage.setItem(key,value);},removeItem:function(key){localStorage.removeItem(key);}},post:function(message){postToFrame(message.type,message);},frame:function(){return frame&&frame.contentWindow;},setTimer:function(callback,ms){return window.setTimeout(callback,ms);},ask:function(kind){var c=NATIVE_CONSENT[kind]||NATIVE_CONSENT.location;return askGeoConsent(c[0],c[1]);}});
+  nativeBroker.start();
   window.addEventListener('message',function(event){
     if(!frame||event.source!==frame.contentWindow)return;var data=event.data;if(!data||typeof data!=='object')return;
     if(castBridge&&castBridge.handle(event))return;
@@ -1597,6 +1678,7 @@
     if(dataBroker.handle(event))return;
     if(stateBroker.handle(event))return;
     if(reminderBroker.handle(event))return;
+    if(nativeBroker.handle(event))return;
     if(geoBroker.handle(event))return;
     if(data.type!=='anchor:ready'&&data.type!=='anchor:picked'&&data.type!=='anchor:positions'&&data.type!=='anchor:navigate')return;
     if(data.type==='anchor:navigate'){var url=parseOutboundHref(data.href);if(!url)return;if(url.origin===window.location.origin){var opened=window.open(url.href,'_blank');if(opened){try{opened.opener=null;}catch(_){}return;}}showOutbound(url);return;}
