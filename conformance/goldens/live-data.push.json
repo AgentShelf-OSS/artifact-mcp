@@ -10,7 +10,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"sources\":[{\"id\":\"acme-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"params\":{}}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
+                "text": "{\"sources\":[{\"id\":\"acme-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"method\":\"GET\",\"params\":{},\"stream\":false}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
                 "type": "text"
               }
             ],
@@ -21,7 +21,9 @@
                   "kind": "push",
                   "operations": {
                     "latest": {
-                      "params": {}
+                      "method": "GET",
+                      "params": {},
+                      "stream": false
                     }
                   },
                   "subscriptions": {
@@ -46,7 +48,7 @@
           "result": {
             "content": [
               {
-                "text": "{\"sources\":[{\"id\":\"beta-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"params\":{}}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
+                "text": "{\"sources\":[{\"id\":\"beta-push\",\"kind\":\"push\",\"operations\":{\"latest\":{\"method\":\"GET\",\"params\":{},\"stream\":false}},\"subscriptions\":{\"events\":{\"transport\":\"push\"}}}]}",
                 "type": "text"
               }
             ],
@@ -57,7 +59,9 @@
                   "kind": "push",
                   "operations": {
                     "latest": {
-                      "params": {}
+                      "method": "GET",
+                      "params": {},
+                      "stream": false
                     }
                   },
                   "subscriptions": {

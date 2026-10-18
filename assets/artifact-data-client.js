@@ -18,6 +18,9 @@
       var item = pending.get(data.requestId); if (!item) return; pending.delete(data.requestId); clearTimeout(item.timer); if (item.signal && item.abort) item.signal.removeEventListener('abort', item.abort);
       if (data.type === 'data:error') item.reject(new Error(typeof data.reason === 'string' ? data.reason : 'data_unavailable')); else item.resolve(data.data); return;
     }
+    if (data.type === 'data:chunk') {
+      var streamItem = pending.get(data.requestId); if (streamItem && streamItem.onChunk) { try { streamItem.onChunk(data.data); } catch (_) {} } return;
+    }
     if (data.type === 'data:event') {
       var key = String(data.binding || '') + ':' + String(data.subscription || ''), envelope = { binding: data.binding, subscription: data.subscription, event: data.event, id: data.id, data: data.data };
       var subscription = activeSubscriptions.get(data.requestId); if (subscription && subscription.key === key) { try { subscription.callback(envelope); } catch (_) {} }
@@ -32,10 +35,12 @@
       if (!validName(binding) || !validName(operation) || !params || typeof params !== 'object' || Array.isArray(params)) throw new Error('bad_params');
       var requestId = id();
       return new Promise(function (resolve, reject) {
-        var timer = setTimeout(function () { post({ type: 'data:cancel', requestId: requestId }); failPending(requestId, 'data_unavailable'); }, 32000), abort;
-        pending.set(requestId, { resolve: resolve, reject: reject, timer: timer, signal: options.signal, abort: abort });
+        var streaming = options.stream === true, timer = setTimeout(function () { post({ type: 'data:cancel', requestId: requestId }); failPending(requestId, 'data_unavailable'); }, streaming ? 125000 : 32000), abort;
+        pending.set(requestId, { resolve: resolve, reject: reject, timer: timer, signal: options.signal, abort: abort, onChunk: typeof options.onChunk === 'function' ? options.onChunk : null });
         if (options.signal) { if (options.signal.aborted) { failPending(requestId, 'aborted'); return; } abort = function () { if (pending.has(requestId)) { failPending(requestId, 'aborted'); post({ type: 'data:cancel', requestId: requestId }); } }; pending.get(requestId).abort = abort; options.signal.addEventListener('abort', abort, { once: true }); }
-        post({ type: 'data:query', requestId: requestId, binding: binding, operation: operation, params: params });
+        var message = { type: 'data:query', requestId: requestId, binding: binding, operation: operation, params: params };
+        if (streaming) message.stream = true;
+        post(message);
       });
     });
   }
@@ -48,7 +53,9 @@
     ready.then(function (state) { if (active && state.enabled) post({ type: 'data:subscribe', requestId: requestId, binding: binding, subscription: subscription }); });
     return function () { active = false; activeSubscriptions.delete(requestId); var current = listeners.get(key); if (current) { current.delete(callback); if (!current.size) listeners.delete(key); } if (settled && enabled) post({ type: 'data:unsubscribe', requestId: requestId, binding: binding, subscription: subscription }); };
   }
-  root.artifact = root.artifact || {}; root.artifact.data = { ready: ready, query: query, subscribe: subscribe };
+  // ADR-0017: calls onChunk for every line of a streaming operation and resolves with the last one.
+  function stream(binding, operation, params, onChunk, options) { return query(binding, operation, params, Object.assign({}, options || {}, { stream: true, onChunk: onChunk })); }
+  root.artifact = root.artifact || {}; root.artifact.data = { ready: ready, query: query, stream: stream, subscribe: subscribe };
   root.addEventListener('pagehide', function () { pending.forEach(function (_, requestId) { failPending(requestId, 'aborted'); post({ type: 'data:cancel', requestId: requestId }); }); activeSubscriptions.forEach(function (value, requestId) { post({ type: 'data:unsubscribe', requestId: requestId, binding: value.binding, subscription: value.subscription }); }); activeSubscriptions.clear(); listeners.clear(); });
   function retryHello() { if (settled) return; post({ type: 'data:hello' }); setTimeout(retryHello, 100); }
   retryHello();

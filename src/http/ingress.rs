@@ -876,7 +876,10 @@ fn classify(method: &Method, path: &str) -> RequestClass {
     if path == "/mcp" {
         return RequestClass::Mcp;
     }
-    if *method == Method::POST && path.split('/').count() == 4 && path.ends_with("/data/query") {
+    if *method == Method::POST
+        && path.split('/').count() == 4
+        && (path.ends_with("/data/query") || path.ends_with("/data/stream"))
+    {
         return RequestClass::Data;
     }
     if path.contains("/feedback") {

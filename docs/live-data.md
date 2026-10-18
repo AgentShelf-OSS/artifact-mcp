@@ -59,6 +59,25 @@ forward. Poll subscriptions periodically invoke an operation without required pa
 subscription has an independent connection status and replay position. A failed upstream retries
 without disconnecting other bindings.
 
+### POST and streaming operations
+
+An HTTP operation may set `"method": "POST"` to send its parameters as a typed JSON body instead of
+a query string. POST operations allow up to 32 parameters and strings up to 16384 characters; the
+serialized body may not exceed 64 KiB. An operation may also set `"stream": true` when its upstream
+answers newline-delimited JSON (`application/x-ndjson`). Streaming operations may use a
+`timeout_ms` up to 120000, and `max_bytes` bounds the whole stream. A pause of more than 30 seconds
+between lines ends it. See [ADR-0017](adr/0017-broker-post-and-streaming-operations.md).
+
+```json
+"chat": {
+  "path": "/chat/stream", "method": "POST", "stream": true, "timeout_ms": 70000,
+  "params": {
+    "session": { "type": "string", "required": true, "max_length": 64 },
+    "msg": { "type": "string", "required": true, "max_length": 2000 }
+  }
+}
+```
+
 ## Discover and bind through MCP
 
 `list_data_sources` returns the caller's available sources, their public parameter definitions,
@@ -116,13 +135,21 @@ if (!connection.enabled) {
 }
 ```
 
+For a streaming operation, `stream(binding, operation, params, onChunk, { signal })` calls `onChunk`
+for each line as it arrives and resolves with the last line. Without the SDK, send `data:query` with
+`stream: true`; the shell answers with `data:chunk { requestId, data }` messages and a final
+`data:result` carrying the last chunk. Calling `query` on a streaming operation returns only its
+last line.
+
 `query(binding, operation, params, { signal })` returns the upstream JSON value and supports
 cancellation with an AbortSignal. `subscribe(binding, subscription, callback)` returns an
 unsubscribe function. Event envelopes contain `binding`, `subscription`, `event`, `id`, and `data`.
 The broker preserves selected upstream event names and IDs. Combined replay cursors contain an
 independent ID for each subscription. A replay gap tells the client to reload authoritative data.
 
-The viewer uses `GET /:id/data` to read bindings, `POST /:id/data/query` for queries, and
+The viewer uses `GET /:id/data` to read bindings, `POST /:id/data/query` for queries,
+`POST /:id/data/stream` for streaming operations (`{"chunk":…}` lines, then `{"done":true}` or one
+`{"error":…}` line), and
 `GET /:id/data/events` for a multiplexed SSE stream. Viewer authentication, organization checks,
 and the existing request-authenticity policy protect these routes.
 
