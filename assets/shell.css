@@ -61,6 +61,13 @@
 
 /* Narration delivery settings follow the player's existing brass controls. */
 .vreader-style-panel[hidden],.vreader-custom[hidden]{display:none}
+.vreader-finder{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:.48rem;margin-top:.6rem}.vreader-finder[hidden]{display:none}
+.vreader-finder input[type=search]{grid-column:1/-1;min-height:2.75rem;border:1px solid var(--line);border-radius:6px;padding:0 .6rem;background:var(--bg);color:inherit;font:600 .75rem/1 system-ui,-apple-system,"Segoe UI",sans-serif}
+.vreader-chips{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:.35rem}
+.vreader-chips button,.vreader-save{min-height:2.5rem;padding:0 .8rem;border:1px solid var(--line);border-radius:999px;background:var(--bg);color:inherit;font:600 .7rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;cursor:pointer}
+.vreader-chips button[aria-pressed=true],.vreader-save[aria-pressed=true]{background:var(--brass);border-color:var(--brass);color:var(--panel)}
+.vreader-finder select{min-height:2.5rem;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:inherit;font:600 .7rem/1 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 .48rem}
+.vreader-voice-count{grid-column:1/-1;margin:0;color:var(--dim);font:600 .62rem/1.3 system-ui,-apple-system,"Segoe UI",sans-serif}
 .vreader-style-panel{margin-top:.8rem;padding-top:.8rem;border-top:1px solid var(--line)}
 .vreader-style-row{display:grid;grid-template-columns:minmax(0,1fr);gap:.6rem;align-items:end}
 .vreader-style-row label,.vreader-custom{display:grid;gap:.35rem;color:var(--dim);font:700 .56rem/1.3 ui-monospace,monospace;letter-spacing:.04em}
