@@ -1,6 +1,6 @@
 # ADR-0018: Native Android app and car surfaces
 
-- Status: Proposed
+- Status: Accepted (Phase 1 in progress)
 - Date: 2026-10-18
 - Issue: [#105](https://github.com/AgentShelf-OSS/artifact-mcp/issues/105)
 
@@ -70,6 +70,47 @@ from the templates rather than from artifact authors. The schema is documented i
 developer mode ("Unknown sources"). Play Store publication and iOS / CarPlay are out of scope
 for this decision.
 
+## Decisions recorded at acceptance
+
+- The app lives in its own repository, `AgentShelf-OSS/artifact-mcp-android` (Kotlin, Gradle,
+  Android Car App Library). Shell-side bridges live in this repository.
+- Builds run in a container with the Android SDK; CI builds signed release APKs. The release
+  signing key is held in the deployment's secrets manager, never in the repository.
+- Phase 1 ships the viewer, login and the native bridges below. Phase 2 (car surfaces) follows
+  after review.
+- Android pauses page scripts in a backgrounded WebView, so anything that must happen with the
+  screen off runs natively. Location-triggered narration is therefore a native capability
+  (`audio.geotrigger`), not a page loop.
+
+## Bridge protocol (version 1)
+
+**Host channel.** The app registers a WebView message listener named `ArtifactNative`, scoped to
+the artifact origin (`WebViewCompat.addWebMessageListener` with an allowed-origin rule). Only the
+top-level viewer shell page matches that origin. The artifact iframe has an opaque origin and
+never receives the object. `addJavascriptInterface` is not used, because it exposes the object to
+every frame. Messages are JSON strings with `v: 1`.
+
+Shell → app: `{"type":"hello"}`; app → shell: `{"type":"ready","app":"<version>",
+"capabilities":["geo.watch","audio.queue","audio.geotrigger","notify"]}`. Without a reply, the
+shell assumes a browser and offers none of these.
+
+**Artifact ↔ shell messages** (the shell checks consent, then relays to the app):
+
+| Artifact sends | Shell/app behaviour | Artifact receives |
+| --- | --- | --- |
+| `native:hello` | reports what the host supports | `native:ready {available, capabilities}` |
+| `geo:watch {requestId, intervalMs≥15000, highAccuracy?}` | per-artifact background-location consent; foreground service with a persistent notification | `geo:position {requestId, lat, lon, accuracy, timestamp}` while the page runs; `geo:error {requestId, reason}` |
+| `geo:unwatch {requestId}` | stops the watch | — |
+| `audio:queue {requestId, item}` | app synthesizes `item.text` with `item.voice` through the artifact's speech route (same session cookie) or plays a same-origin `item.url`, in a MediaSession visible to Android Auto | `audio:state {id, state: queued\|playing\|done\|error}` |
+| `audio:geotrigger {requestId, items}` | replaces the artifact's trigger set; while active, the app's location service plays an item the first time the device is within `radius_m` (500–10000) of `lat/lon` | `audio:played {id, at}`, replayed when the page next runs |
+| `audio:stop {}` | stops playback and clears the queue | — |
+| `notify:show {requestId, title, body}` | a local notification attributed to the artifact | — |
+
+An audio item is `{id ≤64 chars, title ≤120, text ≤1500 | url, voice?, lat?, lon?, radius_m?}`.
+An artifact may hold at most 50 trigger items. Consent for background location and for
+notifications is asked by the shell per artifact, stored like ADR-0016 consent, and revocable
+from the app's settings. A browser viewer answers `native:ready {available:false}`.
+
 ## Consequences
 
 - One app gives every artifact background location, car audio and a car screen. Examples: road
@@ -85,8 +126,5 @@ for this decision.
 
 ## Open questions
 
-- Should car views travel in viewer state or as a push data binding (updates without an open
-  viewer)?
-- Kotlin with the Car App Library only, or a cross-platform shell with native plugins?
-- Should the Android project live in this repository (`android/`) or a separate one?
-- How should the release signing key be held (the deployment's secrets manager)?
+- Should car views (Phase 2) travel in viewer state or as a push data binding (updates without an
+  open viewer)?
