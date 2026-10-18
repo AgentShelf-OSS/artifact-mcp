@@ -1,0 +1,119 @@
+{
+  "model": "english_2026-04",
+  "gated_revision": "19f95fe2df36e79fbd9f10008595cc4c977a0fcc",
+  "quantized": true,
+  "results": [
+    {
+      "voice": "andy",
+      "label": "Andy",
+      "cache_key": "legacy",
+      "source_gain_db": 6.08,
+      "source_sha256": "2f19517de7b777a4b0d6816a1711a58026305d34e02d05c33effea889322524c",
+      "embedding_sha256": "ab39f2fd280d138bed258245346e3a4ff614ab0e0574c15d62e199aecea21de7",
+      "bytes": 5605176,
+      "source": "voice-zero"
+    },
+    {
+      "voice": "karen_savage2",
+      "label": "Karen Savage",
+      "cache_key": "legacy",
+      "source_gain_db": 4.61,
+      "source_sha256": "bb92bc05208cd4e8448ad4c824bc4790175e07528f7a79a244ea8238d6d8848b",
+      "embedding_sha256": "b211023c4bf8b619ebc28d74afd979c79dbc3cce951eebdeccdc3b73cc7f9d7a",
+      "bytes": 5605176,
+      "source": "voice-zero"
+    },
+    {
+      "voice": "kristin_hughes_expressive",
+      "label": "Kristin Hughes",
+      "cache_key": "legacy",
+      "source_gain_db": 7.05,
+      "source_sha256": "eff896ae45a5614ae9e5df46c39a2617e39b9655e5b990ad63ec1d8f966daca0",
+      "embedding_sha256": "749bd66e4247896b5be0d159e53036fe91cbe87750619593e3b0c8cf2bca4a41",
+      "bytes": 5408568,
+      "source": "voice-zero"
+    },
+    {
+      "voice": "laura_caldwell",
+      "label": "Laura Caldwell",
+      "cache_key": "legacy",
+      "source_gain_db": 4.35,
+      "source_sha256": "b42f27923bc1cdf4f454f3fb8d289e33268e983a734ed6612dcee22de5d9f569",
+      "embedding_sha256": "f384f9faefaa7d67c640cd857a96a44661121912701f9416dae829f3f907dce8",
+      "bytes": 5359416,
+      "source": "voice-zero"
+    },
+    {
+      "voice": "simon_evers",
+      "label": "Simon Evers",
+      "cache_key": "legacy",
+      "source_gain_db": 11.08,
+      "source_sha256": "3260517de0220d583890db9da0815bd0d53987b68df4d9301ff04c20a5bb64da",
+      "embedding_sha256": "098669ade192be234c2617ee787584578400d931d6981d9e5986542aa5a3b048",
+      "bytes": 6539064,
+      "source": "voice-zero"
+    },
+    {
+      "voice": "andrea",
+      "label": "Andrea",
+      "cache_key": "legacy",
+      "source_gain_db": 0.34,
+      "source_sha256": "4d988ea2b9267dddb9325b8779931912c8cefe6d7b5bacda37a5fdd8f39576e0",
+      "embedding_sha256": "1191c25b0aa390f92506e843ac8ef7b202600d0cc5cf0b799113c23c369a441b",
+      "bytes": 6195000,
+      "source_collection": "kyutai/tts-voices/voice-donations",
+      "source_id": "Andrea_enhanced",
+      "source_revision": "323332d33f997de8394f24a193e1a76df720e01a",
+      "license": "CC0-1.0",
+      "consent_terms": "https://kyutai.org/legal/Terms%20of%20Use%20-%20Unmute%20Voice%20Donation%20Project%20v1.pdf",
+      "source": "kyutai-donation"
+    },
+    {
+      "voice": "darius",
+      "label": "Darius",
+      "cache_key": "legacy",
+      "source_gain_db": 0.09,
+      "source_sha256": "8af3832805483812f5c152941320a1677e5c0585e2cb56e0ffef2ad02293021e",
+      "embedding_sha256": "1a94e44224be0348a777f08862b67df8f2728317bf60c1a8a26f7f5890c41aae",
+      "bytes": 6195000,
+      "source_collection": "kyutai/tts-voices/voice-donations",
+      "source_id": "Darius_enhanced",
+      "source_revision": "323332d33f997de8394f24a193e1a76df720e01a",
+      "license": "CC0-1.0",
+      "consent_terms": "https://kyutai.org/legal/Terms%20of%20Use%20-%20Unmute%20Voice%20Donation%20Project%20v1.pdf",
+      "source": "kyutai-donation"
+    },
+    {
+      "voice": "hannah",
+      "label": "Hannah",
+      "cache_key": "legacy",
+      "source_gain_db": 0.14,
+      "source_sha256": "7b9fedd90dee8fdbc4babe74ebdbd41fe90af166acd8a930f1842b7f4ca06f8e",
+      "embedding_sha256": "a335c44ab3f7e8eb46c83ff0a5d6094a729646b1b64c2cf2eb7643e77f71ec16",
+      "bytes": 6195000,
+      "source_collection": "kyutai/tts-voices/voice-donations",
+      "source_id": "Hannah_enhanced",
+      "source_revision": "323332d33f997de8394f24a193e1a76df720e01a",
+      "license": "CC0-1.0",
+      "consent_terms": "https://kyutai.org/legal/Terms%20of%20Use%20-%20Unmute%20Voice%20Donation%20Project%20v1.pdf",
+      "source": "kyutai-donation"
+    },
+    {
+      "voice": "bedfordshire",
+      "label": "Bedfordshire",
+      "cache_key": "legacy",
+      "source_gain_db": -0.64,
+      "source_sha256": "12ef20b3d2dd9d2a6d357621d42d894f2de19ed806d954d264d0e1c8dd653e29",
+      "embedding_sha256": "8e9de67580b0e03f1af1c0cf6cb4847f61ee8b88a9c885187347692a4fff13c6",
+      "bytes": 6195000,
+      "source_collection": "kyutai/tts-voices/voice-donations",
+      "source_id": "Midlands_Bedfordshire_Dialect_enhanced",
+      "source_revision": "323332d33f997de8394f24a193e1a76df720e01a",
+      "license": "CC0-1.0",
+      "consent_terms": "https://kyutai.org/legal/Terms%20of%20Use%20-%20Unmute%20Voice%20Donation%20Project%20v1.pdf",
+      "source": "kyutai-donation"
+    }
+  ],
+  "schema_version": 2,
+  "note": "Worker loads results in order. label is shown as \"<label> \u00b7 Pocket\". cache_key legacy keeps pre-directory cache keys. Exposure to users is controlled by artifact-mcp, not this file."
+}

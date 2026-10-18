@@ -1,0 +1,13 @@
+# Incremental layer used on VM310. It keeps the exact Python, torch, and
+# timestamped-fork layers of the deployed image, so audio stays identical, and
+# replaces only the worker source and the bundled fallback voice directory.
+# Build context needs server.py, the three helper modules, and voices/ with the
+# nine original *.safetensors files plus voices/manifest.json.
+ARG BASE_IMAGE=homelab/artifact-pocket:3.1.0-donated-20260914
+FROM ${BASE_IMAGE}
+USER 0:0
+RUN rm -rf /app/voices
+COPY server.py stream_control.py timed_protocol.py cache_store.py /app/
+COPY voices /app/voices/
+RUN chown -R 0:0 /app && chmod -R a+rX,go-w /app
+USER 65532:65532

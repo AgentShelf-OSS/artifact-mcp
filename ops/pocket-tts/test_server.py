@@ -169,6 +169,48 @@ class ServerCacheTests(unittest.TestCase):
             self.assertEqual(names, {})
             self.assertEqual(calls, [])
 
+    def test_manifest_controls_order_labels_checksums_and_cache_keys(self):
+        server = self.server
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("zed_voice", "amy_voice", "bad_hash", "unlisted"):
+                (root / (name + ".safetensors")).write_bytes(name.encode())
+            sha = server.hashlib.sha256(b"amy_voice").hexdigest()
+            (root / "manifest.json").write_text(json.dumps({"results": [
+                {"voice": "zed_voice", "label": "Zed", "cache_key": "legacy"},
+                {"voice": "amy_voice", "label": "Amy Reader", "embedding_sha256": sha},
+                {"voice": "bad_hash", "embedding_sha256": "0" * 64},
+                {"voice": "missing_file"},
+            ]}))
+            states, names = {}, {}
+
+            class Loader:
+                def get_state_for_audio_prompt(self, prompt):
+                    return "state:" + Path(prompt).stem
+
+            server.VOICE_CONTENT_HASHES.clear()
+            server.load_voice_directory(directory, Loader(), states, names)
+            self.assertEqual(list(names), ["pocket_zed_voice", "pocket_amy_voice"])
+            self.assertEqual(names["pocket_amy_voice"], "Amy Reader · Pocket")
+            self.assertEqual(states["pocket_zed_voice"], "state:zed_voice")
+            self.assertNotIn("pocket_zed_voice", server.VOICE_CONTENT_HASHES)
+            self.assertEqual(server.VOICE_CONTENT_HASHES["pocket_amy_voice"], sha)
+
+    def test_unreadable_manifest_loads_nothing(self):
+        server = self.server
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "quiet.safetensors").write_bytes(b"x")
+            (root / "manifest.json").write_text("{not json")
+            states, names = {}, {}
+            server.load_voice_directory(directory, object(), states, names)
+            self.assertEqual(states, {})
+
+    def test_missing_voice_directory_is_not_fatal(self):
+        states, names = {}, {}
+        self.server.load_voice_directory("/nonexistent/pocket-voices", object(), states, names)
+        self.assertEqual(states, {})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 services:
   speech:
-    image: homelab/artifact-pocket:3.1.0-cache-queue-20260913
+    image: homelab/artifact-pocket:3.1.0-voicedir-20261018
     build: .
     restart: unless-stopped
     ports:
@@ -41,4 +41,4 @@ networks:
     name: artifact-tts-trial_default
 secrets:
   tts_token:
-    file: ./tts-token
+    file: /run/artifact-pocket-runtime/tts-token

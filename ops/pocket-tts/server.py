@@ -29,10 +29,16 @@ from pocket_tts_timestamped import AudioChunk, TTSModel, WordEnd, WordStart
 
 PRESETS = ['alba', 'marius', 'javert', 'jean', 'cosette', 'eponine', 'fantine', 'azelma',
            'anna', 'bill_boerst', 'caro_davy', 'charles', 'eve', 'george', 'jane',
-           'mary', 'michael', 'paul', 'peter_yearsley', 'stuart_bell', 'vera']
+           'mary', 'michael', 'paul', 'peter_yearsley', 'stuart_bell', 'vera',
+           'estelle', 'giovanni', 'juergen', 'lola', 'rafael']
 VOICES = {'pocket_' + name: name.replace('_', ' ').title() + ' · Pocket' for name in PRESETS}
-VOICE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,31}$")
+VOICE_NAME_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 MAX_VOICE_FILE_BYTES = 16 * 1024 * 1024
+# Prepared voice states live in a directory described by manifest.json. The
+# image bundles the original nine at /app/voices; deployments mount a larger
+# directory and point POCKET_TTS_VOICE_DIR at it. Adding a voice is a file plus
+# a manifest entry, not a code change.
+DEFAULT_VOICE_DIR = Path(__file__).parent / "voices"
 MAX_CHARS = 1500
 MAX_BODY = 8192
 MAX_CACHE_BYTES = 512 * 1024 * 1024
@@ -74,44 +80,89 @@ voices = {"pocket_" + name: model.get_state_for_audio_prompt(name) for name in P
 VOICE_CONTENT_HASHES = {}
 
 
+def _read_manifest(directory):
+    """Return manifest entries, or None when the directory has no manifest."""
+    path = directory / "manifest.json"
+    if not path.exists():
+        return None
+    data = json.loads(path.read_text())
+    entries = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("manifest.json needs a results list")
+    return entries
+
+
+def _load_voice_file(path, loaded_model, voice_names, expected_sha=None):
+    stem = path.stem
+    voice_id = "pocket_" + stem
+    if path.is_symlink():
+        raise ValueError("symlinks are not allowed")
+    if not VOICE_NAME_PATTERN.fullmatch(stem):
+        raise ValueError("invalid voice name")
+    if stem in PRESETS or voice_id in voice_names:
+        raise ValueError("voice name collides with a built-in preset")
+    if not path.is_file():
+        raise ValueError("not a regular file")
+    if path.stat().st_size > MAX_VOICE_FILE_BYTES:
+        raise ValueError("file exceeds 16 MiB")
+    content = path.read_bytes()
+    if len(content) > MAX_VOICE_FILE_BYTES:
+        raise ValueError("file exceeds 16 MiB")
+    digest = hashlib.sha256(content).hexdigest()
+    if expected_sha is not None and digest != expected_sha:
+        raise ValueError("embedding_sha256 does not match manifest")
+    return voice_id, loaded_model.get_state_for_audio_prompt(path), digest
+
+
 def load_voice_directory(voice_dir, loaded_model, voice_states, voice_names):
-    """Load valid operator-supplied voice states without failing worker startup."""
+    """Load prepared voice states without failing worker startup.
+
+    With manifest.json, only listed voices load, in manifest order, using the
+    manifest label and checksum. Without one, every valid *.safetensors file
+    loads with a title-cased label. Entries marked "cache_key": "legacy" keep
+    the pre-directory cache key (no content hash) so existing audio stays warm.
+    """
     if voice_dir is None:
         return
     directory = Path(voice_dir)
     try:
+        entries = _read_manifest(directory)
         candidates = sorted(directory.glob("*.safetensors"))
-    except OSError as error:
-        logging.warning("Could not list Pocket voice directory %s: %s", directory, error)
+    except (OSError, ValueError) as error:
+        logging.warning("Could not read Pocket voice directory %s: %s", directory, error)
         return
-    for path in candidates:
-        stem = path.stem
-        voice_id = "pocket_" + stem
+    if entries is None:
+        entries = [{"voice": path.stem} for path in candidates]
+    else:
+        listed = {entry.get("voice") for entry in entries if isinstance(entry, dict)}
+        for path in candidates:
+            if path.stem not in listed:
+                logging.warning("Skipping Pocket voice file %s: not in manifest", path.name)
+    for entry in entries:
         try:
-            if path.is_symlink():
-                raise ValueError("symlinks are not allowed")
+            if not isinstance(entry, dict) or not isinstance(entry.get("voice"), str):
+                raise ValueError("manifest entry needs a voice name")
+            stem = entry["voice"]
             if not VOICE_NAME_PATTERN.fullmatch(stem):
                 raise ValueError("invalid voice name")
-            if stem in PRESETS or voice_id in voice_names:
-                raise ValueError("voice name collides with a built-in preset")
-            if not path.is_file():
-                raise ValueError("not a regular file")
-            if path.stat().st_size > MAX_VOICE_FILE_BYTES:
-                raise ValueError("file exceeds 16 MiB")
-            content = path.read_bytes()
-            if len(content) > MAX_VOICE_FILE_BYTES:
-                raise ValueError("file exceeds 16 MiB")
-            state = loaded_model.get_state_for_audio_prompt(path)
+            label = entry.get("label") or stem.replace("_", " ").title()
+            if not isinstance(label, str) or not 0 < len(label) <= 60:
+                raise ValueError("invalid label")
+            voice_id, state, digest = _load_voice_file(
+                directory / (stem + ".safetensors"), loaded_model, voice_names,
+                entry.get("embedding_sha256"))
         except Exception as error:
-            logging.warning("Skipping Pocket voice file %s: %s", path.name, error)
+            logging.warning("Skipping Pocket voice %s: %s",
+                            entry.get("voice") if isinstance(entry, dict) else entry, error)
             continue
         voice_states[voice_id] = state
-        voice_names[voice_id] = stem.replace("_", " ").title() + " · Pocket"
-        VOICE_CONTENT_HASHES[voice_id] = hashlib.sha256(content).hexdigest()
+        voice_names[voice_id] = label + " · Pocket"
+        if entry.get("cache_key") != "legacy":
+            VOICE_CONTENT_HASHES[voice_id] = digest
 
 
-VOICE_DIR = os.environ.get("POCKET_TTS_VOICE_DIR")
-load_voice_directory(VOICE_DIR if VOICE_DIR else None, model, voices, VOICES)
+VOICE_DIR = os.environ.get("POCKET_TTS_VOICE_DIR") or str(DEFAULT_VOICE_DIR)
+load_voice_directory(VOICE_DIR, model, voices, VOICES)
 MODEL_ID = "pocket-tts-timestamped-65037e84-english_2026-04" + ("-int8" if QUANTIZE else "")
 MODEL_LOAD_SECONDS = time.monotonic() - started
 GATE = InferenceGate(MAX_QUEUED_REQUESTS)
@@ -476,5 +527,5 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    print(json.dumps({"event": "ready", "model_load_seconds": MODEL_LOAD_SECONDS, "model_id": MODEL_ID, "quantized": QUANTIZE}), flush=True)
+    print(json.dumps({"event": "ready", "model_load_seconds": MODEL_LOAD_SECONDS, "model_id": MODEL_ID, "quantized": QUANTIZE, "voices": len(VOICES)}), flush=True)
     ThreadingHTTPServer(("0.0.0.0", 8788), Handler).serve_forever()
