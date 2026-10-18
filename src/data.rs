@@ -64,7 +64,20 @@ pub struct OperationConfig {
     pub max_bytes: usize,
     #[serde(default = "default_timeout")]
     pub timeout_ms: u64,
+    /// ADR-0017: `GET` (query string) or `POST` (typed JSON body).
+    #[serde(default = "default_method")]
+    pub method: String,
+    /// ADR-0017: the upstream answers newline-delimited JSON relayed line by line.
+    #[serde(default)]
+    pub stream: bool,
 }
+fn default_method() -> String {
+    "GET".into()
+}
+/// Longest quiet gap allowed between two lines of a streaming upstream.
+const STREAM_IDLE: Duration = Duration::from_secs(30);
+/// Largest serialized JSON body a POST operation may send upstream.
+const MAX_POST_BODY: usize = 64 * 1024;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ParamConfig {
@@ -810,7 +823,12 @@ impl DataBroker {
                 operations: s
                     .operations
                     .iter()
-                    .map(|(n, o)| (n.clone(), json!({"params":public_params(&o.params)})))
+                    .map(|(n, o)| {
+                        (
+                            n.clone(),
+                            json!({"params":public_params(&o.params),"method":o.method,"stream":o.stream}),
+                        )
+                    })
                     .collect(),
                 subscriptions: s
                     .subscriptions
@@ -1015,6 +1033,111 @@ impl DataBroker {
             .await;
         result
     }
+    /// Sends the operation's request and checks the status (and the content type of a stream).
+    async fn open_upstream(
+        &self,
+        s: &SourceConfig,
+        o: &OperationConfig,
+        params: &Value,
+    ) -> Result<reqwest::Response, String> {
+        let (url, body) = build_request(s, o, params)?;
+        let request = match body {
+            Some(body) => self.client.post(url).json(&body),
+            None => self.client.get(url),
+        };
+        let response = request
+            .headers(Self::resolved_headers(s)?)
+            .timeout(Duration::from_millis(o.timeout_ms))
+            .send()
+            .await
+            .map_err(|_| "data_unavailable")?;
+        if response.status() == reqwest::StatusCode::NOT_FOUND {
+            return Err("not_found".into());
+        }
+        if !response.status().is_success() {
+            return Err("data_unavailable".into());
+        }
+        if o.stream
+            && !response
+                .headers()
+                .get(reqwest::header::CONTENT_TYPE)
+                .and_then(|v| v.to_str().ok())
+                .is_some_and(|v| {
+                    v.split(';')
+                        .next()
+                        .is_some_and(|t| t.trim().eq_ignore_ascii_case("application/x-ndjson"))
+                })
+        {
+            return Err("data_unavailable".into());
+        }
+        Ok(response)
+    }
+    /// ADR-0017: relays a streaming operation. Errors before the upstream answers are returned
+    /// directly; later ones arrive as the channel's last item. Dropping the receiver cancels the
+    /// upstream request.
+    pub async fn query_stream(
+        &self,
+        id: &str,
+        binding: &str,
+        operation: &str,
+        params: Value,
+    ) -> Result<tokio::sync::mpsc::Receiver<Result<Value, String>>, String> {
+        let (b, s) = self.binding_source(id, binding).await?;
+        if !b.operations.iter().any(|n| n == operation) {
+            return Err("not_found".into());
+        }
+        let o = s.operations.get(operation).ok_or("not_found")?.clone();
+        if s.kind != "http" || !o.stream {
+            return Err("bad_params".into());
+        }
+        let opened = self.open_upstream(&s, &o, &params).await;
+        self.record_query_health(&s.id, opened.as_ref().map(|_| ()).map_err(|e| e.as_str()))
+            .await;
+        let mut response = opened?;
+        let (tx, rx) = tokio::sync::mpsc::channel(16);
+        let deadline = tokio::time::Instant::now() + Duration::from_millis(o.timeout_ms);
+        tokio::spawn(async move {
+            let mut lines = NdjsonLines::new(o.max_bytes);
+            loop {
+                let wait = tokio::time::timeout_at(
+                    deadline.min(tokio::time::Instant::now() + STREAM_IDLE),
+                    response.chunk(),
+                )
+                .await;
+                let chunk = match wait {
+                    Ok(Ok(Some(chunk))) => chunk,
+                    Ok(Ok(None)) => break,
+                    _ => {
+                        let _ = tx.send(Err("data_unavailable".into())).await;
+                        return;
+                    }
+                };
+                match lines.push(&chunk) {
+                    Ok(values) => {
+                        for value in values {
+                            if tx.send(Ok(value)).await.is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Err(reason) => {
+                        let _ = tx.send(Err(reason)).await;
+                        return;
+                    }
+                }
+            }
+            match lines.finish() {
+                Ok(Some(value)) => {
+                    let _ = tx.send(Ok(value)).await;
+                }
+                Ok(None) => {}
+                Err(reason) => {
+                    let _ = tx.send(Err(reason)).await;
+                }
+            }
+        });
+        Ok(rx)
+    }
     async fn record_query_health(&self, id: &str, result: Result<(), &str>) {
         let mut health = self.health.write().await;
         let entry = health.entry(id.to_owned()).or_default();
@@ -1074,20 +1197,20 @@ impl DataBroker {
         o: &OperationConfig,
         params: &Value,
     ) -> Result<Value, String> {
-        let url = build_url(s, o, params)?;
-        let mut response = self
-            .client
-            .get(url)
-            .headers(Self::resolved_headers(s)?)
-            .timeout(Duration::from_millis(o.timeout_ms))
-            .send()
-            .await
-            .map_err(|_| "data_unavailable")?;
-        if response.status() == reqwest::StatusCode::NOT_FOUND {
-            return Err("not_found".into());
-        }
-        if !response.status().is_success() {
-            return Err("data_unavailable".into());
+        let mut response = self.open_upstream(s, o, params).await?;
+        if o.stream {
+            // Older clients use /data/query for a streaming operation; they receive its last line.
+            let mut lines = NdjsonLines::new(o.max_bytes);
+            let mut last = None;
+            while let Some(chunk) = response.chunk().await.map_err(|_| "data_unavailable")? {
+                for value in lines.push(&chunk)? {
+                    last = Some(value);
+                }
+            }
+            if let Some(value) = lines.finish()? {
+                last = Some(value);
+            }
+            return last.ok_or_else(|| "data_unavailable".into());
         }
         if response
             .content_length()
@@ -1719,11 +1842,15 @@ fn validate_source(s: &SourceConfig) -> Result<(), String> {
         return Err(error());
     }
     for (n, o) in &s.operations {
+        let post = o.method == "POST";
+        let max_timeout = if o.stream { 120000 } else { 30000 };
         if !valid_name(n)
+            || !matches!(o.method.as_str(), "GET" | "POST")
+            || s.kind == "push" && (post || o.stream)
             || o.max_bytes == 0
             || o.max_bytes > MAX_BYTES
-            || !(100..=30000).contains(&o.timeout_ms)
-            || o.params.len() > 16
+            || !(100..=max_timeout).contains(&o.timeout_ms)
+            || o.params.len() > if post { 32 } else { 16 }
         {
             return Err(error());
         }
@@ -1748,7 +1875,8 @@ fn validate_source(s: &SourceConfig) -> Result<(), String> {
         for (p, c) in &o.params {
             if !valid_name(p)
                 || !matches!(c.kind.as_str(), "string" | "integer" | "boolean")
-                || c.max_length.is_some_and(|m| m == 0 || m > 256)
+                || c.max_length
+                    .is_some_and(|m| m == 0 || m > if post { 16384 } else { 256 })
                 || c.minimum.zip(c.maximum).is_some_and(|(a, b)| a > b)
             {
                 return Err(error());
@@ -1875,7 +2003,58 @@ fn validate_bindings(
     }
     Ok(())
 }
+/// Splits newline-delimited JSON across arbitrary chunk boundaries and bounds the total size.
+pub(crate) struct NdjsonLines {
+    pending: Vec<u8>,
+    total: usize,
+    max_bytes: usize,
+}
+impl NdjsonLines {
+    pub(crate) fn new(max_bytes: usize) -> Self {
+        Self {
+            pending: Vec::new(),
+            total: 0,
+            max_bytes,
+        }
+    }
+    pub(crate) fn push(&mut self, chunk: &[u8]) -> Result<Vec<Value>, String> {
+        self.total = self.total.saturating_add(chunk.len());
+        if self.total > self.max_bytes {
+            return Err("too_large".into());
+        }
+        self.pending.extend_from_slice(chunk);
+        let mut values = Vec::new();
+        while let Some(end) = self.pending.iter().position(|b| *b == b'\n') {
+            let line: Vec<u8> = self.pending.drain(..=end).collect();
+            if let Some(value) = Self::parse(&line[..line.len() - 1])? {
+                values.push(value);
+            }
+        }
+        Ok(values)
+    }
+    pub(crate) fn finish(&mut self) -> Result<Option<Value>, String> {
+        let rest = std::mem::take(&mut self.pending);
+        Self::parse(&rest)
+    }
+    fn parse(line: &[u8]) -> Result<Option<Value>, String> {
+        let line = line.strip_suffix(b"\r").unwrap_or(line);
+        if line.iter().all(u8::is_ascii_whitespace) {
+            return Ok(None);
+        }
+        serde_json::from_slice(line)
+            .map(Some)
+            .map_err(|_| "data_unavailable".into())
+    }
+}
 fn build_url(s: &SourceConfig, o: &OperationConfig, params: &Value) -> Result<Url, String> {
+    build_request(s, o, params).map(|(url, _)| url)
+}
+/// Builds the upstream URL and, for POST operations, the typed JSON body (ADR-0017).
+fn build_request(
+    s: &SourceConfig,
+    o: &OperationConfig,
+    params: &Value,
+) -> Result<(Url, Option<Value>), String> {
     let object = params.as_object().ok_or("bad_params")?;
     if object.keys().any(|p| !o.params.contains_key(p)) {
         return Err("bad_params".into());
@@ -1885,6 +2064,8 @@ fn build_url(s: &SourceConfig, o: &OperationConfig, params: &Value) -> Result<Ur
     let mut path = o.path.clone().ok_or("data_unavailable")?;
     let original = path.clone();
     let mut query = Vec::new();
+    let post = o.method == "POST";
+    let mut body = serde_json::Map::new();
     for (p, c) in &o.params {
         let Some(v) = object.get(p).or(c.default.as_ref()) else {
             if c.required {
@@ -1915,6 +2096,8 @@ fn build_url(s: &SourceConfig, o: &OperationConfig, params: &Value) -> Result<Ur
                 })
                 .collect();
             path = path.replace(&marker, &encoded);
+        } else if post {
+            body.insert(p.clone(), v.clone());
         } else {
             query.push((p, value));
         }
@@ -1923,5 +2106,12 @@ fn build_url(s: &SourceConfig, o: &OperationConfig, params: &Value) -> Result<Ur
     for (p, v) in query {
         url.query_pairs_mut().append_pair(p, &v);
     }
-    Ok(url)
+    if !post {
+        return Ok((url, None));
+    }
+    let body = Value::Object(body);
+    if serde_json::to_vec(&body).map_err(|_| "bad_params")?.len() > MAX_POST_BODY {
+        return Err("too_large".into());
+    }
+    Ok((url, Some(body)))
 }

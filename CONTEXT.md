@@ -33,6 +33,7 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Operator connection**: A data source whose configuration the deployment operator maintains. Administrators can inspect it but cannot change it in the Connections workspace.
 - **Artifact binding**: An artifact's named grant to selected operations and subscriptions from a data source. One artifact can bind several sources.
 - **Live data**: Runtime JSON snapshots and events delivered through the viewer shell. Its lifetime is separate from artifact HTML revisions and viewer state.
+- **Streaming operation**: a live-data operation whose upstream answers newline-delimited JSON; the broker relays each line to the artifact as `data:chunk` before the final `data:result`. POST operations send typed JSON bodies. See ADR-0017.
 - **Viewer geolocation**: a one-shot position the viewer shell reads for its artifact after the viewer allows it for that artifact (once or always). Artifacts send `geo:request` and receive `geo:position` or `geo:error`. See ADR-0016.
 - **Viewer state**: JSON values belonging to an artifact in a chosen viewer state scope. State survives artifact revisions. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
 - **Viewer state scope**: The audience for a state key. `org` shares the value with viewers who can access the artifact and is the default. `viewer` restricts the value to the authenticated person who owns it, including when that person is an administrator.

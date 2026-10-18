@@ -23,6 +23,7 @@ pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/{id}/data", get(manifest))
         .route("/{id}/data/query", post(query))
+        .route("/{id}/data/stream", post(stream))
         .route("/{id}/data/events", get(events))
 }
 fn failure(reason: &str) -> Response {
@@ -85,6 +86,54 @@ async fn query(State(deps): State<AppDeps>, Path(id): Path<String>, request: Req
             .into_response(),
         Err(e) => failure(&e),
     }
+}
+/// ADR-0017: relays a streaming operation as `{"chunk":…}` lines, then `{"done":true}` or one
+/// `{"error":…}` line.
+async fn stream(State(deps): State<AppDeps>, Path(id): Path<String>, request: Request) -> Response {
+    if let Err(e) = authorize(&deps, request.headers(), &id).await {
+        return e.into_response();
+    }
+    let Ok(body) = axum::body::to_bytes(request.into_body(), 64 * 1024).await else {
+        return failure("too_large");
+    };
+    let Ok(input) = serde_json::from_slice::<QueryBody>(&body) else {
+        return failure("bad_params");
+    };
+    let receiver = match deps
+        .data
+        .query_stream(&id, &input.binding, &input.operation, input.params)
+        .await
+    {
+        Ok(receiver) => receiver,
+        Err(e) => return failure(&e),
+    };
+    let lines = futures_util::stream::unfold(Some(receiver), |state| async move {
+        let mut receiver = state?;
+        let (line, next) = match receiver.recv().await {
+            Some(Ok(value)) => (json!({"chunk":value}), Some(receiver)),
+            Some(Err(reason)) => {
+                let reason = if reason == "too_large" {
+                    "too_large"
+                } else {
+                    "data_unavailable"
+                };
+                (json!({"error":reason}), None)
+            }
+            None => (json!({"done":true}), None),
+        };
+        let mut bytes = serde_json::to_vec(&line).unwrap_or_default();
+        bytes.push(b'\n');
+        Some((Ok::<_, Infallible>(axum::body::Bytes::from(bytes)), next))
+    });
+    (
+        [
+            (header::CONTENT_TYPE, "application/x-ndjson; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store"),
+            (header::HeaderName::from_static("x-accel-buffering"), "no"),
+        ],
+        axum::body::Body::from_stream(lines),
+    )
+        .into_response()
 }
 fn parse_cursor(raw: &str) -> Result<BTreeMap<String, String>, String> {
     if raw.len() > 8192 {
