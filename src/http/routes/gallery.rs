@@ -22,10 +22,13 @@ use crate::{
 const HTML_CONTENT_TYPE: &str = "text/html; charset=utf-8";
 const GALLERY_TOP_LIMIT: usize = 10;
 const NOTIFICATION_LIMIT: usize = 30;
+/// Most recent artifacts listed per organization in the native media library (ADR-0019).
+const LIBRARY_LIMIT: usize = 200;
 
 pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
         .route("/", get(gallery))
+        .route("/api/library", get(library))
         .route("/notifications/seen", post(mark_notifications_seen))
         .route("/{id}", get(shell))
 }
@@ -193,6 +196,73 @@ async fn gallery_result(deps: &AppDeps, viewer: Viewer) -> Result<Response, AppE
         unread_notifications,
     })?;
     Ok(html_response(StatusCode::OK, body, true))
+}
+
+/// ADR-0019: the artifacts this viewer may open, grouped by organization, for native media
+/// libraries such as Android Auto. Visibility matches the gallery, without hidden uploads.
+async fn library(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
+    let viewer = match deps.viewer_identity.resolve(&headers).await {
+        Ok(viewer) => viewer,
+        Err(error) => return error.into_response(),
+    };
+    if !deps
+        .ingress
+        .allow_verified_viewer(&headers, &viewer, ViewerCost::Read)
+    {
+        return AppError::RateLimited.into_response();
+    }
+    let no_store = [(header::CACHE_CONTROL, "no-store")];
+    if !AccessPolicy::is_signed_in(&viewer) {
+        return (
+            StatusCode::FORBIDDEN,
+            no_store,
+            Json(serde_json::json!({"error": "not_signed_in"})),
+        )
+            .into_response();
+    }
+    match gallery_sections(&deps, &viewer).await {
+        Ok(sections) => (no_store, Json(library_body(sections))).into_response(),
+        Err(error) => {
+            let mut response = error.into_response();
+            response
+                .headers_mut()
+                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            response
+        }
+    }
+}
+
+pub(crate) fn library_body(sections: Vec<OrgArtifacts>) -> serde_json::Value {
+    let orgs = sections
+        .into_iter()
+        .map(|section| {
+            let mut items: Vec<_> = section
+                .items
+                .into_iter()
+                .filter(|item| !item.hidden)
+                .collect();
+            items.sort_by(|a, b| {
+                b.updated_at
+                    .0
+                    .cmp(&a.updated_at.0)
+                    .then_with(|| a.id.0.cmp(&b.id.0))
+            });
+            items.truncate(LIBRARY_LIMIT);
+            serde_json::json!({
+                "org": section.org.0,
+                "artifacts": items
+                    .iter()
+                    .map(|item| serde_json::json!({
+                        "id": item.id.0,
+                        "title": item.title,
+                        "category": item.category,
+                        "updated_at": item.updated_at.0,
+                    }))
+                    .collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::json!({ "orgs": orgs })
 }
 
 async fn gallery_sections(deps: &AppDeps, viewer: &Viewer) -> Result<Vec<OrgArtifacts>, AppError> {
@@ -419,4 +489,63 @@ async fn shell_result(
         cast_enabled,
     })?;
     Ok(html_response(StatusCode::OK, body, true))
+}
+
+#[cfg(test)]
+mod library_tests {
+    use super::library_body;
+    use crate::model::{ArtifactId, ArtifactMeta, ClientId, OrgArtifacts, OrgId, Timestamp};
+
+    fn meta(id: &str, updated: &str, hidden: bool) -> ArtifactMeta {
+        ArtifactMeta {
+            id: ArtifactId(id.into()),
+            client_id: ClientId("publisher".into()),
+            org: OrgId("acme".into()),
+            title: format!("Title {id}"),
+            description: String::new(),
+            bytes: 1,
+            created_at: Timestamp(updated.into()),
+            updated_at: Timestamp(updated.into()),
+            uploader_label: String::new(),
+            owner_email: None,
+            is_bundle: false,
+            entry: String::new(),
+            revision: 1,
+            category: "Family".into(),
+            hidden,
+            body_sha256: String::new(),
+            artifact_key: None,
+        }
+    }
+
+    #[test]
+    fn library_lists_visible_artifacts_newest_first() {
+        let body = library_body(vec![OrgArtifacts {
+            org: OrgId("acme".into()),
+            items: vec![
+                meta("old", "2026-10-01T00:00:00Z", false),
+                meta("new", "2026-10-18T00:00:00Z", false),
+                meta("draft", "2026-10-18T01:00:00Z", true),
+            ],
+        }]);
+        assert_eq!(
+            body,
+            serde_json::json!({"orgs":[{"org":"acme","artifacts":[
+                {"id":"new","title":"Title new","category":"Family","updated_at":"2026-10-18T00:00:00Z"},
+                {"id":"old","title":"Title old","category":"Family","updated_at":"2026-10-01T00:00:00Z"}
+            ]}]})
+        );
+    }
+
+    #[test]
+    fn library_caps_each_organization() {
+        let items = (0..250)
+            .map(|i| meta(&format!("a{i:03}"), "2026-10-01T00:00:00Z", false))
+            .collect();
+        let body = library_body(vec![OrgArtifacts {
+            org: OrgId("acme".into()),
+            items,
+        }]);
+        assert_eq!(body["orgs"][0]["artifacts"].as_array().unwrap().len(), 200);
+    }
 }
