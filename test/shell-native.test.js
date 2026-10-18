@@ -45,7 +45,7 @@ test("without the app host the artifact learns native features are unavailable",
 test("hello handshake reports the host's capabilities", async () => {
   const f = fakeHost();
   const h = harness({ host: f.host });
-  assert.deepEqual(f.sent, [{ v: 1, artifactId: "trip", type: "hello" }]);
+  assert.deepEqual(f.sent, [{ v: 1, type: "hello" }]);
   const pending = h.send({ type: "native:hello" });
   f.reply({ type: "ready", app: "0.1.0", capabilities: ["geo.watch", "audio.queue", "audio.geotrigger", "notify"] });
   await pending; await settle();
@@ -122,4 +122,47 @@ test("historical views offer nothing even inside the app", async () => {
   const h = await readyHarness({ enabled: false });
   await h.send({ type: "native:hello" });
   assert.deepEqual(h.messages.at(-1), { type: "native:ready", available: false, capabilities: [] });
+});
+
+// Mirrors the field allowlists in artifact-mcp-android bridge/Protocol.kt (protocol v1), which
+// rejects any unknown field. Update both together.
+const APP_FIELDS = {
+  hello: ["v", "type"],
+  "geo.watch": ["v", "type", "artifactId", "requestId", "intervalMs", "highAccuracy"],
+  "geo.unwatch": ["v", "type", "artifactId", "requestId"],
+  "audio.queue": ["v", "type", "artifactId", "requestId", "item"],
+  "audio.geotrigger": ["v", "type", "artifactId", "requestId", "items"],
+  "audio.stop": ["v", "type", "artifactId"],
+  "notify.show": ["v", "type", "artifactId", "requestId", "title", "body"],
+  "played.ack": ["v", "type", "artifactId", "ids"],
+};
+const QUEUE_ITEM = ["id", "title", "text", "url", "voice"];
+const TRIGGER_ITEM = [...QUEUE_ITEM, "lat", "lon", "radius_m"];
+const subset = (obj, allowed) => Object.keys(obj).every(k => allowed.includes(k));
+
+test("every host message matches the app's field allowlist", async () => {
+  const h = await readyHarness();
+  await h.send({ type: "geo:watch", requestId: "w1", intervalMs: 20000 });
+  await h.send({ type: "geo:unwatch", requestId: "w1" });
+  await h.send({ type: "audio:queue", requestId: "q1", item: { id: "s-2", title: "Luxor", text: "Glass pyramid.", voice: "andrea" } });
+  await h.send({ type: "audio:geotrigger", requestId: "g1", items: [story] });
+  await h.send({ type: "notify:show", requestId: "n1", title: "Hi", body: "There" });
+  await h.send({ type: "audio:stop" });
+  h.f.reply({ type: "audio.played", artifactId: "trip", id: "s-1", at: 1 });
+  await h.send({ type: "native:hello" });
+  const seen = new Set();
+  for (const m of h.f.sent) {
+    assert.ok(APP_FIELDS[m.type], "unknown host message " + m.type);
+    assert.ok(subset(m, APP_FIELDS[m.type]), m.type + " has fields the app rejects: " + Object.keys(m));
+    if (m.item) assert.ok(subset(m.item, QUEUE_ITEM));
+    if (m.items) m.items.forEach(i => assert.ok(subset(i, TRIGGER_ITEM)));
+    seen.add(m.type);
+  }
+  assert.deepEqual([...seen].sort(), Object.keys(APP_FIELDS).sort());
+});
+
+test("voices the app would reject are refused in the shell", async () => {
+  const h = await readyHarness();
+  await h.send({ type: "audio:queue", requestId: "q1", item: { id: "s-2", title: "Luxor", text: "x", voice: "qwen/custom voice" } });
+  assert.deepEqual(h.messages.at(-1), { type: "native:error", requestId: "q1", reason: "bad_request" });
 });

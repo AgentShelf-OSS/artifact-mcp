@@ -158,7 +158,8 @@
     var idPattern=/^[A-Za-z0-9._:-]{1,64}(?![\s\S])/,artifact=String(options.artifactId||'');
     var consentPrefix='artifact-native:'+artifact+':';
     function send(type,fields){options.post(Object.assign({type:type},fields||{}));}
-    function toHost(message){if(!host)return false;try{host.postMessage(JSON.stringify(Object.assign({v:1,artifactId:artifact},message)));return true;}catch(_){return false;}}
+    // The app rejects unknown fields; hello carries only v and type (ADR-0018 protocol v1).
+    function toHost(message){if(!host)return false;try{host.postMessage(JSON.stringify(message.type==='hello'?{v:1,type:'hello'}:Object.assign({v:1,artifactId:artifact},message)));return true;}catch(_){return false;}}
     function allowed(kind){try{return options.storage.getItem(consentPrefix+kind)==='allow';}catch(_){return false;}}
     function remember(kind){try{options.storage.setItem(consentPrefix+kind,'allow');}catch(_){}}
     function forget(kind){try{options.storage.removeItem(consentPrefix+kind);}catch(_){}}
@@ -171,7 +172,7 @@
       if(str(item.text,1500))out.text=item.text;
       else if(str(item.url,2048)){try{var u=new URL(item.url,options.origin);if(u.origin!==options.origin)return null;out.url=u.href;}catch(_){return null;}}
       else return null;
-      if(item.voice!==undefined){if(!str(item.voice,64))return null;out.voice=item.voice;}
+      if(item.voice!==undefined){if(!str(item.voice,64)||!/^[A-Za-z0-9_-]{1,64}$/.test(item.voice))return null;out.voice=item.voice;}
       if(geo){
         if(!Number.isFinite(item.lat)||!Number.isFinite(item.lon)||Math.abs(item.lat)>90||Math.abs(item.lon)>180)return null;
         var radius=Number.isFinite(item.radius_m)?Math.round(item.radius_m):3000;
