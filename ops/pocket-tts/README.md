@@ -44,7 +44,11 @@ the live workers use; see [voice-dir parity](trials/voice-dir-parity/README.md).
 For cloned voices, keep written consent from the speaker that explicitly
 permits creation and use of the clone. Public-domain recordings do not count as
 speaker consent. Do not add a cloned voice without that explicit written
-permission.
+permission, with one documented exception: a corpus recorded expressly for
+building speech-synthesis voices and released under an attribution licence (CC
+BY) counts, provided its credit is kept wherever the voices are listed. Neil
+approved VCTK under this exception on 2026-10-19. Voice-Zero (LibriVox
+audiobook readings) does not qualify and stays hidden.
 
 ## Voice sources and credits
 
@@ -63,9 +67,9 @@ Toolkit (version 0.92)*, University of Edinburgh, CSTR, 2019,
 per speaker, made from 3–5 recordings and level-normalised, conditions Pocket TTS,
 which then speaks new text. Keep this credit wherever VCTK voices are listed or
 shipped. Each manifest entry carries `license`, `attribution`, and `source_doi`.
-VCTK was recorded for speaker-adaptive speech synthesis and is CC BY 4.0, but we
-hold no per-speaker written consent (see the rule above). The voices were
-prepared at Neil's request, and keeping any is his decision.
+VCTK was recorded for speaker-adaptive speech synthesis and is CC BY 4.0. There is
+no per-speaker written consent; Neil approved it under the corpus exception in the
+rule above (2026-10-19).
 
 ## Adding voices: audition workflow
 
