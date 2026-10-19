@@ -1,0 +1,4 @@
+FROM homelab/pocket-voice-analysis:20261018
+USER 0:0
+RUN pip install --no-cache-dir praat-parselmouth==0.4.6
+USER 65532:65532

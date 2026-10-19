@@ -10,21 +10,36 @@ Michael, Paul, Peter Yearsley, Stuart Bell, and Vera: 21 English voices in total
 All are supported by the pinned Pocket TTS 3.1.0 package; the model is unchanged.
 No voice recordings or cloning setup are needed for these presets.
 
-## Operator-supplied voices
+## Prepared voices (voice directory)
 
-Place a `.safetensors` voice state in `voices/` and restart the worker. The
-worker loads regular files with lowercase IDs matching
-`^[a-z][a-z0-9_]{0,31}$`; for example, `quiet_reader.safetensors` is exposed as
-`pocket_quiet_reader` and displayed as “Quiet Reader · Pocket”. Names that
-match built-in presets are skipped. Symlinks and files larger than 16 MiB are
-also skipped and logged. A bad file does not prevent the worker from starting.
-The directory is mounted read-only in Compose. Removing a file and restarting
-the worker removes that voice. Each file's content hash is part of its audio
-cache key, so updated voice states do not reuse stale cached audio.
+The worker loads prepared voice states from `POCKET_TTS_VOICE_DIR`. The
+default is `/app/voices`, which the image bundles with the original nine states.
+On VM310, both workers mount `/opt/docker/artifact-pocket-tts/voices` read-only at
+`/voices`. To add a voice, copy a `.safetensors` state into that directory, add
+an entry to its `manifest.json`, and restart the workers. No code change is needed.
 
-The current public extra states are `estelle`, `giovanni`, `juergen`, `lola`,
-and `rafael`. Add each matching state file and the corresponding
-`POCKET_TTS_EXTRA_VOICES` entry in artifact-mcp before exposing it in Listen.
+`manifest.json` has a `results` list. The worker loads the listed voices in list
+order and skips files that the manifest does not list. Each entry needs `voice`
+(the file stem, `^[a-z][a-z0-9_]{0,39}$`). Optional fields:
+
+- `label`: display name; the worker shows it as “Label · Pocket”.
+- `embedding_sha256`: the worker skips the voice if the file hash differs.
+- `cache_key: "legacy"`: keep the cache key without the content hash. The nine
+  original voices use it so that their existing cached audio stays valid.
+  Other voices include the file hash in the cache key, so a replaced state never
+  reuses stale audio.
+
+Other fields (source, license, consent, gains) are provenance and are not read by
+the worker. Without a manifest, the worker loads every valid file with a
+title-cased label. Names that match built-in presets, symlinks, and files larger
+than 16 MiB are skipped and logged. A bad entry does not stop the worker.
+
+The worker serves every loaded voice. Artifact MCP controls which voices users
+see, through its built-in list, `POCKET_TTS_EXTRA_VOICES`, and the voice catalog
+(`POCKET_TTS_VOICE_CATALOG`). The Voice-Zero states stay loadable but hidden.
+[`voices/manifest.json`](voices/manifest.json) is the source copy for the nine
+original voices. `Dockerfile.voice-dir` builds the incremental image layer that
+the live workers use; see [voice-dir parity](trials/voice-dir-parity/README.md).
 
 For cloned voices, keep written consent from the speaker that explicitly
 permits creation and use of the clone. Public-domain recordings do not count as

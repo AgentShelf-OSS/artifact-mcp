@@ -1,0 +1,128 @@
+{
+  "schema_version": 1,
+  "audition_url": "https://artifact.neilblackman.dev/pb9z0f83xhe7",
+  "passage": "The garden was quiet in the early morning. She opened the book and began to read. Beyond the window, a distant bell marked the beginning of another day. There was no reason to hurry.",
+  "model": "english_2026-04-int8-timestamped-65037e84",
+  "voices": [
+    {
+      "voice_id": "pocket_andrea",
+      "label": "Andrea",
+      "source_id": "Andrea_enhanced",
+      "technical_evidence": {
+        "voice": "Andrea_enhanced",
+        "duration_seconds": 12.48,
+        "sample_rate": 24000,
+        "rms_dbfs": -25.06,
+        "peak": 0.5733224749565125,
+        "clipped_fraction": 0.0,
+        "generation_frames": 160,
+        "eos_signals": 8,
+        "word_events": 68,
+        "numeric_checks_pass": true,
+        "elapsed_seconds": 3.095,
+        "sha256": "52289e11e5fe212dea39f767bc01d6fd347321fea489c1b4c2621f356a245873"
+      },
+      "listening_review": {
+        "reviewer": "Neil",
+        "decision": "accepted",
+        "evidence": "First audition, short prose passage",
+        "clarity": null,
+        "naturalness": null,
+        "pacing": null,
+        "expressiveness": null,
+        "use_tags": [],
+        "notes": ""
+      }
+    },
+    {
+      "voice_id": "pocket_darius",
+      "label": "Darius",
+      "source_id": "Darius_enhanced",
+      "technical_evidence": {
+        "voice": "Darius_enhanced",
+        "duration_seconds": 11.84,
+        "sample_rate": 24000,
+        "rms_dbfs": -23.08,
+        "peak": 0.7150218486785889,
+        "clipped_fraction": 0.0,
+        "generation_frames": 152,
+        "eos_signals": 8,
+        "word_events": 68,
+        "numeric_checks_pass": true,
+        "elapsed_seconds": 4.623,
+        "sha256": "d697b9b31291e3d15d6e3c8c2c06cfd73f329475a1890cb1b4e93b6410296f7c"
+      },
+      "listening_review": {
+        "reviewer": "Neil",
+        "decision": "accepted",
+        "evidence": "First audition, short prose passage",
+        "clarity": null,
+        "naturalness": null,
+        "pacing": null,
+        "expressiveness": null,
+        "use_tags": [],
+        "notes": ""
+      }
+    },
+    {
+      "voice_id": "pocket_hannah",
+      "label": "Hannah",
+      "source_id": "Hannah_enhanced",
+      "technical_evidence": {
+        "voice": "Hannah_enhanced",
+        "duration_seconds": 9.04,
+        "sample_rate": 24000,
+        "rms_dbfs": -21.63,
+        "peak": 0.5658195614814758,
+        "clipped_fraction": 0.0,
+        "generation_frames": 117,
+        "eos_signals": 8,
+        "word_events": 68,
+        "numeric_checks_pass": true,
+        "elapsed_seconds": 2.463,
+        "sha256": "dedf3cf3981bdae2d4e5ba5c28c996f26be57842d9a4e2c3be6894d24e108f57"
+      },
+      "listening_review": {
+        "reviewer": "Neil",
+        "decision": "accepted",
+        "evidence": "First audition, short prose passage",
+        "clarity": null,
+        "naturalness": null,
+        "pacing": null,
+        "expressiveness": null,
+        "use_tags": [],
+        "notes": ""
+      }
+    },
+    {
+      "voice_id": "pocket_bedfordshire",
+      "label": "Bedfordshire",
+      "source_id": "Midlands_Bedfordshire_Dialect_enhanced",
+      "technical_evidence": {
+        "voice": "Midlands_Bedfordshire_Dialect_enhanced",
+        "duration_seconds": 13.2,
+        "sample_rate": 24000,
+        "rms_dbfs": -22.56,
+        "peak": 0.6298845410346985,
+        "clipped_fraction": 0.0,
+        "generation_frames": 169,
+        "eos_signals": 8,
+        "word_events": 68,
+        "numeric_checks_pass": true,
+        "elapsed_seconds": 3.177,
+        "sha256": "4e00cba92c8d190420d25eb8b8855f97f24177cad2bfa26da8988e11f30d6d72"
+      },
+      "listening_review": {
+        "reviewer": "Neil",
+        "decision": "accepted",
+        "evidence": "First audition, short prose passage",
+        "clarity": null,
+        "naturalness": null,
+        "pacing": null,
+        "expressiveness": null,
+        "use_tags": [],
+        "notes": ""
+      }
+    }
+  ]
+}

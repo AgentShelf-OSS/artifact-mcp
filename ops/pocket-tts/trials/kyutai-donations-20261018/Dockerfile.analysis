@@ -1,0 +1,4 @@
+FROM homelab/artifact-pocket:3.1.0-voicedir-20261018
+USER 0:0
+RUN pip install --no-cache-dir faster-whisper==1.1.1 pyloudnorm==0.1.1 transformers==4.56.2 scipy==1.15.3
+USER 65532:65532

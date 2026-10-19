@@ -1,0 +1,275 @@
+{
+ "version": 1,
+ "voices": [
+  {
+   "id": "alba",
+   "label": "Alba",
+   "gainDb": 0,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "marius",
+   "label": "Marius",
+   "gainDb": 8.5,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "javert",
+   "label": "Javert",
+   "gainDb": 7,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "jean",
+   "label": "Jean",
+   "gainDb": 0,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "cosette",
+   "label": "Cosette",
+   "gainDb": 11.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "eponine",
+   "label": "Eponine",
+   "gainDb": 1.5,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "fantine",
+   "label": "Fantine",
+   "gainDb": 1,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "azelma",
+   "label": "Azelma",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "anna",
+   "label": "Anna",
+   "gainDb": 1,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "bill_boerst",
+   "label": "Bill Boerst",
+   "gainDb": 8,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "caro_davy",
+   "label": "Caro Davy",
+   "gainDb": 7,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "charles",
+   "label": "Charles",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "eve",
+   "label": "Eve",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "george",
+   "label": "George",
+   "gainDb": 1,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "jane",
+   "label": "Jane",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "mary",
+   "label": "Mary",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "michael",
+   "label": "Michael",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "paul",
+   "label": "Paul",
+   "gainDb": 0.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "peter_yearsley",
+   "label": "Peter Yearsley",
+   "gainDb": 10.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "stuart_bell",
+   "label": "Stuart Bell",
+   "gainDb": 12,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "vera",
+   "label": "Vera",
+   "gainDb": 2.5,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "estelle",
+   "label": "Estelle",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "giovanni",
+   "label": "Giovanni",
+   "gainDb": 8,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "juergen",
+   "label": "Juergen",
+   "gainDb": 9,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "lola",
+   "label": "Lola",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "rafael",
+   "label": "Rafael",
+   "gainDb": 8.5,
+   "gender": null,
+   "accent": null,
+   "style": null,
+   "source": "pocket-preset"
+  },
+  {
+   "id": "andrea",
+   "label": "Andrea",
+   "gainDb": 6,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "darius",
+   "label": "Darius",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "hannah",
+   "label": "Hannah",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "bedfordshire",
+   "label": "Bedfordshire",
+   "gainDb": 4.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  }
+ ]
+}
