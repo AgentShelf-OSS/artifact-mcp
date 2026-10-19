@@ -34,6 +34,7 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Artifact binding**: An artifact's named grant to selected operations and subscriptions from a data source. One artifact can bind several sources.
 - **Live data**: Runtime JSON snapshots and events delivered through the viewer shell. Its lifetime is separate from artifact HTML revisions and viewer state.
 - **Streaming operation**: a live-data operation whose upstream answers newline-delimited JSON; the broker relays each line to the artifact as `data:chunk` before the final `data:result`. POST operations send typed JSON bodies. See ADR-0017.
+- **Voice catalog**: the operator's Pocket voice list with tags (`POCKET_TTS_VOICE_CATALOG`), which drives the searchable Listen voice picker. See ADR-0020.
 - **Artifact library**: `GET /api/library`, the viewer's visible artifacts grouped by organization (no hidden uploads), used by native media libraries such as Android Auto. See ADR-0019.
 - **Native host**: the Artifact MCP Android app hosting the viewer. The shell detects it through an origin-scoped `ArtifactNative` channel and relays consented background location, car audio (including location-triggered audio) and notifications to the artifact. Browsers report `native:ready {available:false}`. See ADR-0018.
 - **Viewer geolocation**: a one-shot position the viewer shell reads for its artifact after the viewer allows it for that artifact (once or always). Artifacts send `geo:request` and receive `geo:position` or `geo:error`. See ADR-0016.

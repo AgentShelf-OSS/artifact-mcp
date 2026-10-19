@@ -268,6 +268,7 @@ ereader format](../ops/tts/README.md). Restart the service after changing these 
 |---|---|
 | `TTS_ENABLED` | Set to `1` to enable narration for authorized artifacts. |
 | `TTS_ARTIFACT_IDS` | Optional comma-separated allowlist. A nonempty list also preserves legacy trial enablement when `TTS_ENABLED` is unset. Clear this list as well as setting `TTS_ENABLED=0` to disable narration. |
+| `POCKET_TTS_VOICE_CATALOG` | Optional path to a Pocket voice catalog JSON file (ADR-0020): up to 400 voices with labels, gains and picker tags (gender, accent, style, source). It is re-read when the file changes; an invalid file is logged and ignored. |
 | `TTS_WORKER_URL` | Private HTTP(S) base URL for the Kokoro worker. Never sent to the artifact. |
 | `TTS_WORKER_TOKEN_FILE` | Path to the worker bearer token, readable by the artifact service account. Never include the token itself in HTML or environment settings. |
 | `POCKET_TTS_WORKER_URL` | Optional private Pocket TTS worker URL. Adds 21 preset English Pocket voices. It can be the only configured worker. |
