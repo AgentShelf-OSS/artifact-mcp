@@ -76,3 +76,8 @@ python3 ops/pocket-tts/voice_catalog.py \
 
 `../../catalog/pocket-voices.json` is the baseline output with no choices yet: the
 21 built-in presets and the 9 `POCKET_TTS_EXTRA_VOICES`.
+
+Since 2026-10-19 the generator merges several auditions (repeat `--audition`; the
+VCTK batch is in `../vctk-20261019`). It also applies `../../catalog/label-overrides.json`
+last, which keeps Neil's renames (`donor_30c5` Mason, `donor_3973` Clara,
+`donor_8935` Owen). The command above still works.

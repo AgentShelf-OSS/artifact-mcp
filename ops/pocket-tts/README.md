@@ -44,7 +44,60 @@ the live workers use; see [voice-dir parity](trials/voice-dir-parity/README.md).
 For cloned voices, keep written consent from the speaker that explicitly
 permits creation and use of the clone. Public-domain recordings do not count as
 speaker consent. Do not add a cloned voice without that explicit written
-permission.
+permission, with one documented exception: a corpus recorded expressly for
+building speech-synthesis voices and released under an attribution licence (CC
+BY) counts, provided its credit is kept wherever the voices are listed. Neil
+approved VCTK under this exception on 2026-10-19. Voice-Zero (LibriVox
+audiobook readings) does not qualify and stays hidden.
+
+## Voice sources and credits
+
+| Source | Licence | Catalog `source` | Audition |
+|---|---|---|---|
+| Kyutai Unmute voice donations | CC0-1.0, donor agreement covers voice transformation | `kyutai-donation` | [trials/kyutai-donations-20261018](trials/kyutai-donations-20261018/README.md) |
+| CSTR VCTK Corpus 0.92 | CC BY 4.0, attribution required | `custom` (manifest: `VCTK (CC BY 4.0)`) | [trials/vctk-20261019](trials/vctk-20261019/README.md) |
+| Voice-Zero | CC0 | `voice-zero` | [voices/README.md](voices/README.md) |
+
+**VCTK credit.** Voices derived from the VCTK corpus, CSTR, University of
+Edinburgh, CC BY 4.0. Corpus: Junichi Yamagishi, Christophe Veaux, and Kirsten
+MacDonald, *CSTR VCTK Corpus: English Multi-speaker Corpus for CSTR Voice Cloning
+Toolkit (version 0.92)*, University of Edinburgh, CSTR, 2019,
+<https://doi.org/10.7488/ds/2645>. Licence:
+<https://creativecommons.org/licenses/by/4.0/>. Changes: a 10–15 s reference clip
+per speaker, made from 3–5 recordings and level-normalised, conditions Pocket TTS,
+which then speaks new text. Keep this credit wherever VCTK voices are listed or
+shipped. Each manifest entry carries `license`, `attribution`, and `source_doi`.
+VCTK was recorded for speaker-adaptive speech synthesis and is CC BY 4.0. There is
+no per-speaker written consent; Neil approved it under the corpus exception in the
+rule above (2026-10-19).
+
+## Adding voices: audition workflow
+
+1. Export candidate states with the donation procedure (verify `andrea.safetensors`
+   reproduces first), synthesize the two audition sentences, and run the analyzer.
+   See the trial READMEs for the commands.
+2. Select (`select_candidates.py` for donations, `select_vctk.py` for VCTK) to
+   write `voice-metrics.json`. Build and publish the audition bundle with
+   `build_audition.py` and `publish_bundle.py` (optional template, artifact key,
+   and title arguments).
+3. Stage the selected states into the worker voices directory with
+   `stage_worker_voices.py` (keeps a `manifest.json.pre-*` rollback copy), restart
+   both workers one at a time, and check `/health` and `/speech` on :8790 and :8794.
+   Staged voices are loaded but not visible.
+4. After Neil decides, build the catalog from every audition at once:
+
+   ```sh
+   python3 ops/pocket-tts/voice_catalog.py \
+     --audition ops/pocket-tts/trials/kyutai-donations-20261018/voice-metrics.json \
+     --audition ops/pocket-tts/trials/vctk-20261019/voice-metrics.json \
+     --from-ct220 --worker-manifest ops/pocket-tts/voices/manifest.json --out /tmp/pocket-catalog
+   ```
+
+   `catalog/label-overrides.json` (`{voice id: label}`) is applied last, so a
+   rename made outside an audition survives every regeneration. Check
+   `summary.json` (kept, maybe, skipped per audition; unused overrides; duplicate
+   labels), then install `pocket-voices.json` on CT220. artifact-mcp reloads it
+   without a restart.
 
 ## Deployment
 
