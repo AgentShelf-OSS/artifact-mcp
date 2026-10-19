@@ -1,4 +1,8 @@
-"""Publish a bundle.json ({path: content}) via the Artifact MCP endpoint. Token from env ARTIFACT_MCP_API_KEY."""
+"""Publish a bundle.json ({path: content}) via the Artifact MCP endpoint. Token from env ARTIFACT_MCP_API_KEY.
+
+Usage: publish_bundle.py <bundle.json> [artifact_key] [title] [description]
+Defaults publish the Kyutai donation audition (voices/pocket-donated-audition).
+"""
 import json, os, sys, urllib.request
 EP = "https://artifact.neilblackman.dev/mcp"
 TOKEN = os.environ["ARTIFACT_MCP_API_KEY"]
@@ -21,7 +25,9 @@ rpc("initialize", {"protocolVersion": "2025-06-18", "capabilities": {}, "clientI
 if sys.argv[1] == "--categories":
     print(json.dumps(call("list_categories", {"org": "homelab"}))[:1500]); sys.exit()
 files = json.loads(open(sys.argv[1]).read())
-out = call("publish_bundle", {"files": files, "entry": "index.html", "title": "Pocket voice audition",
-    "description": "Listen to donated Pocket voices and choose which ones join the Listen voice picker.",
-    "category": "Family", "org": "homelab", "artifact_key": "voices/pocket-donated-audition"})
+key = sys.argv[2] if len(sys.argv) > 2 else "voices/pocket-donated-audition"
+title = sys.argv[3] if len(sys.argv) > 3 else "Pocket voice audition"
+desc = sys.argv[4] if len(sys.argv) > 4 else "Listen to donated Pocket voices and choose which ones join the Listen voice picker."
+out = call("publish_bundle", {"files": files, "entry": "index.html", "title": title, "description": desc,
+    "category": "Family", "org": "homelab", "artifact_key": key})
 print(json.dumps({k: out.get(k) for k in ("id", "url", "revision", "artifact_key", "created")}))

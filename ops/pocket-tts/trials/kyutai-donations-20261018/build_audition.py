@@ -1,6 +1,8 @@
 """Build the Pocket voice audition bundle.
 
-Usage: build_audition.py <voice-metrics.json> <audio-dir> <out-dir>
+Usage: build_audition.py <voice-metrics.json> <audio-dir> <out-dir> [template.html]
+The template defaults to audition.html next to this script. Candidates with "label",
+"accent", "region", or "age" (the VCTK audition) pass them to the page as lbl/acc/reg/age.
 Writes out-dir/index.html and out-dir/audio-NN.js (base64 MP3 data URIs),
 plus out-dir/bundle.json ({path: content}) for publish_bundle.
 """
@@ -26,16 +28,20 @@ for i, r in enumerate(sel):
     if c == len(chunks):
         chunks.append({})
     chunks[c][r["voice"]] = [mp3(AUDIO / f"{r['voice']}_neutral.wav"), mp3(AUDIO / f"{r['voice']}_story.wav")]
-    voices.append({"id": r["voice"], "src": r["source_id"].removesuffix("_enhanced"), "c": c, "rank": r["rank"],
-                   "g": r["gender_estimate"], "f0": r["f0_median"], "wpm": round(r["wpm"]), "pace": wpm_tag(r["wpm"]),
-                   "wer": round(r["wer_mean"] * 100, 1), "gain": r["gain_db"]})
+    v = {"id": r["voice"], "src": r["source_id"].removesuffix("_enhanced"), "c": c, "rank": r["rank"],
+         "g": r["gender_estimate"], "f0": r["f0_median"], "wpm": round(r["wpm"]), "pace": wpm_tag(r["wpm"]),
+         "wer": round(r["wer_mean"] * 100, 1), "gain": r["gain_db"]}
+    for key, short in (("label", "lbl"), ("accent", "acc"), ("region", "reg"), ("age", "age")):
+        if r.get(key) is not None:
+            v[short] = r[key]
+    voices.append(v)
 
 files = {}
 for c, data in enumerate(chunks):
     files[f"audio-{c:02d}.js"] = "window.__aud&&window.__aud(%d,%s);\n" % (c, json.dumps(data, separators=(",", ":")))
 
 S = report["summary"]
-tpl = Path(__file__).with_name("audition.html").read_text()
+tpl = Path(sys.argv[4] if len(sys.argv) > 4 else Path(__file__).with_name("audition.html")).read_text()
 page = (tpl.replace("__VOICES__", json.dumps(voices, separators=(",", ":")))
            .replace("__NCAND__", str(S["candidates"])).replace("__NSEL__", str(S["selected"]))
            .replace("__SENT_N__", html.escape(report["sentences"]["neutral"]))

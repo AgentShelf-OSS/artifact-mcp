@@ -1,0 +1,4296 @@
+{
+ "p225": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.4,
+   "mic2": 41.35
+  },
+  "utterances": [
+   "280",
+   "044",
+   "149"
+  ],
+  "texts": {
+   "280": "Sadly, the revival could not be sustained.",
+   "044": "It was served by sheriff officers, not by the council.",
+   "149": "Shareholders will be asked to approve a new replacement scheme."
+  },
+  "seconds": 14.57,
+  "ok": true,
+  "ref": {
+   "seconds": 14.569,
+   "peak": 0.8013,
+   "clipped": 0,
+   "noise_db": -58.1,
+   "speech_db": -15.4,
+   "snr_db": 42.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p225/p225_280_mic2.flac",
+   "wav48_silence_trimmed/p225/p225_044_mic2.flac",
+   "wav48_silence_trimmed/p225/p225_149_mic2.flac"
+  ],
+  "source_sha256": [
+   "7b06f1367e3f463ac753bbf81c0834c485f77f72f4dd7a485c2954e982d11f52",
+   "e6d4f2001e0909ba4ceefaaac7304f609314051b1f67b0e860dfbfff4b341688",
+   "b7ae42eb792222896801977d3c6ca84c1c97efc364bec7f92a4f17c700da7356"
+  ]
+ },
+ "p226": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.599999999999994,
+   "mic2": 38.05
+  },
+  "utterances": [
+   "153",
+   "043",
+   "033"
+  ],
+  "texts": {
+   "153": "That group reported just before Christmas.",
+   "043": "Is there a new way forward?",
+   "033": "From that day on we started to look for another full back."
+  },
+  "seconds": 13.18,
+  "ok": true,
+  "ref": {
+   "seconds": 13.183,
+   "peak": 0.7122,
+   "clipped": 0,
+   "noise_db": -57.3,
+   "speech_db": -15.1,
+   "snr_db": 42.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p226/p226_153_mic2.flac",
+   "wav48_silence_trimmed/p226/p226_043_mic2.flac",
+   "wav48_silence_trimmed/p226/p226_033_mic2.flac"
+  ],
+  "source_sha256": [
+   "ffc1f5d1fa2c88980c4bd390f81366742ffa9869a0c3cd44535c355406f68741",
+   "af3780e44d0d3bd59e720ce0d654ace0dc18a8ec7737496b98238cda58ed7faa",
+   "107f697dfa542d4ad490233dff1c6b2a5fbb14815d5573f19f7a64e79c4eb502"
+  ]
+ },
+ "p227": {
+  "mic": "mic1",
+  "highpass_60hz": true,
+  "mic_median_snr_db": {
+   "mic1": 33.55,
+   "mic2": 28.85
+  },
+  "utterances": [
+   "127",
+   "150",
+   "305"
+  ],
+  "texts": {
+   "127": "Any success would have been an improvement.",
+   "150": "Charles Gordon, leader of Glasgow City Council declined to comment.",
+   "305": "There was a final revealing detail about the broadcast."
+  },
+  "seconds": 12.38,
+  "ok": true,
+  "ref": {
+   "seconds": 12.38,
+   "peak": 0.7241,
+   "clipped": 0,
+   "noise_db": -62.4,
+   "speech_db": -17.3,
+   "snr_db": 45.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p227/p227_127_mic1.flac",
+   "wav48_silence_trimmed/p227/p227_150_mic1.flac",
+   "wav48_silence_trimmed/p227/p227_305_mic1.flac"
+  ],
+  "source_sha256": [
+   "e9eeef1e61cc5537784d0da2fd115295cc08c7b9c04028c7ed86a744d3d48606",
+   "746a22c73922b717e4435b4d7aec9952d5fbbbc36036aa3cfa68f41ffc7d135c",
+   "c63e07f573e175c3ff2240cec66e5be623efdaf4aa0ef4e925b2935f454c0d02"
+  ]
+ },
+ "p228": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 28.8,
+   "mic2": 34.45
+  },
+  "utterances": [
+   "134",
+   "267",
+   "325"
+  ],
+  "texts": {
+   "134": "Despite the result, it was still a great moment.",
+   "267": "It's great, because it takes a lot of pressure off the players.",
+   "325": "The same things will happen with GM foods."
+  },
+  "seconds": 13.45,
+  "ok": true,
+  "ref": {
+   "seconds": 13.452,
+   "peak": 0.7333,
+   "clipped": 0,
+   "noise_db": -54.9,
+   "speech_db": -16.9,
+   "snr_db": 37.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p228/p228_134_mic2.flac",
+   "wav48_silence_trimmed/p228/p228_267_mic2.flac",
+   "wav48_silence_trimmed/p228/p228_325_mic2.flac"
+  ],
+  "source_sha256": [
+   "832825840bfba981984d3acf53e79823eb8a2be90968c610f4169adefc984059",
+   "0b2f77fd722f86d3198b237a47a8d0ceee80bc808c6bb3c0a1fcd6e5438bd7b2",
+   "f76a44b266503b83ffc65382cc2dbe3a899ebf17cd21fa1ded8b77a014bbb53b"
+  ]
+ },
+ "p229": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.25,
+   "mic2": 41.7
+  },
+  "utterances": [
+   "099",
+   "143",
+   "160",
+   "079"
+  ],
+  "texts": {
+   "099": "He is hungry for success and I am the same.",
+   "143": "We never said that we would walk through the third division.",
+   "160": "Charles Gordon, leader of Glasgow City Council declined to comment.",
+   "079": "Other members of the family were too upset to comment last night."
+  },
+  "seconds": 13.3,
+  "ok": true,
+  "ref": {
+   "seconds": 13.302,
+   "peak": 0.78,
+   "clipped": 0,
+   "noise_db": -56.9,
+   "speech_db": -17.7,
+   "snr_db": 39.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p229/p229_099_mic2.flac",
+   "wav48_silence_trimmed/p229/p229_143_mic2.flac",
+   "wav48_silence_trimmed/p229/p229_160_mic2.flac",
+   "wav48_silence_trimmed/p229/p229_079_mic2.flac"
+  ],
+  "source_sha256": [
+   "257c08352871981aaa9215ad5161d4c564e0c3e8d1ef22878604c5e0913c26cb",
+   "66dd50449911041faef1089cf4f0a7715004f55df7200a4deb1f3542578f5346",
+   "46da43d2d189fb53b09b4624af41b611ab0ac5666aa5414f1f4c6ff95d7b3741",
+   "fac0437112a99313d1d950013d48ab9e935b0eb44eb87bf26f3b28ec6bc88f7e"
+  ]
+ },
+ "p230": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.65,
+   "mic2": 32.75
+  },
+  "utterances": [
+   "002",
+   "121",
+   "069"
+  ],
+  "texts": {
+   "002": "Ask her to bring these things with her from the store.",
+   "121": "The abuse of elderly people was appalling.",
+   "069": "It is a job creation scheme."
+  },
+  "seconds": 12.31,
+  "ok": true,
+  "ref": {
+   "seconds": 12.311,
+   "peak": 0.2935,
+   "clipped": 0,
+   "noise_db": -57.6,
+   "speech_db": -22.2,
+   "snr_db": 35.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p230/p230_002_mic2.flac",
+   "wav48_silence_trimmed/p230/p230_121_mic2.flac",
+   "wav48_silence_trimmed/p230/p230_069_mic2.flac"
+  ],
+  "source_sha256": [
+   "d53b7b91ac38054284842df6b2153a4cc114286e653b284774962fe9b49eef02",
+   "1acd98639080cec36c08767e6660d1f5a338b47f6f116abce1611f89137d2a20",
+   "6cbf4934103be73866eeaebef451f5f7d2de392bc98545c7861716c485a9f64e"
+  ]
+ },
+ "p231": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.8,
+   "mic2": 34.2
+  },
+  "utterances": [
+   "269",
+   "291",
+   "298",
+   "315"
+  ],
+  "texts": {
+   "269": "The property is owned by Glasgow City Council.",
+   "291": "It was not hard to feel some sympathy for Baxter yesterday.",
+   "298": "They have shown a great desire and attitude.",
+   "315": "Employees are entitled to follow their contract to the letter."
+  },
+  "seconds": 13.14,
+  "ok": true,
+  "ref": {
+   "seconds": 13.138,
+   "peak": 0.6184,
+   "clipped": 0,
+   "noise_db": -53.7,
+   "speech_db": -16.4,
+   "snr_db": 37.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p231/p231_269_mic2.flac",
+   "wav48_silence_trimmed/p231/p231_291_mic2.flac",
+   "wav48_silence_trimmed/p231/p231_298_mic2.flac",
+   "wav48_silence_trimmed/p231/p231_315_mic2.flac"
+  ],
+  "source_sha256": [
+   "29024a03a4309f1bdbf1b67a04e76e57d48ab738086ef1ddd6886926e9fbd55e",
+   "8235a5f16e61e20333b4f8092cd15e54a949674b9dbfbb66a9b8c7c720bee7e4",
+   "dc0782817f83a5ac3e5eb457f94cb9159a62d55157aec12443dd0d5488ea6531",
+   "a018320c5aa0dbcb3679b341849865dcefade6a0f9b365225a18b020c8179ae9"
+  ]
+ },
+ "p232": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.7,
+   "mic2": 37.85
+  },
+  "utterances": [
+   "070",
+   "030",
+   "356"
+  ],
+  "texts": {
+   "070": "There is an element of racism in Scotland.",
+   "030": "They were described as being in a serious but stable condition yesterday.",
+   "356": "That's the principal difference between an artist and a dog."
+  },
+  "seconds": 10.11,
+  "ok": true,
+  "ref": {
+   "seconds": 10.109,
+   "peak": 0.6242,
+   "clipped": 0,
+   "noise_db": -56.4,
+   "speech_db": -14.8,
+   "snr_db": 41.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p232/p232_070_mic2.flac",
+   "wav48_silence_trimmed/p232/p232_030_mic2.flac",
+   "wav48_silence_trimmed/p232/p232_356_mic2.flac"
+  ],
+  "source_sha256": [
+   "1310ee9c071fa25fae868765279495522057ac8b5d336e45f1efbaebbf569d2c",
+   "888f2be63b312981fcf8af582bae103eaff6ac7139807185f690d12be9df1da1",
+   "24c3e5876b275bc5b933a87d5705fb23250d434f96be175295691261dc190834"
+  ]
+ },
+ "p233": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.55,
+   "mic2": 32.8
+  },
+  "utterances": [
+   "072",
+   "017",
+   "240"
+  ],
+  "texts": {
+   "072": "Seriously, we are not concerned at all.",
+   "017": "Others have tried to explain the phenomenon physically.",
+   "240": "The singer is expected to be in hospital for several days."
+  },
+  "seconds": 12.78,
+  "ok": true,
+  "ref": {
+   "seconds": 12.779,
+   "peak": 0.6081,
+   "clipped": 0,
+   "noise_db": -54.1,
+   "speech_db": -18.8,
+   "snr_db": 35.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p233/p233_072_mic2.flac",
+   "wav48_silence_trimmed/p233/p233_017_mic2.flac",
+   "wav48_silence_trimmed/p233/p233_240_mic2.flac"
+  ],
+  "source_sha256": [
+   "09e772e1f62a2606533e892f51fcd40feb8ab2e65e910b3c1f0398cbd9d5c6a3",
+   "7529eceaea755cf4b4e2d2c521f6cb27a6003a31248e0d6d011ed51485858a35",
+   "1450703ec4826ba3e9ad791a016022673d6d2df08e7d827bfe9e490fbeb19369"
+  ]
+ },
+ "p234": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.35,
+   "mic2": 33.0
+  },
+  "utterances": [
+   "268",
+   "017",
+   "350"
+  ],
+  "texts": {
+   "268": "Then was the summer of their discontent.",
+   "017": "Others have tried to explain the phenomenon physically.",
+   "350": "Overall, we continue to look to the future with confidence."
+  },
+  "seconds": 11.95,
+  "ok": true,
+  "ref": {
+   "seconds": 11.953,
+   "peak": 0.6303,
+   "clipped": 0,
+   "noise_db": -55.3,
+   "speech_db": -18.5,
+   "snr_db": 36.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p234/p234_268_mic2.flac",
+   "wav48_silence_trimmed/p234/p234_017_mic2.flac",
+   "wav48_silence_trimmed/p234/p234_350_mic2.flac"
+  ],
+  "source_sha256": [
+   "34e005e1e9cf5754d9613ad6b17186dc66ccada02ce0995104fdfd3426a88401",
+   "7f6e5d052d3c80f69b78ecaf60b00c987b0a0cba12bfc734855ca0b0698b236c",
+   "7fb420b25dd1dd27418938b865382fe0a76be201e91d2490c3be674d3d84429b"
+  ]
+ },
+ "p236": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.0,
+   "mic2": 36.95
+  },
+  "utterances": [
+   "234",
+   "266",
+   "465",
+   "264"
+  ],
+  "texts": {
+   "234": "His third goal was superb.",
+   "266": "Either way, the investor retains the premium.",
+   "465": "I was all image and no substance.",
+   "264": "Clearly, the need for a personal loan is written in the stars."
+  },
+  "seconds": 12.8,
+  "ok": true,
+  "ref": {
+   "seconds": 12.801,
+   "peak": 0.5485,
+   "clipped": 0,
+   "noise_db": -58.4,
+   "speech_db": -17.1,
+   "snr_db": 41.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p236/p236_234_mic2.flac",
+   "wav48_silence_trimmed/p236/p236_266_mic2.flac",
+   "wav48_silence_trimmed/p236/p236_465_mic2.flac",
+   "wav48_silence_trimmed/p236/p236_264_mic2.flac"
+  ],
+  "source_sha256": [
+   "d5d378a7f355f7305d30fdbd30202bcc534451319a30ba5c75859a81533d88ba",
+   "9f4b5041124945d367ceeb7bf16d8dff4272489e3c0a71653586fe1f7563e7f1",
+   "68c2673f6fb78743df0c6845cd28b07e22a0cf73238d53e7f7596bff7b55b486",
+   "3640358ddb895453f83619cdfa728fd20f3473374a6cef1256ef18d5dca9cf9e"
+  ]
+ },
+ "p237": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.85,
+   "mic2": 40.150000000000006
+  },
+  "utterances": [
+   "224",
+   "208",
+   "049"
+  ],
+  "texts": {
+   "224": "However, Dundee deserved to win this game.",
+   "208": "I, in the meantime, had been far from chilling.",
+   "049": "We're in the premier division and we intend to stay there."
+  },
+  "seconds": 12.29,
+  "ok": true,
+  "ref": {
+   "seconds": 12.288,
+   "peak": 0.4153,
+   "clipped": 0,
+   "noise_db": -62.6,
+   "speech_db": -21.3,
+   "snr_db": 41.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p237/p237_224_mic2.flac",
+   "wav48_silence_trimmed/p237/p237_208_mic2.flac",
+   "wav48_silence_trimmed/p237/p237_049_mic2.flac"
+  ],
+  "source_sha256": [
+   "1247a8048b5723b2e3de2899282fa51798e19ac6f3bb15a9787afbeba185d92d",
+   "19c8a3a81e31cd7daa91b6d106d7028a8a4da16d58b4e9469e0f1d3fb4d488a0",
+   "608ff9c651d67d0b17ac7c0304ee7b14d00cd5b4cc994ddc02ed6cabe9f06c5b"
+  ]
+ },
+ "p238": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.349999999999994,
+   "mic2": 38.05
+  },
+  "utterances": [
+   "044",
+   "135",
+   "342"
+  ],
+  "texts": {
+   "044": "It is about regular committed giving which is the real attraction.",
+   "135": "No one person or small group could be singled out.",
+   "342": "He is the son of former chairman, Lord Wolfson."
+  },
+  "seconds": 14.3,
+  "ok": true,
+  "ref": {
+   "seconds": 14.305,
+   "peak": 0.6095,
+   "clipped": 0,
+   "noise_db": -59.4,
+   "speech_db": -18.6,
+   "snr_db": 40.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p238/p238_044_mic2.flac",
+   "wav48_silence_trimmed/p238/p238_135_mic2.flac",
+   "wav48_silence_trimmed/p238/p238_342_mic2.flac"
+  ],
+  "source_sha256": [
+   "8c783d444626f2c9e2dc78eb286b129e9668dad28ef17ef0a7c0dfdc884a84ef",
+   "efc84fd8683a8655f933d4faf649caeec6a2662ac1936d84347554be776c7819",
+   "92e8c6e9e94349d24adad102b8ec6cd7c2044f424e33330d90e100b364235676"
+  ]
+ },
+ "p239": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 28.9,
+   "mic2": 38.95
+  },
+  "utterances": [
+   "483",
+   "193",
+   "464"
+  ],
+  "texts": {
+   "483": "Again the parallel with football can be drawn.",
+   "193": "In addition, margins have been maintained.",
+   "464": "We also acknowledge the grief and pain of their relatives."
+  },
+  "seconds": 10.46,
+  "ok": true,
+  "ref": {
+   "seconds": 10.462,
+   "peak": 0.5252,
+   "clipped": 0,
+   "noise_db": -61.1,
+   "speech_db": -18.4,
+   "snr_db": 42.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p239/p239_483_mic2.flac",
+   "wav48_silence_trimmed/p239/p239_193_mic2.flac",
+   "wav48_silence_trimmed/p239/p239_464_mic2.flac"
+  ],
+  "source_sha256": [
+   "bad0373a9fc5484c22961a362fd60cd04f747956f4b2da9a613f53bf6a2f62f6",
+   "3971255a9b75ba89d15e2802bb6ede2c179e78f8aa521c04a109066263ccf379",
+   "18d3bd94829a6773298721b11de1a8619ed2df708c8f74a8b195fa272e840048"
+  ]
+ },
+ "p240": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.9,
+   "mic2": 35.9
+  },
+  "utterances": [
+   "361",
+   "377",
+   "224"
+  ],
+  "texts": {
+   "361": "He met Mr Davies to establish the scale of the scandal.",
+   "377": "He later became a respected High Court judge.",
+   "224": "Women were mostly notable by their absence."
+  },
+  "seconds": 10.96,
+  "ok": true,
+  "ref": {
+   "seconds": 10.961,
+   "peak": 0.4671,
+   "clipped": 0,
+   "noise_db": -56.2,
+   "speech_db": -17.8,
+   "snr_db": 38.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p240/p240_361_mic2.flac",
+   "wav48_silence_trimmed/p240/p240_377_mic2.flac",
+   "wav48_silence_trimmed/p240/p240_224_mic2.flac"
+  ],
+  "source_sha256": [
+   "4e2dd26cab462776c7967011dd56bb8323ee6717fa0ae9efc62a4a74f1322692",
+   "0917c7e08db79ce547fc4e462322e4719fb35cb0a6443019b985244aad2103d7",
+   "612acd9909b68ad71f6ddf9df5dfce422178473714fc32d565400e2c3b392751"
+  ]
+ },
+ "p241": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.0,
+   "mic2": 41.0
+  },
+  "utterances": [
+   "212",
+   "149",
+   "234"
+  ],
+  "texts": {
+   "212": "A Grampian Police spokesman said.",
+   "149": "We want to see the maximum of change.",
+   "234": "We have a free vote on these things in our party."
+  },
+  "seconds": 10.26,
+  "ok": true,
+  "ref": {
+   "seconds": 10.262,
+   "peak": 0.6324,
+   "clipped": 0,
+   "noise_db": -60.6,
+   "speech_db": -16.7,
+   "snr_db": 43.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p241/p241_212_mic2.flac",
+   "wav48_silence_trimmed/p241/p241_149_mic2.flac",
+   "wav48_silence_trimmed/p241/p241_234_mic2.flac"
+  ],
+  "source_sha256": [
+   "fbb610834ae967a1836b11175f4b885e009b71ab09412b314044e90f2deca354",
+   "00b48bdbb25fcff829e3bc89770c103267013ff84b3938e62d0b9122d27e09fa",
+   "da1ed8c59c67cddfbe2777fa6cd5a5755014fe0ffb3789f9cadfb8c4da55c52a"
+  ]
+ },
+ "p243": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 36.849999999999994,
+   "mic2": 43.95
+  },
+  "utterances": [
+   "041",
+   "168",
+   "026"
+  ],
+  "texts": {
+   "041": "Hearts hit back with two goals in four minutes.",
+   "168": "I knew that I needed to lower my ball flight.",
+   "026": "His secretary said it was a matter for Murray Financial to deal with."
+  },
+  "seconds": 11.92,
+  "ok": true,
+  "ref": {
+   "seconds": 11.92,
+   "peak": 0.569,
+   "clipped": 0,
+   "noise_db": -63.5,
+   "speech_db": -19.4,
+   "snr_db": 44.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p243/p243_041_mic2.flac",
+   "wav48_silence_trimmed/p243/p243_168_mic2.flac",
+   "wav48_silence_trimmed/p243/p243_026_mic2.flac"
+  ],
+  "source_sha256": [
+   "21f2078c302a4c7a89ba6a90cbd6227f23ff0574c7f568cf831346150de34425",
+   "ce2a46b24824438845905976d24bcfcebd7d58cba0124e995090e70dbf8fe47a",
+   "ea5ecdb6c34e5103b493d0d33805ccffcc9c72c408093f8c4871e75919808ed0"
+  ]
+ },
+ "p244": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.15,
+   "mic2": 34.65
+  },
+  "utterances": [
+   "173",
+   "418",
+   "159",
+   "088"
+  ],
+  "texts": {
+   "173": "We were all over the place in the first half.",
+   "418": "However, he said the proposal was at an early stage.",
+   "159": "If not, a deal could take many months.",
+   "088": "I am a soldier, a soldier, a soldier."
+  },
+  "seconds": 13.86,
+  "ok": true,
+  "ref": {
+   "seconds": 13.863,
+   "peak": 0.5601,
+   "clipped": 0,
+   "noise_db": -52.9,
+   "speech_db": -16.2,
+   "snr_db": 36.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p244/p244_173_mic2.flac",
+   "wav48_silence_trimmed/p244/p244_418_mic2.flac",
+   "wav48_silence_trimmed/p244/p244_159_mic2.flac",
+   "wav48_silence_trimmed/p244/p244_088_mic2.flac"
+  ],
+  "source_sha256": [
+   "3716274c9c1c5d6c7ca354f4edb8ad41f2546c5fb55816113293d2283a9a8af5",
+   "7e4533de6e46032778842ae2e9f94dd4c8642f48b16719a7a04f7210305b0273",
+   "e6af04f8232da7458ace02b0f1cc4a0f74391d2311fda1ac48eca120883128b3",
+   "547e24227816a311ccfef4171dcb2496ee713a31a535c934420fe3884650897f"
+  ]
+ },
+ "p245": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.95,
+   "mic2": 35.7
+  },
+  "utterances": [
+   "121",
+   "112",
+   "174"
+  ],
+  "texts": {
+   "121": "The trial is funded solely by Edinburgh City Council.",
+   "112": "Wednesday night was a difficult time for Britton.",
+   "174": "However, he said the money had not been wasted."
+  },
+  "seconds": 12.37,
+  "ok": true,
+  "ref": {
+   "seconds": 12.37,
+   "peak": 0.7113,
+   "clipped": 0,
+   "noise_db": -57.3,
+   "speech_db": -16.7,
+   "snr_db": 40.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p245/p245_121_mic2.flac",
+   "wav48_silence_trimmed/p245/p245_112_mic2.flac",
+   "wav48_silence_trimmed/p245/p245_174_mic2.flac"
+  ],
+  "source_sha256": [
+   "507027cce4260d6aa3a569095815c01b20108c1ba0df2c56dce32aa1b22f9476",
+   "eb70e784b6646b2c99d3f90bb4b700e815a2e9d9fcb9d012bb370b77d1eb9f42",
+   "a7451700a90e8449f17865d3eea7e739c4f66b09161fbc468c716aa6bb2f4af0"
+  ]
+ },
+ "p246": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.900000000000006,
+   "mic2": 35.0
+  },
+  "utterances": [
+   "157",
+   "115",
+   "167"
+  ],
+  "texts": {
+   "157": "This year, this month, will be special for Torrance.",
+   "115": "There will be a beginning, a middle, and an end.",
+   "167": "It's too early to say whether a public inquiry would be appropriate."
+  },
+  "seconds": 13.41,
+  "ok": true,
+  "ref": {
+   "seconds": 13.411,
+   "peak": 0.3872,
+   "clipped": 0,
+   "noise_db": -58.1,
+   "speech_db": -19.5,
+   "snr_db": 38.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p246/p246_157_mic2.flac",
+   "wav48_silence_trimmed/p246/p246_115_mic2.flac",
+   "wav48_silence_trimmed/p246/p246_167_mic2.flac"
+  ],
+  "source_sha256": [
+   "b37edf2bbace078a4bd8edcfa589b288d2fb0e16912a8e8eb60a9613cc6feb22",
+   "a9a5db2eac03a584e0cd7a9b32f3a9e344152eb60810a57d467f29b5c3867536",
+   "5d9be4bdfb9992364678cdc78874d0c2364e50b68c812760c69c3b1f601fa1cf"
+  ]
+ },
+ "p247": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.45,
+   "mic2": 42.95
+  },
+  "utterances": [
+   "237",
+   "109",
+   "370",
+   "040"
+  ],
+  "texts": {
+   "237": "The scientific debate is dead.",
+   "109": "The following are the principal provisions.",
+   "370": "He had no access to the database.",
+   "040": "It is serious - but not that serious."
+  },
+  "seconds": 12.27,
+  "ok": true,
+  "ref": {
+   "seconds": 12.274,
+   "peak": 0.9409,
+   "clipped": 0,
+   "noise_db": -60.9,
+   "speech_db": -15.7,
+   "snr_db": 45.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p247/p247_237_mic2.flac",
+   "wav48_silence_trimmed/p247/p247_109_mic2.flac",
+   "wav48_silence_trimmed/p247/p247_370_mic2.flac",
+   "wav48_silence_trimmed/p247/p247_040_mic2.flac"
+  ],
+  "source_sha256": [
+   "1a8237e1f48488fd1a7feabc7a6652f1244ca5f66ebbcbc563fb08c98de7a20c",
+   "8337b1a2e87b96e394bdf53013755a7779594db1aeaf9cb1ce7a8acfb083906c",
+   "9c59be4f3ff2cb6ad50f205c40c8ac6e293dd37014f6d75168a1144bdfbf0390",
+   "7ca11c4931a5f98d1817f824e0454b01358f320307636ed105737cb5148e1977"
+  ]
+ },
+ "p248": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 37.45,
+   "mic2": 43.4
+  },
+  "utterances": [
+   "201",
+   "267",
+   "364"
+  ],
+  "texts": {
+   "201": "The Shadow Chancellor is away on holiday.",
+   "267": "Perhaps it's because I haven't finished the first two races.",
+   "364": "This big issue is whether it can be enforced."
+  },
+  "seconds": 10.91,
+  "ok": true,
+  "ref": {
+   "seconds": 10.912,
+   "peak": 0.7065,
+   "clipped": 0,
+   "noise_db": -60.5,
+   "speech_db": -16.9,
+   "snr_db": 43.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p248/p248_201_mic2.flac",
+   "wav48_silence_trimmed/p248/p248_267_mic2.flac",
+   "wav48_silence_trimmed/p248/p248_364_mic2.flac"
+  ],
+  "source_sha256": [
+   "74dec6b5e9019cfd830599be9258243b7ad9d92f220a3e5b05aee66af27be7b7",
+   "2c5ee1c0f7dd4b9354078e0430a11ecb7b203db2a221def418244d1fc1ca8fd9",
+   "8ec1aad12873454c93fcab5902079b53b778c54354eaf1f83ed23f3a51128704"
+  ]
+ },
+ "p249": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 28.0,
+   "mic2": 34.099999999999994
+  },
+  "utterances": [
+   "106",
+   "156",
+   "279"
+  ],
+  "texts": {
+   "106": "We have always maintained that we would never abandon Scottish football.",
+   "156": "The woman is a star who has grown to love the limelight.",
+   "279": "For the moment, that is the result of the X-ray."
+  },
+  "seconds": 12.52,
+  "ok": true,
+  "ref": {
+   "seconds": 12.515,
+   "peak": 0.5157,
+   "clipped": 0,
+   "noise_db": -55.8,
+   "speech_db": -19.0,
+   "snr_db": 36.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p249/p249_106_mic2.flac",
+   "wav48_silence_trimmed/p249/p249_156_mic2.flac",
+   "wav48_silence_trimmed/p249/p249_279_mic2.flac"
+  ],
+  "source_sha256": [
+   "0d2223510807bdba47a52d00a97adec28802c87f8dff513d6fea027caf425c50",
+   "3a7b6535011a4200d61239eb5e84f648355e15f3365abaaabecd6bab2b575bf0",
+   "e91d5e7f1267302fafc00c50f7b4940d229ee8cf4cf3233b0b0560be21c624fd"
+  ]
+ },
+ "p250": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.55,
+   "mic2": 39.25
+  },
+  "utterances": [
+   "408",
+   "183",
+   "320",
+   "199"
+  ],
+  "texts": {
+   "408": "Offence to the herd was not easily overlooked.",
+   "183": "The reviews were welcomed by business lobby groups.",
+   "320": "We would hope to make progress on that next year.",
+   "199": "He was rejected because he had retired."
+  },
+  "seconds": 11.79,
+  "ok": true,
+  "ref": {
+   "seconds": 11.787,
+   "peak": 0.7232,
+   "clipped": 0,
+   "noise_db": -60.4,
+   "speech_db": -17.9,
+   "snr_db": 42.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p250/p250_408_mic2.flac",
+   "wav48_silence_trimmed/p250/p250_183_mic2.flac",
+   "wav48_silence_trimmed/p250/p250_320_mic2.flac",
+   "wav48_silence_trimmed/p250/p250_199_mic2.flac"
+  ],
+  "source_sha256": [
+   "d4cd0bf951dbd7720399ecbebd18262611a73c462f85e856b4211fec69193dd0",
+   "e9e414b0d1981ce5129a943abb13e464dfee2d3cf5c59bd644fb1d5859020001",
+   "dc013e7ca4f52bf59a658d7c24fed9301020bc9b7beee31ac40ddddc62428cd9",
+   "677abd232bf796d71a0aa8542f561da91ebd3217cf4e0281427b25af5b9aaf7e"
+  ]
+ },
+ "p251": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.1,
+   "mic2": 36.2
+  },
+  "utterances": [
+   "362",
+   "271",
+   "076"
+  ],
+  "texts": {
+   "362": "He met Mr Davies to establish the scale of the scandal.",
+   "271": "One MP said he feared the job losses were only the beginning.",
+   "076": "It is linked to the row over proposed changes at Scottish Ballet."
+  },
+  "seconds": 12.66,
+  "ok": true,
+  "ref": {
+   "seconds": 12.66,
+   "peak": 0.5556,
+   "clipped": 0,
+   "noise_db": -53.3,
+   "speech_db": -15.1,
+   "snr_db": 38.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p251/p251_362_mic2.flac",
+   "wav48_silence_trimmed/p251/p251_271_mic2.flac",
+   "wav48_silence_trimmed/p251/p251_076_mic2.flac"
+  ],
+  "source_sha256": [
+   "0de88aae5679fdef0ce24b2ba9f6deb4473996953077de4ebcd5f8ae0673c448",
+   "a19caf8de7585c54bc74bc77c4372c30ff5caba8cae84bdd3a27cee77ce09d56",
+   "7bb62120101d9f680281ee21ca9c380c9d3089021b8e32eddc0f7bcad097f292"
+  ]
+ },
+ "p252": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.5,
+   "mic2": 42.35
+  },
+  "utterances": [
+   "343",
+   "392",
+   "238"
+  ],
+  "texts": {
+   "343": "We are a husband and wife team.",
+   "392": "The property is owned by Glasgow City Council.",
+   "238": "The full Cabinet will meet today to discuss the oil crisis."
+  },
+  "seconds": 11.18,
+  "ok": true,
+  "ref": {
+   "seconds": 11.18,
+   "peak": 0.8761,
+   "clipped": 0,
+   "noise_db": -61.1,
+   "speech_db": -15.9,
+   "snr_db": 45.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p252/p252_343_mic2.flac",
+   "wav48_silence_trimmed/p252/p252_392_mic2.flac",
+   "wav48_silence_trimmed/p252/p252_238_mic2.flac"
+  ],
+  "source_sha256": [
+   "ae2b059fcf6949a2f91a40e80bb45cd05e482d4e1d8c9dc18c1630ab9f3fa40e",
+   "e5f66cf5fd9dd81316cf3b394af96580ef6411895a17e8acc1832651940f208e",
+   "b7b0e593103ab39fdb557017303b3c8f58d5ad5270bdd53b5c9924e19910d015"
+  ]
+ },
+ "p253": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.3,
+   "mic2": 43.55
+  },
+  "utterances": [
+   "265",
+   "048",
+   "245"
+  ],
+  "texts": {
+   "265": "Charles Kennedy had an effective outing.",
+   "048": "Charlie Gordon, leader of the council, dismissed the suggestion.",
+   "245": "Now, suddenly, we have this new landscape."
+  },
+  "seconds": 10.23,
+  "ok": true,
+  "ref": {
+   "seconds": 10.23,
+   "peak": 0.9989,
+   "clipped": 0,
+   "noise_db": -59.3,
+   "speech_db": -16.1,
+   "snr_db": 43.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p253/p253_265_mic2.flac",
+   "wav48_silence_trimmed/p253/p253_048_mic2.flac",
+   "wav48_silence_trimmed/p253/p253_245_mic2.flac"
+  ],
+  "source_sha256": [
+   "e4642e3b1d0b6233ad037cdfd898b27b98ba8cdc0060f81d8ceacd58ee5e1476",
+   "07eca8551b20b33239966f16243b51f602548d033cebd9ea814caf7a75030f12",
+   "777258a4543fb8f46f1895cf21fa9996a130d7ad30b50560cac55c46583156d0"
+  ]
+ },
+ "p254": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.5,
+   "mic2": 35.8
+  },
+  "utterances": [
+   "191",
+   "357",
+   "028"
+  ],
+  "texts": {
+   "191": "The modern approach will also be reflected in the terms of address.",
+   "357": "On fuel, the Chancellor has a number of options.",
+   "028": "I am not interested in the money, it is the principle."
+  },
+  "seconds": 11.34,
+  "ok": true,
+  "ref": {
+   "seconds": 11.343,
+   "peak": 0.4911,
+   "clipped": 0,
+   "noise_db": -58.7,
+   "speech_db": -19.2,
+   "snr_db": 39.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p254/p254_191_mic2.flac",
+   "wav48_silence_trimmed/p254/p254_357_mic2.flac",
+   "wav48_silence_trimmed/p254/p254_028_mic2.flac"
+  ],
+  "source_sha256": [
+   "1a28f9f9f5540354ad28432bd8be382168323ac852e1ec57a3e5fc20452ac153",
+   "f5f862f20af3962cf8eb5e27533f2e0de9ef02f8031a49bd74410e88fcd91213",
+   "552dff0fe3797236bdc0618771ffdf3a7d43ef5d14d900d6c36f84a7a527d6eb"
+  ]
+ },
+ "p255": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.65,
+   "mic2": 37.849999999999994
+  },
+  "utterances": [
+   "276",
+   "343",
+   "224"
+  ],
+  "texts": {
+   "276": "I am pleased with the result, as it was a possible upset.",
+   "343": "That is the very reason why it was so vital.",
+   "224": "A final decision will be taken by First Minister Donald Dewar."
+  },
+  "seconds": 12.17,
+  "ok": true,
+  "ref": {
+   "seconds": 12.17,
+   "peak": 0.7227,
+   "clipped": 0,
+   "noise_db": -57.0,
+   "speech_db": -17.3,
+   "snr_db": 39.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p255/p255_276_mic2.flac",
+   "wav48_silence_trimmed/p255/p255_343_mic2.flac",
+   "wav48_silence_trimmed/p255/p255_224_mic2.flac"
+  ],
+  "source_sha256": [
+   "a3531991d668038bdc8177ecab82a2366d2d57b7d6e03694b6acf0a5a54dca8d",
+   "ad632f9aef7d6b3008bb57e6b9b57ff45fe66495c7bfdf32407c71a84f0022f9",
+   "ea8d9c9b155df80cb42f76a868bcf9b0e6e83c0b0a09f6eb2858df0c2b7d075c"
+  ]
+ },
+ "p256": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.0,
+   "mic2": 35.95
+  },
+  "utterances": [
+   "007",
+   "103",
+   "138"
+  ],
+  "texts": {
+   "007": "The rainbow is a division of white light into many beautiful colors.",
+   "103": "The court heard he drove into the path of a car.",
+   "138": "We never said that we would walk through the third division."
+  },
+  "seconds": 14.61,
+  "ok": true,
+  "ref": {
+   "seconds": 14.608,
+   "peak": 0.7132,
+   "clipped": 0,
+   "noise_db": -59.6,
+   "speech_db": -18.2,
+   "snr_db": 41.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p256/p256_007_mic2.flac",
+   "wav48_silence_trimmed/p256/p256_103_mic2.flac",
+   "wav48_silence_trimmed/p256/p256_138_mic2.flac"
+  ],
+  "source_sha256": [
+   "b4f34351d17ccf9a77ce5f4ac4c35bf4f1f9347013f2225e9d37deb09e946bc9",
+   "3457fa879da369418c6609a9abcf6d27716a3c2f30d7f36a715dcfd05d859f16",
+   "55dfa67144bdceecb8bbb1d437660c9f3ea2be50831d195575c2ceb68928ff33"
+  ]
+ },
+ "p257": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.0,
+   "mic2": 35.8
+  },
+  "utterances": [
+   "066",
+   "374",
+   "248",
+   "251"
+  ],
+  "texts": {
+   "066": "I was just trying to win the golf tournament.",
+   "374": "It is also claimed that he was murdered.",
+   "248": "He was my big brother, my father, my grandfather.",
+   "251": "There was no mention of an amnesty in the Belfast Agreement."
+  },
+  "seconds": 12.94,
+  "ok": true,
+  "ref": {
+   "seconds": 12.94,
+   "peak": 0.4896,
+   "clipped": 0,
+   "noise_db": -58.4,
+   "speech_db": -18.7,
+   "snr_db": 39.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p257/p257_066_mic2.flac",
+   "wav48_silence_trimmed/p257/p257_374_mic2.flac",
+   "wav48_silence_trimmed/p257/p257_248_mic2.flac",
+   "wav48_silence_trimmed/p257/p257_251_mic2.flac"
+  ],
+  "source_sha256": [
+   "f3f1681a73124467527a6366c3de652a9f423a097bdf855ff746691dfd564bc5",
+   "76db439b129bbd997eac71f2babce57202587030ff5f62a089cd558fc48ccbe7",
+   "36bde233ee6b067629682d52a4c869bc11039ca1e1d897e1a1f68eff7bcde225",
+   "c78109447279c638031cd62a52d35c9e0b630c34524184c3bbbe99289b1472e7"
+  ]
+ },
+ "p258": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.35,
+   "mic2": 37.650000000000006
+  },
+  "utterances": [
+   "070",
+   "246",
+   "125"
+  ],
+  "texts": {
+   "070": "I am a soldier, a soldier, a soldier.",
+   "246": "It is a policy which has the full support of the minister.",
+   "125": "So the European elections are extremely important."
+  },
+  "seconds": 10.71,
+  "ok": true,
+  "ref": {
+   "seconds": 10.706,
+   "peak": 0.6872,
+   "clipped": 0,
+   "noise_db": -59.0,
+   "speech_db": -17.5,
+   "snr_db": 41.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p258/p258_070_mic2.flac",
+   "wav48_silence_trimmed/p258/p258_246_mic2.flac",
+   "wav48_silence_trimmed/p258/p258_125_mic2.flac"
+  ],
+  "source_sha256": [
+   "e3b110f2fb0168623ac76774ef7549da9bf6cd40ac068df815fa9a1adf52feb2",
+   "e55d2ce3f90d2440033e609486d83e94a65179f423a4ed60f6fa94c448fc9176",
+   "70255f789db3e54f4a567a1ec467b2a7af9c59a17299c2f55a98528864eac96e"
+  ]
+ },
+ "p259": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.45,
+   "mic2": 38.5
+  },
+  "utterances": [
+   "157",
+   "155",
+   "054"
+  ],
+  "texts": {
+   "157": "No-one from the Fire Brigades Union was available for comment yesterday.",
+   "155": "It opens the door to the Champions League.",
+   "054": "In time, the First Minister will grow in stature."
+  },
+  "seconds": 11.99,
+  "ok": true,
+  "ref": {
+   "seconds": 11.992,
+   "peak": 0.7892,
+   "clipped": 0,
+   "noise_db": -61.6,
+   "speech_db": -17.3,
+   "snr_db": 44.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p259/p259_157_mic2.flac",
+   "wav48_silence_trimmed/p259/p259_155_mic2.flac",
+   "wav48_silence_trimmed/p259/p259_054_mic2.flac"
+  ],
+  "source_sha256": [
+   "c85cea19305360aa0ede174ceb2249e336d6431d4b3676b9de53736c3993b5c0",
+   "0e1b47c7a9150e4b1d289dda476cc289c502fb27fb558d2c2dfad435d7aed126",
+   "a62bb69fe5d00bc79d2a7495079bf9338ad6801d9eface099bf939e456ad0e5a"
+  ]
+ },
+ "p260": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 37.3,
+   "mic2": 44.1
+  },
+  "utterances": [
+   "182",
+   "142",
+   "308",
+   "047"
+  ],
+  "texts": {
+   "182": "He was adamant that he was still ahead on everything that matters.",
+   "142": "He sets the nature of his Parliament in a simple, realistic context.",
+   "308": "In performance, that quality can prove to be a challenge.",
+   "047": "Every aspect of our play was first class."
+  },
+  "seconds": 13.06,
+  "ok": true,
+  "ref": {
+   "seconds": 13.061,
+   "peak": 0.9989,
+   "clipped": 0,
+   "noise_db": -59.6,
+   "speech_db": -14.7,
+   "snr_db": 45.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p260/p260_182_mic2.flac",
+   "wav48_silence_trimmed/p260/p260_142_mic2.flac",
+   "wav48_silence_trimmed/p260/p260_308_mic2.flac",
+   "wav48_silence_trimmed/p260/p260_047_mic2.flac"
+  ],
+  "source_sha256": [
+   "9e81d1acd9ecf097bf87324ed4ab1d4cd8acac1741b4779dc6fbf6242ba9fefb",
+   "084fe4aea45350b33c693f6535b8eb9fbddcc2f61a1a4402d9f8680be36df927",
+   "76502aa4665deac319b2464059af7dc95ac33bfa1b1c50039a87cf97593e384e",
+   "c775910d014976dbc1110f670ef08428562d7d7c3b2289e5c5a0f99cca4460c8"
+  ]
+ },
+ "p261": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.5,
+   "mic2": 35.6
+  },
+  "utterances": [
+   "241",
+   "421",
+   "097"
+  ],
+  "texts": {
+   "241": "No evidence that it was Osama bin Laden.",
+   "421": "The second goal was superb.",
+   "097": "If we cannot succeed in this endeavour, then so be it."
+  },
+  "seconds": 11.83,
+  "ok": true,
+  "ref": {
+   "seconds": 11.828,
+   "peak": 0.6729,
+   "clipped": 0,
+   "noise_db": -56.9,
+   "speech_db": -17.0,
+   "snr_db": 39.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p261/p261_241_mic2.flac",
+   "wav48_silence_trimmed/p261/p261_421_mic2.flac",
+   "wav48_silence_trimmed/p261/p261_097_mic2.flac"
+  ],
+  "source_sha256": [
+   "f14702e1e3ba9481e84a901aa1ce439edc4280b06fb98dfac2608530d522285b",
+   "e247f650f6b740cf23704b75f0d31356b3dfdb54193f067f4e184a34a9a41027",
+   "2a8912c35e9bcb55f30458479c3170bc42ccc45f9aed8dcefcbde62400e06968"
+  ]
+ },
+ "p262": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 28.700000000000003,
+   "mic2": 35.95
+  },
+  "utterances": [
+   "298",
+   "261",
+   "385"
+  ],
+  "texts": {
+   "298": "The results are sometimes contentious.",
+   "261": "It will now relate to all public bodies in Scotland.",
+   "385": "Apart from the result we have to be happy with our performance."
+  },
+  "seconds": 11.6,
+  "ok": true,
+  "ref": {
+   "seconds": 11.603,
+   "peak": 0.9788,
+   "clipped": 0,
+   "noise_db": -55.0,
+   "speech_db": -16.2,
+   "snr_db": 38.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p262/p262_298_mic2.flac",
+   "wav48_silence_trimmed/p262/p262_261_mic2.flac",
+   "wav48_silence_trimmed/p262/p262_385_mic2.flac"
+  ],
+  "source_sha256": [
+   "3e10d980f595eebb03475810db9b5e3244c0d9832cf16730d0775eab0f5c2720",
+   "56e228015fdbfcf39a060275347534cccba90a1889a3aee84c11f4338816dde0",
+   "f39b6bfa759f1b29da754bb2c16a1c7e343219cbd6cd5264ef2994559c0aa4cc"
+  ]
+ },
+ "p263": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.5,
+   "mic2": 37.7
+  },
+  "utterances": [
+   "014",
+   "066",
+   "450"
+  ],
+  "texts": {
+   "014": "To the Hebrews it was a token that there would be no more universal floods.",
+   "066": "But retail banking would be run from Halifax.",
+   "450": "He was convicted at Glasgow Sheriff Court."
+  },
+  "seconds": 11.15,
+  "ok": true,
+  "ref": {
+   "seconds": 11.147,
+   "peak": 0.5025,
+   "clipped": 0,
+   "noise_db": -58.8,
+   "speech_db": -19.6,
+   "snr_db": 39.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p263/p263_014_mic2.flac",
+   "wav48_silence_trimmed/p263/p263_066_mic2.flac",
+   "wav48_silence_trimmed/p263/p263_450_mic2.flac"
+  ],
+  "source_sha256": [
+   "b672afb6dee453a2c3948ba4d0ab61deda09b1f614fffeb1e3056fd37e4e6ab2",
+   "8b380051006fbb310e50aa1913219eca5e66151874acba2674ad8e24da622d94",
+   "83f6c6f24a7273b8079fd57c19cbc4f702f9c5e7d0839f6012bb4f49d08cb5e2"
+  ]
+ },
+ "p264": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.200000000000003,
+   "mic2": 39.1
+  },
+  "utterances": [
+   "340",
+   "472",
+   "494"
+  ],
+  "texts": {
+   "340": "In Great Britain, it has a life of its own.",
+   "472": "We showed some spirit against Newcastle.",
+   "494": "That means a ban on French products."
+  },
+  "seconds": 10.79,
+  "ok": true,
+  "ref": {
+   "seconds": 10.785,
+   "peak": 0.999,
+   "clipped": 0,
+   "noise_db": -59.3,
+   "speech_db": -16.2,
+   "snr_db": 43.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p264/p264_340_mic2.flac",
+   "wav48_silence_trimmed/p264/p264_472_mic2.flac",
+   "wav48_silence_trimmed/p264/p264_494_mic2.flac"
+  ],
+  "source_sha256": [
+   "6f94ef93bebaa5666f831cb5b027ac7a9cbd6c189e47347fad5b85cc85f9ed1c",
+   "1e498392d0492feedc2e30e066ebda9e1b826da29a6baa5b724e7e9beb5b50d8",
+   "ebff7f1f49335a679ae4b29d3ee985a0810ea8b8f7dc0e220762dfe08bf36c14"
+  ]
+ },
+ "p265": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.0,
+   "mic2": 38.75
+  },
+  "utterances": [
+   "239",
+   "164",
+   "026"
+  ],
+  "texts": {
+   "239": "In the meantime, the fans would settle for a derby win.",
+   "164": "However, the figures were disputed by the Scottish Prison Service.",
+   "026": "However, the following year the cancer returned."
+  },
+  "seconds": 14.98,
+  "ok": true,
+  "ref": {
+   "seconds": 14.98,
+   "peak": 0.7917,
+   "clipped": 0,
+   "noise_db": -56.6,
+   "speech_db": -14.9,
+   "snr_db": 41.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p265/p265_239_mic2.flac",
+   "wav48_silence_trimmed/p265/p265_164_mic2.flac",
+   "wav48_silence_trimmed/p265/p265_026_mic2.flac"
+  ],
+  "source_sha256": [
+   "548774e05693d9291c5040e1410930fa9f63e16033aa61c3891017e4a7ab59bc",
+   "165e6c12cf4b89164c071e9caa0862e1553bf5751f22a26b766fbb5143939fc4",
+   "c745a7df2624d92e4e01e9290f4b23ef28561676446da5cd73cd3174ae6e32ab"
+  ]
+ },
+ "p266": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.8,
+   "mic2": 32.650000000000006
+  },
+  "utterances": [
+   "332",
+   "159",
+   "055"
+  ],
+  "texts": {
+   "332": "However, they will only be found in the wild.",
+   "159": "This year, this month, will be special for Torrance.",
+   "055": "We need the chief medical officer to clarify the matter."
+  },
+  "seconds": 10.48,
+  "ok": true,
+  "ref": {
+   "seconds": 10.476,
+   "peak": 0.3022,
+   "clipped": 0,
+   "noise_db": -55.7,
+   "speech_db": -20.7,
+   "snr_db": 35.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p266/p266_332_mic2.flac",
+   "wav48_silence_trimmed/p266/p266_159_mic2.flac",
+   "wav48_silence_trimmed/p266/p266_055_mic2.flac"
+  ],
+  "source_sha256": [
+   "3103b684732b6fc36d258f68d04318c68e79135fb9469c082b8c5a54d33db874",
+   "d06eeb0af0856ad8d99c5170a6e255c868c9a935c5b7ae45c12c3550a084bc4a",
+   "7c900f5aa01c30c34619c388d6ffba9bc9312de084c6075c763d9e72bf94a113"
+  ]
+ },
+ "p267": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 26.1,
+   "mic2": 30.75
+  },
+  "utterances": [
+   "261",
+   "132",
+   "229"
+  ],
+  "texts": {
+   "261": "There will be widespread support on all sides.",
+   "132": "Their prescription is largely about changing attitudes.",
+   "229": "Murray Financial has fallen at the first hurdle."
+  },
+  "seconds": 10.68,
+  "ok": true,
+  "ref": {
+   "seconds": 10.68,
+   "peak": 0.4871,
+   "clipped": 0,
+   "noise_db": -51.4,
+   "speech_db": -19.4,
+   "snr_db": 32.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p267/p267_261_mic2.flac",
+   "wav48_silence_trimmed/p267/p267_132_mic2.flac",
+   "wav48_silence_trimmed/p267/p267_229_mic2.flac"
+  ],
+  "source_sha256": [
+   "e2d5e84c50c50d018ee2a3c74a26c4208d5303faf38549f032f1dffe83265321",
+   "6a7206c670c132ca51e31ccbde8530df34e633beff235f3c41cfe083468d08e0",
+   "e8998cc4ede5f31ba96dd7d4994d1cfd45ea19c7b6f94a8dcce1b354e772407d"
+  ]
+ },
+ "p268": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 37.0,
+   "mic2": 42.150000000000006
+  },
+  "utterances": [
+   "377",
+   "402",
+   "337"
+  ],
+  "texts": {
+   "377": "David Murray, the Rangers chairman, also welcomed the scheme.",
+   "402": "There is no change in principle from the White Paper.",
+   "337": "HARRY Potter has lost his magic."
+  },
+  "seconds": 12.61,
+  "ok": true,
+  "ref": {
+   "seconds": 12.614,
+   "peak": 0.7765,
+   "clipped": 0,
+   "noise_db": -60.7,
+   "speech_db": -15.4,
+   "snr_db": 45.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p268/p268_377_mic2.flac",
+   "wav48_silence_trimmed/p268/p268_402_mic2.flac",
+   "wav48_silence_trimmed/p268/p268_337_mic2.flac"
+  ],
+  "source_sha256": [
+   "54b225254a031b5e68880a55c3c719dc5b82696cc89f5ac6d0f22327da16306d",
+   "24bdf1a08c77cb9fe50b7b05e559b88b9864282b985fe2dc866dc655dd7a6550",
+   "8ac5868f0d4b3509b2967e4fc7710e0f943831242cdd4b22109aa842cc1bc300"
+  ]
+ },
+ "p269": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.25,
+   "mic2": 37.4
+  },
+  "utterances": [
+   "258",
+   "309",
+   "197"
+  ],
+  "texts": {
+   "258": "For the Scottish judges, the affair is very delicate and unique.",
+   "309": "However, the snow was welcomed by some.",
+   "197": "Mr Kennedy is not a candidate for the Scottish Parliament."
+  },
+  "seconds": 11.62,
+  "ok": true,
+  "ref": {
+   "seconds": 11.618,
+   "peak": 0.7154,
+   "clipped": 0,
+   "noise_db": -57.0,
+   "speech_db": -16.0,
+   "snr_db": 41.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p269/p269_258_mic2.flac",
+   "wav48_silence_trimmed/p269/p269_309_mic2.flac",
+   "wav48_silence_trimmed/p269/p269_197_mic2.flac"
+  ],
+  "source_sha256": [
+   "b6da22cdd801486bcbe4def1db4a86f13783c0d154c4f696bcd4bb394f3c051b",
+   "aeb22cf5ba4c0efcefcfbc7e6a7464c411a50507500393fb8275945f9e540b2a",
+   "ed7203e73ae9546388ce90d307db99f5b1fa74660205fd6b097377b66dbcbef1"
+  ]
+ },
+ "p270": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 25.4,
+   "mic2": 34.25
+  },
+  "utterances": [
+   "186",
+   "257",
+   "297"
+  ],
+  "texts": {
+   "186": "They are determined to make a meaningful contribution.",
+   "257": "I was just getting over the time difference.",
+   "297": "There was a final revealing detail about the broadcast."
+  },
+  "seconds": 10.63,
+  "ok": true,
+  "ref": {
+   "seconds": 10.634,
+   "peak": 0.4752,
+   "clipped": 0,
+   "noise_db": -52.9,
+   "speech_db": -16.0,
+   "snr_db": 37.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p270/p270_186_mic2.flac",
+   "wav48_silence_trimmed/p270/p270_257_mic2.flac",
+   "wav48_silence_trimmed/p270/p270_297_mic2.flac"
+  ],
+  "source_sha256": [
+   "91dc63c82670014fd5e9ca00d18b53295b6c2a6093fcfffa6a5f80535be2eb8b",
+   "8088cb13a5f4382952edd494c9ab620b246c51c3a3027198550b796008a309ee",
+   "b148de07a3505b4ddbed102900b366052378a60945f7da1c96eca88e0e50a954"
+  ]
+ },
+ "p271": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.35,
+   "mic2": 34.8
+  },
+  "utterances": [
+   "281",
+   "091",
+   "448"
+  ],
+  "texts": {
+   "281": "In fact, he was talking about the survival business.",
+   "091": "Downing Street will make the second appointment in the Scotland Office today.",
+   "448": "We are certainly moving in the right direction as a club."
+  },
+  "seconds": 12.58,
+  "ok": true,
+  "ref": {
+   "seconds": 12.583,
+   "peak": 0.5284,
+   "clipped": 0,
+   "noise_db": -55.8,
+   "speech_db": -19.3,
+   "snr_db": 36.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p271/p271_281_mic2.flac",
+   "wav48_silence_trimmed/p271/p271_091_mic2.flac",
+   "wav48_silence_trimmed/p271/p271_448_mic2.flac"
+  ],
+  "source_sha256": [
+   "288928701f6eafc606fb4c427e73ab04140f40b02423d7db2c256d2d458888ec",
+   "fa8059fada4001d0fa88aee77644457bce4487da300e3ebd223efcd5afe7b703",
+   "23bccbe640406d0dab2b41914176614a84e8b797b9deca59f787b9da2663fcdd"
+  ]
+ },
+ "p272": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.6,
+   "mic2": 39.55
+  },
+  "utterances": [
+   "124",
+   "270",
+   "214"
+  ],
+  "texts": {
+   "124": "There will be a beginning, a middle, and an end.",
+   "270": "In fact, he was talking about the survival business.",
+   "214": "You should always be able to get out in some direction."
+  },
+  "seconds": 12.45,
+  "ok": true,
+  "ref": {
+   "seconds": 12.452,
+   "peak": 0.4449,
+   "clipped": 0,
+   "noise_db": -61.3,
+   "speech_db": -19.4,
+   "snr_db": 41.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p272/p272_124_mic2.flac",
+   "wav48_silence_trimmed/p272/p272_270_mic2.flac",
+   "wav48_silence_trimmed/p272/p272_214_mic2.flac"
+  ],
+  "source_sha256": [
+   "6d6919b74cc960c0017fe78a5f463378aa5e5d2a32a92a695ec999893be47ca9",
+   "a99a5cd9d1505f402ec22bea17175b20a799aec4fefc54999a04e129239f1912",
+   "ce9a8f5281a0c7624fcf2b25f9848bb2e0ea8ef5a11bfa4bb8c49fab3179c7e9"
+  ]
+ },
+ "p273": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.549999999999997,
+   "mic2": 33.5
+  },
+  "utterances": [
+   "318",
+   "073",
+   "333",
+   "069"
+  ],
+  "texts": {
+   "318": "Leading share prices have also fallen in Paris and Frankfurt.",
+   "073": "It makes for an interesting conference.",
+   "333": "He declined to comment on possible disposals.",
+   "069": "Stephen has never considered the question of compensation."
+  },
+  "seconds": 13.61,
+  "ok": true,
+  "ref": {
+   "seconds": 13.613,
+   "peak": 0.6747,
+   "clipped": 0,
+   "noise_db": -55.9,
+   "speech_db": -18.0,
+   "snr_db": 37.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p273/p273_318_mic2.flac",
+   "wav48_silence_trimmed/p273/p273_073_mic2.flac",
+   "wav48_silence_trimmed/p273/p273_333_mic2.flac",
+   "wav48_silence_trimmed/p273/p273_069_mic2.flac"
+  ],
+  "source_sha256": [
+   "714301f1cf7a4305cb6701a04f603d52cfc4957472bc5d953476eacfdce44596",
+   "3591d1932fe863e09c86643c40da897cb9cc409d82a1814036be1bad20577973",
+   "7f69ece208e544710e88d4fcab1b849a382358782961f8e2b2e009af83f16a0a",
+   "fa3dbcda41f00553fea8673d05dd5f5e6ed0128175d1ca3feffeb25af12f392e"
+  ]
+ },
+ "p274": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.45,
+   "mic2": 37.55
+  },
+  "utterances": [
+   "104",
+   "048",
+   "158"
+  ],
+  "texts": {
+   "104": "While they went on holiday, we got the contract.",
+   "048": "Subsidy income will not be affected.",
+   "158": "Scotland came very close in the second Test."
+  },
+  "seconds": 10.61,
+  "ok": true,
+  "ref": {
+   "seconds": 10.615,
+   "peak": 0.5424,
+   "clipped": 0,
+   "noise_db": -56.9,
+   "speech_db": -17.6,
+   "snr_db": 39.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p274/p274_104_mic2.flac",
+   "wav48_silence_trimmed/p274/p274_048_mic2.flac",
+   "wav48_silence_trimmed/p274/p274_158_mic2.flac"
+  ],
+  "source_sha256": [
+   "2684aceda8eab3ba31932f865a7119c460eb6ad28d785dd9fe05eca3607d7826",
+   "80547ca21c8ac9d7aed5b02ede67fb45fb4734d8bbfc542e8468c53b951b8832",
+   "21ec1bedfcc5f3abbb03c4f4a17f014de8cfafb41ac549212d19c2644dfd125d"
+  ]
+ },
+ "p275": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.0,
+   "mic2": 31.299999999999997
+  },
+  "utterances": [
+   "250",
+   "367",
+   "066"
+  ],
+  "texts": {
+   "250": "For the Scottish judges, the affair is very delicate and unique.",
+   "367": "It took about an hour for the gas to clear.",
+   "066": "He becomes the new Minister for Sport and Culture."
+  },
+  "seconds": 10.66,
+  "ok": true,
+  "ref": {
+   "seconds": 10.658,
+   "peak": 0.373,
+   "clipped": 0,
+   "noise_db": -55.1,
+   "speech_db": -19.6,
+   "snr_db": 35.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p275/p275_250_mic2.flac",
+   "wav48_silence_trimmed/p275/p275_367_mic2.flac",
+   "wav48_silence_trimmed/p275/p275_066_mic2.flac"
+  ],
+  "source_sha256": [
+   "776db1bf72572296aef1bbce99c860db5c257107be1baf6cd278b5ecc302c29b",
+   "d250b031f628096d3e17548f6ab1e23a96a1ec12d4b7d952fd861fe209f61e74",
+   "93527417d19aa5efe31a1e421b8a51e531dead5a0965a65d43e59603ba9fbbcb"
+  ]
+ },
+ "p276": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.4,
+   "mic2": 35.75
+  },
+  "utterances": [
+   "439",
+   "375",
+   "309"
+  ],
+  "texts": {
+   "439": "Today has been a good day for Northern Ireland.",
+   "375": "He remains a main board director of Royal.",
+   "309": "Our destiny is in our own hands."
+  },
+  "seconds": 11.01,
+  "ok": true,
+  "ref": {
+   "seconds": 11.009,
+   "peak": 0.5154,
+   "clipped": 0,
+   "noise_db": -56.2,
+   "speech_db": -16.9,
+   "snr_db": 39.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p276/p276_439_mic2.flac",
+   "wav48_silence_trimmed/p276/p276_375_mic2.flac",
+   "wav48_silence_trimmed/p276/p276_309_mic2.flac"
+  ],
+  "source_sha256": [
+   "f5ba230e3e5208bd7073caa35d9dca0acdcc9fb495a4240df169dd88f6bdfdbc",
+   "3853ba864705b6a2feb49881edf9c15aa8c7099457aafcfd88b16d8caf24b440",
+   "3be5757f8336832d1ee00743ad63148a72f68c882417ffb0ded592f0a76c3653"
+  ]
+ },
+ "p277": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.15,
+   "mic2": 34.85
+  },
+  "utterances": [
+   "198",
+   "211",
+   "222"
+  ],
+  "texts": {
+   "198": "They make a selective perception process.",
+   "211": "Naturally enough, the letter in question was an E.",
+   "222": "However, no further action was taken by police."
+  },
+  "seconds": 10.5,
+  "ok": true,
+  "ref": {
+   "seconds": 10.504,
+   "peak": 0.63,
+   "clipped": 0,
+   "noise_db": -56.6,
+   "speech_db": -18.6,
+   "snr_db": 38.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p277/p277_198_mic2.flac",
+   "wav48_silence_trimmed/p277/p277_211_mic2.flac",
+   "wav48_silence_trimmed/p277/p277_222_mic2.flac"
+  ],
+  "source_sha256": [
+   "9266c665703f2b32e383260f1d36f02c982ea5a381dfdb7efa73746f19b398de",
+   "022a4b0e6df14d4e5ee35bc94ae06d5cb33c053aadf99d69a4429b8b9c769984",
+   "f67b110348cb2d38e1a918929a4027dd18c79abcd99b58c1c9fb080a8183f281"
+  ]
+ },
+ "p278": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 36.05,
+   "mic2": 41.849999999999994
+  },
+  "utterances": [
+   "300",
+   "026",
+   "159"
+  ],
+  "texts": {
+   "300": "However, he will have his work cut out defending his title.",
+   "026": "These decisions are not simple.",
+   "159": "Worry can have that effect on some citizens."
+  },
+  "seconds": 12.6,
+  "ok": true,
+  "ref": {
+   "seconds": 12.6,
+   "peak": 0.8801,
+   "clipped": 0,
+   "noise_db": -59.2,
+   "speech_db": -14.9,
+   "snr_db": 44.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p278/p278_300_mic2.flac",
+   "wav48_silence_trimmed/p278/p278_026_mic2.flac",
+   "wav48_silence_trimmed/p278/p278_159_mic2.flac"
+  ],
+  "source_sha256": [
+   "4b7bfc56587afb2b1b47cdb3bb6cc559ad81051894d28bcf326aeefea4557643",
+   "819f1abe7e146b58f63a8cf4b8c75e67943b544f9a5142d9b4c1ea356e55d028",
+   "703936d0f0e8955d1448747915e36a882c8a1ac46f036ca188a3f0b4be989c60"
+  ]
+ },
+ "p279": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 37.2,
+   "mic2": 37.400000000000006
+  },
+  "utterances": [
+   "205",
+   "261",
+   "340"
+  ],
+  "texts": {
+   "205": "The album was widely expected to be a commercial disaster.",
+   "261": "The work between the musicians and the fire is very important.",
+   "340": "I was pleased to be back on the podium in Brazil."
+  },
+  "seconds": 10.4,
+  "ok": true,
+  "ref": {
+   "seconds": 10.395,
+   "peak": 0.6645,
+   "clipped": 0,
+   "noise_db": -60.2,
+   "speech_db": -17.5,
+   "snr_db": 42.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p279/p279_205_mic2.flac",
+   "wav48_silence_trimmed/p279/p279_261_mic2.flac",
+   "wav48_silence_trimmed/p279/p279_340_mic2.flac"
+  ],
+  "source_sha256": [
+   "7ffe52959448182aeaa7203dff8e5cdd81720240766d42231bbb6e244b45a63b",
+   "3ace19252649204575b52f77bf79f6fbe7803fbacac4387c15477ca91d76eef5",
+   "3faf5d547ae8d731b88d1f4899d995511e386d19b1c79eedb722176da55e6b85"
+  ]
+ },
+ "p280": {
+  "mic": "mic1",
+  "highpass_60hz": true,
+  "mic_median_snr_db": {
+   "mic1": 32.2
+  },
+  "utterances": [
+   "004",
+   "142",
+   "084"
+  ],
+  "texts": {
+   "004": "We also need a small plastic snake and a big toy frog for the kids.",
+   "142": "The allegations were still under investigation, he added.",
+   "084": "A regular bus service runs between the hall and the town centre."
+  },
+  "seconds": 11.1,
+  "ok": true,
+  "ref": {
+   "seconds": 11.1,
+   "peak": 0.7129,
+   "clipped": 0,
+   "noise_db": -60.1,
+   "speech_db": -15.8,
+   "snr_db": 44.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p280/p280_004_mic1.flac",
+   "wav48_silence_trimmed/p280/p280_142_mic1.flac",
+   "wav48_silence_trimmed/p280/p280_084_mic1.flac"
+  ],
+  "source_sha256": [
+   "a3b5d87c88f29f9b7701195620ed04ee5d61bf7fad33d4d63c2eddbcdaf6fb07",
+   "12fd12f5f56c1413bdd24d447521704fb9b40e9f1654742e75d828b1ae3a2279",
+   "9b203592522e7c04672f35f86bad731ed22b491b819335a1fb671ccfb35ae38a"
+  ]
+ },
+ "p281": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 26.5,
+   "mic2": 31.45
+  },
+  "utterances": [
+   "282",
+   "236",
+   "171"
+  ],
+  "texts": {
+   "282": "Not many companies can say that these days.",
+   "236": "For the refugees, the return will not come a moment too soon.",
+   "171": "The reviews were welcomed by business lobby groups."
+  },
+  "seconds": 12.28,
+  "ok": true,
+  "ref": {
+   "seconds": 12.278,
+   "peak": 0.4698,
+   "clipped": 0,
+   "noise_db": -54.7,
+   "speech_db": -19.1,
+   "snr_db": 35.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p281/p281_282_mic2.flac",
+   "wav48_silence_trimmed/p281/p281_236_mic2.flac",
+   "wav48_silence_trimmed/p281/p281_171_mic2.flac"
+  ],
+  "source_sha256": [
+   "95eb079a9bd09b2684550a054a3788ac9746de7d60d9b8a0c01c7abd46e893c0",
+   "5f1eac5e3a24ddb37ef009484eeee7ab2bca9535a5b42d65512e24a92cfb0c0c",
+   "e77698714ade70cea1acf4b936dea4e857cc0983ef9e79dfa43e98b7b31fc19e"
+  ]
+ },
+ "p282": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.95,
+   "mic2": 35.1
+  },
+  "utterances": [
+   "159",
+   "225",
+   "075"
+  ],
+  "texts": {
+   "159": "The whole of southern Africa is in the grip of Aids.",
+   "225": "I am very sorry that Alastair Campbell has taken this decision.",
+   "075": "We have to create a climate of trust, which is not easy."
+  },
+  "seconds": 11.66,
+  "ok": true,
+  "ref": {
+   "seconds": 11.664,
+   "peak": 0.5642,
+   "clipped": 0,
+   "noise_db": -58.2,
+   "speech_db": -18.8,
+   "snr_db": 39.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p282/p282_159_mic2.flac",
+   "wav48_silence_trimmed/p282/p282_225_mic2.flac",
+   "wav48_silence_trimmed/p282/p282_075_mic2.flac"
+  ],
+  "source_sha256": [
+   "c97fc1f6ab361dac128d72c80fa8a8128d3bee7d0b73b3695c4a5697b7e0647b",
+   "8b15e571ebe8585d3e2e6825c9600f0ba2435270b52909450fbf2cf7ecdc5af1",
+   "aefdc66789660f49c9eac08c46cfa89ce4767aa2d4e2aa31eb8a6a7d921341fd"
+  ]
+ },
+ "p283": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.1,
+   "mic2": 32.0
+  },
+  "utterances": [
+   "319",
+   "470",
+   "322",
+   "218"
+  ],
+  "texts": {
+   "319": "He is well respected by his colleagues.",
+   "470": "City sentiment is in his favour.",
+   "322": "Certainly, the Taliban regime is finished.",
+   "218": "We represent a wide range of society."
+  },
+  "seconds": 13.08,
+  "ok": true,
+  "ref": {
+   "seconds": 13.085,
+   "peak": 0.4309,
+   "clipped": 0,
+   "noise_db": -56.6,
+   "speech_db": -22.8,
+   "snr_db": 33.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p283/p283_319_mic2.flac",
+   "wav48_silence_trimmed/p283/p283_470_mic2.flac",
+   "wav48_silence_trimmed/p283/p283_322_mic2.flac",
+   "wav48_silence_trimmed/p283/p283_218_mic2.flac"
+  ],
+  "source_sha256": [
+   "e5fb31497b6ba1454807439d89490a5cc4ed863fd901fae45eacdf6bcf59a88e",
+   "f43a05889589ceb2597d4fc37348f123a0946621d9bcedd2ca2b6843ce4dd39d",
+   "79c533c5587cd4dce4544b7a34c348b482ed06f3ba824e4207fe8e815157b4d6",
+   "842d71b0fadb8046d251da502905b5439b751c7e94d3fb0f65e28eec58f53529"
+  ]
+ },
+ "p284": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.45,
+   "mic2": 40.15
+  },
+  "utterances": [
+   "269",
+   "230",
+   "208"
+  ],
+  "texts": {
+   "269": "She has fallen in love with Scotland, however.",
+   "230": "On the ground, the West Bank was again the focus of violence.",
+   "208": "However, Dundee deserved to win this game."
+  },
+  "seconds": 10.12,
+  "ok": true,
+  "ref": {
+   "seconds": 10.118,
+   "peak": 0.9011,
+   "clipped": 0,
+   "noise_db": -59.6,
+   "speech_db": -15.5,
+   "snr_db": 44.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p284/p284_269_mic2.flac",
+   "wav48_silence_trimmed/p284/p284_230_mic2.flac",
+   "wav48_silence_trimmed/p284/p284_208_mic2.flac"
+  ],
+  "source_sha256": [
+   "ad40c25930345a5aec2fe35e496d4f8400bd299d825cac0f4f91fc3616f20a43",
+   "b0421801f6f5cfa8f7747572d314c548202ac52e652bb3485241f13dda9941a1",
+   "2a2beda667cc010ee915026eb2c1e8ddb08079338ffb40a574f3d3110d760f0f"
+  ]
+ },
+ "p285": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.900000000000006,
+   "mic2": 38.5
+  },
+  "utterances": [
+   "199",
+   "389",
+   "256"
+  ],
+  "texts": {
+   "199": "The guidelines are expected to be finalised before next spring.",
+   "389": "Well, it did last time, he was reminded.",
+   "256": "One MP said he feared the job losses were only the beginning."
+  },
+  "seconds": 11.05,
+  "ok": true,
+  "ref": {
+   "seconds": 11.046,
+   "peak": 0.7509,
+   "clipped": 0,
+   "noise_db": -57.7,
+   "speech_db": -18.0,
+   "snr_db": 39.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p285/p285_199_mic2.flac",
+   "wav48_silence_trimmed/p285/p285_389_mic2.flac",
+   "wav48_silence_trimmed/p285/p285_256_mic2.flac"
+  ],
+  "source_sha256": [
+   "d93bb7e31ba134c9f10f7c753e7707948e34c4030a2aa955d792201681912a19",
+   "1be295410287f8f8429b672e86169db4e6420f65026f244bac374ad027f4b4e3",
+   "7d25f0a6ad738460dcc10686044b24328922595c50f508516d15d112f1f361fb"
+  ]
+ },
+ "p286": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.75,
+   "mic2": 40.35
+  },
+  "utterances": [
+   "129",
+   "103",
+   "164"
+  ],
+  "texts": {
+   "129": "The firm also has a construction division.",
+   "103": "The allegations were still under investigation, he added.",
+   "164": "She also defended the Lord Chancellor's existing powers."
+  },
+  "seconds": 10.84,
+  "ok": true,
+  "ref": {
+   "seconds": 10.838,
+   "peak": 0.9205,
+   "clipped": 0,
+   "noise_db": -56.8,
+   "speech_db": -14.9,
+   "snr_db": 41.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p286/p286_129_mic2.flac",
+   "wav48_silence_trimmed/p286/p286_103_mic2.flac",
+   "wav48_silence_trimmed/p286/p286_164_mic2.flac"
+  ],
+  "source_sha256": [
+   "78a24a1cc576f1c2277d022f78dac378d9970bf9aefdecba7e7933919a6fa20c",
+   "83983f979c1a0851dcd587abc392c05890c5a98a57a95dfc45ac4aa42878a98b",
+   "61f26f0759caf1ed1b1258a7eb1f6382fab9a06ca5875a7ec4642c30e98007fd"
+  ]
+ },
+ "p287": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.95,
+   "mic2": 35.95
+  },
+  "utterances": [
+   "075",
+   "084",
+   "173",
+   "226"
+  ],
+  "texts": {
+   "075": "Here, too, the Post Office has missed the boat.",
+   "084": "In each case they were a goal down.",
+   "173": "Our destiny is in our own hands.",
+   "226": "Murray Financial has fallen at the first hurdle."
+  },
+  "seconds": 13.31,
+  "ok": true,
+  "ref": {
+   "seconds": 13.309,
+   "peak": 0.4328,
+   "clipped": 0,
+   "noise_db": -58.9,
+   "speech_db": -18.7,
+   "snr_db": 40.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p287/p287_075_mic2.flac",
+   "wav48_silence_trimmed/p287/p287_084_mic2.flac",
+   "wav48_silence_trimmed/p287/p287_173_mic2.flac",
+   "wav48_silence_trimmed/p287/p287_226_mic2.flac"
+  ],
+  "source_sha256": [
+   "bbc61c866d654b8ae8678c77fca5d37a8d57df9d19dc16d929e0bca4c6b328aa",
+   "e2956618aec7ccc23fbad6a733b0f343bfa6ea64abf7194c21e50361ce63cecf",
+   "9a792ac22db2dd8fa3fa0ded3b9961843e54b5bffde6a711cb78d72352a9fb02",
+   "ba08035314622ec8c981ae793255802a79c16ecd1f6fbf3455911936dff2cd0f"
+  ]
+ },
+ "p288": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.45,
+   "mic2": 36.7
+  },
+  "utterances": [
+   "370",
+   "383",
+   "088"
+  ],
+  "texts": {
+   "370": "All the investment is possible through the public sector.",
+   "383": "It is an interesting title, Believing in Britain.",
+   "088": "Every time I play I do not understand their reaction."
+  },
+  "seconds": 11.77,
+  "ok": true,
+  "ref": {
+   "seconds": 11.774,
+   "peak": 0.3591,
+   "clipped": 0,
+   "noise_db": -59.9,
+   "speech_db": -21.3,
+   "snr_db": 38.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p288/p288_370_mic2.flac",
+   "wav48_silence_trimmed/p288/p288_383_mic2.flac",
+   "wav48_silence_trimmed/p288/p288_088_mic2.flac"
+  ],
+  "source_sha256": [
+   "09fc3a435667b631e208fdbbf382b7fc04aecde8ec90ac57ec5ff1ffbaeaa2c5",
+   "8054a51190afb6fa2b18168547b7ca1ba2a4c0b367e213df3f3467fe61230f87",
+   "e94a2e61e4fcf4c4962c8e72562d354953cdfcf23436c1aa8abb1cd20302aa5f"
+  ]
+ },
+ "p292": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.5,
+   "mic2": 42.95
+  },
+  "utterances": [
+   "270",
+   "201",
+   "313",
+   "072"
+  ],
+  "texts": {
+   "270": "She added, The sheriff was obviously frustrated.",
+   "201": "Lockerbie has been a terrible disaster for everyone.",
+   "313": "This means a great deal to the families.",
+   "072": "He was between people and God."
+  },
+  "seconds": 12.7,
+  "ok": true,
+  "ref": {
+   "seconds": 12.7,
+   "peak": 0.786,
+   "clipped": 0,
+   "noise_db": -59.6,
+   "speech_db": -16.3,
+   "snr_db": 43.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p292/p292_270_mic2.flac",
+   "wav48_silence_trimmed/p292/p292_201_mic2.flac",
+   "wav48_silence_trimmed/p292/p292_313_mic2.flac",
+   "wav48_silence_trimmed/p292/p292_072_mic2.flac"
+  ],
+  "source_sha256": [
+   "698104577d8f17534ec420c550c8c9b7f60fd52198486ac23d66c32dea60fc6e",
+   "6e3e908953225cdd210e73114052c61044e7bada4714450adfeb78fa798eb253",
+   "dc706d285e67d366b9931b74159af2b6f2b071050436987aec7ce27cd8488631",
+   "f66d516e6d5b81f2492f0e217649b02fceb62d2cc175126ad68f911e1ca4cc0d"
+  ]
+ },
+ "p293": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.15,
+   "mic2": 40.4
+  },
+  "utterances": [
+   "358",
+   "153",
+   "154"
+  ],
+  "texts": {
+   "358": "The science is well known, the solution is simple.",
+   "153": "Who would be out there, singing?",
+   "154": "It is very simple, no-one is forced to compete."
+  },
+  "seconds": 14.56,
+  "ok": true,
+  "ref": {
+   "seconds": 14.558,
+   "peak": 0.1824,
+   "clipped": 0,
+   "noise_db": -68.8,
+   "speech_db": -26.3,
+   "snr_db": 42.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p293/p293_358_mic2.flac",
+   "wav48_silence_trimmed/p293/p293_153_mic2.flac",
+   "wav48_silence_trimmed/p293/p293_154_mic2.flac"
+  ],
+  "source_sha256": [
+   "509c9fce650d9e070ba6e24a77b70bd23dd62d0aaa303818c87502fa4c0037d7",
+   "e2e036f67c98846983a5c6a22b1fceaf65ef7aed8e9635bc7d93fbef8b7545dd",
+   "777962ac64c4dcaec4326e263b79409ea61ec0bb8c1c232947baf00655646e6b"
+  ]
+ },
+ "p294": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.1,
+   "mic2": 39.55
+  },
+  "utterances": [
+   "224",
+   "063",
+   "231"
+  ],
+  "texts": {
+   "224": "It should be a pretty exciting session.",
+   "063": "How is he enjoying life as a senior?",
+   "231": "General, You didn't get a modified."
+  },
+  "seconds": 10.49,
+  "ok": true,
+  "ref": {
+   "seconds": 10.487,
+   "peak": 0.3184,
+   "clipped": 0,
+   "noise_db": -64.2,
+   "speech_db": -22.6,
+   "snr_db": 41.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p294/p294_224_mic2.flac",
+   "wav48_silence_trimmed/p294/p294_063_mic2.flac",
+   "wav48_silence_trimmed/p294/p294_231_mic2.flac"
+  ],
+  "source_sha256": [
+   "21593a624fc3b78c0eec750b9a4c2c9a3ae1bcc0f4fdb15f1f273bd34b877d1c",
+   "1ee822f3c38cd87b2fae69b0a42fa2a25c523de906fa08a4485ba47b536cba16",
+   "c63eaa86d1c7c12f04ac29099bbf35d57b362fd9ed2b7c777fc188bd0f92b661"
+  ]
+ },
+ "p295": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.049999999999997,
+   "mic2": 42.0
+  },
+  "utterances": [
+   "381",
+   "254",
+   "122"
+  ],
+  "texts": {
+   "381": "I could go on, but none of these things is true.",
+   "254": "We're all involved in creating the work.",
+   "122": "They were outstanding and thoroughly deserved their win."
+  },
+  "seconds": 10.98,
+  "ok": true,
+  "ref": {
+   "seconds": 10.982,
+   "peak": 0.3912,
+   "clipped": 0,
+   "noise_db": -65.4,
+   "speech_db": -21.4,
+   "snr_db": 44.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p295/p295_381_mic2.flac",
+   "wav48_silence_trimmed/p295/p295_254_mic2.flac",
+   "wav48_silence_trimmed/p295/p295_122_mic2.flac"
+  ],
+  "source_sha256": [
+   "55fdd2beb607ce352c6af43f2141dec8f7f1a67b68d0f15b8963cdca922a7990",
+   "8c28f7400796d31afcb4b3a418d1f069ef4b28c8493b3473bd3d938903990f61",
+   "23807123931e90817587fe0b690dd58d313f7dfc5d2480b8e9549d16519062ee"
+  ]
+ },
+ "p297": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.85,
+   "mic2": 46.4
+  },
+  "utterances": [
+   "034",
+   "050",
+   "199",
+   "232"
+  ],
+  "texts": {
+   "034": "The Shadow Chancellor is away on holiday.",
+   "050": "At the time, he was a living legend.",
+   "199": "Any error is severely punished.",
+   "232": "She added, The sheriff was obviously frustrated."
+  },
+  "seconds": 12.36,
+  "ok": true,
+  "ref": {
+   "seconds": 12.36,
+   "peak": 0.6574,
+   "clipped": 0,
+   "noise_db": -61.6,
+   "speech_db": -17.5,
+   "snr_db": 44.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p297/p297_034_mic2.flac",
+   "wav48_silence_trimmed/p297/p297_050_mic2.flac",
+   "wav48_silence_trimmed/p297/p297_199_mic2.flac",
+   "wav48_silence_trimmed/p297/p297_232_mic2.flac"
+  ],
+  "source_sha256": [
+   "94e43f12c69ab4ee7aab712709a5aea1089454ac908fc81672f69761f48aa87d",
+   "1dfa0875f041f84efa3a7c477bd7f39f13c66a8e701df61381968b32bcf7a3a4",
+   "9ef46b5f5c0d825e663e4f23e92a9b970eefc38cdf08ac251fcc55b5a7cf8c0c",
+   "3f693b6b22c09aa8533237e2ae4fdfe48a4575f2a3912838f92a941201733601"
+  ]
+ },
+ "p298": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.75,
+   "mic2": 44.0
+  },
+  "utterances": [
+   "143",
+   "034",
+   "169"
+  ],
+  "texts": {
+   "143": "Over the last four years, we have been fairly consistent.",
+   "034": "The crackdown is launched today by the government.",
+   "169": "For athletes in our current climate, their sport is their livelihood."
+  },
+  "seconds": 11.94,
+  "ok": true,
+  "ref": {
+   "seconds": 11.94,
+   "peak": 0.387,
+   "clipped": 0,
+   "noise_db": -67.8,
+   "speech_db": -22.2,
+   "snr_db": 45.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p298/p298_143_mic2.flac",
+   "wav48_silence_trimmed/p298/p298_034_mic2.flac",
+   "wav48_silence_trimmed/p298/p298_169_mic2.flac"
+  ],
+  "source_sha256": [
+   "3b29f69384969f374719ba45ce023ffee69aeef122a2e45873972aa49094e037",
+   "3af0cb965775d48a96cab54b660a9e1d4e6303769abf389487eb4647b7884c3a",
+   "4fc3fbc56943de428c5a877390d4b44f5c2b18d243a16a4b0b89a7ee0da18069"
+  ]
+ },
+ "p299": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.7,
+   "mic2": 42.9
+  },
+  "utterances": [
+   "200",
+   "105",
+   "205",
+   "197"
+  ],
+  "texts": {
+   "200": "If they don't, they might well decide not to play.",
+   "105": "I tried to be cautious, but it's hard in that role.",
+   "205": "The actors are confident and polished.",
+   "197": "The rear of the plane was on fire."
+  },
+  "seconds": 13.11,
+  "ok": true,
+  "ref": {
+   "seconds": 13.107,
+   "peak": 0.9986,
+   "clipped": 0,
+   "noise_db": -60.4,
+   "speech_db": -14.6,
+   "snr_db": 45.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p299/p299_200_mic2.flac",
+   "wav48_silence_trimmed/p299/p299_105_mic2.flac",
+   "wav48_silence_trimmed/p299/p299_205_mic2.flac",
+   "wav48_silence_trimmed/p299/p299_197_mic2.flac"
+  ],
+  "source_sha256": [
+   "149ccc436804d0d396e39cec9855e7a9a824c1cd0a639d0afe9604764f0d722c",
+   "b23470b5e41b29c13c1554f625789eec5b7b98e4c38a5a9dd9796facf7b52ea4",
+   "150ed37cf13d401a146386c786ee9d6f2621df392c08d82d9b80721d11f4218f",
+   "fd3d16fe41b9c9b30e3f20790e32b3d916c25a15b387f9141af7d636137741f7"
+  ]
+ },
+ "p300": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.7,
+   "mic2": 35.55
+  },
+  "utterances": [
+   "048",
+   "266",
+   "104"
+  ],
+  "texts": {
+   "048": "But all forms of the illness are treatable.",
+   "266": "His expulsion would not solve the problem.",
+   "104": "After all, he is the King of Scotland."
+  },
+  "seconds": 14.87,
+  "ok": true,
+  "ref": {
+   "seconds": 14.872,
+   "peak": 0.1736,
+   "clipped": 0,
+   "noise_db": -66.4,
+   "speech_db": -27.8,
+   "snr_db": 38.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p300/p300_048_mic2.flac",
+   "wav48_silence_trimmed/p300/p300_266_mic2.flac",
+   "wav48_silence_trimmed/p300/p300_104_mic2.flac"
+  ],
+  "source_sha256": [
+   "f06f2156cac2f0e2d763fac0e4b1351c236e0b0f4737416b58da20c6ba99cef6",
+   "754eb1e0791df188489798373fe0d76501b025fecd0049430000a497ff0c9032",
+   "57b63a934fcc3f467ab2f136e255ef3140fb6849a49107f9dd13a099bf29abf7"
+  ]
+ },
+ "p301": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 36.9,
+   "mic2": 42.95
+  },
+  "utterances": [
+   "270",
+   "240",
+   "274"
+  ],
+  "texts": {
+   "270": "It is believed she had serious head injuries.",
+   "240": "The Tories election campaign has certainly been colourful.",
+   "274": "The pilot was making a visual approach."
+  },
+  "seconds": 14.83,
+  "ok": true,
+  "ref": {
+   "seconds": 14.833,
+   "peak": 0.3195,
+   "clipped": 0,
+   "noise_db": -69.3,
+   "speech_db": -24.2,
+   "snr_db": 45.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p301/p301_270_mic2.flac",
+   "wav48_silence_trimmed/p301/p301_240_mic2.flac",
+   "wav48_silence_trimmed/p301/p301_274_mic2.flac"
+  ],
+  "source_sha256": [
+   "3c158806c47ebd39e5568f699bcb767b4bb022b37ce6dcbcce058492a66ff986",
+   "b738f15081236a2a2aae20386e3805644047be3e7fc4a53a3cb9ef8dc54a392a",
+   "d2ba6ee931aafdf1ac42d6a14fa0bd4dfa89ab21fe9c3d5d4fa4a5321639e080"
+  ]
+ },
+ "p302": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.15,
+   "mic2": 42.25
+  },
+  "utterances": [
+   "269",
+   "100",
+   "140"
+  ],
+  "texts": {
+   "269": "Three years probation is just a joke.",
+   "100": "We have no idea what caused the derailment.",
+   "140": "How much of a cop out is that?"
+  },
+  "seconds": 10.96,
+  "ok": true,
+  "ref": {
+   "seconds": 10.96,
+   "peak": 0.2394,
+   "clipped": 0,
+   "noise_db": -69.4,
+   "speech_db": -24.6,
+   "snr_db": 44.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p302/p302_269_mic2.flac",
+   "wav48_silence_trimmed/p302/p302_100_mic2.flac",
+   "wav48_silence_trimmed/p302/p302_140_mic2.flac"
+  ],
+  "source_sha256": [
+   "ccebaef21173a9ed93bd8ef723e4f766705d57bd6805bac89074d3476583dd0e",
+   "49462a482d75c70f3c6d090bc220a6cf9f2bc89677323cb6f193de7b9fe6f71e",
+   "fc4e421619425799abcfa385863531028560b2a0214289cc90003b3115a76cfa"
+  ]
+ },
+ "p303": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.95,
+   "mic2": 45.099999999999994
+  },
+  "utterances": [
+   "026",
+   "053",
+   "081"
+  ],
+  "texts": {
+   "026": "There will be widespread support on all sides.",
+   "053": "Jim Wallace, justice minister, has refused to hold an inquiry.",
+   "081": "It is, in other words, Entrapment by another name."
+  },
+  "seconds": 11.02,
+  "ok": true,
+  "ref": {
+   "seconds": 11.02,
+   "peak": 0.4294,
+   "clipped": 0,
+   "noise_db": -63.4,
+   "speech_db": -19.9,
+   "snr_db": 43.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p303/p303_026_mic2.flac",
+   "wav48_silence_trimmed/p303/p303_053_mic2.flac",
+   "wav48_silence_trimmed/p303/p303_081_mic2.flac"
+  ],
+  "source_sha256": [
+   "1946533bf1ede5009fe555af1dafcf4b90666541ba59d14cbcec730490069c7f",
+   "4f32fa2892d15b2bc06e96d2b476b38f1624630ab8ad817d0e34c34a23c4d7f5",
+   "30c82447721ba40d2783e4936eaaea952db7e10df6396c6612ed29ea3ade940b"
+  ]
+ },
+ "p304": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 36.150000000000006,
+   "mic2": 46.3
+  },
+  "utterances": [
+   "176",
+   "048",
+   "328",
+   "398"
+  ],
+  "texts": {
+   "176": "The result today is an impasse.",
+   "048": "We are waiting for advice on the film.",
+   "328": "Who honestly expected anything else?",
+   "398": "It would have been a very explosive issue."
+  },
+  "seconds": 10.62,
+  "ok": true,
+  "ref": {
+   "seconds": 10.62,
+   "peak": 0.7686,
+   "clipped": 0,
+   "noise_db": -62.1,
+   "speech_db": -15.9,
+   "snr_db": 46.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p304/p304_176_mic2.flac",
+   "wav48_silence_trimmed/p304/p304_048_mic2.flac",
+   "wav48_silence_trimmed/p304/p304_328_mic2.flac",
+   "wav48_silence_trimmed/p304/p304_398_mic2.flac"
+  ],
+  "source_sha256": [
+   "6cf2f7cc4507843e3f1b1b500035998c65b84d4ac1dea3dc71b193253ee16ba3",
+   "35b275830435e55393f1e4a74b7570edbbd0cabc75a6874f7a6978f7d02a0ba0",
+   "f90f8039900a7da9487c7fc00714b254db7cdf25c55cd9525f3720b3e98671ee",
+   "232b97a911131400f564ccb42bbccd275b5c349d84e4dfaae2cf8484b6102c95"
+  ]
+ },
+ "p305": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.900000000000006,
+   "mic2": 42.6
+  },
+  "utterances": [
+   "129",
+   "084",
+   "397"
+  ],
+  "texts": {
+   "129": "This is the biggest thing in the world, isn't it?",
+   "084": "This season has been great for me, it's been an experience.",
+   "397": "She had every right to read the warrant."
+  },
+  "seconds": 12.7,
+  "ok": true,
+  "ref": {
+   "seconds": 12.699,
+   "peak": 0.408,
+   "clipped": 0,
+   "noise_db": -65.5,
+   "speech_db": -21.1,
+   "snr_db": 44.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p305/p305_129_mic2.flac",
+   "wav48_silence_trimmed/p305/p305_084_mic2.flac",
+   "wav48_silence_trimmed/p305/p305_397_mic2.flac"
+  ],
+  "source_sha256": [
+   "967d236bd5c2c62e1cb71e1f4482cc005acef2a2677e16a9f89eb846d4d66fe3",
+   "5cc63a72ed07d52012f37b14421b78446de1811b5666788d67bbff62d66c2aa0",
+   "9e189eee51e7185cee4fb187bde27e5787d4fa5b6f977f3ad2d49fe68e0cc2ea"
+  ]
+ },
+ "p306": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.3,
+   "mic2": 40.400000000000006
+  },
+  "utterances": [
+   "251",
+   "322"
+  ],
+  "texts": {
+   "251": "I am totally horrified by the sentence.",
+   "322": "Technically, it was a very good performance by Scotland."
+  },
+  "seconds": 11.4,
+  "ok": true,
+  "ref": {
+   "seconds": 11.4,
+   "peak": 0.2147,
+   "clipped": 0,
+   "noise_db": -69.8,
+   "speech_db": -26.9,
+   "snr_db": 42.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p306/p306_251_mic2.flac",
+   "wav48_silence_trimmed/p306/p306_322_mic2.flac"
+  ],
+  "source_sha256": [
+   "6daedf0b807223e112b894c5dc8cec89e07a45c55f435b5e320ec3287200c050",
+   "b1d3815d095da47b27655f7a59ef457fa4b42aa639dad7399138ac29dacdd6eb"
+  ]
+ },
+ "p307": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.9,
+   "mic2": 43.4
+  },
+  "utterances": [
+   "193",
+   "159",
+   "033"
+  ],
+  "texts": {
+   "193": "He scored one goal and was on fire.",
+   "159": "The death toll included five children.",
+   "033": "However, there are signs of dissent among his colleagues."
+  },
+  "seconds": 11.53,
+  "ok": true,
+  "ref": {
+   "seconds": 11.53,
+   "peak": 0.2281,
+   "clipped": 0,
+   "noise_db": -68.1,
+   "speech_db": -23.6,
+   "snr_db": 44.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p307/p307_193_mic2.flac",
+   "wav48_silence_trimmed/p307/p307_159_mic2.flac",
+   "wav48_silence_trimmed/p307/p307_033_mic2.flac"
+  ],
+  "source_sha256": [
+   "9c04a1550a6bd84324ef13e92bb632c534e9171c6ce9d44a4b8d52214839633c",
+   "c1fdd14f66446a6010169a5242624a9ea9f0f54683d279636d0a226ffa84af92",
+   "200bc66158f3f0b6a30e9ee240a933cf8861d3f1632ccc0921316f810b442cec"
+  ]
+ },
+ "p308": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.15,
+   "mic2": 39.45
+  },
+  "utterances": [
+   "083",
+   "201",
+   "324"
+  ],
+  "texts": {
+   "083": "They won the trophy in the Hoops.",
+   "201": "It was a lot of hard work, but it wasn't difficult.",
+   "324": "They would be wise to do just that."
+  },
+  "seconds": 12.74,
+  "ok": true,
+  "ref": {
+   "seconds": 12.735,
+   "peak": 0.1068,
+   "clipped": 0,
+   "noise_db": -70.6,
+   "speech_db": -30.0,
+   "snr_db": 40.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p308/p308_083_mic2.flac",
+   "wav48_silence_trimmed/p308/p308_201_mic2.flac",
+   "wav48_silence_trimmed/p308/p308_324_mic2.flac"
+  ],
+  "source_sha256": [
+   "b8117e6c3e23d88bf789557a00926adb56c8d0708b7d68dc1ee83b19503a77f8",
+   "07684c0d840e2c78a60e4f4080dd468ca871ba0795e40c95a5e82f439d2b1e5d",
+   "75b6b177de467769fd4f7c39ec01fce343423f1757c69fb53a77ffa017de2a65"
+  ]
+ },
+ "p310": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.0,
+   "mic2": 40.45
+  },
+  "utterances": [
+   "045",
+   "069",
+   "249"
+  ],
+  "texts": {
+   "045": "He moved back to Edinburgh, where he lived with his mother.",
+   "069": "In fact, they will not be disciplined.",
+   "249": "Staff should be paid for what they produce."
+  },
+  "seconds": 11.6,
+  "ok": true,
+  "ref": {
+   "seconds": 11.599,
+   "peak": 0.547,
+   "clipped": 0,
+   "noise_db": -61.8,
+   "speech_db": -19.6,
+   "snr_db": 42.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p310/p310_045_mic2.flac",
+   "wav48_silence_trimmed/p310/p310_069_mic2.flac",
+   "wav48_silence_trimmed/p310/p310_249_mic2.flac"
+  ],
+  "source_sha256": [
+   "82f57f119339fd731f480e0087337a325ab2c06f501bd5f6aa446da927bebe4f",
+   "da11ee8fcc05311334834015a91a80632a908e0c35c0524879616da94b79e1d0",
+   "e6f59aba23ad8dfb1353a619b44221edc555041c0228147f7d51fca41e91c6b0"
+  ]
+ },
+ "p311": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 38.05,
+   "mic2": 41.9
+  },
+  "utterances": [
+   "332",
+   "299",
+   "234"
+  ],
+  "texts": {
+   "332": "The German had a point to make.",
+   "299": "They're not always the same person.",
+   "234": "Where do we go from here?"
+  },
+  "seconds": 10.76,
+  "ok": true,
+  "ref": {
+   "seconds": 10.764,
+   "peak": 0.5624,
+   "clipped": 0,
+   "noise_db": -65.9,
+   "speech_db": -20.8,
+   "snr_db": 45.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p311/p311_332_mic2.flac",
+   "wav48_silence_trimmed/p311/p311_299_mic2.flac",
+   "wav48_silence_trimmed/p311/p311_234_mic2.flac"
+  ],
+  "source_sha256": [
+   "6fbe2a51da925eb103310573d5d141cb1e79e948bf0612b6d87fa2d5f8986d12",
+   "970560486910bdc1a983d27f82047048f402a441720b368610c66cc7a48b3c69",
+   "cb0225ce0b7cc78cf599215d81661ad440df9fd203a8955e6e596720afc111de"
+  ]
+ },
+ "p312": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 38.0,
+   "mic2": 48.349999999999994
+  },
+  "utterances": [
+   "191",
+   "055",
+   "188",
+   "116"
+  ],
+  "texts": {
+   "191": "He never asked me for money.",
+   "055": "They have a car and cannot afford another.",
+   "188": "I probably would have been a dancer.",
+   "116": "I am not against a further inquiry."
+  },
+  "seconds": 10.93,
+  "ok": true,
+  "ref": {
+   "seconds": 10.934,
+   "peak": 0.7139,
+   "clipped": 0,
+   "noise_db": -63.6,
+   "speech_db": -14.0,
+   "snr_db": 49.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p312/p312_191_mic2.flac",
+   "wav48_silence_trimmed/p312/p312_055_mic2.flac",
+   "wav48_silence_trimmed/p312/p312_188_mic2.flac",
+   "wav48_silence_trimmed/p312/p312_116_mic2.flac"
+  ],
+  "source_sha256": [
+   "d3935dc13996f721b4ea7c6ce44e8f86f919d2fc04066487833bf9ff93869c52",
+   "b1e4ce15d03a5be21d33638e6bc1df8d04f0b1c128e0a4016c397f2417fba675",
+   "7543b349e4d236730fc191395e6996186b54f324ce82ffff5a7660017f3ba535",
+   "a73e75455bc4643241d7d96d5747e1dcf8c5089b71c5018acd7858246d4c1033"
+  ]
+ },
+ "p313": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.0,
+   "mic2": 39.5
+  },
+  "utterances": [
+   "236",
+   "036",
+   "038"
+  ],
+  "texts": {
+   "236": "Home is in the Scottish Borders.",
+   "036": "The waiting is over, well almost.",
+   "038": "I'm not allowed to say that, of course."
+  },
+  "seconds": 12.57,
+  "ok": true,
+  "ref": {
+   "seconds": 12.573,
+   "peak": 0.1696,
+   "clipped": 0,
+   "noise_db": -69.4,
+   "speech_db": -28.5,
+   "snr_db": 40.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p313/p313_236_mic2.flac",
+   "wav48_silence_trimmed/p313/p313_036_mic2.flac",
+   "wav48_silence_trimmed/p313/p313_038_mic2.flac"
+  ],
+  "source_sha256": [
+   "217d356f45881da140f7137af9b608dcb1f2850d0725ff5f000440ca81379eb4",
+   "f4d1652fb99f62a06c9f5082ea365dafcbd06a1697e0bc6f4c94ac37bc001b5e",
+   "178cb65591c564558f0e2a0b2f81dc356fd22e638d10c682ec5d8918ad882684"
+  ]
+ },
+ "p314": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.9,
+   "mic2": 42.349999999999994
+  },
+  "utterances": [
+   "088",
+   "374",
+   "267"
+  ],
+  "texts": {
+   "088": "We should do everything at a stroke.",
+   "374": "The European is a piece of vanity publishing.",
+   "267": "He was my big brother, my father, my grandfather."
+  },
+  "seconds": 10.71,
+  "ok": true,
+  "ref": {
+   "seconds": 10.714,
+   "peak": 0.5136,
+   "clipped": 0,
+   "noise_db": -62.4,
+   "speech_db": -18.3,
+   "snr_db": 44.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p314/p314_088_mic2.flac",
+   "wav48_silence_trimmed/p314/p314_374_mic2.flac",
+   "wav48_silence_trimmed/p314/p314_267_mic2.flac"
+  ],
+  "source_sha256": [
+   "cb80d966da0d30f856023015b90d68373d7b424bbbf77786459f2cba1e29bd04",
+   "aeba07c5134337099c9b543c76b9828d4451c983c623f64eccb8240b96b792ea",
+   "32a23753232fa68809e3dadcebc035dc6b045d5bf41a50738ef2b85207eef53f"
+  ]
+ },
+ "p315": {
+  "mic": "mic1",
+  "highpass_60hz": true,
+  "mic_median_snr_db": {
+   "mic1": 33.0
+  },
+  "utterances": [
+   "176",
+   "308",
+   "310",
+   "208"
+  ],
+  "texts": {
+   "176": null,
+   "308": null,
+   "310": null,
+   "208": null
+  },
+  "seconds": 12.06,
+  "ok": true,
+  "ref": {
+   "seconds": 12.062,
+   "peak": 0.8489,
+   "clipped": 0,
+   "noise_db": -63.3,
+   "speech_db": -16.2,
+   "snr_db": 47.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p315/p315_176_mic1.flac",
+   "wav48_silence_trimmed/p315/p315_308_mic1.flac",
+   "wav48_silence_trimmed/p315/p315_310_mic1.flac",
+   "wav48_silence_trimmed/p315/p315_208_mic1.flac"
+  ],
+  "source_sha256": [
+   "2494dce04aeee524f073d068f6a7b52c90f1f528dc47efb25fdf8b703a213841",
+   "87133d8537a0fffa3514af7fc0d3796598b8924e41cfcdfed79aa63354bd2e70",
+   "ecda5e5b2c3adfd4c754487637d801f347412432dccb1ac0f97d3d2c8db9c3af",
+   "a63145e9a014ce80ba053a4998aaf3eb06e2c32516dfd45f56f5adda4da27d0c"
+  ]
+ },
+ "p316": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.7,
+   "mic2": 34.099999999999994
+  },
+  "utterances": [
+   "158",
+   "250",
+   "055"
+  ],
+  "texts": {
+   "158": "The things writers and directors say!",
+   "250": "At the end of the day, two men have been shot.",
+   "055": "But the law is very clear on this."
+  },
+  "seconds": 11.64,
+  "ok": true,
+  "ref": {
+   "seconds": 11.638,
+   "peak": 0.2266,
+   "clipped": 0,
+   "noise_db": -62.4,
+   "speech_db": -23.1,
+   "snr_db": 39.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p316/p316_158_mic2.flac",
+   "wav48_silence_trimmed/p316/p316_250_mic2.flac",
+   "wav48_silence_trimmed/p316/p316_055_mic2.flac"
+  ],
+  "source_sha256": [
+   "3675faf23dd691e7282cf6a24aba32300f0541d035e37675a1ec202bcd753f9c",
+   "7a2ad1e62d9327c047eaae6635a1a0d78f54ad09817de172aa193ba9789e4fe0",
+   "e33c9875a678d3e29b304010b02530099dc09db18706dfb8b9f51711d088b7b5"
+  ]
+ },
+ "p317": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.35,
+   "mic2": 41.3
+  },
+  "utterances": [
+   "079",
+   "335",
+   "116"
+  ],
+  "texts": {
+   "079": "I played well but missed a few chances.",
+   "335": "It's not that difficult, it really isn't.",
+   "116": "Then, as we know too well, anything can happen."
+  },
+  "seconds": 11.3,
+  "ok": true,
+  "ref": {
+   "seconds": 11.302,
+   "peak": 0.3781,
+   "clipped": 0,
+   "noise_db": -65.5,
+   "speech_db": -21.4,
+   "snr_db": 44.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p317/p317_079_mic2.flac",
+   "wav48_silence_trimmed/p317/p317_335_mic2.flac",
+   "wav48_silence_trimmed/p317/p317_116_mic2.flac"
+  ],
+  "source_sha256": [
+   "0f59f6da432b1160ec567fd6d074a424248b857a7fd88bcd8d86e73b6fff7daa",
+   "03dc7013354de6c28242e95e75f1da64ebcb1454cfe8b99cf070f20b92d0dfd5",
+   "637c559c63c5997da6bdecd0e6a3723296ed7c10f2ddc2c36e1271ae270d9017"
+  ]
+ },
+ "p318": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.150000000000006,
+   "mic2": 41.6
+  },
+  "utterances": [
+   "196",
+   "083",
+   "178"
+  ],
+  "texts": {
+   "196": "After that, though, we are still waiting to see.",
+   "083": "I've invented a village in East Lothian.",
+   "178": "Any error is severely punished."
+  },
+  "seconds": 11.58,
+  "ok": true,
+  "ref": {
+   "seconds": 11.582,
+   "peak": 0.3308,
+   "clipped": 0,
+   "noise_db": -64.3,
+   "speech_db": -20.5,
+   "snr_db": 43.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p318/p318_196_mic2.flac",
+   "wav48_silence_trimmed/p318/p318_083_mic2.flac",
+   "wav48_silence_trimmed/p318/p318_178_mic2.flac"
+  ],
+  "source_sha256": [
+   "63e7b858b3348a88536f97872865be9bb9dc6a3013b2f37504a3b2b1b0337a74",
+   "f398d1bf360a09ec56ebeef3d424e3be5e30ca0b3ed151463e33a1dfb6191708",
+   "743d577b955cd9061c034be0b73a9b6760f50ca187adbb0ac68376f4bd95a9a8"
+  ]
+ },
+ "p323": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 36.15,
+   "mic2": 38.55
+  },
+  "utterances": [
+   "243",
+   "313",
+   "386"
+  ],
+  "texts": {
+   "243": "The result could be all down to turnout.",
+   "313": "Florida is the pivotal state in the nation.",
+   "386": "I don't have any more contact with Airdrie."
+  },
+  "seconds": 10.31,
+  "ok": true,
+  "ref": {
+   "seconds": 10.306,
+   "peak": 0.4094,
+   "clipped": 0,
+   "noise_db": -59.9,
+   "speech_db": -19.1,
+   "snr_db": 40.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p323/p323_243_mic2.flac",
+   "wav48_silence_trimmed/p323/p323_313_mic2.flac",
+   "wav48_silence_trimmed/p323/p323_386_mic2.flac"
+  ],
+  "source_sha256": [
+   "888ddb48211f992574f4315953065cf99f901cd7d4e89ac6d586d9aa25812c89",
+   "6f999aba352005bc216e77e1d32af0adb26c7837525e2fc0860bd1c58c8ca4a6",
+   "012755e44695c9305debd6aff2bdfc7bbfee4f1d9b51b7b030672a48bd273f79"
+  ]
+ },
+ "p326": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 26.15,
+   "mic2": 37.349999999999994
+  },
+  "utterances": [
+   "360",
+   "066",
+   "060"
+  ],
+  "texts": {
+   "360": "There is no musical background in his family.",
+   "066": "Now, suddenly, we have this new landscape.",
+   "060": "Yesterday's performance was exactly that."
+  },
+  "seconds": 11.07,
+  "ok": true,
+  "ref": {
+   "seconds": 11.069,
+   "peak": 0.2163,
+   "clipped": 0,
+   "noise_db": -66.4,
+   "speech_db": -25.8,
+   "snr_db": 40.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p326/p326_360_mic2.flac",
+   "wav48_silence_trimmed/p326/p326_066_mic2.flac",
+   "wav48_silence_trimmed/p326/p326_060_mic2.flac"
+  ],
+  "source_sha256": [
+   "1cc59735cc2a0e3bc9d9a583d2dd425647cb3cbe40f34fafb279f0c04f31cbac",
+   "ef9b8d137d60eb3d0bc375de10032d75fa93e09e665419c2d4daaa404706d86b",
+   "555489865af4c44a37e1df6496e0c7bb4b7717d9e00029dc7243db15e9ebef25"
+  ]
+ },
+ "p329": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 30.55,
+   "mic2": 36.95
+  },
+  "utterances": [
+   "080",
+   "146",
+   "237"
+  ],
+  "texts": {
+   "080": "We will see how he is after treatment.",
+   "146": "That left a bad taste in my mouth.",
+   "237": "Mary Archer is almost too clever."
+  },
+  "seconds": 13.37,
+  "ok": true,
+  "ref": {
+   "seconds": 13.368,
+   "peak": 0.2544,
+   "clipped": 0,
+   "noise_db": -64.5,
+   "speech_db": -23.1,
+   "snr_db": 41.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p329/p329_080_mic2.flac",
+   "wav48_silence_trimmed/p329/p329_146_mic2.flac",
+   "wav48_silence_trimmed/p329/p329_237_mic2.flac"
+  ],
+  "source_sha256": [
+   "1dbe277ea84455d9a100a3aa334c2fc65b469a52364c7844eb899b6c4dcc4316",
+   "c34e02b53d1b707fc7e45c6da0b4ada6f96692e38b0cfd617d86fd117b3a9ed4",
+   "69743b16da680a91756b47e330f71c7526d23a7124afc431595b11ceaba2ac38"
+  ]
+ },
+ "p330": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 28.25,
+   "mic2": 33.55
+  },
+  "utterances": [
+   "287",
+   "050",
+   "263"
+  ],
+  "texts": {
+   "287": "He later became a respected High Court judge.",
+   "050": "There will be widespread support on all sides.",
+   "263": "Last week, he was taken into hospital."
+  },
+  "seconds": 12.64,
+  "ok": true,
+  "ref": {
+   "seconds": 12.638,
+   "peak": 0.1967,
+   "clipped": 0,
+   "noise_db": -62.8,
+   "speech_db": -26.9,
+   "snr_db": 35.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p330/p330_287_mic2.flac",
+   "wav48_silence_trimmed/p330/p330_050_mic2.flac",
+   "wav48_silence_trimmed/p330/p330_263_mic2.flac"
+  ],
+  "source_sha256": [
+   "7568b66ec05864e3c2364d64e660e336e8432429ea60c945b0d2be5499d83154",
+   "b09f6a1998997abaf27d35a360fa95a30898f90fd7016e55c099d6d60bd2da43",
+   "6336178c23968291f47301ea894806953230f67e38a520bfdbfa91d96a2b624f"
+  ]
+ },
+ "p333": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.5,
+   "mic2": 38.75
+  },
+  "utterances": [
+   "057",
+   "292",
+   "277",
+   "377"
+  ],
+  "texts": {
+   "057": "Alright, it was a defeat, but it felt like a victory.",
+   "292": "My wife is totally behind me on this.",
+   "277": "Lord Levy said he started life with nothing.",
+   "377": "It's been like that for ages, according to the guys."
+  },
+  "seconds": 12.0,
+  "ok": true,
+  "ref": {
+   "seconds": 11.997,
+   "peak": 0.3089,
+   "clipped": 0,
+   "noise_db": -65.9,
+   "speech_db": -23.6,
+   "snr_db": 42.2
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p333/p333_057_mic2.flac",
+   "wav48_silence_trimmed/p333/p333_292_mic2.flac",
+   "wav48_silence_trimmed/p333/p333_277_mic2.flac",
+   "wav48_silence_trimmed/p333/p333_377_mic2.flac"
+  ],
+  "source_sha256": [
+   "ad5dbece238675fb17facb5d1a1835066027845fd168e102624cfcae9c1b1ad2",
+   "64a707e74de61b5096060cb93f3f100a3e1727f70cc03b04d286d496afaf060d",
+   "2deb7947386e2685dc25277cce7fc6dcb40917502a0c29d638c44307a1e9ea09",
+   "9aef4e6ac6f341e6498c0302bffc1db90935f08f3f922895b74b995af94b0a2f"
+  ]
+ },
+ "p334": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.0,
+   "mic2": 40.35
+  },
+  "utterances": [
+   "175",
+   "007",
+   "172"
+  ],
+  "texts": {
+   "175": "Therefore, this type of aircraft is completely safe.",
+   "007": "The rainbow is a division of white light into many beautiful colors.",
+   "172": "Three people were pronounced dead at the scene."
+  },
+  "seconds": 10.75,
+  "ok": true,
+  "ref": {
+   "seconds": 10.752,
+   "peak": 0.2811,
+   "clipped": 0,
+   "noise_db": -64.6,
+   "speech_db": -22.3,
+   "snr_db": 42.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p334/p334_175_mic2.flac",
+   "wav48_silence_trimmed/p334/p334_007_mic2.flac",
+   "wav48_silence_trimmed/p334/p334_172_mic2.flac"
+  ],
+  "source_sha256": [
+   "5a4923cd34d8decf8ead18f4b0546fec248345b6a9a439a3abffb2517c60bf9e",
+   "9889e28f4fa946f067fe0cc4a4c813b8a3b0ffd6ec021964ffac508fb4fb7163",
+   "be7889b710d473086b9e7b2efb16d76284afd05fb1286c9c70b59847a4ee4e92"
+  ]
+ },
+ "p335": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.849999999999994,
+   "mic2": 43.05
+  },
+  "utterances": [
+   "191",
+   "106",
+   "295"
+  ],
+  "texts": {
+   "191": "It's hard, but if we don't do it, nobody will.",
+   "106": "It wasn't a penalty, it was outside the area.",
+   "295": "He knew it would cost him millions."
+  },
+  "seconds": 12.04,
+  "ok": true,
+  "ref": {
+   "seconds": 12.041,
+   "peak": 0.3596,
+   "clipped": 0,
+   "noise_db": -63.0,
+   "speech_db": -19.2,
+   "snr_db": 43.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p335/p335_191_mic2.flac",
+   "wav48_silence_trimmed/p335/p335_106_mic2.flac",
+   "wav48_silence_trimmed/p335/p335_295_mic2.flac"
+  ],
+  "source_sha256": [
+   "34be6d820bf6a67ced81aa405e646d673a4e15da18cfecef3c473c401e256413",
+   "63fd92952c68dc6abca10c98ec8129dbfba2253032a2aacb721c4d5f88856913",
+   "345037ccb170f0686a60e758b853090c463aab5e507529b185a6f2304d715427"
+  ]
+ },
+ "p336": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.5,
+   "mic2": 42.25
+  },
+  "utterances": [
+   "222",
+   "225",
+   "156",
+   "334"
+  ],
+  "texts": {
+   "222": "The warnings were a good reminder.",
+   "225": "Barry Ferguson is one of them.",
+   "156": "We have waited a long time for this.",
+   "334": "They are very concerned, and you can understand that."
+  },
+  "seconds": 13.29,
+  "ok": true,
+  "ref": {
+   "seconds": 13.294,
+   "peak": 0.9779,
+   "clipped": 0,
+   "noise_db": -63.9,
+   "speech_db": -17.4,
+   "snr_db": 46.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p336/p336_222_mic2.flac",
+   "wav48_silence_trimmed/p336/p336_225_mic2.flac",
+   "wav48_silence_trimmed/p336/p336_156_mic2.flac",
+   "wav48_silence_trimmed/p336/p336_334_mic2.flac"
+  ],
+  "source_sha256": [
+   "15ee004271c43c661b4da2aec11752bbbfa2773f75ab79edf59cef1531eab898",
+   "8617cddbed692c0c8cbf739d9d6bd67354699f9b4fa2a8605b0fea9587310fd7",
+   "ed94e1ce92fb8b0938fb96bc9e46dea3fecd6b85b5fdb53c2a2d527fbcbb28aa",
+   "49ed5a53cd8e73fb904ee0659a0114e835a26fde0fcf4ede5374f39c36d1a73f"
+  ]
+ },
+ "p339": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.650000000000006,
+   "mic2": 42.650000000000006
+  },
+  "utterances": [
+   "050",
+   "046",
+   "091",
+   "103"
+  ],
+  "texts": {
+   "050": "It is a hard act to follow, the Winning act.",
+   "046": "That is not the place for her.",
+   "091": "I decided to take my time.",
+   "103": "We should not be surprised at that."
+  },
+  "seconds": 10.28,
+  "ok": true,
+  "ref": {
+   "seconds": 10.28,
+   "peak": 0.778,
+   "clipped": 0,
+   "noise_db": -63.4,
+   "speech_db": -16.9,
+   "snr_db": 46.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p339/p339_050_mic2.flac",
+   "wav48_silence_trimmed/p339/p339_046_mic2.flac",
+   "wav48_silence_trimmed/p339/p339_091_mic2.flac",
+   "wav48_silence_trimmed/p339/p339_103_mic2.flac"
+  ],
+  "source_sha256": [
+   "20784b2de0e2b4bd366413a973a7f0b282f06c427219b16cc98daf040264f5cb",
+   "ad8cb2025dd7561112317632596ede20b9df594672e9da2adf8dc53b21d2b181",
+   "6044e26fd28efb953c6f542b1776eb42552e58792cdd9efcd1d88638c575ce3f",
+   "634ff09247abedec615637e8b82520439ad7ba2706b04fb612f13991f0f46097"
+  ]
+ },
+ "p340": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.25,
+   "mic2": 42.4
+  },
+  "utterances": [
+   "104",
+   "086",
+   "380",
+   "141"
+  ],
+  "texts": {
+   "104": "So what is the problem?",
+   "086": "I've thought a lot about the Commonwealths.",
+   "380": "They are expected to be released today.",
+   "141": "He was shaking like a leaf."
+  },
+  "seconds": 10.38,
+  "ok": true,
+  "ref": {
+   "seconds": 10.377,
+   "peak": 0.4582,
+   "clipped": 0,
+   "noise_db": -67.5,
+   "speech_db": -21.0,
+   "snr_db": 46.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p340/p340_104_mic2.flac",
+   "wav48_silence_trimmed/p340/p340_086_mic2.flac",
+   "wav48_silence_trimmed/p340/p340_380_mic2.flac",
+   "wav48_silence_trimmed/p340/p340_141_mic2.flac"
+  ],
+  "source_sha256": [
+   "6e9317802784dfb34a9dbcec19c4a901b35a4d2cc9ded52bb26fb221faee00c0",
+   "8efdb260eea63326878732dad0983aa5d36d25fe4e27f7e2652b89c9603db3d7",
+   "a18908454f9b0aa54cb99bd59f9a6262e6943474d92a6131018ad2bb6425afa1",
+   "2e4d73ba9e4c8df31fe394238800addc87354f6028a6c4e663e9b3b79802e04f"
+  ]
+ },
+ "p341": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.7,
+   "mic2": 41.599999999999994
+  },
+  "utterances": [
+   "048",
+   "367",
+   "102",
+   "151"
+  ],
+  "texts": {
+   "048": "All the lads are totally focused on that.",
+   "367": "The surprise is its product is so poor.",
+   "102": "He put some colour into Scottish history.",
+   "151": "Sean Connery did not disappoint."
+  },
+  "seconds": 14.41,
+  "ok": true,
+  "ref": {
+   "seconds": 14.405,
+   "peak": 0.4889,
+   "clipped": 0,
+   "noise_db": -64.2,
+   "speech_db": -19.7,
+   "snr_db": 44.5
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p341/p341_048_mic2.flac",
+   "wav48_silence_trimmed/p341/p341_367_mic2.flac",
+   "wav48_silence_trimmed/p341/p341_102_mic2.flac",
+   "wav48_silence_trimmed/p341/p341_151_mic2.flac"
+  ],
+  "source_sha256": [
+   "d11752c006de5780324aa2173bb693088f28c02ead683df816187134c5f03c6c",
+   "b7c7f63981569c6d32d46d8ddf8471c9dce8bd01ba8a9239bac3d75c5a9acce1",
+   "aa9963b2f417dac1bde1dee36ba43e5c563a25fcc495ce044c4c19c5220bf711",
+   "aa429cca18269b7d0fcf0c65abd26c5a61007650285762c6802bf90b0714c195"
+  ]
+ },
+ "p343": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.9,
+   "mic2": 34.25
+  },
+  "utterances": [
+   "114",
+   "205",
+   "253"
+  ],
+  "texts": {
+   "114": "After this, they were always in the driving seat.",
+   "205": "That has proved to be a lasting lesson.",
+   "253": "There were too many mistakes."
+  },
+  "seconds": 11.74,
+  "ok": true,
+  "ref": {
+   "seconds": 11.738,
+   "peak": 0.2659,
+   "clipped": 0,
+   "noise_db": -64.9,
+   "speech_db": -26.9,
+   "snr_db": 38.0
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p343/p343_114_mic2.flac",
+   "wav48_silence_trimmed/p343/p343_205_mic2.flac",
+   "wav48_silence_trimmed/p343/p343_253_mic2.flac"
+  ],
+  "source_sha256": [
+   "cdbac3d7db08e577fe38d7e374f940d3f834d8854aa5cc7f4868fce1e79251bc",
+   "0b73e54ff9cafaa5d8a5d0b57ce4d883917bbd3102f0a4d8576163631a3c4da8",
+   "bbfa775e6305cb25d847a178f955b317fd1e0732ecfcb2a2d395a0ae14911119"
+  ]
+ },
+ "p345": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 34.85,
+   "mic2": 47.4
+  },
+  "utterances": [
+   "124",
+   "393",
+   "132",
+   "205"
+  ],
+  "texts": {
+   "124": "It is sad and frustrating.",
+   "393": "I've never had problems with any football managers.",
+   "132": "The whole matter is done and dusted.",
+   "205": "The devil, of course, will be in the detail."
+  },
+  "seconds": 11.58,
+  "ok": true,
+  "ref": {
+   "seconds": 11.58,
+   "peak": 0.5925,
+   "clipped": 0,
+   "noise_db": -61.7,
+   "speech_db": -17.0,
+   "snr_db": 44.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p345/p345_124_mic2.flac",
+   "wav48_silence_trimmed/p345/p345_393_mic2.flac",
+   "wav48_silence_trimmed/p345/p345_132_mic2.flac",
+   "wav48_silence_trimmed/p345/p345_205_mic2.flac"
+  ],
+  "source_sha256": [
+   "de7898dfb5f64998f073a987710bb4084705f0e465e2b7f010c7ddaa12b49344",
+   "445b7a58f29127ddbef6132d1c65a70886116d78828c113fbb0f16a1cf292561",
+   "75a146dfcb92e6cf1b93821b97122d343832932fb45b3e9713e25cb6135a5809",
+   "0f22babe8cfae1e7a24971007a1579f5e07ec170007b63be2aae8d4a8a68f82b"
+  ]
+ },
+ "p347": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 25.8,
+   "mic2": 39.75
+  },
+  "utterances": [
+   "294",
+   "229",
+   "206"
+  ],
+  "texts": {
+   "294": "Six months later, they returned to Scotland.",
+   "229": "It is time for a more honest approach.",
+   "206": "He was convicted at Glasgow Sheriff Court."
+  },
+  "seconds": 11.46,
+  "ok": true,
+  "ref": {
+   "seconds": 11.458,
+   "peak": 0.2619,
+   "clipped": 0,
+   "noise_db": -66.2,
+   "speech_db": -25.6,
+   "snr_db": 40.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p347/p347_294_mic2.flac",
+   "wav48_silence_trimmed/p347/p347_229_mic2.flac",
+   "wav48_silence_trimmed/p347/p347_206_mic2.flac"
+  ],
+  "source_sha256": [
+   "bae3a6117f723e2f52d11485566b1c4341c1eb97bed072fb54005f1daf865329",
+   "a7104b12d0f35ac8658c0d26f01a8f049db63880141a3ae0ef739e1d906224ab",
+   "0e3a64731a7e34b4ac95855c7f9847ad18c93046445478b2170111d5508a16d7"
+  ]
+ },
+ "p351": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 31.450000000000003,
+   "mic2": 37.25
+  },
+  "utterances": [
+   "059",
+   "171",
+   "060",
+   "096"
+  ],
+  "texts": {
+   "059": "Hopefully, they will not go through with it.",
+   "171": "I'm really happy with how things went there.",
+   "060": "They have been very lucky with the ice.",
+   "096": "Surely this is not supposed to happen?"
+  },
+  "seconds": 12.97,
+  "ok": true,
+  "ref": {
+   "seconds": 12.973,
+   "peak": 0.1867,
+   "clipped": 0,
+   "noise_db": -65.1,
+   "speech_db": -26.2,
+   "snr_db": 38.9
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p351/p351_059_mic2.flac",
+   "wav48_silence_trimmed/p351/p351_171_mic2.flac",
+   "wav48_silence_trimmed/p351/p351_060_mic2.flac",
+   "wav48_silence_trimmed/p351/p351_096_mic2.flac"
+  ],
+  "source_sha256": [
+   "b908be9513cdaa01b2d9cfdb0255e44757968084b2fe4660a550e809600c745b",
+   "757532f034f6ce411551c8431a76a9a8fcbff579356ad535ef753f1e612b1c92",
+   "c7924de2c36d0b04374631cab3cb9942cbd41bc533c15d5210a442c7153befe9",
+   "77790d0871057aa60a3b21fefb757a8ff1452c43982315737ded4b39a1b522eb"
+  ]
+ },
+ "p360": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 32.45,
+   "mic2": 34.8
+  },
+  "utterances": [
+   "041",
+   "130",
+   "277",
+   "188"
+  ],
+  "texts": {
+   "041": "A similar exercise is expected in Scotland.",
+   "130": "I hope it has helped the prisoners.",
+   "277": "I have no further comment to make.",
+   "188": "Only one person can claim the credit."
+  },
+  "seconds": 11.35,
+  "ok": true,
+  "ref": {
+   "seconds": 11.346,
+   "peak": 0.1079,
+   "clipped": 0,
+   "noise_db": -66.9,
+   "speech_db": -31.6,
+   "snr_db": 35.4
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p360/p360_041_mic2.flac",
+   "wav48_silence_trimmed/p360/p360_130_mic2.flac",
+   "wav48_silence_trimmed/p360/p360_277_mic2.flac",
+   "wav48_silence_trimmed/p360/p360_188_mic2.flac"
+  ],
+  "source_sha256": [
+   "586b114b77da907001fb4b7588f82c493d7e8353df5949864af52619d1ee1696",
+   "808dfd8d6e4b160ae9a4c006c4c6296443011bfcfdb9e723942b1a02aed3fa3d",
+   "408e09b17d5e3357c411425288d2584ccfae3034445828e55f44e5508552588e",
+   "6d9761f0a43440ea4a9b6882e017a7414edfb0100bdab524e1eacb1c42be5313"
+  ]
+ },
+ "p361": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 33.25,
+   "mic2": 38.0
+  },
+  "utterances": [
+   "177",
+   "048",
+   "099",
+   "226"
+  ],
+  "texts": {
+   "177": "However, it was a different story in the final.",
+   "048": "It is all starting to come together.",
+   "099": "Seriously, we are not concerned at all.",
+   "226": "Part-time staff are being laid off."
+  },
+  "seconds": 14.66,
+  "ok": true,
+  "ref": {
+   "seconds": 14.661,
+   "peak": 0.148,
+   "clipped": 0,
+   "noise_db": -69.5,
+   "speech_db": -28.3,
+   "snr_db": 41.3
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p361/p361_177_mic2.flac",
+   "wav48_silence_trimmed/p361/p361_048_mic2.flac",
+   "wav48_silence_trimmed/p361/p361_099_mic2.flac",
+   "wav48_silence_trimmed/p361/p361_226_mic2.flac"
+  ],
+  "source_sha256": [
+   "ac63d6711f803075b0a78550a242178e323dac52f3816971c4660e96431400ad",
+   "37c676c0ce2947718bc89bf452d34f48d06bfc93d053a1d17422d27b2a2a0001",
+   "4e24753769a41088d2cb5e47feccefd909d7d5f61e4905f2c71eaa4cb85c75c6",
+   "cf2d2dd8ed0330d46ccb003d3e051a5d912d161d51f1c5c9199ce5813991f840"
+  ]
+ },
+ "p362": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.6,
+   "mic2": 40.55
+  },
+  "utterances": [
+   "380",
+   "113",
+   "168",
+   "154"
+  ],
+  "texts": {
+   "380": "We are not getting him back.",
+   "113": "I've never felt affection for Emu.",
+   "168": "People also have trouble with the currency.",
+   "154": "Wrong decisions Address in full"
+  },
+  "seconds": 13.01,
+  "ok": true,
+  "ref": {
+   "seconds": 13.014,
+   "peak": 0.6609,
+   "clipped": 0,
+   "noise_db": -61.0,
+   "speech_db": -17.3,
+   "snr_db": 43.8
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p362/p362_380_mic2.flac",
+   "wav48_silence_trimmed/p362/p362_113_mic2.flac",
+   "wav48_silence_trimmed/p362/p362_168_mic2.flac",
+   "wav48_silence_trimmed/p362/p362_154_mic2.flac"
+  ],
+  "source_sha256": [
+   "7031e9a0310763dee1995882011d42126341e28def0b6d4f76cb6e9cd9179995",
+   "5d97fe95495397e724444676fd6dbde1b85a9d1d1fe3270215caf951b606ccc6",
+   "d8a676bf0f14ebd0f3da83307197a459634a906508e81d490eb6054e789985be",
+   "3e9c54b327c66fb30c6cc3936512b4ab4d31c42f1363bdce0259fa494c7f0559"
+  ]
+ },
+ "p363": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 29.15,
+   "mic2": 37.2
+  },
+  "utterances": [
+   "072",
+   "422",
+   "075",
+   "383"
+  ],
+  "texts": {
+   "072": "Thirty people have applied for his job!",
+   "422": "Hopefully, the answer is in the positive.",
+   "075": "Today we must not repeat that mistake.",
+   "383": "It was a double tragedy for the family."
+  },
+  "seconds": 13.01,
+  "ok": true,
+  "ref": {
+   "seconds": 13.013,
+   "peak": 0.1901,
+   "clipped": 0,
+   "noise_db": -67.8,
+   "speech_db": -27.1,
+   "snr_db": 40.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p363/p363_072_mic2.flac",
+   "wav48_silence_trimmed/p363/p363_422_mic2.flac",
+   "wav48_silence_trimmed/p363/p363_075_mic2.flac",
+   "wav48_silence_trimmed/p363/p363_383_mic2.flac"
+  ],
+  "source_sha256": [
+   "c1cbeb5173f6b3d459761e8316fd22c9b1916ac49bbeb49e00d58267a5a91709",
+   "5e8b08eea0ba9db97126ecea16b8e57efd6ecf66b8bbb6b3b1b2e38e03e09cb6",
+   "94fca3a916c61e0010a70b47baae72b713f0319767953bdbffc7c87f9a5f46ea",
+   "a89bc1e74748a7d5ae8c6fac816d774e848e7ab0cef760c03d5dcac8f810afbe"
+  ]
+ },
+ "p364": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 26.5,
+   "mic2": 33.65
+  },
+  "utterances": [
+   "193",
+   "228",
+   "166",
+   "233"
+  ],
+  "texts": {
+   "193": "I would say the risk is very small.",
+   "228": "Is it a warning to parents?",
+   "166": "Now they have to do something about it.",
+   "233": "And there are some interesting conductors, too."
+  },
+  "seconds": 13.03,
+  "ok": true,
+  "ref": {
+   "seconds": 13.033,
+   "peak": 0.1537,
+   "clipped": 0,
+   "noise_db": -66.2,
+   "speech_db": -28.1,
+   "snr_db": 38.1
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p364/p364_193_mic2.flac",
+   "wav48_silence_trimmed/p364/p364_228_mic2.flac",
+   "wav48_silence_trimmed/p364/p364_166_mic2.flac",
+   "wav48_silence_trimmed/p364/p364_233_mic2.flac"
+  ],
+  "source_sha256": [
+   "b2d57d28c08dcea70014bc33831d8322f56f757103dd4a3c40be8c31666bec1b",
+   "7ace7fcbf18c23292e31522202a2cd9986fcb19dac9c391cf0f927bead603740",
+   "387f6320c3e934eabd207dfe787eb6741be3257c024916ada2b60ee89c46bbb2",
+   "5399a23f54a36df544a0dde5702d308f930752a4513c33c61068673afe03c80d"
+  ]
+ },
+ "p374": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 25.85,
+   "mic2": 35.3
+  },
+  "utterances": [
+   "032",
+   "422",
+   "159"
+  ],
+  "texts": {
+   "032": "Why did it take a concerted campaign?",
+   "422": "Next year this time  we will be home.",
+   "159": "But every two minutes it was exploding."
+  },
+  "seconds": 10.14,
+  "ok": true,
+  "ref": {
+   "seconds": 10.137,
+   "peak": 0.5273,
+   "clipped": 0,
+   "noise_db": -58.7,
+   "speech_db": -21.1,
+   "snr_db": 37.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p374/p374_032_mic2.flac",
+   "wav48_silence_trimmed/p374/p374_422_mic2.flac",
+   "wav48_silence_trimmed/p374/p374_159_mic2.flac"
+  ],
+  "source_sha256": [
+   "52b66708e739b5da4fc2b037a5861c49a4eaccb21865a39d40851e4629cb888c",
+   "d64e6629423e3a083fdf95a5befadf5948a1450888b6445855a1762ef899855d",
+   "10a456abbd1a67dfbc988168527e83173050ef2bd1eac06eb587a1b6a5f3776b"
+  ]
+ },
+ "p376": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 27.2,
+   "mic2": 33.3
+  },
+  "utterances": [
+   "210",
+   "391",
+   "121",
+   "058"
+  ],
+  "texts": {
+   "210": "Today is not about contracts.",
+   "391": "The Treasury confirmed that the latter was correct.",
+   "121": "The ministers are now to make their decision.",
+   "058": "I will be having talks with the workforce."
+  },
+  "seconds": 12.47,
+  "ok": true,
+  "ref": {
+   "seconds": 12.467,
+   "peak": 0.189,
+   "clipped": 0,
+   "noise_db": -62.9,
+   "speech_db": -27.3,
+   "snr_db": 35.6
+  },
+  "source_members": [
+   "wav48_silence_trimmed/p376/p376_210_mic2.flac",
+   "wav48_silence_trimmed/p376/p376_391_mic2.flac",
+   "wav48_silence_trimmed/p376/p376_121_mic2.flac",
+   "wav48_silence_trimmed/p376/p376_058_mic2.flac"
+  ],
+  "source_sha256": [
+   "ce14a148f360c995dc7822e087c29acbeb8d3ed83d5fcc35c0b63e64940eb392",
+   "07b6f17abdffb34034fe3b628116c4ec457ceb5df63803ffb478f66976beef93",
+   "e757499dc2471cb9909490cde9a8a5bb6342bdab33d52840e8cb790738a8d17b",
+   "c1a15a8377790ec4f6d056534c88f98ce77c2e961c4bc1aa518a036087b9f035"
+  ]
+ },
+ "s5": {
+  "mic": "mic2",
+  "highpass_60hz": false,
+  "mic_median_snr_db": {
+   "mic1": 35.25,
+   "mic2": 44.4
+  },
+  "utterances": [
+   "185",
+   "083",
+   "220"
+  ],
+  "texts": {
+   "185": "There was no way back for Rangers after that blow.",
+   "083": "The rate of growth in road traffic is already beginning to slow.",
+   "220": "Sports Secretary Chris Smith welcomed the action."
+  },
+  "seconds": 14.93,
+  "ok": true,
+  "ref": {
+   "seconds": 14.928,
+   "peak": 0.6754,
+   "clipped": 0,
+   "noise_db": -62.8,
+   "speech_db": -16.1,
+   "snr_db": 46.7
+  },
+  "source_members": [
+   "wav48_silence_trimmed/s5/s5_185_mic2.flac",
+   "wav48_silence_trimmed/s5/s5_083_mic2.flac",
+   "wav48_silence_trimmed/s5/s5_220_mic2.flac"
+  ],
+  "source_sha256": [
+   "ec2fa86cf434b82031d59010ef1654415755b5088bd0181da780676a08c4f449",
+   "7086700bd3d1088c5aeb422a7362b9c5f597ad3036e952c99c65985bfe987398",
+   "3696945a037cccac710c3d6b15cd8b9bd9b62cffddc366b29b3278ba21d0e781"
+  ]
+ }
+}

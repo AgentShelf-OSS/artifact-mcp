@@ -1,0 +1,5089 @@
+{
+ "schema_version": 1,
+ "generated": "2026-10-19",
+ "source": "vctk",
+ "asr": "faster-whisper 1.1.1 small.en int8 CPU, beam 1",
+ "speaker_embedding": "microsoft/wavlm-base-plus-sv (cosine)",
+ "sentences": {
+  "neutral": "Please check the schedule before Thursday. The meeting has moved to room twelve, near the north entrance.",
+  "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+ },
+ "synthesis": "production int8 ungated Pocket worker model, torch seed 20261018, one thread",
+ "attribution": "Voices derived from the VCTK corpus, CSTR, University of Edinburgh, CC BY 4.0",
+ "summary": {
+  "candidates": 110,
+  "selected": 50,
+  "dropped": {
+   "generation_failed": 0,
+   "intelligibility": 0,
+   "audio_faults": 6,
+   "duplicate_existing": 14,
+   "duplicate_candidate": 9,
+   "accent_cap": 0,
+   "over_cap": 31
+  },
+  "passed": 81,
+  "selected_gender": {
+   "female": 25,
+   "male": 25
+  },
+  "selected_accent": {
+   "Scottish": 8,
+   "British": 7,
+   "American": 7,
+   "Irish": 6,
+   "Canadian": 6,
+   "Northern Irish": 5,
+   "Indian": 3,
+   "South African": 3,
+   "Australian": 2,
+   "Welsh": 1,
+   "None": 1,
+   "New Zealand": 1
+  },
+  "passed_gender": {
+   "male": 40,
+   "female": 41
+  },
+  "passed_accent": {
+   "British": 20,
+   "Scottish": 15,
+   "American": 14,
+   "Irish": 8,
+   "Canadian": 8,
+   "Northern Irish": 5,
+   "Indian": 3,
+   "South African": 3,
+   "Australian": 2,
+   "Welsh": 1,
+   "None": 1,
+   "New Zealand": 1
+  },
+  "f0_check_selected": {
+   "ambiguous": 5,
+   "agrees": 45
+  },
+  "thresholds": {
+   "wer_mean_max": 0.12,
+   "wer_any_max": 0.25,
+   "duplicate_cosine": 0.975,
+   "candidate_pair_cosine_p99": 0.9668,
+   "candidate_pair_cosine_max": 0.9862,
+   "wpm_range": [
+    120,
+    250
+   ],
+   "max_gap_s": 2.0,
+   "max_edge_silence_s": 1.5,
+   "clip_fraction_max": 0.001,
+   "accent_cap": 12
+  },
+  "loudness_target_lufs": -18.63,
+  "gender_rule": "VCTK speaker-info.txt; F0 (Praat median, <145 male, >=175 female) recorded as a sanity check"
+ },
+ "selected": [
+  "vctk_p231",
+  "vctk_p255",
+  "vctk_p248",
+  "vctk_p292",
+  "vctk_p253",
+  "vctk_p298",
+  "vctk_p280",
+  "vctk_p326",
+  "vctk_p303",
+  "vctk_p345",
+  "vctk_p323",
+  "vctk_p227",
+  "vctk_p263",
+  "vctk_p266",
+  "vctk_p374",
+  "vctk_p333",
+  "vctk_p376",
+  "vctk_p270",
+  "vctk_p262",
+  "vctk_p283",
+  "vctk_p236",
+  "vctk_p265",
+  "vctk_p271",
+  "vctk_p240",
+  "vctk_p275",
+  "vctk_p269",
+  "vctk_p276",
+  "vctk_p281",
+  "vctk_p285",
+  "vctk_p363",
+  "vctk_p245",
+  "vctk_p334",
+  "vctk_p251",
+  "vctk_p364",
+  "vctk_p297",
+  "vctk_p312",
+  "vctk_p317",
+  "vctk_p304",
+  "vctk_p335",
+  "vctk_p347",
+  "vctk_p339",
+  "vctk_p238",
+  "vctk_p340",
+  "vctk_p336",
+  "vctk_p261",
+  "vctk_p360",
+  "vctk_p351",
+  "vctk_p311",
+  "vctk_p302",
+  "vctk_p316"
+ ],
+ "candidates": {
+  "vctk_p225": {
+   "voice": "vctk_p225",
+   "source_id": "p225",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 2.018,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.38,
+   "peak_dbfs": -3.55,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.96,
+   "wpm": 155.2,
+   "f0_median": 165.9,
+   "f0_iqr": [
+    154.1,
+    179.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "fantine",
+    0.9528
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.16,
+    "story": 10.16
+   }
+  },
+  "vctk_p226": {
+   "voice": "vctk_p226",
+   "source_id": "p226",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Surrey",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.832,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.7,
+   "peak_dbfs": -3.88,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.54,
+   "wpm": 142.2,
+   "f0_median": 108.8,
+   "f0_iqr": [
+    101.8,
+    115.1
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "stuart_bell",
+    0.9341
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 11.36
+   }
+  },
+  "vctk_p227": {
+   "voice": "vctk_p227",
+   "source_id": "p227",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Cumbria",
+   "age": 38,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.14,
+   "peak_dbfs": -1.99,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.06,
+   "wpm": 189.3,
+   "f0_median": 120.4,
+   "f0_iqr": [
+    113.7,
+    126.4
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "donor_30c5",
+    0.905
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 7.92
+   },
+   "rank": 12,
+   "label": "Alfie"
+  },
+  "vctk_p228": {
+   "voice": "vctk_p228",
+   "source_id": "p228",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice anna (0.982)"
+   ],
+   "score": 0.725,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.99,
+   "peak_dbfs": -3.83,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.38,
+   "wpm": 152.7,
+   "f0_median": 197.6,
+   "f0_iqr": [
+    183.2,
+    215.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "anna",
+    0.9815
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 8.64
+   }
+  },
+  "vctk_p229": {
+   "voice": "vctk_p229",
+   "source_id": "p229",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice vera (0.984)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.63,
+   "peak_dbfs": -4.67,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.76,
+   "wpm": 202.4,
+   "f0_median": 170.3,
+   "f0_iqr": [
+    163.9,
+    179.5
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "vera",
+    0.9841
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.84,
+    "story": 7.2
+   }
+  },
+  "vctk_p230": {
+   "voice": "vctk_p230",
+   "source_id": "p230",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Stockton-on-tees",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 2.005,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.45,
+   "peak_dbfs": -2.69,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.78,
+   "wpm": 143.1,
+   "f0_median": 198.0,
+   "f0_iqr": [
+    186.2,
+    207.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.0,
+   "nearest_existing": [
+    "fantine",
+    0.9724
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.56,
+    "story": 9.12
+   }
+  },
+  "vctk_p231": {
+   "voice": "vctk_p231",
+   "source_id": "p231",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.34,
+   "peak_dbfs": -4.76,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.0,
+   "wpm": 204.5,
+   "f0_median": 174.9,
+   "f0_iqr": [
+    164.4,
+    196.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "anna",
+    0.9599
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.0,
+    "story": 7.52
+   },
+   "rank": 1,
+   "label": "Harriet"
+  },
+  "vctk_p232": {
+   "voice": "vctk_p232",
+   "source_id": "p232",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.79,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.16,
+   "peak_dbfs": -4.06,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.9,
+   "wpm": 225.8,
+   "f0_median": 108.6,
+   "f0_iqr": [
+    92.4,
+    124.1
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "marius",
+    0.9588
+   ],
+   "transcripts": {
+    "neutral": "please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.28,
+    "story": 6.4
+   }
+  },
+  "vctk_p233": {
+   "voice": "vctk_p233",
+   "source_id": "p233",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Staffordshire",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p240 (0.979)"
+   ],
+   "score": 0.32,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.55,
+   "peak_dbfs": -3.58,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.36,
+   "wpm": 166.1,
+   "f0_median": 206.0,
+   "f0_iqr": [
+    189.0,
+    224.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "vera",
+    0.9428
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.28,
+    "story": 7.92
+   }
+  },
+  "vctk_p234": {
+   "voice": "vctk_p234",
+   "source_id": "p234",
+   "gender": "female",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "West Dumfries",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.54,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.14,
+   "peak_dbfs": -2.78,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.84,
+   "wpm": 170.4,
+   "f0_median": 171.5,
+   "f0_iqr": [
+    93.8,
+    183.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "eponine",
+    0.9255
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.0,
+    "story": 7.76
+   }
+  },
+  "vctk_p236": {
+   "voice": "vctk_p236",
+   "source_id": "p236",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Manchester",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.44,
+   "peak_dbfs": -0.81,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.86,
+   "wpm": 176.5,
+   "f0_median": 236.1,
+   "f0_iqr": [
+    226.5,
+    252.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "azelma",
+    0.7995
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.24
+   },
+   "rank": 21,
+   "label": "Imogen"
+  },
+  "vctk_p237": {
+   "voice": "vctk_p237",
+   "source_id": "p237",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Fife",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.04,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.89,
+   "peak_dbfs": -1.01,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.22,
+   "wpm": 184.4,
+   "f0_median": 79.4,
+   "f0_iqr": [
+    76.8,
+    84.3
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "bedfordshire",
+    0.8964
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.4
+   }
+  },
+  "vctk_p238": {
+   "voice": "vctk_p238",
+   "source_id": "p238",
+   "gender": "female",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Belfast",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.84,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.71,
+   "peak_dbfs": -3.48,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.4,
+   "wpm": 162.8,
+   "f0_median": 194.1,
+   "f0_iqr": [
+    96.0,
+    212.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "eponine",
+    0.9105
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 9.84
+   },
+   "rank": 42,
+   "label": "Caoimhe"
+  },
+  "vctk_p239": {
+   "voice": "vctk_p239",
+   "source_id": "p239",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "SW England",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice vera (0.977)"
+   ],
+   "score": 0.68,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.29,
+   "peak_dbfs": -1.16,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.42,
+   "wpm": 184.1,
+   "f0_median": 181.5,
+   "f0_iqr": [
+    170.2,
+    201.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "vera",
+    0.9775
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.2,
+    "story": 8.48
+   }
+  },
+  "vctk_p240": {
+   "voice": "vctk_p240",
+   "source_id": "p240",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.57,
+   "peak_dbfs": -1.39,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.12,
+   "wpm": 176.6,
+   "f0_median": 227.8,
+   "f0_iqr": [
+    212.3,
+    252.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.0,
+   "nearest_existing": [
+    "vera",
+    0.9551
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.72,
+    "story": 8.72
+   },
+   "rank": 24,
+   "label": "Poppy"
+  },
+  "vctk_p241": {
+   "voice": "vctk_p241",
+   "source_id": "p241",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Perth",
+   "age": 21,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.44,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.25,
+   "peak_dbfs": -0.52,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.42,
+   "wpm": 190.6,
+   "f0_median": 114.7,
+   "f0_iqr": [
+    107.9,
+    123.4
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "paul",
+    0.9552
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.84
+   }
+  },
+  "vctk_p243": {
+   "voice": "vctk_p243",
+   "source_id": "p243",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "London",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.02,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.6,
+   "peak_dbfs": -2.32,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.92,
+   "wpm": 181.2,
+   "f0_median": 117.4,
+   "f0_iqr": [
+    110.3,
+    125.2
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "stuart_bell",
+    0.9654
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 8.56
+   }
+  },
+  "vctk_p244": {
+   "voice": "vctk_p244",
+   "source_id": "p244",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Manchester",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice fantine (0.989)"
+   ],
+   "score": 0.24,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.96,
+   "peak_dbfs": -4.07,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.08,
+   "wpm": 194.2,
+   "f0_median": 186.9,
+   "f0_iqr": [
+    176.6,
+    205.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "fantine",
+    0.9886
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 7.6
+   }
+  },
+  "vctk_p245": {
+   "voice": "vctk_p245",
+   "source_id": "p245",
+   "gender": "male",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Dublin",
+   "age": 25,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.08,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.66,
+   "peak_dbfs": -3.21,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.24,
+   "wpm": 192.1,
+   "f0_median": 87.0,
+   "f0_iqr": [
+    81.8,
+    93.4
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "marius",
+    0.9101
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.68
+   },
+   "rank": 31,
+   "label": "Cormac"
+  },
+  "vctk_p246": {
+   "voice": "vctk_p246",
+   "source_id": "p246",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Selkirk",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.197,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.05,
+   "peak_dbfs": -4.28,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.76,
+   "wpm": 156.1,
+   "f0_median": 100.2,
+   "f0_iqr": [
+    94.8,
+    107.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "stuart_bell",
+    0.9559
+   ],
+   "transcripts": {
+    "neutral": "please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.28,
+    "story": 8.8
+   }
+  },
+  "vctk_p247": {
+   "voice": "vctk_p247",
+   "source_id": "p247",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Argyll",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.04,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.73,
+   "peak_dbfs": -5.27,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.22,
+   "wpm": 184.8,
+   "f0_median": 132.4,
+   "f0_iqr": [
+    124.1,
+    141.7
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "paul",
+    0.9451
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.16
+   }
+  },
+  "vctk_p248": {
+   "voice": "vctk_p248",
+   "source_id": "p248",
+   "gender": "female",
+   "accent": "Indian",
+   "accent_raw": "Indian",
+   "region": null,
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.16,
+   "peak_dbfs": -2.87,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.84,
+   "wpm": 187.2,
+   "f0_median": 229.2,
+   "f0_iqr": [
+    205.1,
+    268.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "lola",
+    0.9696
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.72,
+    "story": 8.08
+   },
+   "rank": 3,
+   "label": "Priya"
+  },
+  "vctk_p249": {
+   "voice": "vctk_p249",
+   "source_id": "p249",
+   "gender": "female",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Aberdeen",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice anna (0.978)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.88,
+   "peak_dbfs": -5.43,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.8,
+   "wpm": 191.9,
+   "f0_median": 161.8,
+   "f0_iqr": [
+    95.4,
+    176.3
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "anna",
+    0.9782
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 7.6
+   }
+  },
+  "vctk_p250": {
+   "voice": "vctk_p250",
+   "source_id": "p250",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "SE England",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p276 (0.977)"
+   ],
+   "score": 0.062,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.41,
+   "peak_dbfs": -5.05,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.98,
+   "wpm": 211.2,
+   "f0_median": 199.8,
+   "f0_iqr": [
+    188.5,
+    214.5
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "vera",
+    0.9564
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.92,
+    "story": 7.04
+   }
+  },
+  "vctk_p251": {
+   "voice": "vctk_p251",
+   "source_id": "p251",
+   "gender": "male",
+   "accent": "Indian",
+   "accent_raw": "Indian",
+   "region": null,
+   "age": 26,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.12,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.05,
+   "peak_dbfs": -2.08,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.26,
+   "wpm": 181.8,
+   "f0_median": 133.5,
+   "f0_iqr": [
+    121.8,
+    146.5
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 0.5,
+   "nearest_existing": [
+    "juergen",
+    0.9304
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.32
+   },
+   "rank": 33,
+   "label": "Rohan"
+  },
+  "vctk_p252": {
+   "voice": "vctk_p252",
+   "source_id": "p252",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Edinburgh",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.16,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.42,
+   "peak_dbfs": -2.74,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.28,
+   "wpm": 191.6,
+   "f0_median": 117.8,
+   "f0_iqr": [
+    111.3,
+    125.3
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "paul",
+    0.9189
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.56,
+    "story": 8.32
+   }
+  },
+  "vctk_p253": {
+   "voice": "vctk_p253",
+   "source_id": "p253",
+   "gender": "female",
+   "accent": "Welsh",
+   "accent_raw": "Welsh",
+   "region": "Cardiff",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.63,
+   "peak_dbfs": -7.65,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.98,
+   "wpm": 195.5,
+   "f0_median": 224.0,
+   "f0_iqr": [
+    211.2,
+    243.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "vera",
+    0.9637
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 8.0
+   },
+   "rank": 5,
+   "label": "Rhian"
+  },
+  "vctk_p254": {
+   "voice": "vctk_p254",
+   "source_id": "p254",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Surrey",
+   "age": 21,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice charles (0.992)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.58,
+   "peak_dbfs": -1.34,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.98,
+   "wpm": 185.2,
+   "f0_median": 82.0,
+   "f0_iqr": [
+    77.3,
+    88.6
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "charles",
+    0.9922
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 7.76
+   }
+  },
+  "vctk_p255": {
+   "voice": "vctk_p255",
+   "source_id": "p255",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Galloway",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.52,
+   "peak_dbfs": -4.1,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.04,
+   "wpm": 206.8,
+   "f0_median": 138.7,
+   "f0_iqr": [
+    132.3,
+    148.1
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "cicada",
+    0.9266
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago in a village by the sea an old woman kept a lantern burning every night Waiting for a ship that never came home"
+   },
+   "seconds": {
+    "neutral": 5.84,
+    "story": 7.12
+   },
+   "rank": 2,
+   "label": "Callum"
+  },
+  "vctk_p256": {
+   "voice": "vctk_p256",
+   "source_id": "p256",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Birmingham",
+   "age": 24,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice charles (0.982)"
+   ],
+   "score": 1.02,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.77,
+   "peak_dbfs": -3.03,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.58,
+   "wpm": 163.8,
+   "f0_median": 85.0,
+   "f0_iqr": [
+    80.7,
+    91.5
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "charles",
+    0.9821
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.6,
+    "story": 9.92
+   }
+  },
+  "vctk_p257": {
+   "voice": "vctk_p257",
+   "source_id": "p257",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 24,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p231 (0.980)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.21,
+   "peak_dbfs": -4.6,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.66,
+   "wpm": 195.4,
+   "f0_median": 204.0,
+   "f0_iqr": [
+    187.3,
+    219.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "anna",
+    0.9701
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.76,
+    "story": 7.12
+   }
+  },
+  "vctk_p258": {
+   "voice": "vctk_p258",
+   "source_id": "p258",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p271 (0.977)"
+   ],
+   "score": 1.04,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.94,
+   "peak_dbfs": -3.73,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.72,
+   "wpm": 162.8,
+   "f0_median": 120.9,
+   "f0_iqr": [
+    116.8,
+    125.7
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "paul",
+    0.9686
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.44,
+    "story": 8.24
+   }
+  },
+  "vctk_p259": {
+   "voice": "vctk_p259",
+   "source_id": "p259",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Nottingham",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice paul (0.994)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.12,
+   "peak_dbfs": -4.16,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.04,
+   "wpm": 186.9,
+   "f0_median": 113.7,
+   "f0_iqr": [
+    107.7,
+    121.7
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "paul",
+    0.9936
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago in a village by the sea an old woman kept a lantern burning every night Waiting for a ship that never came home"
+   },
+   "seconds": {
+    "neutral": 6.56,
+    "story": 7.84
+   }
+  },
+  "vctk_p260": {
+   "voice": "vctk_p260",
+   "source_id": "p260",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Orkney",
+   "age": 21,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.275,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.98,
+   "peak_dbfs": -1.68,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.98,
+   "wpm": 215.5,
+   "f0_median": 97.9,
+   "f0_iqr": [
+    89.5,
+    110.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 6.5,
+   "nearest_existing": [
+    "paul",
+    0.9242
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago in a village by the sea an old woman kept a lantern burning every night Waiting for a ship that never came home"
+   },
+   "seconds": {
+    "neutral": 5.68,
+    "story": 7.04
+   }
+  },
+  "vctk_p261": {
+   "voice": "vctk_p261",
+   "source_id": "p261",
+   "gender": "female",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Belfast",
+   "age": 26,
+   "dropped": false,
+   "reasons": [],
+   "score": 1.002,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.12,
+   "peak_dbfs": -3.7,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.46,
+   "wpm": 155.2,
+   "f0_median": 242.9,
+   "f0_iqr": [
+    206.8,
+    267.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "eve",
+    0.885
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 10.56
+   },
+   "rank": 45,
+   "label": "Bronagh"
+  },
+  "vctk_p262": {
+   "voice": "vctk_p262",
+   "source_id": "p262",
+   "gender": "female",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Edinburgh",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -25.6,
+   "peak_dbfs": -7.47,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.1,
+   "wpm": 183.4,
+   "f0_median": 153.2,
+   "f0_iqr": [
+    143.3,
+    168.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 7.0,
+   "nearest_existing": [
+    "anna",
+    0.9651
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.4
+   },
+   "rank": 19,
+   "label": "Fiona"
+  },
+  "vctk_p263": {
+   "voice": "vctk_p263",
+   "source_id": "p263",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Aberdeen",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.64,
+   "peak_dbfs": -0.73,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.02,
+   "wpm": 194.8,
+   "f0_median": 105.3,
+   "f0_iqr": [
+    98.8,
+    115.9
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "stuart_bell",
+    0.943
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.24,
+    "story": 7.76
+   },
+   "rank": 13,
+   "label": "Angus"
+  },
+  "vctk_p264": {
+   "voice": "vctk_p264",
+   "source_id": "p264",
+   "gender": "female",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "West Lothian",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p335 (0.977)"
+   ],
+   "score": 0.72,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -25.45,
+   "peak_dbfs": -4.58,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.38,
+   "wpm": 172.9,
+   "f0_median": 199.9,
+   "f0_iqr": [
+    191.4,
+    213.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 7.0,
+   "nearest_existing": [
+    "vera",
+    0.9465
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.12,
+    "story": 9.76
+   }
+  },
+  "vctk_p265": {
+   "voice": "vctk_p265",
+   "source_id": "p265",
+   "gender": "female",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Ross",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.29,
+   "peak_dbfs": -3.82,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.2,
+   "wpm": 168.9,
+   "f0_median": 178.0,
+   "f0_iqr": [
+    163.9,
+    199.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "vera",
+    0.9379
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.04,
+    "story": 9.04
+   },
+   "rank": 22,
+   "label": "Isla"
+  },
+  "vctk_p266": {
+   "voice": "vctk_p266",
+   "source_id": "p266",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Athlone",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.16,
+   "peak_dbfs": -4.22,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.0,
+   "wpm": 183.3,
+   "f0_median": 172.6,
+   "f0_iqr": [
+    164.1,
+    191.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "lola",
+    0.9135
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago in a village by the sea. An old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.24,
+    "story": 7.6
+   },
+   "rank": 14,
+   "label": "Siobhan"
+  },
+  "vctk_p267": {
+   "voice": "vctk_p267",
+   "source_id": "p267",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Yorkshire",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p231 (0.978)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.44,
+   "peak_dbfs": -4.62,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.78,
+   "wpm": 179.7,
+   "f0_median": 176.3,
+   "f0_iqr": [
+    164.6,
+    198.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "vera",
+    0.9667
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.16,
+    "story": 7.84
+   }
+  },
+  "vctk_p268": {
+   "voice": "vctk_p268",
+   "source_id": "p268",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Southern England",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.92,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.64,
+   "peak_dbfs": -2.67,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.54,
+   "wpm": 173.9,
+   "f0_median": 208.3,
+   "f0_iqr": [
+    192.5,
+    226.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "vera",
+    0.9686
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.68,
+    "story": 8.88
+   }
+  },
+  "vctk_p269": {
+   "voice": "vctk_p269",
+   "source_id": "p269",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Newcastle",
+   "age": 20,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.47,
+   "peak_dbfs": -6.3,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.0,
+   "wpm": 203.1,
+   "f0_median": 181.9,
+   "f0_iqr": [
+    172.5,
+    199.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "fantine",
+    0.9697
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 7.44
+   },
+   "rank": 26,
+   "label": "Beatrice"
+  },
+  "vctk_p270": {
+   "voice": "vctk_p270",
+   "source_id": "p270",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Yorkshire",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.74,
+   "peak_dbfs": -6.35,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.88,
+   "wpm": 182.9,
+   "f0_median": 99.5,
+   "f0_iqr": [
+    97.0,
+    102.9
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "paul",
+    0.9257
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.16,
+    "story": 7.68
+   },
+   "rank": 18,
+   "label": "Rupert"
+  },
+  "vctk_p271": {
+   "voice": "vctk_p271",
+   "source_id": "p271",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Fife",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.66,
+   "peak_dbfs": -4.11,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.86,
+   "wpm": 195.9,
+   "f0_median": 116.6,
+   "f0_iqr": [
+    112.5,
+    121.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "paul",
+    0.9696
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.0,
+    "story": 7.6
+   },
+   "rank": 23,
+   "label": "Hamish"
+  },
+  "vctk_p272": {
+   "voice": "vctk_p272",
+   "source_id": "p272",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Edinburgh",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice paul (0.977)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.68,
+   "peak_dbfs": -2.21,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.16,
+   "wpm": 199.2,
+   "f0_median": 118.1,
+   "f0_iqr": [
+    108.4,
+    128.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "paul",
+    0.9769
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.6
+   }
+  },
+  "vctk_p273": {
+   "voice": "vctk_p273",
+   "source_id": "p273",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Suffolk",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.16,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.75,
+   "peak_dbfs": -5.95,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.28,
+   "wpm": 189.6,
+   "f0_median": 150.4,
+   "f0_iqr": [
+    144.5,
+    157.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "paul",
+    0.9176
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.0
+   }
+  },
+  "vctk_p274": {
+   "voice": "vctk_p274",
+   "source_id": "p274",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Essex",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.16,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.27,
+   "peak_dbfs": -1.64,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.28,
+   "wpm": 183.7,
+   "f0_median": 96.1,
+   "f0_iqr": [
+    89.1,
+    106.7
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "stuart_bell",
+    0.968
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 7.68
+   }
+  },
+  "vctk_p275": {
+   "voice": "vctk_p275",
+   "source_id": "p275",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Midlothian",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.46,
+   "peak_dbfs": -3.87,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.76,
+   "wpm": 187.8,
+   "f0_median": 112.9,
+   "f0_iqr": [
+    106.5,
+    118.9
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "cicada",
+    0.9374
+   ],
+   "transcripts": {
+    "neutral": "please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.92,
+    "story": 7.52
+   },
+   "rank": 25,
+   "label": "Euan"
+  },
+  "vctk_p276": {
+   "voice": "vctk_p276",
+   "source_id": "p276",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Oxford",
+   "age": 24,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.67,
+   "peak_dbfs": -5.02,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.18,
+   "wpm": 175.4,
+   "f0_median": 217.4,
+   "f0_iqr": [
+    205.6,
+    238.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "vera",
+    0.9468
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 8.0
+   },
+   "rank": 27,
+   "label": "Rosie"
+  },
+  "vctk_p277": {
+   "voice": "vctk_p277",
+   "source_id": "p277",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "NE England",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p240 (0.981)"
+   ],
+   "score": 0.82,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.13,
+   "peak_dbfs": -3.5,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.48,
+   "wpm": 185.6,
+   "f0_median": 196.2,
+   "f0_iqr": [
+    184.5,
+    213.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "vera",
+    0.9552
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.28,
+    "story": 8.4
+   }
+  },
+  "vctk_p278": {
+   "voice": "vctk_p278",
+   "source_id": "p278",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Cheshire",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.48,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.92,
+   "peak_dbfs": -0.24,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.82,
+   "wpm": 177.3,
+   "f0_median": 114.1,
+   "f0_iqr": [
+    105.2,
+    124.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "donor_30c5",
+    0.9584
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.68,
+    "story": 8.4
+   }
+  },
+  "vctk_p279": {
+   "voice": "vctk_p279",
+   "source_id": "p279",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Leicester",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.4,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -25.44,
+   "peak_dbfs": -5.94,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.4,
+   "wpm": 180.7,
+   "f0_median": 112.9,
+   "f0_iqr": [
+    104.6,
+    124.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 7.0,
+   "nearest_existing": [
+    "stuart_bell",
+    0.9447
+   ],
+   "transcripts": {
+    "neutral": "please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.56,
+    "story": 7.52
+   }
+  },
+  "vctk_p280": {
+   "voice": "vctk_p280",
+   "source_id": "p280",
+   "gender": "female",
+   "accent": null,
+   "accent_raw": "Unknown",
+   "region": "France",
+   "age": 25,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.38,
+   "peak_dbfs": -2.41,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.66,
+   "wpm": 206.9,
+   "f0_median": 176.0,
+   "f0_iqr": [
+    164.6,
+    199.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "fantine",
+    0.9626
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.68,
+    "story": 7.28
+   },
+   "rank": 7,
+   "label": "Amelie"
+  },
+  "vctk_p281": {
+   "voice": "vctk_p281",
+   "source_id": "p281",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Edinburgh",
+   "age": 29,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.27,
+   "peak_dbfs": -1.96,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.82,
+   "wpm": 177.7,
+   "f0_median": 90.3,
+   "f0_iqr": [
+    85.7,
+    95.3
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "paul",
+    0.9248
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 8.0
+   },
+   "rank": 28,
+   "label": "Fraser"
+  },
+  "vctk_p282": {
+   "voice": "vctk_p282",
+   "source_id": "p282",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Newcastle",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice fantine (0.986)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.13,
+   "peak_dbfs": -3.95,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.78,
+   "wpm": 168.5,
+   "f0_median": 181.7,
+   "f0_iqr": [
+    171.5,
+    202.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "fantine",
+    0.9865
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 8.16
+   }
+  },
+  "vctk_p283": {
+   "voice": "vctk_p283",
+   "source_id": "p283",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Cork",
+   "age": 24,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.06,
+   "peak_dbfs": -5.59,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.5,
+   "wpm": 182.2,
+   "f0_median": 207.6,
+   "f0_iqr": [
+    195.4,
+    222.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "vera",
+    0.9433
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 7.84
+   },
+   "rank": 20,
+   "label": "Aoife"
+  },
+  "vctk_p284": {
+   "voice": "vctk_p284",
+   "source_id": "p284",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Fife",
+   "age": 20,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice charles (0.976)"
+   ],
+   "score": 0.282,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.7,
+   "peak_dbfs": -3.0,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.9,
+   "wpm": 215.6,
+   "f0_median": 98.0,
+   "f0_iqr": [
+    88.6,
+    111.2
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "charles",
+    0.9756
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.84,
+    "story": 6.88
+   }
+  },
+  "vctk_p285": {
+   "voice": "vctk_p285",
+   "source_id": "p285",
+   "gender": "male",
+   "accent": "Scottish",
+   "accent_raw": "Scottish",
+   "region": "Edinburgh",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.09,
+   "peak_dbfs": -3.5,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.92,
+   "wpm": 209.3,
+   "f0_median": 117.9,
+   "f0_iqr": [
+    111.0,
+    130.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "alba",
+    0.9137
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.76,
+    "story": 7.36
+   },
+   "rank": 29,
+   "label": "Alasdair"
+  },
+  "vctk_p286": {
+   "voice": "vctk_p286",
+   "source_id": "p286",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "Newcastle",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.32,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.87,
+   "peak_dbfs": -5.66,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.36,
+   "wpm": 191.2,
+   "f0_median": 139.3,
+   "f0_iqr": [
+    130.6,
+    149.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "paul",
+    0.9548
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.68
+   }
+  },
+  "vctk_p287": {
+   "voice": "vctk_p287",
+   "source_id": "p287",
+   "gender": "male",
+   "accent": "British",
+   "accent_raw": "English",
+   "region": "York",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.16,
+   "peak_dbfs": -4.26,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.14,
+   "wpm": 198.4,
+   "f0_median": 98.6,
+   "f0_iqr": [
+    90.4,
+    107.5
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "charles",
+    0.9445
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago in a village by the sea an old woman kept a lantern burning every night Waiting for a ship that never came home"
+   },
+   "seconds": {
+    "neutral": 6.0,
+    "story": 7.6
+   }
+  },
+  "vctk_p288": {
+   "voice": "vctk_p288",
+   "source_id": "p288",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Dublin",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p280 (0.983)"
+   ],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.59,
+   "peak_dbfs": -1.23,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.04,
+   "wpm": 187.8,
+   "f0_median": 175.5,
+   "f0_iqr": [
+    164.8,
+    194.0
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "vera",
+    0.943
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.08,
+    "story": 8.08
+   }
+  },
+  "vctk_p292": {
+   "voice": "vctk_p292",
+   "source_id": "p292",
+   "gender": "male",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Belfast",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.7,
+   "peak_dbfs": -4.58,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.86,
+   "wpm": 195.6,
+   "f0_median": 104.9,
+   "f0_iqr": [
+    96.8,
+    115.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "donor_8935",
+    0.9381
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.16,
+    "story": 7.84
+   },
+   "rank": 4,
+   "label": "Seamus"
+  },
+  "vctk_p293": {
+   "voice": "vctk_p293",
+   "source_id": "p293",
+   "gender": "female",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Belfast",
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in story (2.16s)"
+   ],
+   "score": 3.885,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.98,
+   "peak_dbfs": -2.49,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.16,
+   "wpm": 120.7,
+   "f0_median": 176.8,
+   "f0_iqr": [
+    164.4,
+    194.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "fantine",
+    0.9682
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 9.36,
+    "story": 11.76
+   }
+  },
+  "vctk_p294": {
+   "voice": "vctk_p294",
+   "source_id": "p294",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "San Francisco",
+   "age": 33,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.16,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.93,
+   "peak_dbfs": -2.05,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.76,
+   "wpm": 162.1,
+   "f0_median": 162.0,
+   "f0_iqr": [
+    151.9,
+    176.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "jane",
+    0.9353
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.12,
+    "story": 9.6
+   }
+  },
+  "vctk_p295": {
+   "voice": "vctk_p295",
+   "source_id": "p295",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Dublin",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.22,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.38,
+   "peak_dbfs": -4.78,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.68,
+   "wpm": 162.2,
+   "f0_median": 185.8,
+   "f0_iqr": [
+    174.1,
+    204.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "fantine",
+    0.9707
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.84,
+    "story": 10.16
+   }
+  },
+  "vctk_p297": {
+   "voice": "vctk_p297",
+   "source_id": "p297",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "New York",
+   "age": 20,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.14,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.86,
+   "peak_dbfs": -1.84,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.02,
+   "wpm": 181.3,
+   "f0_median": 170.6,
+   "f0_iqr": [
+    158.9,
+    203.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "jane",
+    0.9587
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.32,
+    "story": 9.12
+   },
+   "rank": 35,
+   "label": "Savannah"
+  },
+  "vctk_p298": {
+   "voice": "vctk_p298",
+   "source_id": "p298",
+   "gender": "male",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Tipperary",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.84,
+   "peak_dbfs": -3.75,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.92,
+   "wpm": 208.4,
+   "f0_median": 115.2,
+   "f0_iqr": [
+    106.8,
+    123.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "michael",
+    0.9057
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago in a village by the sea an old woman kept a lantern burning every night waiting for a ship that never came home"
+   },
+   "seconds": {
+    "neutral": 5.92,
+    "story": 7.12
+   },
+   "rank": 6,
+   "label": "Ciaran"
+  },
+  "vctk_p299": {
+   "voice": "vctk_p299",
+   "source_id": "p299",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "California",
+   "age": 25,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in neutral (2.12s)"
+   ],
+   "score": 2.445,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.56,
+   "peak_dbfs": -5.09,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.12,
+   "wpm": 152.7,
+   "f0_median": 171.9,
+   "f0_iqr": [
+    157.5,
+    195.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "eve",
+    0.9572
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.84,
+    "story": 11.2
+   }
+  },
+  "vctk_p300": {
+   "voice": "vctk_p300",
+   "source_id": "p300",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "California",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.917,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.95,
+   "peak_dbfs": -2.21,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.66,
+   "wpm": 140.1,
+   "f0_median": 196.0,
+   "f0_iqr": [
+    183.0,
+    219.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "azelma",
+    0.9473
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.84,
+    "story": 10.16
+   }
+  },
+  "vctk_p301": {
+   "voice": "vctk_p301",
+   "source_id": "p301",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "North Carolina",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in neutral (2.1s)"
+   ],
+   "score": 1.8,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.55,
+   "peak_dbfs": -4.44,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.1,
+   "wpm": 170.6,
+   "f0_median": 164.3,
+   "f0_iqr": [
+    154.5,
+    176.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "george",
+    0.9062
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.68,
+    "story": 8.64
+   }
+  },
+  "vctk_p302": {
+   "voice": "vctk_p302",
+   "source_id": "p302",
+   "gender": "male",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Montreal",
+   "age": 20,
+   "dropped": false,
+   "reasons": [],
+   "score": 1.99,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.71,
+   "peak_dbfs": -0.97,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.92,
+   "wpm": 149.0,
+   "f0_median": 122.7,
+   "f0_iqr": [
+    116.4,
+    133.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.0,
+   "nearest_existing": [
+    "jeffrey",
+    0.9433
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.12,
+    "story": 9.92
+   },
+   "rank": 49,
+   "label": "Brayden"
+  },
+  "vctk_p303": {
+   "voice": "vctk_p303",
+   "source_id": "p303",
+   "gender": "female",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Toronto",
+   "age": 24,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.91,
+   "peak_dbfs": -5.09,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.72,
+   "wpm": 183.1,
+   "f0_median": 217.5,
+   "f0_iqr": [
+    202.4,
+    235.0
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "azelma",
+    0.9658
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.72,
+    "story": 7.92
+   },
+   "rank": 9,
+   "label": "Chantal"
+  },
+  "vctk_p304": {
+   "voice": "vctk_p304",
+   "source_id": "p304",
+   "gender": "male",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Belfast",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.24,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.31,
+   "peak_dbfs": -2.94,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.32,
+   "wpm": 197.9,
+   "f0_median": 106.7,
+   "f0_iqr": [
+    95.1,
+    125.5
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "javert",
+    0.9376
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.52
+   },
+   "rank": 38,
+   "label": "Colm"
+  },
+  "vctk_p305": {
+   "voice": "vctk_p305",
+   "source_id": "p305",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Philadelphia",
+   "age": 19,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in neutral (2.04s)"
+   ],
+   "score": 1.92,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.96,
+   "peak_dbfs": -4.76,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.04,
+   "wpm": 165.8,
+   "f0_median": 231.2,
+   "f0_iqr": [
+    211.4,
+    264.3
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "azelma",
+    0.9641
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.08,
+    "story": 9.2
+   }
+  },
+  "vctk_p306": {
+   "voice": "vctk_p306",
+   "source_id": "p306",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "New York",
+   "age": 21,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 2.772,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.88,
+   "peak_dbfs": -3.71,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.88,
+   "wpm": 131.8,
+   "f0_median": 174.7,
+   "f0_iqr": [
+    167.1,
+    192.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "eponine",
+    0.9566
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.48,
+    "story": 10.64
+   }
+  },
+  "vctk_p307": {
+   "voice": "vctk_p307",
+   "source_id": "p307",
+   "gender": "female",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Ontario",
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.285,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.49,
+   "peak_dbfs": -1.96,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.58,
+   "wpm": 154.3,
+   "f0_median": 245.5,
+   "f0_iqr": [
+    221.1,
+    275.8
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "azelma",
+    0.9625
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 9.52
+   }
+  },
+  "vctk_p308": {
+   "voice": "vctk_p308",
+   "source_id": "p308",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Alabama",
+   "age": 18,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in neutral (2.04s)",
+    "dropout/long pause in story (2.14s)"
+   ],
+   "score": 3.183,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -18.02,
+   "peak_dbfs": -1.44,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.14,
+   "wpm": 133.9,
+   "f0_median": 175.4,
+   "f0_iqr": [
+    165.0,
+    196.3
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": -0.5,
+   "nearest_existing": [
+    "mary",
+    0.9173
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the North entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.84,
+    "story": 11.2
+   }
+  },
+  "vctk_p310": {
+   "voice": "vctk_p310",
+   "source_id": "p310",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Tennessee",
+   "age": 21,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.578,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.94,
+   "peak_dbfs": -3.28,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.78,
+   "wpm": 156.8,
+   "f0_median": 240.7,
+   "f0_iqr": [
+    226.8,
+    260.5
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.5,
+   "nearest_existing": [
+    "hannah",
+    0.9095
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.0,
+    "story": 9.84
+   }
+  },
+  "vctk_p311": {
+   "voice": "vctk_p311",
+   "source_id": "p311",
+   "gender": "male",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Iowa",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 1.7,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.81,
+   "peak_dbfs": -2.06,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.94,
+   "wpm": 162.0,
+   "f0_median": 110.8,
+   "f0_iqr": [
+    102.2,
+    125.5
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "allen",
+    0.9146
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.12,
+    "story": 10.8
+   },
+   "rank": 48,
+   "label": "Garrett"
+  },
+  "vctk_p312": {
+   "voice": "vctk_p312",
+   "source_id": "p312",
+   "gender": "female",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Hamilton",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.16,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.68,
+   "peak_dbfs": -3.53,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.02,
+   "wpm": 189.6,
+   "f0_median": 220.6,
+   "f0_iqr": [
+    195.9,
+    239.2
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "jane",
+    0.9412
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.48
+   },
+   "rank": 36,
+   "label": "Kendra"
+  },
+  "vctk_p313": {
+   "voice": "vctk_p313",
+   "source_id": "p313",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "County Down",
+   "age": 24,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 4.72,
+   "wer": [
+    0.0588,
+    0.0
+   ],
+   "wer_mean": 0.0294,
+   "lufs": -21.01,
+   "peak_dbfs": -3.66,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.76,
+   "wpm": 151.2,
+   "f0_median": 162.8,
+   "f0_iqr": [
+    155.7,
+    172.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "lola",
+    0.8985
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. Meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.76,
+    "story": 10.16
+   }
+  },
+  "vctk_p314": {
+   "voice": "vctk_p314",
+   "source_id": "p314",
+   "gender": "female",
+   "accent": "South African",
+   "accent_raw": "SouthAfrican",
+   "region": "Cape Town",
+   "age": 26,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of better candidate vctk_p231 (0.978)"
+   ],
+   "score": 1.28,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.23,
+   "peak_dbfs": -0.87,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.74,
+   "wpm": 166.3,
+   "f0_median": 171.4,
+   "f0_iqr": [
+    158.7,
+    193.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "anna",
+    0.9698
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.32,
+    "story": 10.56
+   }
+  },
+  "vctk_p315": {
+   "voice": "vctk_p315",
+   "source_id": "p315",
+   "gender": "male",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "New England",
+   "age": 18,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice george (0.986)"
+   ],
+   "score": 1.29,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.66,
+   "peak_dbfs": -4.09,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.76,
+   "wpm": 235.8,
+   "f0_median": 119.3,
+   "f0_iqr": [
+    105.5,
+    130.8
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 5.0,
+   "nearest_existing": [
+    "george",
+    0.9859
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.04,
+    "story": 6.4
+   }
+  },
+  "vctk_p316": {
+   "voice": "vctk_p316",
+   "source_id": "p316",
+   "gender": "male",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Alberta",
+   "age": 20,
+   "dropped": false,
+   "reasons": [],
+   "score": 2.118,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.73,
+   "peak_dbfs": -4.69,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.74,
+   "wpm": 139.2,
+   "f0_median": 96.1,
+   "f0_iqr": [
+    88.9,
+    103.2
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "alba",
+    0.9482
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.4,
+    "story": 9.76
+   },
+   "rank": 50,
+   "label": "Kyle"
+  },
+  "vctk_p317": {
+   "voice": "vctk_p317",
+   "source_id": "p317",
+   "gender": "female",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Hamilton",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.2,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.71,
+   "peak_dbfs": -2.65,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.18,
+   "wpm": 177.2,
+   "f0_median": 246.4,
+   "f0_iqr": [
+    229.7,
+    271.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "hannah",
+    0.9546
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.96,
+    "story": 9.28
+   },
+   "rank": 37,
+   "label": "Shannon"
+  },
+  "vctk_p318": {
+   "voice": "vctk_p318",
+   "source_id": "p318",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Napa",
+   "age": 32,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.297,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.14,
+   "peak_dbfs": -4.06,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.64,
+   "wpm": 156.1,
+   "f0_median": 183.4,
+   "f0_iqr": [
+    164.9,
+    209.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "eponine",
+    0.9216
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.08,
+    "story": 9.84
+   }
+  },
+  "vctk_p323": {
+   "voice": "vctk_p323",
+   "source_id": "p323",
+   "gender": "female",
+   "accent": "South African",
+   "accent_raw": "SouthAfrican",
+   "region": "Pretoria",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.13,
+   "peak_dbfs": -4.81,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.08,
+   "wpm": 171.8,
+   "f0_median": 205.8,
+   "f0_iqr": [
+    187.0,
+    252.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.5,
+   "nearest_existing": [
+    "vera",
+    0.9479
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.04,
+    "story": 8.96
+   },
+   "rank": 11,
+   "label": "Thandi"
+  },
+  "vctk_p326": {
+   "voice": "vctk_p326",
+   "source_id": "p326",
+   "gender": "male",
+   "accent": "Australian",
+   "accent_raw": "Australian",
+   "region": "Sydney",
+   "age": 26,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.65,
+   "peak_dbfs": -3.32,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.16,
+   "wpm": 177.9,
+   "f0_median": 78.5,
+   "f0_iqr": [
+    76.6,
+    82.2
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "donor_8935",
+    0.8853
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 8.24
+   },
+   "rank": 8,
+   "label": "Bruce"
+  },
+  "vctk_p329": {
+   "voice": "vctk_p329",
+   "source_id": "p329",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": null,
+   "age": 23,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 3.022,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.31,
+   "peak_dbfs": -2.49,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.84,
+   "wpm": 125.2,
+   "f0_median": 204.7,
+   "f0_iqr": [
+    193.7,
+    218.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 0.5,
+   "nearest_existing": [
+    "eponine",
+    0.9406
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.4,
+    "story": 11.76
+   }
+  },
+  "vctk_p330": {
+   "voice": "vctk_p330",
+   "source_id": "p330",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": null,
+   "age": 26,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 3.095,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.68,
+   "peak_dbfs": -2.63,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.94,
+   "wpm": 127.7,
+   "f0_median": 183.4,
+   "f0_iqr": [
+    170.3,
+    200.5
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.0,
+   "nearest_existing": [
+    "eponine",
+    0.9488
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 9.52,
+    "story": 10.24
+   }
+  },
+  "vctk_p333": {
+   "voice": "vctk_p333",
+   "source_id": "p333",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Indiana",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.7,
+   "peak_dbfs": -4.16,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.96,
+   "wpm": 189.7,
+   "f0_median": 171.7,
+   "f0_iqr": [
+    161.8,
+    192.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "eve",
+    0.9723
+   ],
+   "transcripts": {
+    "neutral": "please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.0,
+    "story": 7.6
+   },
+   "rank": 16,
+   "label": "Madison"
+  },
+  "vctk_p334": {
+   "voice": "vctk_p334",
+   "source_id": "p334",
+   "gender": "male",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Chicago",
+   "age": 18,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.09,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.89,
+   "peak_dbfs": -1.6,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.02,
+   "wpm": 211.8,
+   "f0_median": 91.5,
+   "f0_iqr": [
+    84.9,
+    100.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "george",
+    0.9447
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.68,
+    "story": 7.04
+   },
+   "rank": 32,
+   "label": "Cody"
+  },
+  "vctk_p335": {
+   "voice": "vctk_p335",
+   "source_id": "p335",
+   "gender": "female",
+   "accent": "New Zealand",
+   "accent_raw": "NewZealand",
+   "region": null,
+   "age": 25,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.52,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.45,
+   "peak_dbfs": -3.64,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.04,
+   "wpm": 168.9,
+   "f0_median": 200.6,
+   "f0_iqr": [
+    189.4,
+    218.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "vera",
+    0.9499
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.84,
+    "story": 9.52
+   },
+   "rank": 39,
+   "label": "Aroha"
+  },
+  "vctk_p336": {
+   "voice": "vctk_p336",
+   "source_id": "p336",
+   "gender": "female",
+   "accent": "South African",
+   "accent_raw": "SouthAfrican",
+   "region": "Johannesburg",
+   "age": 18,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.98,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -26.98,
+   "peak_dbfs": -5.32,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.56,
+   "wpm": 181.4,
+   "f0_median": 200.7,
+   "f0_iqr": [
+    186.4,
+    221.9
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 8.5,
+   "nearest_existing": [
+    "vera",
+    0.8799
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.52,
+    "story": 8.56
+   },
+   "rank": 44,
+   "label": "Annelie"
+  },
+  "vctk_p339": {
+   "voice": "vctk_p339",
+   "source_id": "p339",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Pennsylvania",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.64,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -26.35,
+   "peak_dbfs": -4.6,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.52,
+   "wpm": 188.0,
+   "f0_median": 188.1,
+   "f0_iqr": [
+    174.0,
+    209.4
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 7.5,
+   "nearest_existing": [
+    "jane",
+    0.9738
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.72,
+    "story": 8.0
+   },
+   "rank": 41,
+   "label": "Brooke"
+  },
+  "vctk_p340": {
+   "voice": "vctk_p340",
+   "source_id": "p340",
+   "gender": "female",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Dublin",
+   "age": 18,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.92,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.56,
+   "peak_dbfs": -5.6,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.44,
+   "wpm": 183.4,
+   "f0_median": 208.1,
+   "f0_iqr": [
+    200.0,
+    218.6
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "anna",
+    0.907
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.6,
+    "story": 8.16
+   },
+   "rank": 43,
+   "label": "Niamh"
+  },
+  "vctk_p341": {
+   "voice": "vctk_p341",
+   "source_id": "p341",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Ohio",
+   "age": 26,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice eve (0.976)"
+   ],
+   "score": 1.235,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -22.55,
+   "peak_dbfs": -3.66,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.58,
+   "wpm": 154.9,
+   "f0_median": 178.9,
+   "f0_iqr": [
+    168.5,
+    206.1
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 4.0,
+   "nearest_existing": [
+    "eve",
+    0.9758
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.92,
+    "story": 10.32
+   }
+  },
+  "vctk_p343": {
+   "voice": "vctk_p343",
+   "source_id": "p343",
+   "gender": "female",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Alberta",
+   "age": 27,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 1.722,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -23.93,
+   "peak_dbfs": -5.45,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.6,
+   "wpm": 146.4,
+   "f0_median": 154.7,
+   "f0_iqr": [
+    143.6,
+    170.7
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": null,
+   "f0_check": "ambiguous",
+   "gain_db": 5.5,
+   "nearest_existing": [
+    "cicada",
+    0.9258
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.0,
+    "story": 10.48
+   }
+  },
+  "vctk_p345": {
+   "voice": "vctk_p345",
+   "source_id": "p345",
+   "gender": "male",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "Florida",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.12,
+   "peak_dbfs": -2.74,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.02,
+   "wpm": 205.4,
+   "f0_median": 90.1,
+   "f0_iqr": [
+    84.7,
+    100.0
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "michael",
+    0.908
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.0,
+    "story": 7.2
+   },
+   "rank": 10,
+   "label": "Tyler"
+  },
+  "vctk_p347": {
+   "voice": "vctk_p347",
+   "source_id": "p347",
+   "gender": "male",
+   "accent": "South African",
+   "accent_raw": "SouthAfrican",
+   "region": "Johannesburg",
+   "age": 26,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.56,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.77,
+   "peak_dbfs": -0.0,
+   "clipped_fraction": 1.2e-05,
+   "longest_gap": 1.48,
+   "wpm": 180.2,
+   "f0_median": 84.5,
+   "f0_iqr": [
+    80.6,
+    89.4
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 3.0,
+   "nearest_existing": [
+    "peter_yearsley",
+    0.8934
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.72,
+    "story": 8.32
+   },
+   "rank": 40,
+   "label": "Pieter"
+  },
+  "vctk_p351": {
+   "voice": "vctk_p351",
+   "source_id": "p351",
+   "gender": "female",
+   "accent": "Northern Irish",
+   "accent_raw": "NorthernIrish",
+   "region": "Derry",
+   "age": 21,
+   "dropped": false,
+   "reasons": [],
+   "score": 1.535,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.07,
+   "peak_dbfs": -4.01,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.88,
+   "wpm": 156.5,
+   "f0_median": 223.7,
+   "f0_iqr": [
+    215.1,
+    238.3
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "hannah",
+    0.9296
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.76,
+    "story": 8.32
+   },
+   "rank": 47,
+   "label": "Deirdre"
+  },
+  "vctk_p360": {
+   "voice": "vctk_p360",
+   "source_id": "p360",
+   "gender": "male",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "New Jersey",
+   "age": 19,
+   "dropped": false,
+   "reasons": [],
+   "score": 1.093,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.31,
+   "peak_dbfs": -2.54,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.34,
+   "wpm": 143.8,
+   "f0_median": 93.6,
+   "f0_iqr": [
+    86.2,
+    107.3
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "michael",
+    0.967
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.52,
+    "story": 10.0
+   },
+   "rank": 46,
+   "label": "Dustin"
+  },
+  "vctk_p361": {
+   "voice": "vctk_p361",
+   "source_id": "p361",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": "New Jersey",
+   "age": 19,
+   "dropped": true,
+   "reasons": [
+    "near-duplicate of existing voice eve (0.978)"
+   ],
+   "score": 3.568,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -19.3,
+   "peak_dbfs": -1.78,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.0,
+   "wpm": 120.6,
+   "f0_median": 180.1,
+   "f0_iqr": [
+    166.3,
+    205.0
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 0.5,
+   "nearest_existing": [
+    "eve",
+    0.9784
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 9.28,
+    "story": 11.68
+   }
+  },
+  "vctk_p362": {
+   "voice": "vctk_p362",
+   "source_id": "p362",
+   "gender": "female",
+   "accent": "American",
+   "accent_raw": "American",
+   "region": null,
+   "age": 29,
+   "dropped": true,
+   "reasons": [
+    "dropout/long pause in neutral (2.04s)"
+   ],
+   "score": 2.26,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -21.34,
+   "peak_dbfs": -5.06,
+   "clipped_fraction": 0.0,
+   "longest_gap": 2.04,
+   "wpm": 149.2,
+   "f0_median": 203.6,
+   "f0_iqr": [
+    183.8,
+    222.5
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.5,
+   "nearest_existing": [
+    "eponine",
+    0.9325
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 8.0,
+    "story": 9.76
+   }
+  },
+  "vctk_p363": {
+   "voice": "vctk_p363",
+   "source_id": "p363",
+   "gender": "male",
+   "accent": "Canadian",
+   "accent_raw": "Canadian",
+   "region": "Toronto",
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.04,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.21,
+   "peak_dbfs": -2.7,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.22,
+   "wpm": 187.1,
+   "f0_median": 106.5,
+   "f0_iqr": [
+    98.4,
+    121.6
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 1.5,
+   "nearest_existing": [
+    "javert",
+    0.9233
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12, near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.64,
+    "story": 7.6
+   },
+   "rank": 30,
+   "label": "Mathieu"
+  },
+  "vctk_p364": {
+   "voice": "vctk_p364",
+   "source_id": "p364",
+   "gender": "male",
+   "accent": "Irish",
+   "accent_raw": "Irish",
+   "region": "Donegal",
+   "age": 23,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.12,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.84,
+   "peak_dbfs": -4.06,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.26,
+   "wpm": 166.7,
+   "f0_median": 100.3,
+   "f0_iqr": [
+    93.1,
+    109.9
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "donor_8935",
+    0.9128
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.8,
+    "story": 8.48
+   },
+   "rank": 34,
+   "label": "Eoin"
+  },
+  "vctk_p374": {
+   "voice": "vctk_p374",
+   "source_id": "p374",
+   "gender": "male",
+   "accent": "Australian",
+   "accent_raw": "Australian",
+   "region": null,
+   "age": 28,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -24.5,
+   "peak_dbfs": -7.6,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.16,
+   "wpm": 170.9,
+   "f0_median": 119.4,
+   "f0_iqr": [
+    103.6,
+    135.1
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 6.0,
+   "nearest_existing": [
+    "donor_30c5",
+    0.9179
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 6.96,
+    "story": 8.56
+   },
+   "rank": 15,
+   "label": "Darcy"
+  },
+  "vctk_p376": {
+   "voice": "vctk_p376",
+   "source_id": "p376",
+   "gender": "male",
+   "accent": "Indian",
+   "accent_raw": "Indian",
+   "region": null,
+   "age": 22,
+   "dropped": false,
+   "reasons": [],
+   "score": 0.0,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.77,
+   "peak_dbfs": -1.79,
+   "clipped_fraction": 0.0,
+   "longest_gap": 0.76,
+   "wpm": 188.1,
+   "f0_median": 101.3,
+   "f0_iqr": [
+    91.4,
+    111.7
+   ],
+   "gender_estimate": "male",
+   "gender_f0_rule": "male",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "donor_8935",
+    0.9279
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to room 12 near the north entrance.",
+    "story": "Long ago in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 5.92,
+    "story": 7.6
+   },
+   "rank": 17,
+   "label": "Vikram"
+  },
+  "vctk_s5": {
+   "voice": "vctk_s5",
+   "source_id": "s5",
+   "gender": "female",
+   "accent": "British",
+   "accent_raw": "British",
+   "region": null,
+   "age": 22,
+   "dropped": true,
+   "reasons": [
+    "outside the 50-voice cap (balanced by gender and accent, then quality)"
+   ],
+   "score": 0.42,
+   "wer": [
+    0.0,
+    0.0
+   ],
+   "wer_mean": 0.0,
+   "lufs": -20.62,
+   "peak_dbfs": -1.16,
+   "clipped_fraction": 0.0,
+   "longest_gap": 1.26,
+   "wpm": 181.7,
+   "f0_median": 205.3,
+   "f0_iqr": [
+    188.2,
+    236.3
+   ],
+   "gender_estimate": "female",
+   "gender_f0_rule": "female",
+   "f0_check": "agrees",
+   "gain_db": 2.0,
+   "nearest_existing": [
+    "vera",
+    0.8534
+   ],
+   "transcripts": {
+    "neutral": "Please check the schedule before Thursday. The meeting has moved to Room 12 near the north entrance.",
+    "story": "Long ago, in a village by the sea, an old woman kept a lantern burning every night, waiting for a ship that never came home."
+   },
+   "seconds": {
+    "neutral": 7.28,
+    "story": 8.8
+   }
+  }
+ }
+}

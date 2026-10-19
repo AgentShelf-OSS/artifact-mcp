@@ -1,0 +1,4245 @@
+{
+ "model": "english_2026-04",
+ "gated_revision": "19f95fe2df36e79fbd9f10008595cc4c977a0fcc",
+ "quantized": true,
+ "results": [
+  {
+   "voice": "vctk_p225",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p225",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p225/p225_280_mic2.flac",
+    "wav48_silence_trimmed/p225/p225_044_mic2.flac",
+    "wav48_silence_trimmed/p225/p225_149_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "7b06f1367e3f463ac753bbf81c0834c485f77f72f4dd7a485c2954e982d11f52",
+    "e6d4f2001e0909ba4ceefaaac7304f609314051b1f67b0e860dfbfff4b341688",
+    "b7ae42eb792222896801977d3c6ca84c1c97efc364bec7f92a4f17c700da7356"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3fab61b9bd66dd853ffa2d15f72a3bc5871b17b1accc123436b9458b397f56cd",
+   "source_seconds": 14.569,
+   "source_rms_dbfs": -22.91,
+   "source_peak": 0.8013,
+   "source_gain_db": 1.01,
+   "embedding_sha256": "9950cb366c05256efc46804bf155ea0680675a20cf5320df6619aa20332ef9a3",
+   "bytes": 9045816,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p225  23  F    English    Southern  England"
+   },
+   "export_seconds": 4.22
+  },
+  {
+   "voice": "vctk_p226",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p226",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p226/p226_153_mic2.flac",
+    "wav48_silence_trimmed/p226/p226_043_mic2.flac",
+    "wav48_silence_trimmed/p226/p226_033_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ffc1f5d1fa2c88980c4bd390f81366742ffa9869a0c3cd44535c355406f68741",
+    "af3780e44d0d3bd59e720ce0d654ace0dc18a8ec7737496b98238cda58ed7faa",
+    "107f697dfa542d4ad490233dff1c6b2a5fbb14815d5573f19f7a64e79c4eb502"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "cb7a758611befc958652119b5e9ba7804f7ae226a1b95c91aa6d32484c1f7480",
+   "source_seconds": 13.183,
+   "source_rms_dbfs": -22.84,
+   "source_peak": 0.7122,
+   "source_gain_db": 2.03,
+   "embedding_sha256": "1071f71ef38b3a63ba259ee2939b86ef98f55912f58c1434bba363c4699ae249",
+   "bytes": 8161080,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Surrey",
+    "line": "p226  22  M    English    Surrey"
+   },
+   "export_seconds": 3.7
+  },
+  {
+   "voice": "vctk_p227",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p227",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p227/p227_127_mic1.flac",
+    "wav48_silence_trimmed/p227/p227_150_mic1.flac",
+    "wav48_silence_trimmed/p227/p227_305_mic1.flac"
+   ],
+   "source_member_sha256": [
+    "e9eeef1e61cc5537784d0da2fd115295cc08c7b9c04028c7ed86a744d3d48606",
+    "746a22c73922b717e4435b4d7aec9952d5fbbbc36036aa3cfa68f41ffc7d135c",
+    "c63e07f573e175c3ff2240cec66e5be623efdaf4aa0ef4e925b2935f454c0d02"
+   ],
+   "source_mic": "mic1",
+   "source_highpass_60hz": true,
+   "source_sha256": "21b969f9526d86b72364ce54c2af9f068cbb777591ad430654d20e1897867b7e",
+   "source_seconds": 12.38,
+   "source_rms_dbfs": -24.99,
+   "source_peak": 0.7241,
+   "source_gain_db": 1.89,
+   "embedding_sha256": "9f38692d5a488c8d0f1b80ca7c9e88016236732a69c43494437989a6395bc839",
+   "bytes": 7669560,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 38,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Cumbria",
+    "line": "p227  38  M    English    Cumbria"
+   },
+   "export_seconds": 3.09
+  },
+  {
+   "voice": "vctk_p228",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p228",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p228/p228_134_mic2.flac",
+    "wav48_silence_trimmed/p228/p228_267_mic2.flac",
+    "wav48_silence_trimmed/p228/p228_325_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "832825840bfba981984d3acf53e79823eb8a2be90968c610f4169adefc984059",
+    "0b2f77fd722f86d3198b237a47a8d0ceee80bc808c6bb3c0a1fcd6e5438bd7b2",
+    "f76a44b266503b83ffc65382cc2dbe3a899ebf17cd21fa1ded8b77a014bbb53b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3791a9b10b3ab7f08f57757cb2c54b7a2a14d17c32068add411d8a957bf1b014",
+   "source_seconds": 13.452,
+   "source_rms_dbfs": -24.47,
+   "source_peak": 0.7333,
+   "source_gain_db": 1.78,
+   "embedding_sha256": "9ab09f1d91276bcd48b3d3055426f9fe239fb51e3ca090d4f38b257a4cf89cd0",
+   "bytes": 8357688,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p228  22  F    English    Southern  England"
+   },
+   "export_seconds": 3.12
+  },
+  {
+   "voice": "vctk_p229",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p229",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p229/p229_099_mic2.flac",
+    "wav48_silence_trimmed/p229/p229_143_mic2.flac",
+    "wav48_silence_trimmed/p229/p229_160_mic2.flac",
+    "wav48_silence_trimmed/p229/p229_079_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "257c08352871981aaa9215ad5161d4c564e0c3e8d1ef22878604c5e0913c26cb",
+    "66dd50449911041faef1089cf4f0a7715004f55df7200a4deb1f3542578f5346",
+    "46da43d2d189fb53b09b4624af41b611ab0ac5666aa5414f1f4c6ff95d7b3741",
+    "fac0437112a99313d1d950013d48ab9e935b0eb44eb87bf26f3b28ec6bc88f7e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "10cc4a97d81315e66d838a3ff1dae41eb0ffd1ea28bd9c44b6a800874bc2f058",
+   "source_seconds": 13.302,
+   "source_rms_dbfs": -24.17,
+   "source_peak": 0.78,
+   "source_gain_db": 1.24,
+   "embedding_sha256": "2b4bab6df6b1654c432f726cecdef00db943c4249d3d5405ac9986433ee20c32",
+   "bytes": 8259384,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p229  23  F    English    Southern  England"
+   },
+   "export_seconds": 3.59
+  },
+  {
+   "voice": "vctk_p230",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p230",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p230/p230_002_mic2.flac",
+    "wav48_silence_trimmed/p230/p230_121_mic2.flac",
+    "wav48_silence_trimmed/p230/p230_069_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d53b7b91ac38054284842df6b2153a4cc114286e653b284774962fe9b49eef02",
+    "1acd98639080cec36c08767e6660d1f5a338b47f6f116abce1611f89137d2a20",
+    "6cbf4934103be73866eeaebef451f5f7d2de392bc98545c7861716c485a9f64e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "0818c820b35e2273fc9d81a5e835cda7e4200ceddc9d0b1dec48c2c0bdbe77c2",
+   "source_seconds": 12.311,
+   "source_rms_dbfs": -29.83,
+   "source_peak": 0.2935,
+   "source_gain_db": 9.73,
+   "embedding_sha256": "dacbc14645e16bbdb88ad549391685ae2db969cdc2141322daeee3cbec3243a5",
+   "bytes": 7620408,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Stockton-on-tees",
+    "line": "p230  22  F    English    Stockton-on-tees"
+   },
+   "export_seconds": 3.03
+  },
+  {
+   "voice": "vctk_p231",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p231",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p231/p231_269_mic2.flac",
+    "wav48_silence_trimmed/p231/p231_291_mic2.flac",
+    "wav48_silence_trimmed/p231/p231_298_mic2.flac",
+    "wav48_silence_trimmed/p231/p231_315_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "29024a03a4309f1bdbf1b67a04e76e57d48ab738086ef1ddd6886926e9fbd55e",
+    "8235a5f16e61e20333b4f8092cd15e54a949674b9dbfbb66a9b8c7c720bee7e4",
+    "dc0782817f83a5ac3e5eb457f94cb9159a62d55157aec12443dd0d5488ea6531",
+    "a018320c5aa0dbcb3679b341849865dcefade6a0f9b365225a18b020c8179ae9"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "dd15daab54017a1f279e1c0059bdb6376163cdb0f26fe8cdcefad00b5f1a6a64",
+   "source_seconds": 13.138,
+   "source_rms_dbfs": -23.97,
+   "source_peak": 0.6184,
+   "source_gain_db": 3.26,
+   "embedding_sha256": "639b1ef86bb25fcabe6c6c61dc10d7f8014c8a6fb61dc25fbb0eb2a2dc765b75",
+   "bytes": 8161080,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p231  23  F    English    Southern  England"
+   },
+   "export_seconds": 3.15
+  },
+  {
+   "voice": "vctk_p232",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p232",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p232/p232_070_mic2.flac",
+    "wav48_silence_trimmed/p232/p232_030_mic2.flac",
+    "wav48_silence_trimmed/p232/p232_356_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1310ee9c071fa25fae868765279495522057ac8b5d336e45f1efbaebbf569d2c",
+    "888f2be63b312981fcf8af582bae103eaff6ac7139807185f690d12be9df1da1",
+    "24c3e5876b275bc5b933a87d5705fb23250d434f96be175295691261dc190834"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "6fc8eca5783de3332404621388bcafa7152edcb9c98e14ca2c8ab16b61aabc27",
+   "source_seconds": 10.109,
+   "source_rms_dbfs": -22.02,
+   "source_peak": 0.6242,
+   "source_gain_db": 2.02,
+   "embedding_sha256": "0e91b43a1faf0d3a9c7aa16ce33a98a3039a30f6aacd32ed697a22ad0b0f7f0b",
+   "bytes": 6293304,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p232  23  M    English    Southern  England"
+   },
+   "export_seconds": 2.54
+  },
+  {
+   "voice": "vctk_p233",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p233",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p233/p233_072_mic2.flac",
+    "wav48_silence_trimmed/p233/p233_017_mic2.flac",
+    "wav48_silence_trimmed/p233/p233_240_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "09e772e1f62a2606533e892f51fcd40feb8ab2e65e910b3c1f0398cbd9d5c6a3",
+    "7529eceaea755cf4b4e2d2c521f6cb27a6003a31248e0d6d011ed51485858a35",
+    "1450703ec4826ba3e9ad791a016022673d6d2df08e7d827bfe9e490fbeb19369"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "15207171b939f3f1150ce3b991ea7efe8950c6969e4a81b6efa5684d8ea0b1c0",
+   "source_seconds": 12.779,
+   "source_rms_dbfs": -25.29,
+   "source_peak": 0.6081,
+   "source_gain_db": 3.41,
+   "embedding_sha256": "14b68ac26790145b5c1ff4b6be460fcd7ac524ce9be55a8f3b04713a7a247ede",
+   "bytes": 7915320,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Staffordshire",
+    "line": "p233  23  F    English    Staffordshire"
+   },
+   "export_seconds": 3.21
+  },
+  {
+   "voice": "vctk_p234",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p234",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p234/p234_268_mic2.flac",
+    "wav48_silence_trimmed/p234/p234_017_mic2.flac",
+    "wav48_silence_trimmed/p234/p234_350_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "34e005e1e9cf5754d9613ad6b17186dc66ccada02ce0995104fdfd3426a88401",
+    "7f6e5d052d3c80f69b78ecaf60b00c987b0a0cba12bfc734855ca0b0698b236c",
+    "7fb420b25dd1dd27418938b865382fe0a76be201e91d2490c3be674d3d84429b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "099eae19e151f4d703a7d73054aa0c57256087b53a791cd98469c400b43f6b7b",
+   "source_seconds": 11.953,
+   "source_rms_dbfs": -25.96,
+   "source_peak": 0.6303,
+   "source_gain_db": 3.09,
+   "embedding_sha256": "c747c80cc7fd85079a4e7f5a8eb90390c508f011834af7c591ec8e3a9da53f2d",
+   "bytes": 7423800,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "West Dumfries",
+    "line": "p234  22  F    Scottish  West  Dumfries"
+   },
+   "export_seconds": 2.88
+  },
+  {
+   "voice": "vctk_p236",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p236",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p236/p236_234_mic2.flac",
+    "wav48_silence_trimmed/p236/p236_266_mic2.flac",
+    "wav48_silence_trimmed/p236/p236_465_mic2.flac",
+    "wav48_silence_trimmed/p236/p236_264_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d5d378a7f355f7305d30fdbd30202bcc534451319a30ba5c75859a81533d88ba",
+    "9f4b5041124945d367ceeb7bf16d8dff4272489e3c0a71653586fe1f7563e7f1",
+    "68c2673f6fb78743df0c6845cd28b07e22a0cf73238d53e7f7596bff7b55b486",
+    "3640358ddb895453f83619cdfa728fd20f3473374a6cef1256ef18d5dca9cf9e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "47045d47556c6a9e195ce37444c0703f0bb0b28cf816df0466b99d1bc3a2ebab",
+   "source_seconds": 12.801,
+   "source_rms_dbfs": -24.73,
+   "source_peak": 0.5485,
+   "source_gain_db": 4.3,
+   "embedding_sha256": "ed0d5923b7a0018094392834ec21d3724dbcd7a759ef65e63d922d61d415a8da",
+   "bytes": 7964472,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Manchester",
+    "line": "p236  23  F    English    Manchester"
+   },
+   "export_seconds": 3.25
+  },
+  {
+   "voice": "vctk_p237",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p237",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p237/p237_224_mic2.flac",
+    "wav48_silence_trimmed/p237/p237_208_mic2.flac",
+    "wav48_silence_trimmed/p237/p237_049_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1247a8048b5723b2e3de2899282fa51798e19ac6f3bb15a9787afbeba185d92d",
+    "19c8a3a81e31cd7daa91b6d106d7028a8a4da16d58b4e9469e0f1d3fb4d488a0",
+    "608ff9c651d67d0b17ac7c0304ee7b14d00cd5b4cc994ddc02ed6cabe9f06c5b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "feb46e36101b6b143852b61e5ba47d079876a18cc06aca2b9e5f5d86fa09c687",
+   "source_seconds": 12.288,
+   "source_rms_dbfs": -28.49,
+   "source_peak": 0.4153,
+   "source_gain_db": 6.72,
+   "embedding_sha256": "00276cb4db240836776c088d60aea0f9cc74abf30b98cff590f97c2c573c3b22",
+   "bytes": 7620408,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Fife",
+    "line": "p237  22  M    Scottish  Fife"
+   },
+   "export_seconds": 3.2
+  },
+  {
+   "voice": "vctk_p238",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p238",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p238/p238_044_mic2.flac",
+    "wav48_silence_trimmed/p238/p238_135_mic2.flac",
+    "wav48_silence_trimmed/p238/p238_342_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "8c783d444626f2c9e2dc78eb286b129e9668dad28ef17ef0a7c0dfdc884a84ef",
+    "efc84fd8683a8655f933d4faf649caeec6a2662ac1936d84347554be776c7819",
+    "92e8c6e9e94349d24adad102b8ec6cd7c2044f424e33330d90e100b364235676"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "1e1157b00d758a85993c83321baa79196ef30e490416fffaa7f8964958c3f0b2",
+   "source_seconds": 14.305,
+   "source_rms_dbfs": -25.42,
+   "source_peak": 0.6095,
+   "source_gain_db": 3.38,
+   "embedding_sha256": "d7060948bbd1c7e80b9402df604dab7370f8bcb3bdc7d841fb230c8e6d520ff1",
+   "bytes": 8849208,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Belfast",
+    "line": "p238  22  F    NorthernIrish  Belfast"
+   },
+   "export_seconds": 3.85
+  },
+  {
+   "voice": "vctk_p239",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p239",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p239/p239_483_mic2.flac",
+    "wav48_silence_trimmed/p239/p239_193_mic2.flac",
+    "wav48_silence_trimmed/p239/p239_464_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "bad0373a9fc5484c22961a362fd60cd04f747956f4b2da9a613f53bf6a2f62f6",
+    "3971255a9b75ba89d15e2802bb6ede2c179e78f8aa521c04a109066263ccf379",
+    "18d3bd94829a6773298721b11de1a8619ed2df708c8f74a8b195fa272e840048"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "17c642b1b3945591e298975090fc48edb8be2e95d2113129785cf1d74a417f9a",
+   "source_seconds": 10.462,
+   "source_rms_dbfs": -25.59,
+   "source_peak": 0.5252,
+   "source_gain_db": 4.68,
+   "embedding_sha256": "9c737200241a884a3750696a1a051418e52492ce2338f779fbf8ef4d814e5531",
+   "bytes": 6489912,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "SW England",
+    "line": "p239  22  F    English    SW  England"
+   },
+   "export_seconds": 2.37
+  },
+  {
+   "voice": "vctk_p240",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p240",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p240/p240_361_mic2.flac",
+    "wav48_silence_trimmed/p240/p240_377_mic2.flac",
+    "wav48_silence_trimmed/p240/p240_224_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "4e2dd26cab462776c7967011dd56bb8323ee6717fa0ae9efc62a4a74f1322692",
+    "0917c7e08db79ce547fc4e462322e4719fb35cb0a6443019b985244aad2103d7",
+    "612acd9909b68ad71f6ddf9df5dfce422178473714fc32d565400e2c3b392751"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "96170b4dca07376989af2c646bd770ee577c6bec0bfcf3fbb66d401884c2245f",
+   "source_seconds": 10.961,
+   "source_rms_dbfs": -24.63,
+   "source_peak": 0.4671,
+   "source_gain_db": 4.63,
+   "embedding_sha256": "c730ab513e2169cd623317981e335517ad6f6718f55dc275f269c2dafb078405",
+   "bytes": 6833976,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p240  21  F    English    Southern  England"
+   },
+   "export_seconds": 2.85
+  },
+  {
+   "voice": "vctk_p241",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p241",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p241/p241_212_mic2.flac",
+    "wav48_silence_trimmed/p241/p241_149_mic2.flac",
+    "wav48_silence_trimmed/p241/p241_234_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "fbb610834ae967a1836b11175f4b885e009b71ab09412b314044e90f2deca354",
+    "00b48bdbb25fcff829e3bc89770c103267013ff84b3938e62d0b9122d27e09fa",
+    "da1ed8c59c67cddfbe2777fa6cd5a5755014fe0ffb3789f9cadfb8c4da55c52a"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "5a3b5905b7c7bf543d1688bba81285e95b1f5c0c936c39d2e9f42cefff910a0b",
+   "source_seconds": 10.262,
+   "source_rms_dbfs": -24.22,
+   "source_peak": 0.6324,
+   "source_gain_db": 3.07,
+   "embedding_sha256": "41cd3123b8821172562d4b5e8106d32ec2624f619e523f2f3c5520568d887b09",
+   "bytes": 6391608,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Perth",
+    "line": "p241  21  M    Scottish  Perth"
+   },
+   "export_seconds": 2.3
+  },
+  {
+   "voice": "vctk_p243",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p243",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p243/p243_041_mic2.flac",
+    "wav48_silence_trimmed/p243/p243_168_mic2.flac",
+    "wav48_silence_trimmed/p243/p243_026_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "21f2078c302a4c7a89ba6a90cbd6227f23ff0574c7f568cf831346150de34425",
+    "ce2a46b24824438845905976d24bcfcebd7d58cba0124e995090e70dbf8fe47a",
+    "ea5ecdb6c34e5103b493d0d33805ccffcc9c72c408093f8c4871e75919808ed0"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "5cdb1eea91f95d5c397e7a05b78a8d41cad23aba4664d9427353b67fa06e1a1b",
+   "source_seconds": 11.92,
+   "source_rms_dbfs": -25.97,
+   "source_peak": 0.569,
+   "source_gain_db": 3.98,
+   "embedding_sha256": "fb1399de4d10943c5297dc22abfa52160d8d00c5ae380cd78e11393f5d070379",
+   "bytes": 7374648,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "London",
+    "line": "p243  22  M    English    London"
+   },
+   "export_seconds": 3.1
+  },
+  {
+   "voice": "vctk_p244",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p244",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p244/p244_173_mic2.flac",
+    "wav48_silence_trimmed/p244/p244_418_mic2.flac",
+    "wav48_silence_trimmed/p244/p244_159_mic2.flac",
+    "wav48_silence_trimmed/p244/p244_088_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3716274c9c1c5d6c7ca354f4edb8ad41f2546c5fb55816113293d2283a9a8af5",
+    "7e4533de6e46032778842ae2e9f94dd4c8642f48b16719a7a04f7210305b0273",
+    "e6af04f8232da7458ace02b0f1cc4a0f74391d2311fda1ac48eca120883128b3",
+    "547e24227816a311ccfef4171dcb2496ee713a31a535c934420fe3884650897f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "a6a76eb9e63ac815b1e5b235b4cbce4e932eedc4422ea0cb3e6e5e96862ffa0a",
+   "source_seconds": 13.863,
+   "source_rms_dbfs": -23.49,
+   "source_peak": 0.5601,
+   "source_gain_db": 3.49,
+   "embedding_sha256": "ebc0367fb1c12dea86ccd754fd3325eb5975b28f44a1b709e25bedebd95ccb7d",
+   "bytes": 8603448,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Manchester",
+    "line": "p244  22  F    English    Manchester"
+   },
+   "export_seconds": 3.47
+  },
+  {
+   "voice": "vctk_p245",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p245",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p245/p245_121_mic2.flac",
+    "wav48_silence_trimmed/p245/p245_112_mic2.flac",
+    "wav48_silence_trimmed/p245/p245_174_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "507027cce4260d6aa3a569095815c01b20108c1ba0df2c56dce32aa1b22f9476",
+    "eb70e784b6646b2c99d3f90bb4b700e815a2e9d9fcb9d012bb370b77d1eb9f42",
+    "a7451700a90e8449f17865d3eea7e739c4f66b09161fbc468c716aa6bb2f4af0"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3a741ef2a4de6439f70c2fbeb4c62c5927774414808030083fcce5dd19f33975",
+   "source_seconds": 12.37,
+   "source_rms_dbfs": -23.8,
+   "source_peak": 0.7113,
+   "source_gain_db": 2.04,
+   "embedding_sha256": "ad58bcf8237d95871d386b29697191a1c4700f76080b1749ad92fe6f40c9f528",
+   "bytes": 7669560,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 25,
+    "gender": "male",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Dublin",
+    "line": "p245  25  M    Irish  Dublin"
+   },
+   "export_seconds": 3.15
+  },
+  {
+   "voice": "vctk_p246",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p246",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p246/p246_157_mic2.flac",
+    "wav48_silence_trimmed/p246/p246_115_mic2.flac",
+    "wav48_silence_trimmed/p246/p246_167_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b37edf2bbace078a4bd8edcfa589b288d2fb0e16912a8e8eb60a9613cc6feb22",
+    "a9a5db2eac03a584e0cd7a9b32f3a9e344152eb60810a57d467f29b5c3867536",
+    "5d9be4bdfb9992364678cdc78874d0c2364e50b68c812760c69c3b1f601fa1cf"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "60223954f681408b1084a316e0f3c1ea85d6f101551f58ccc2e29e071acbeca9",
+   "source_seconds": 13.411,
+   "source_rms_dbfs": -26.44,
+   "source_peak": 0.3872,
+   "source_gain_db": 6.44,
+   "embedding_sha256": "9bda8fb10947b2571d01f079333dd1c43cf214b18e30c5f51011b2112d693135",
+   "bytes": 8308536,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Selkirk",
+    "line": "p246  22  M    Scottish  Selkirk"
+   },
+   "export_seconds": 3.64
+  },
+  {
+   "voice": "vctk_p247",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p247",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p247/p247_237_mic2.flac",
+    "wav48_silence_trimmed/p247/p247_109_mic2.flac",
+    "wav48_silence_trimmed/p247/p247_370_mic2.flac",
+    "wav48_silence_trimmed/p247/p247_040_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1a8237e1f48488fd1a7feabc7a6652f1244ca5f66ebbcbc563fb08c98de7a20c",
+    "8337b1a2e87b96e394bdf53013755a7779594db1aeaf9cb1ce7a8acfb083906c",
+    "9c59be4f3ff2cb6ad50f205c40c8ac6e293dd37014f6d75168a1144bdfbf0390",
+    "7ca11c4931a5f98d1817f824e0454b01358f320307636ed105737cb5148e1977"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "d5267928c64de07d59d1ce905b42bc22c2c2414369f3cf81a27f93f28445de1f",
+   "source_seconds": 12.274,
+   "source_rms_dbfs": -22.86,
+   "source_peak": 0.9409,
+   "source_gain_db": -0.39,
+   "embedding_sha256": "9f70db3e154aa81ae350915ed79318ede9abcae3eff149159f1bcd458e409870",
+   "bytes": 7620408,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Argyll",
+    "line": "p247  22  M    Scottish  Argyll"
+   },
+   "export_seconds": 3.48
+  },
+  {
+   "voice": "vctk_p248",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p248",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p248/p248_201_mic2.flac",
+    "wav48_silence_trimmed/p248/p248_267_mic2.flac",
+    "wav48_silence_trimmed/p248/p248_364_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "74dec6b5e9019cfd830599be9258243b7ad9d92f220a3e5b05aee66af27be7b7",
+    "2c5ee1c0f7dd4b9354078e0430a11ecb7b203db2a221def418244d1fc1ca8fd9",
+    "8ec1aad12873454c93fcab5902079b53b778c54354eaf1f83ed23f3a51128704"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "0d80ecc7b487addf0de9ca085da8a7796ae02f12f3030c46ef4f47c342e2861f",
+   "source_seconds": 10.912,
+   "source_rms_dbfs": -23.63,
+   "source_peak": 0.7065,
+   "source_gain_db": 2.1,
+   "embedding_sha256": "275e9915f6cf08f8cf7a24f01868d558476eda0a509a280aec9b54d95218cf64",
+   "bytes": 6784824,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Indian",
+    "accent": "Indian",
+    "region": null,
+    "line": "p248  23  F    Indian"
+   },
+   "export_seconds": 3.02
+  },
+  {
+   "voice": "vctk_p249",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p249",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p249/p249_106_mic2.flac",
+    "wav48_silence_trimmed/p249/p249_156_mic2.flac",
+    "wav48_silence_trimmed/p249/p249_279_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "0d2223510807bdba47a52d00a97adec28802c87f8dff513d6fea027caf425c50",
+    "3a7b6535011a4200d61239eb5e84f648355e15f3365abaaabecd6bab2b575bf0",
+    "e91d5e7f1267302fafc00c50f7b4940d229ee8cf4cf3233b0b0560be21c624fd"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b4b41b06971b6f7f6957b073312785b85e8ab7f47e41676e85ef1464cc6cad9b",
+   "source_seconds": 12.515,
+   "source_rms_dbfs": -24.85,
+   "source_peak": 0.5157,
+   "source_gain_db": 4.84,
+   "embedding_sha256": "aa06ab6491a5b7c0b8f4c1137fb3fdac2d75c9e536c9e375dd1adc880427b9a7",
+   "bytes": 7767864,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Aberdeen",
+    "line": "p249  22  F    Scottish  Aberdeen"
+   },
+   "export_seconds": 3.49
+  },
+  {
+   "voice": "vctk_p250",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p250",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p250/p250_408_mic2.flac",
+    "wav48_silence_trimmed/p250/p250_183_mic2.flac",
+    "wav48_silence_trimmed/p250/p250_320_mic2.flac",
+    "wav48_silence_trimmed/p250/p250_199_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d4cd0bf951dbd7720399ecbebd18262611a73c462f85e856b4211fec69193dd0",
+    "e9e414b0d1981ce5129a943abb13e464dfee2d3cf5c59bd644fb1d5859020001",
+    "dc013e7ca4f52bf59a658d7c24fed9301020bc9b7beee31ac40ddddc62428cd9",
+    "677abd232bf796d71a0aa8542f561da91ebd3217cf4e0281427b25af5b9aaf7e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "d4ac0fe2dc1e2664619927c972a810ff46782e37668f203a1184831c4931dbfc",
+   "source_seconds": 11.787,
+   "source_rms_dbfs": -24.7,
+   "source_peak": 0.7232,
+   "source_gain_db": 1.9,
+   "embedding_sha256": "20e31ac255ce799adf6268cafda8a8e1e1c66f2e97cb752b7933461c55967b4d",
+   "bytes": 7325496,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "SE England",
+    "line": "p250  22  F    English    SE  England"
+   },
+   "export_seconds": 3.98
+  },
+  {
+   "voice": "vctk_p251",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p251",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p251/p251_362_mic2.flac",
+    "wav48_silence_trimmed/p251/p251_271_mic2.flac",
+    "wav48_silence_trimmed/p251/p251_076_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "0de88aae5679fdef0ce24b2ba9f6deb4473996953077de4ebcd5f8ae0673c448",
+    "a19caf8de7585c54bc74bc77c4372c30ff5caba8cae84bdd3a27cee77ce09d56",
+    "7bb62120101d9f680281ee21ca9c380c9d3089021b8e32eddc0f7bcad097f292"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "9304eeffd652a0f3dc2b56aa303f54df15ba18650c661286fd4febfb2470d66a",
+   "source_seconds": 12.66,
+   "source_rms_dbfs": -21.4,
+   "source_peak": 0.5556,
+   "source_gain_db": 1.4,
+   "embedding_sha256": "0c373eea247705370c89c588efc5e4b49420b592cea720b2a3a02b0f11ae079a",
+   "bytes": 7866168,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "male",
+    "accent_raw": "Indian",
+    "accent": "Indian",
+    "region": null,
+    "line": "p251  26  M    Indian"
+   },
+   "export_seconds": 3.4
+  },
+  {
+   "voice": "vctk_p252",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p252",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p252/p252_343_mic2.flac",
+    "wav48_silence_trimmed/p252/p252_392_mic2.flac",
+    "wav48_silence_trimmed/p252/p252_238_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ae2b059fcf6949a2f91a40e80bb45cd05e482d4e1d8c9dc18c1630ab9f3fa40e",
+    "e5f66cf5fd9dd81316cf3b394af96580ef6411895a17e8acc1832651940f208e",
+    "b7b0e593103ab39fdb557017303b3c8f58d5ad5270bdd53b5c9924e19910d015"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7d1f433fa4d504de7ea322eb156968bc5d789f65de8572107211b6b58abac64e",
+   "source_seconds": 11.18,
+   "source_rms_dbfs": -23.61,
+   "source_peak": 0.8761,
+   "source_gain_db": 0.23,
+   "embedding_sha256": "e81b93e03dfa415031d61f54ec30dd17aef47a32eda34c5deb9554ba9ff10b38",
+   "bytes": 6932280,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Edinburgh",
+    "line": "p252  22  M    Scottish  Edinburgh"
+   },
+   "export_seconds": 2.85
+  },
+  {
+   "voice": "vctk_p253",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p253",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p253/p253_265_mic2.flac",
+    "wav48_silence_trimmed/p253/p253_048_mic2.flac",
+    "wav48_silence_trimmed/p253/p253_245_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "e4642e3b1d0b6233ad037cdfd898b27b98ba8cdc0060f81d8ceacd58ee5e1476",
+    "07eca8551b20b33239966f16243b51f602548d033cebd9ea814caf7a75030f12",
+    "777258a4543fb8f46f1895cf21fa9996a130d7ad30b50560cac55c46583156d0"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "27c4d43223f98b5ead3ffd7853e0249ee4b7066384b4383e641fed1553881984",
+   "source_seconds": 10.23,
+   "source_rms_dbfs": -22.08,
+   "source_peak": 0.9989,
+   "source_gain_db": -0.91,
+   "embedding_sha256": "6b685cc7c3ec361101f168e551eca80b209d9ed88275d3ac877f549204c48b94",
+   "bytes": 6342456,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "Welsh",
+    "accent": "Welsh",
+    "region": "Cardiff",
+    "line": "p253  22  F    Welsh  Cardiff"
+   },
+   "export_seconds": 2.46
+  },
+  {
+   "voice": "vctk_p254",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p254",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p254/p254_191_mic2.flac",
+    "wav48_silence_trimmed/p254/p254_357_mic2.flac",
+    "wav48_silence_trimmed/p254/p254_028_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1a28f9f9f5540354ad28432bd8be382168323ac852e1ec57a3e5fc20452ac153",
+    "f5f862f20af3962cf8eb5e27533f2e0de9ef02f8031a49bd74410e88fcd91213",
+    "552dff0fe3797236bdc0618771ffdf3a7d43ef5d14d900d6c36f84a7a527d6eb"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b60d76cf5b07e697e54601524093f3deafc2abe50ac4ae52e630883b9c51c13a",
+   "source_seconds": 11.343,
+   "source_rms_dbfs": -26.02,
+   "source_peak": 0.4911,
+   "source_gain_db": 5.26,
+   "embedding_sha256": "106af93e4da055316b348410ea285e39d67b17d935ada604741417e2efcfcad6",
+   "bytes": 7030584,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Surrey",
+    "line": "p254  21  M    English    Surrey"
+   },
+   "export_seconds": 2.67
+  },
+  {
+   "voice": "vctk_p255",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p255",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p255/p255_276_mic2.flac",
+    "wav48_silence_trimmed/p255/p255_343_mic2.flac",
+    "wav48_silence_trimmed/p255/p255_224_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "a3531991d668038bdc8177ecab82a2366d2d57b7d6e03694b6acf0a5a54dca8d",
+    "ad632f9aef7d6b3008bb57e6b9b57ff45fe66495c7bfdf32407c71a84f0022f9",
+    "ea8d9c9b155df80cb42f76a868bcf9b0e6e83c0b0a09f6eb2858df0c2b7d075c"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "42b42e82e55afa5880dfaf316565ac8a5e785adc4590a5683212121864d67bfe",
+   "source_seconds": 12.17,
+   "source_rms_dbfs": -24.23,
+   "source_peak": 0.7227,
+   "source_gain_db": 1.91,
+   "embedding_sha256": "2a3e9b707a77ce85258984bb3896cd935b1e6ea6cafa9fbcc00ac8b4eca47bf6",
+   "bytes": 7571256,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Galloway",
+    "line": "p255  19  M    Scottish  Galloway"
+   },
+   "export_seconds": 3.06
+  },
+  {
+   "voice": "vctk_p256",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p256",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p256/p256_007_mic2.flac",
+    "wav48_silence_trimmed/p256/p256_103_mic2.flac",
+    "wav48_silence_trimmed/p256/p256_138_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b4f34351d17ccf9a77ce5f4ac4c35bf4f1f9347013f2225e9d37deb09e946bc9",
+    "3457fa879da369418c6609a9abcf6d27716a3c2f30d7f36a715dcfd05d859f16",
+    "55dfa67144bdceecb8bbb1d437660c9f3ea2be50831d195575c2ceb68928ff33"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3fbf98a93914b8a076774cf71856cd47444ed12c1e5dc925c1b1ccc12097b585",
+   "source_seconds": 14.608,
+   "source_rms_dbfs": -25.94,
+   "source_peak": 0.7132,
+   "source_gain_db": 2.02,
+   "embedding_sha256": "8bef5c5a2dfee0daed6529f354e0a8c8dbfc21bbe79727b1aab93585ec0135ee",
+   "bytes": 9045816,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Birmingham",
+    "line": "p256  24  M    English    Birmingham"
+   },
+   "export_seconds": 3.82
+  },
+  {
+   "voice": "vctk_p257",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p257",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p257/p257_066_mic2.flac",
+    "wav48_silence_trimmed/p257/p257_374_mic2.flac",
+    "wav48_silence_trimmed/p257/p257_248_mic2.flac",
+    "wav48_silence_trimmed/p257/p257_251_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "f3f1681a73124467527a6366c3de652a9f423a097bdf855ff746691dfd564bc5",
+    "76db439b129bbd997eac71f2babce57202587030ff5f62a089cd558fc48ccbe7",
+    "36bde233ee6b067629682d52a4c869bc11039ca1e1d897e1a1f68eff7bcde225",
+    "c78109447279c638031cd62a52d35c9e0b630c34524184c3bbbe99289b1472e7"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "5f3f8258959856ac5d5a6225ee5c28069681b4f333d382cb7977a106506810c3",
+   "source_seconds": 12.94,
+   "source_rms_dbfs": -26.2,
+   "source_peak": 0.4896,
+   "source_gain_db": 5.29,
+   "embedding_sha256": "bc9b154349a5a906e2bb2bf97867a924d3184a792dffb0c795b14d351c682b0c",
+   "bytes": 8013624,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p257  24  F    English    Southern  England"
+   },
+   "export_seconds": 3.23
+  },
+  {
+   "voice": "vctk_p258",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p258",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p258/p258_070_mic2.flac",
+    "wav48_silence_trimmed/p258/p258_246_mic2.flac",
+    "wav48_silence_trimmed/p258/p258_125_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "e3b110f2fb0168623ac76774ef7549da9bf6cd40ac068df815fa9a1adf52feb2",
+    "e55d2ce3f90d2440033e609486d83e94a65179f423a4ed60f6fa94c448fc9176",
+    "70255f789db3e54f4a567a1ec467b2a7af9c59a17299c2f55a98528864eac96e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "abbc914dacacd0578ecc3ae26c64fe2a3746dea760201bb207b45a1e70b54cfa",
+   "source_seconds": 10.706,
+   "source_rms_dbfs": -24.43,
+   "source_peak": 0.6872,
+   "source_gain_db": 2.34,
+   "embedding_sha256": "41b938e65d3f0336fc23492341a4476749d9c4f6abcb9bd3021a7710ce4e054d",
+   "bytes": 6637368,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p258  22  M    English    Southern  England"
+   },
+   "export_seconds": 2.64
+  },
+  {
+   "voice": "vctk_p259",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p259",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p259/p259_157_mic2.flac",
+    "wav48_silence_trimmed/p259/p259_155_mic2.flac",
+    "wav48_silence_trimmed/p259/p259_054_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "c85cea19305360aa0ede174ceb2249e336d6431d4b3676b9de53736c3993b5c0",
+    "0e1b47c7a9150e4b1d289dda476cc289c502fb27fb558d2c2dfad435d7aed126",
+    "a62bb69fe5d00bc79d2a7495079bf9338ad6801d9eface099bf939e456ad0e5a"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "149f730c4004c0c065f6f4cc206b93116ebb956ed2888baf44fa5a0192b719b7",
+   "source_seconds": 11.992,
+   "source_rms_dbfs": -24.0,
+   "source_peak": 0.7892,
+   "source_gain_db": 1.14,
+   "embedding_sha256": "6f120ef67028b1d635633a62f2bc9dee74cf7dc70bcdba26c061886623aa47af",
+   "bytes": 7423800,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Nottingham",
+    "line": "p259  23  M    English    Nottingham"
+   },
+   "export_seconds": 2.77
+  },
+  {
+   "voice": "vctk_p260",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p260",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p260/p260_182_mic2.flac",
+    "wav48_silence_trimmed/p260/p260_142_mic2.flac",
+    "wav48_silence_trimmed/p260/p260_308_mic2.flac",
+    "wav48_silence_trimmed/p260/p260_047_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "9e81d1acd9ecf097bf87324ed4ab1d4cd8acac1741b4779dc6fbf6242ba9fefb",
+    "084fe4aea45350b33c693f6535b8eb9fbddcc2f61a1a4402d9f8680be36df927",
+    "76502aa4665deac319b2464059af7dc95ac33bfa1b1c50039a87cf97593e384e",
+    "c775910d014976dbc1110f670ef08428562d7d7c3b2289e5c5a0f99cca4460c8"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "c21f8b9363de07f40a49bbcef9cd41e19aa8b7f90274328d3f96ce1168ad18b2",
+   "source_seconds": 13.061,
+   "source_rms_dbfs": -21.7,
+   "source_peak": 0.9989,
+   "source_gain_db": -0.91,
+   "embedding_sha256": "d60646056c261f3ae6dd110b3bd0ddd0dd6968835fe482174e6a0af82c8f5b65",
+   "bytes": 8111928,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Orkney",
+    "line": "p260  21  M    Scottish  Orkney"
+   },
+   "export_seconds": 3.23
+  },
+  {
+   "voice": "vctk_p261",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p261",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p261/p261_241_mic2.flac",
+    "wav48_silence_trimmed/p261/p261_421_mic2.flac",
+    "wav48_silence_trimmed/p261/p261_097_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "f14702e1e3ba9481e84a901aa1ce439edc4280b06fb98dfac2608530d522285b",
+    "e247f650f6b740cf23704b75f0d31356b3dfdb54193f067f4e184a34a9a41027",
+    "2a8912c35e9bcb55f30458479c3170bc42ccc45f9aed8dcefcbde62400e06968"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "ce66fcbc489f4a40d5b95e3435a44621b43e05e1855584afe980a06873d0971c",
+   "source_seconds": 11.828,
+   "source_rms_dbfs": -24.02,
+   "source_peak": 0.6729,
+   "source_gain_db": 2.53,
+   "embedding_sha256": "265c4abf33633bc42d29a8e98a19403d4638e71efb25c293aae81c87380b8020",
+   "bytes": 7325496,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "female",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Belfast",
+    "line": "p261  26  F    NorthernIrish  Belfast"
+   },
+   "export_seconds": 2.66
+  },
+  {
+   "voice": "vctk_p262",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p262",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p262/p262_298_mic2.flac",
+    "wav48_silence_trimmed/p262/p262_261_mic2.flac",
+    "wav48_silence_trimmed/p262/p262_385_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3e10d980f595eebb03475810db9b5e3244c0d9832cf16730d0775eab0f5c2720",
+    "56e228015fdbfcf39a060275347534cccba90a1889a3aee84c11f4338816dde0",
+    "f39b6bfa759f1b29da754bb2c16a1c7e343219cbd6cd5264ef2994559c0aa4cc"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "4a16788cc74672171cfe7308f0fd6f9cb779e9f91b76d3984c86ab69087e7f0e",
+   "source_seconds": 11.603,
+   "source_rms_dbfs": -23.16,
+   "source_peak": 0.9788,
+   "source_gain_db": -0.73,
+   "embedding_sha256": "0f1c495da2f6828ab427eaa1b1597dbb5e982d2884755d0f449f900c18329af2",
+   "bytes": 7227192,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Edinburgh",
+    "line": "p262  23  F    Scottish  Edinburgh"
+   },
+   "export_seconds": 2.55
+  },
+  {
+   "voice": "vctk_p263",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p263",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p263/p263_014_mic2.flac",
+    "wav48_silence_trimmed/p263/p263_066_mic2.flac",
+    "wav48_silence_trimmed/p263/p263_450_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b672afb6dee453a2c3948ba4d0ab61deda09b1f614fffeb1e3056fd37e4e6ab2",
+    "8b380051006fbb310e50aa1913219eca5e66151874acba2674ad8e24da622d94",
+    "83f6c6f24a7273b8079fd57c19cbc4f702f9c5e7d0839f6012bb4f49d08cb5e2"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "e8576b46f78a4db540c8afeb9dd5d01497432d2f8757a7b6deee5db63d9e6af1",
+   "source_seconds": 11.147,
+   "source_rms_dbfs": -25.76,
+   "source_peak": 0.5025,
+   "source_gain_db": 5.06,
+   "embedding_sha256": "91849fa78429585a017dec1517d294f2523ea9cdee18b0f9cbface19e8f983cf",
+   "bytes": 6932280,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Aberdeen",
+    "line": "p263  22  M    Scottish  Aberdeen"
+   },
+   "export_seconds": 2.58
+  },
+  {
+   "voice": "vctk_p264",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p264",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p264/p264_340_mic2.flac",
+    "wav48_silence_trimmed/p264/p264_472_mic2.flac",
+    "wav48_silence_trimmed/p264/p264_494_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6f94ef93bebaa5666f831cb5b027ac7a9cbd6c189e47347fad5b85cc85f9ed1c",
+    "1e498392d0492feedc2e30e066ebda9e1b826da29a6baa5b724e7e9beb5b50d8",
+    "ebff7f1f49335a679ae4b29d3ee985a0810ea8b8f7dc0e220762dfe08bf36c14"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "c9005cec34bbfdc72c1b3c303b535511d232c9d991e7aa484ffdc4987e7bb278",
+   "source_seconds": 10.785,
+   "source_rms_dbfs": -24.01,
+   "source_peak": 0.999,
+   "source_gain_db": -0.91,
+   "embedding_sha256": "519f9e25bd89a748db310b5e03982524660c595ad0dceb0b626c02d270f2ea94",
+   "bytes": 6686520,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "West Lothian",
+    "line": "p264  23  F    Scottish  West  Lothian"
+   },
+   "export_seconds": 2.7
+  },
+  {
+   "voice": "vctk_p265",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p265",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p265/p265_239_mic2.flac",
+    "wav48_silence_trimmed/p265/p265_164_mic2.flac",
+    "wav48_silence_trimmed/p265/p265_026_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "548774e05693d9291c5040e1410930fa9f63e16033aa61c3891017e4a7ab59bc",
+    "165e6c12cf4b89164c071e9caa0862e1553bf5751f22a26b766fbb5143939fc4",
+    "c745a7df2624d92e4e01e9290f4b23ef28561676446da5cd73cd3174ae6e32ab"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "9aa7f5d165d4c045d61057b05b8f6171c986f30d6f2a25ae907732a1d8367964",
+   "source_seconds": 14.98,
+   "source_rms_dbfs": -22.23,
+   "source_peak": 0.7917,
+   "source_gain_db": 1.11,
+   "embedding_sha256": "ead8c58e0ea9d1adf871ef06ab05c697a4750d2c59879cbc5e4c58af7d3be338",
+   "bytes": 9291576,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Ross",
+    "line": "p265  23  F    Scottish  Ross"
+   },
+   "export_seconds": 4.15
+  },
+  {
+   "voice": "vctk_p266",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p266",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p266/p266_332_mic2.flac",
+    "wav48_silence_trimmed/p266/p266_159_mic2.flac",
+    "wav48_silence_trimmed/p266/p266_055_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3103b684732b6fc36d258f68d04318c68e79135fb9469c082b8c5a54d33db874",
+    "d06eeb0af0856ad8d99c5170a6e255c868c9a935c5b7ae45c12c3550a084bc4a",
+    "7c900f5aa01c30c34619c388d6ffba9bc9312de084c6075c763d9e72bf94a113"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3dc0a86c6cc0fc714766889db745f4e2c17072e34d4db1c8054eef956fff3c1f",
+   "source_seconds": 10.476,
+   "source_rms_dbfs": -27.27,
+   "source_peak": 0.3022,
+   "source_gain_db": 7.27,
+   "embedding_sha256": "da277bf635e85c2edadc74a81e93ba707b444be9fec98be16dbcae2ef9b6b785",
+   "bytes": 6489912,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Athlone",
+    "line": "p266  22  F    Irish  Athlone"
+   },
+   "export_seconds": 2.41
+  },
+  {
+   "voice": "vctk_p267",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p267",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p267/p267_261_mic2.flac",
+    "wav48_silence_trimmed/p267/p267_132_mic2.flac",
+    "wav48_silence_trimmed/p267/p267_229_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "e2d5e84c50c50d018ee2a3c74a26c4208d5303faf38549f032f1dffe83265321",
+    "6a7206c670c132ca51e31ccbde8530df34e633beff235f3c41cfe083468d08e0",
+    "e8998cc4ede5f31ba96dd7d4994d1cfd45ea19c7b6f94a8dcce1b354e772407d"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3ad2829e220d2eeab68d353cbcb2a110eae5347218cdd7140c644eaeb3bee6e6",
+   "source_seconds": 10.68,
+   "source_rms_dbfs": -26.38,
+   "source_peak": 0.4871,
+   "source_gain_db": 5.33,
+   "embedding_sha256": "41921cbd62eef3688da9774fe79e8a3d185d5dc1317a0e5d48d1075f100822bc",
+   "bytes": 6637368,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Yorkshire",
+    "line": "p267  23  F    English    Yorkshire"
+   },
+   "export_seconds": 2.59
+  },
+  {
+   "voice": "vctk_p268",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p268",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p268/p268_377_mic2.flac",
+    "wav48_silence_trimmed/p268/p268_402_mic2.flac",
+    "wav48_silence_trimmed/p268/p268_337_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "54b225254a031b5e68880a55c3c719dc5b82696cc89f5ac6d0f22327da16306d",
+    "24bdf1a08c77cb9fe50b7b05e559b88b9864282b985fe2dc866dc655dd7a6550",
+    "8ac5868f0d4b3509b2967e4fc7710e0f943831242cdd4b22109aa842cc1bc300"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "c21d9af9d8a0aca5a19521889ec9e3677df8fe7cce04b7209d5b3a803413b697",
+   "source_seconds": 12.614,
+   "source_rms_dbfs": -22.82,
+   "source_peak": 0.7765,
+   "source_gain_db": 1.28,
+   "embedding_sha256": "f0cad76119eddefae6ee05de4b7573b8a485f50d5edd97ed801e34ff9dbc461f",
+   "bytes": 7817016,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Southern England",
+    "line": "p268  23  F    English    Southern  England"
+   },
+   "export_seconds": 3.28
+  },
+  {
+   "voice": "vctk_p269",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p269",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p269/p269_258_mic2.flac",
+    "wav48_silence_trimmed/p269/p269_309_mic2.flac",
+    "wav48_silence_trimmed/p269/p269_197_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b6da22cdd801486bcbe4def1db4a86f13783c0d154c4f696bcd4bb394f3c051b",
+    "aeb22cf5ba4c0efcefcfbc7e6a7464c411a50507500393fb8275945f9e540b2a",
+    "ed7203e73ae9546388ce90d307db99f5b1fa74660205fd6b097377b66dbcbef1"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3cc2d8a44b06fc08f76fe2b9491f3419c6504bb504b7dca5b0bba21c9677bde9",
+   "source_seconds": 11.618,
+   "source_rms_dbfs": -22.95,
+   "source_peak": 0.7154,
+   "source_gain_db": 1.99,
+   "embedding_sha256": "0b18f3afc5fe8759781d212414f7c39f4c35d770919f4387feae502c10b17e43",
+   "bytes": 7227192,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 20,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Newcastle",
+    "line": "p269  20  F    English    Newcastle"
+   },
+   "export_seconds": 2.82
+  },
+  {
+   "voice": "vctk_p270",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p270",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p270/p270_186_mic2.flac",
+    "wav48_silence_trimmed/p270/p270_257_mic2.flac",
+    "wav48_silence_trimmed/p270/p270_297_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "91dc63c82670014fd5e9ca00d18b53295b6c2a6093fcfffa6a5f80535be2eb8b",
+    "8088cb13a5f4382952edd494c9ab620b246c51c3a3027198550b796008a309ee",
+    "b148de07a3505b4ddbed102900b366052378a60945f7da1c96eca88e0e50a954"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "bdfefa0db3bd92110960353c82904929cdf45edefdd7ded34778f16cb8d28209",
+   "source_seconds": 10.634,
+   "source_rms_dbfs": -22.09,
+   "source_peak": 0.4752,
+   "source_gain_db": 2.09,
+   "embedding_sha256": "232c755ebe19cd3a02e758855208e523301ba0497457b07cbe027eb5b0439469",
+   "bytes": 6588216,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Yorkshire",
+    "line": "p270  21  M    English    Yorkshire"
+   },
+   "export_seconds": 2.46
+  },
+  {
+   "voice": "vctk_p271",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p271",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p271/p271_281_mic2.flac",
+    "wav48_silence_trimmed/p271/p271_091_mic2.flac",
+    "wav48_silence_trimmed/p271/p271_448_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "288928701f6eafc606fb4c427e73ab04140f40b02423d7db2c256d2d458888ec",
+    "fa8059fada4001d0fa88aee77644457bce4487da300e3ebd223efcd5afe7b703",
+    "23bccbe640406d0dab2b41914176614a84e8b797b9deca59f787b9da2663fcdd"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "c6a4092ee243721f42e8682b71e30ede8d3a2db2ba0b404a341acde3792e7ff0",
+   "source_seconds": 12.583,
+   "source_rms_dbfs": -25.59,
+   "source_peak": 0.5284,
+   "source_gain_db": 4.63,
+   "embedding_sha256": "7018c57f62b482614275665f111da75a1dd2961988c58ea49d8983599e2e69ff",
+   "bytes": 7817016,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Fife",
+    "line": "p271  19  M    Scottish  Fife"
+   },
+   "export_seconds": 3.42
+  },
+  {
+   "voice": "vctk_p272",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p272",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p272/p272_124_mic2.flac",
+    "wav48_silence_trimmed/p272/p272_270_mic2.flac",
+    "wav48_silence_trimmed/p272/p272_214_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6d6919b74cc960c0017fe78a5f463378aa5e5d2a32a92a695ec999893be47ca9",
+    "a99a5cd9d1505f402ec22bea17175b20a799aec4fefc54999a04e129239f1912",
+    "ce9a8f5281a0c7624fcf2b25f9848bb2e0ea8ef5a11bfa4bb8c49fab3179c7e9"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "dc9dbbb739c5707de3b39ff17a803f0eba20c233ca4431c58d8a044ea2832330",
+   "source_seconds": 12.452,
+   "source_rms_dbfs": -26.77,
+   "source_peak": 0.4449,
+   "source_gain_db": 6.12,
+   "embedding_sha256": "858f139ccf10bd7c3c2bc3f0b5a073bcac1a1e0e5a3d5c82351549888fcc5c7e",
+   "bytes": 7718712,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Edinburgh",
+    "line": "p272  23  M    Scottish  Edinburgh"
+   },
+   "export_seconds": 3.22
+  },
+  {
+   "voice": "vctk_p273",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p273",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p273/p273_318_mic2.flac",
+    "wav48_silence_trimmed/p273/p273_073_mic2.flac",
+    "wav48_silence_trimmed/p273/p273_333_mic2.flac",
+    "wav48_silence_trimmed/p273/p273_069_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "714301f1cf7a4305cb6701a04f603d52cfc4957472bc5d953476eacfdce44596",
+    "3591d1932fe863e09c86643c40da897cb9cc409d82a1814036be1bad20577973",
+    "7f69ece208e544710e88d4fcab1b849a382358782961f8e2b2e009af83f16a0a",
+    "fa3dbcda41f00553fea8673d05dd5f5e6ed0128175d1ca3feffeb25af12f392e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "77be82e317ff2b87e7239cff8be72bf0916435734d174ff5d804c9722c200432",
+   "source_seconds": 13.613,
+   "source_rms_dbfs": -25.35,
+   "source_peak": 0.6747,
+   "source_gain_db": 2.5,
+   "embedding_sha256": "b02a638010c0736c045828ca428f7086ec10a579d2395b61c3a31548890bb881",
+   "bytes": 8455992,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Suffolk",
+    "line": "p273  23  M    English    Suffolk"
+   },
+   "export_seconds": 4.05
+  },
+  {
+   "voice": "vctk_p274",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p274",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p274/p274_104_mic2.flac",
+    "wav48_silence_trimmed/p274/p274_048_mic2.flac",
+    "wav48_silence_trimmed/p274/p274_158_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "2684aceda8eab3ba31932f865a7119c460eb6ad28d785dd9fe05eca3607d7826",
+    "80547ca21c8ac9d7aed5b02ede67fb45fb4734d8bbfc542e8468c53b951b8832",
+    "21ec1bedfcc5f3abbb03c4f4a17f014de8cfafb41ac549212d19c2644dfd125d"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "a7f306a001ff955f267baddeb2d5d201664ab8208364ccd76aca07ab846e7929",
+   "source_seconds": 10.615,
+   "source_rms_dbfs": -24.31,
+   "source_peak": 0.5424,
+   "source_gain_db": 4.31,
+   "embedding_sha256": "b81f942d8e7d06aebfa644eeda1ba0622bb57392f916b734b7bee4098219ba3a",
+   "bytes": 6588216,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Essex",
+    "line": "p274  22  M    English    Essex"
+   },
+   "export_seconds": 2.74
+  },
+  {
+   "voice": "vctk_p275",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p275",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p275/p275_250_mic2.flac",
+    "wav48_silence_trimmed/p275/p275_367_mic2.flac",
+    "wav48_silence_trimmed/p275/p275_066_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "776db1bf72572296aef1bbce99c860db5c257107be1baf6cd278b5ecc302c29b",
+    "d250b031f628096d3e17548f6ab1e23a96a1ec12d4b7d952fd861fe209f61e74",
+    "93527417d19aa5efe31a1e421b8a51e531dead5a0965a65d43e59603ba9fbbcb"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "5a4556e84b850dfa903e586e04e452d827c67c0fdbfaa0fa657d25ee42fbff73",
+   "source_seconds": 10.658,
+   "source_rms_dbfs": -26.33,
+   "source_peak": 0.373,
+   "source_gain_db": 6.33,
+   "embedding_sha256": "9833bac70bff8420f12a56f7d018b9dcf8bc44954695e4bb066477faa2de1e37",
+   "bytes": 6637368,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Midlothian",
+    "line": "p275  23  M    Scottish  Midlothian"
+   },
+   "export_seconds": 2.44
+  },
+  {
+   "voice": "vctk_p276",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p276",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p276/p276_439_mic2.flac",
+    "wav48_silence_trimmed/p276/p276_375_mic2.flac",
+    "wav48_silence_trimmed/p276/p276_309_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "f5ba230e3e5208bd7073caa35d9dca0acdcc9fb495a4240df169dd88f6bdfdbc",
+    "3853ba864705b6a2feb49881edf9c15aa8c7099457aafcfd88b16d8caf24b440",
+    "3be5757f8336832d1ee00743ad63148a72f68c882417ffb0ded592f0a76c3653"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "2b6a4aacf1887de09dfcb01ae0b2cc5d96c7ba4a234b4d20b0e7fd3570916dae",
+   "source_seconds": 11.009,
+   "source_rms_dbfs": -24.42,
+   "source_peak": 0.5154,
+   "source_gain_db": 4.42,
+   "embedding_sha256": "44122974d55b4259741ff8b1513be767e04da8471f9401d9feaeb8b4a7f78da4",
+   "bytes": 6833976,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Oxford",
+    "line": "p276  24  F    English    Oxford"
+   },
+   "export_seconds": 2.71
+  },
+  {
+   "voice": "vctk_p277",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p277",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p277/p277_198_mic2.flac",
+    "wav48_silence_trimmed/p277/p277_211_mic2.flac",
+    "wav48_silence_trimmed/p277/p277_222_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "9266c665703f2b32e383260f1d36f02c982ea5a381dfdb7efa73746f19b398de",
+    "022a4b0e6df14d4e5ee35bc94ae06d5cb33c053aadf99d69a4429b8b9c769984",
+    "f67b110348cb2d38e1a918929a4027dd18c79abcd99b58c1c9fb080a8183f281"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "11cc825619048ff24edf331a11eb0c1866af39ebaa44e9694233dfa2aa992fbb",
+   "source_seconds": 10.504,
+   "source_rms_dbfs": -25.55,
+   "source_peak": 0.63,
+   "source_gain_db": 3.1,
+   "embedding_sha256": "1ec90552b4cd0bc8a0471b3a1d61dbc37baa13dc73bcc5fee76138df781d4496",
+   "bytes": 6539064,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "NE England",
+    "line": "p277  23  F    English    NE  England"
+   },
+   "export_seconds": 2.5
+  },
+  {
+   "voice": "vctk_p278",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p278",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p278/p278_300_mic2.flac",
+    "wav48_silence_trimmed/p278/p278_026_mic2.flac",
+    "wav48_silence_trimmed/p278/p278_159_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "4b7bfc56587afb2b1b47cdb3bb6cc559ad81051894d28bcf326aeefea4557643",
+    "819f1abe7e146b58f63a8cf4b8c75e67943b544f9a5142d9b4c1ea356e55d028",
+    "703936d0f0e8955d1448747915e36a882c8a1ac46f036ca188a3f0b4be989c60"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "2b18f03cc8c1be3ce01d09d8a70657533e273fb18b35b8ac8a23fb11ccf949b6",
+   "source_seconds": 12.6,
+   "source_rms_dbfs": -22.34,
+   "source_peak": 0.8801,
+   "source_gain_db": 0.19,
+   "embedding_sha256": "7becc52d171c1014f70b031eb023e8e544f80461d2224c292e455f998516cfcc",
+   "bytes": 7817016,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Cheshire",
+    "line": "p278  22  M    English    Cheshire"
+   },
+   "export_seconds": 3.34
+  },
+  {
+   "voice": "vctk_p279",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p279",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p279/p279_205_mic2.flac",
+    "wav48_silence_trimmed/p279/p279_261_mic2.flac",
+    "wav48_silence_trimmed/p279/p279_340_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "7ffe52959448182aeaa7203dff8e5cdd81720240766d42231bbb6e244b45a63b",
+    "3ace19252649204575b52f77bf79f6fbe7803fbacac4387c15477ca91d76eef5",
+    "3faf5d547ae8d731b88d1f4899d995511e386d19b1c79eedb722176da55e6b85"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "ca9df3a77ac8472367e7187ccf8a83ac55611d4609e1406dfae135901670adee",
+   "source_seconds": 10.395,
+   "source_rms_dbfs": -25.21,
+   "source_peak": 0.6645,
+   "source_gain_db": 2.64,
+   "embedding_sha256": "247bffd89056a0c13d6909de715055d8c6e33136f21748c868a5f69de573e0fe",
+   "bytes": 6440760,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Leicester",
+    "line": "p279  23  M    English    Leicester"
+   },
+   "export_seconds": 2.39
+  },
+  {
+   "voice": "vctk_p280",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p280",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p280/p280_004_mic1.flac",
+    "wav48_silence_trimmed/p280/p280_142_mic1.flac",
+    "wav48_silence_trimmed/p280/p280_084_mic1.flac"
+   ],
+   "source_member_sha256": [
+    "a3b5d87c88f29f9b7701195620ed04ee5d61bf7fad33d4d63c2eddbcdaf6fb07",
+    "12fd12f5f56c1413bdd24d447521704fb9b40e9f1654742e75d828b1ae3a2279",
+    "9b203592522e7c04672f35f86bad731ed22b491b819335a1fb671ccfb35ae38a"
+   ],
+   "source_mic": "mic1",
+   "source_highpass_60hz": true,
+   "source_sha256": "580b2c15a16da12208dceb9d3d96fee5fcf719cddc7765be2e1329b637e5d6fa",
+   "source_seconds": 11.1,
+   "source_rms_dbfs": -22.05,
+   "source_peak": 0.7129,
+   "source_gain_db": 2.02,
+   "embedding_sha256": "ab8a3d7871224aeb31be3c0d105128083dfcccf25239928116195a503c863acc",
+   "bytes": 6883128,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 25,
+    "gender": "female",
+    "accent_raw": "Unknown",
+    "accent": null,
+    "region": "France",
+    "line": "p280  25  F    Unknown  France (mic2 files unavailable)"
+   },
+   "export_seconds": 2.92
+  },
+  {
+   "voice": "vctk_p281",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p281",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p281/p281_282_mic2.flac",
+    "wav48_silence_trimmed/p281/p281_236_mic2.flac",
+    "wav48_silence_trimmed/p281/p281_171_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "95eb079a9bd09b2684550a054a3788ac9746de7d60d9b8a0c01c7abd46e893c0",
+    "5f1eac5e3a24ddb37ef009484eeee7ab2bca9535a5b42d65512e24a92cfb0c0c",
+    "e77698714ade70cea1acf4b936dea4e857cc0983ef9e79dfa43e98b7b31fc19e"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "13d13c97d95983a46c5c6ec149142a06d99b95b606d23f6bee863c3b2c001f21",
+   "source_seconds": 12.278,
+   "source_rms_dbfs": -25.77,
+   "source_peak": 0.4698,
+   "source_gain_db": 5.65,
+   "embedding_sha256": "603dad8bb07004bd4f3b95f151343a12c893661ff21345da4c3751825f960f75",
+   "bytes": 7620408,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 29,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Edinburgh",
+    "line": "p281  29  M    Scottish  Edinburgh"
+   },
+   "export_seconds": 3.15
+  },
+  {
+   "voice": "vctk_p282",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p282",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p282/p282_159_mic2.flac",
+    "wav48_silence_trimmed/p282/p282_225_mic2.flac",
+    "wav48_silence_trimmed/p282/p282_075_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "c97fc1f6ab361dac128d72c80fa8a8128d3bee7d0b73b3695c4a5697b7e0647b",
+    "8b15e571ebe8585d3e2e6825c9600f0ba2435270b52909450fbf2cf7ecdc5af1",
+    "aefdc66789660f49c9eac08c46cfa89ce4767aa2d4e2aa31eb8a6a7d921341fd"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "8ac0a150216fa62bdefaf97f8fd547db5b0d27cfffe2d70011ad76aa6699d7ee",
+   "source_seconds": 11.664,
+   "source_rms_dbfs": -25.83,
+   "source_peak": 0.5642,
+   "source_gain_db": 4.06,
+   "embedding_sha256": "c3e5233dcdb09703aa4b48b691d90886994ba4ec418b110ca21289900acc2d3e",
+   "bytes": 7227192,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Newcastle",
+    "line": "p282  23  F    English    Newcastle"
+   },
+   "export_seconds": 3.04
+  },
+  {
+   "voice": "vctk_p283",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p283",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p283/p283_319_mic2.flac",
+    "wav48_silence_trimmed/p283/p283_470_mic2.flac",
+    "wav48_silence_trimmed/p283/p283_322_mic2.flac",
+    "wav48_silence_trimmed/p283/p283_218_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "e5fb31497b6ba1454807439d89490a5cc4ed863fd901fae45eacdf6bcf59a88e",
+    "f43a05889589ceb2597d4fc37348f123a0946621d9bcedd2ca2b6843ce4dd39d",
+    "79c533c5587cd4dce4544b7a34c348b482ed06f3ba824e4207fe8e815157b4d6",
+    "842d71b0fadb8046d251da502905b5439b751c7e94d3fb0f65e28eec58f53529"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "ade86d4bac499b5ea37b8e0bc48b73891c8000b03fa0d00f3158776652c94ba6",
+   "source_seconds": 13.085,
+   "source_rms_dbfs": -28.66,
+   "source_peak": 0.4309,
+   "source_gain_db": 6.4,
+   "embedding_sha256": "905846387e5eb91ed637d45d09d3cdc688dcdf8681f4a242e6476264f224dfb8",
+   "bytes": 8111928,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Cork",
+    "line": "p283  24  F    Irish  Cork"
+   },
+   "export_seconds": 3.55
+  },
+  {
+   "voice": "vctk_p284",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p284",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p284/p284_269_mic2.flac",
+    "wav48_silence_trimmed/p284/p284_230_mic2.flac",
+    "wav48_silence_trimmed/p284/p284_208_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ad40c25930345a5aec2fe35e496d4f8400bd299d825cac0f4f91fc3616f20a43",
+    "b0421801f6f5cfa8f7747572d314c548202ac52e652bb3485241f13dda9941a1",
+    "2a2beda667cc010ee915026eb2c1e8ddb08079338ffb40a574f3d3110d760f0f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "1b171a2a609309b696fff5d2885bbe4aba888a8fbaacd0b55aaef6b6277892d5",
+   "source_seconds": 10.118,
+   "source_rms_dbfs": -23.3,
+   "source_peak": 0.9011,
+   "source_gain_db": -0.01,
+   "embedding_sha256": "b91bf01a91bac91c02acefcece59a8fc61afb7a8ddc4c1b5b4f09fe470ab4d66",
+   "bytes": 6293304,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 20,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Fife",
+    "line": "p284  20  M    Scottish  Fife"
+   },
+   "export_seconds": 2.28
+  },
+  {
+   "voice": "vctk_p285",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p285",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p285/p285_199_mic2.flac",
+    "wav48_silence_trimmed/p285/p285_389_mic2.flac",
+    "wav48_silence_trimmed/p285/p285_256_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d93bb7e31ba134c9f10f7c753e7707948e34c4030a2aa955d792201681912a19",
+    "1be295410287f8f8429b672e86169db4e6420f65026f244bac374ad027f4b4e3",
+    "7d25f0a6ad738460dcc10686044b24328922595c50f508516d15d112f1f361fb"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7bb6e2c868ebcde0b4bbf778e0d20747bd05623abaa3008bc6aa93145a1aa49e",
+   "source_seconds": 11.046,
+   "source_rms_dbfs": -24.79,
+   "source_peak": 0.7509,
+   "source_gain_db": 1.57,
+   "embedding_sha256": "d8f2ba44956f200190745f286a3352fed98556abaeb6c6605b7b73728d0ad5b4",
+   "bytes": 6883128,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "Scottish",
+    "accent": "Scottish",
+    "region": "Edinburgh",
+    "line": "p285  21  M    Scottish  Edinburgh"
+   },
+   "export_seconds": 2.91
+  },
+  {
+   "voice": "vctk_p286",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p286",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p286/p286_129_mic2.flac",
+    "wav48_silence_trimmed/p286/p286_103_mic2.flac",
+    "wav48_silence_trimmed/p286/p286_164_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "78a24a1cc576f1c2277d022f78dac378d9970bf9aefdecba7e7933919a6fa20c",
+    "83983f979c1a0851dcd587abc392c05890c5a98a57a95dfc45ac4aa42878a98b",
+    "61f26f0759caf1ed1b1258a7eb1f6382fab9a06ca5875a7ec4642c30e98007fd"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "81c7261d6201623591c4351cf92bf2f97ddcdc53495137098b02c48aa466bcc3",
+   "source_seconds": 10.838,
+   "source_rms_dbfs": -21.76,
+   "source_peak": 0.9205,
+   "source_gain_db": -0.2,
+   "embedding_sha256": "3849fc6fa4f1829382183c3c21fba9b6edbee1e649c4e537ed5dcd1b6e8ba8a6",
+   "bytes": 6735672,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "Newcastle",
+    "line": "p286  23  M    English    Newcastle"
+   },
+   "export_seconds": 2.59
+  },
+  {
+   "voice": "vctk_p287",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p287",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p287/p287_075_mic2.flac",
+    "wav48_silence_trimmed/p287/p287_084_mic2.flac",
+    "wav48_silence_trimmed/p287/p287_173_mic2.flac",
+    "wav48_silence_trimmed/p287/p287_226_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "bbc61c866d654b8ae8678c77fca5d37a8d57df9d19dc16d929e0bca4c6b328aa",
+    "e2956618aec7ccc23fbad6a733b0f343bfa6ea64abf7194c21e50361ce63cecf",
+    "9a792ac22db2dd8fa3fa0ded3b9961843e54b5bffde6a711cb78d72352a9fb02",
+    "ba08035314622ec8c981ae793255802a79c16ecd1f6fbf3455911936dff2cd0f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7e2e380928c53b3f6a54a8aed8af49ceed6c9eb1d9e734a2686b696d2650a0f4",
+   "source_seconds": 13.309,
+   "source_rms_dbfs": -25.99,
+   "source_peak": 0.4328,
+   "source_gain_db": 5.99,
+   "embedding_sha256": "a39e5800e74c70613d820a927bd6c316d9138d6812467ab33e1abb97bd9055f0",
+   "bytes": 8259384,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "English",
+    "accent": "British",
+    "region": "York",
+    "line": "p287  23  M    English    York"
+   },
+   "export_seconds": 3.21
+  },
+  {
+   "voice": "vctk_p288",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p288",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p288/p288_370_mic2.flac",
+    "wav48_silence_trimmed/p288/p288_383_mic2.flac",
+    "wav48_silence_trimmed/p288/p288_088_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "09fc3a435667b631e208fdbbf382b7fc04aecde8ec90ac57ec5ff1ffbaeaa2c5",
+    "8054a51190afb6fa2b18168547b7ca1ba2a4c0b367e213df3f3467fe61230f87",
+    "e94a2e61e4fcf4c4962c8e72562d354953cdfcf23436c1aa8abb1cd20302aa5f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "e6b9133b903dc33666235f6a844f45d2a87052b79f76fc9fd1c1af4a27a53143",
+   "source_seconds": 11.774,
+   "source_rms_dbfs": -28.56,
+   "source_peak": 0.3591,
+   "source_gain_db": 7.98,
+   "embedding_sha256": "686d592d76e84848067dc936cd5f54754a8e0266a78310985ced1ec68e57453e",
+   "bytes": 7325496,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Dublin",
+    "line": "p288  22  F    Irish  Dublin"
+   },
+   "export_seconds": 2.97
+  },
+  {
+   "voice": "vctk_p292",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p292",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p292/p292_270_mic2.flac",
+    "wav48_silence_trimmed/p292/p292_201_mic2.flac",
+    "wav48_silence_trimmed/p292/p292_313_mic2.flac",
+    "wav48_silence_trimmed/p292/p292_072_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "698104577d8f17534ec420c550c8c9b7f60fd52198486ac23d66c32dea60fc6e",
+    "6e3e908953225cdd210e73114052c61044e7bada4714450adfeb78fa798eb253",
+    "dc706d285e67d366b9931b74159af2b6f2b071050436987aec7ce27cd8488631",
+    "f66d516e6d5b81f2492f0e217649b02fceb62d2cc175126ad68f911e1ca4cc0d"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "4969f81253b2330dd8533c1f20111147db81a1f62cbe9a70b2b19996ba2f6b25",
+   "source_seconds": 12.7,
+   "source_rms_dbfs": -23.34,
+   "source_peak": 0.786,
+   "source_gain_db": 1.18,
+   "embedding_sha256": "d3b0336fb56f2c04bb6c9b1fd2c8c03c19f0d8e521987b3b787cb35b81b56aa2",
+   "bytes": 7866168,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Belfast",
+    "line": "p292  23  M    NorthernIrish  Belfast"
+   },
+   "export_seconds": 3.02
+  },
+  {
+   "voice": "vctk_p293",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p293",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p293/p293_358_mic2.flac",
+    "wav48_silence_trimmed/p293/p293_153_mic2.flac",
+    "wav48_silence_trimmed/p293/p293_154_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "509c9fce650d9e070ba6e24a77b70bd23dd62d0aaa303818c87502fa4c0037d7",
+    "e2e036f67c98846983a5c6a22b1fceaf65ef7aed8e9635bc7d93fbef8b7545dd",
+    "777962ac64c4dcaec4326e263b79409ea61ec0bb8c1c232947baf00655646e6b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "e1e60089f19ad694f738976affaf152c4d75f9d0ff73f07d58bd9e921376c9ca",
+   "source_seconds": 14.558,
+   "source_rms_dbfs": -34.08,
+   "source_peak": 0.1824,
+   "source_gain_db": 13.86,
+   "embedding_sha256": "ba389052c8eaac1e0946c1a114d2307992bf3e4925782e8352fbacc3810f3c98",
+   "bytes": 8996664,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Belfast",
+    "line": "p293  22  F    NorthernIrish  Belfast"
+   },
+   "export_seconds": 3.47
+  },
+  {
+   "voice": "vctk_p294",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p294",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p294/p294_224_mic2.flac",
+    "wav48_silence_trimmed/p294/p294_063_mic2.flac",
+    "wav48_silence_trimmed/p294/p294_231_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "21593a624fc3b78c0eec750b9a4c2c9a3ae1bcc0f4fdb15f1f273bd34b877d1c",
+    "1ee822f3c38cd87b2fae69b0a42fa2a25c523de906fa08a4485ba47b536cba16",
+    "c63eaa86d1c7c12f04ac29099bbf35d57b362fd9ed2b7c777fc188bd0f92b661"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7d0cbe885e318e814c28019292c8bd405779ff9e4ebd09d1a93ce5eb4848dd01",
+   "source_seconds": 10.487,
+   "source_rms_dbfs": -29.7,
+   "source_peak": 0.3184,
+   "source_gain_db": 9.03,
+   "embedding_sha256": "63ac2ec9fa3fd04ce190c315cd33f7ab2e39bb3b61a058b94e8078908c6be8b0",
+   "bytes": 6539064,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 33,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "San Francisco",
+    "line": "p294  33  F    American  San  Francisco"
+   },
+   "export_seconds": 2.1
+  },
+  {
+   "voice": "vctk_p295",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p295",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p295/p295_381_mic2.flac",
+    "wav48_silence_trimmed/p295/p295_254_mic2.flac",
+    "wav48_silence_trimmed/p295/p295_122_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "55fdd2beb607ce352c6af43f2141dec8f7f1a67b68d0f15b8963cdca922a7990",
+    "8c28f7400796d31afcb4b3a418d1f069ef4b28c8493b3473bd3d938903990f61",
+    "23807123931e90817587fe0b690dd58d313f7dfc5d2480b8e9549d16519062ee"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "fb0bfe59ba26ca86d3299dcd39c418540e7c9cc41be67b68153c23715be17b26",
+   "source_seconds": 10.982,
+   "source_rms_dbfs": -29.16,
+   "source_peak": 0.3912,
+   "source_gain_db": 7.24,
+   "embedding_sha256": "e6be95753a12a8ba4f6162701e554f65262154f5cd094c5c0cfb30a384f05829",
+   "bytes": 6833976,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Dublin",
+    "line": "p295  23  F    Irish  Dublin"
+   },
+   "export_seconds": 2.74
+  },
+  {
+   "voice": "vctk_p297",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p297",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p297/p297_034_mic2.flac",
+    "wav48_silence_trimmed/p297/p297_050_mic2.flac",
+    "wav48_silence_trimmed/p297/p297_199_mic2.flac",
+    "wav48_silence_trimmed/p297/p297_232_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "94e43f12c69ab4ee7aab712709a5aea1089454ac908fc81672f69761f48aa87d",
+    "1dfa0875f041f84efa3a7c477bd7f39f13c66a8e701df61381968b32bcf7a3a4",
+    "9ef46b5f5c0d825e663e4f23e92a9b970eefc38cdf08ac251fcc55b5a7cf8c0c",
+    "3f693b6b22c09aa8533237e2ae4fdfe48a4575f2a3912838f92a941201733601"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "4c7ab175fb8d55c0a9657868c709b0fbe7ecf8eee075b08890574967cbe28ed3",
+   "source_seconds": 12.36,
+   "source_rms_dbfs": -23.46,
+   "source_peak": 0.6574,
+   "source_gain_db": 2.73,
+   "embedding_sha256": "fcca163058e8f92f233c8e769d33b5f0e398d578556e60c4ac7000c23424610e",
+   "bytes": 7669560,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 20,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "New York",
+    "line": "p297  20  F    American  New  York"
+   },
+   "export_seconds": 2.96
+  },
+  {
+   "voice": "vctk_p298",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p298",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p298/p298_143_mic2.flac",
+    "wav48_silence_trimmed/p298/p298_034_mic2.flac",
+    "wav48_silence_trimmed/p298/p298_169_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3b29f69384969f374719ba45ce023ffee69aeef122a2e45873972aa49094e037",
+    "3af0cb965775d48a96cab54b660a9e1d4e6303769abf389487eb4647b7884c3a",
+    "4fc3fbc56943de428c5a877390d4b44f5c2b18d243a16a4b0b89a7ee0da18069"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7e336ee6978b77692817f824ac29cd53d4a017ab3a3776006300c487049e81ec",
+   "source_seconds": 11.94,
+   "source_rms_dbfs": -29.14,
+   "source_peak": 0.387,
+   "source_gain_db": 7.33,
+   "embedding_sha256": "270336e2920b2ab5e99f5357ba37ed5579010172e11f81a658d14944c3e5391d",
+   "bytes": 7423800,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "male",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Tipperary",
+    "line": "p298  19  M    Irish  Tipperary"
+   },
+   "export_seconds": 2.79
+  },
+  {
+   "voice": "vctk_p299",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p299",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p299/p299_200_mic2.flac",
+    "wav48_silence_trimmed/p299/p299_105_mic2.flac",
+    "wav48_silence_trimmed/p299/p299_205_mic2.flac",
+    "wav48_silence_trimmed/p299/p299_197_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "149ccc436804d0d396e39cec9855e7a9a824c1cd0a639d0afe9604764f0d722c",
+    "b23470b5e41b29c13c1554f625789eec5b7b98e4c38a5a9dd9796facf7b52ea4",
+    "150ed37cf13d401a146386c786ee9d6f2621df392c08d82d9b80721d11f4218f",
+    "fd3d16fe41b9c9b30e3f20790e32b3d916c25a15b387f9141af7d636137741f7"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "64fb6e77819494518569cc9cfe7e161366ab51d118787697ce5dcf57de9de04a",
+   "source_seconds": 13.107,
+   "source_rms_dbfs": -22.03,
+   "source_peak": 0.9986,
+   "source_gain_db": -0.9,
+   "embedding_sha256": "6b3848e66c313eba8de07a635c24baaecceb0f83370c2222a19561805dda1890",
+   "bytes": 8111928,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 25,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "California",
+    "line": "p299  25  F    American  California"
+   },
+   "export_seconds": 3.43
+  },
+  {
+   "voice": "vctk_p300",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p300",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p300/p300_048_mic2.flac",
+    "wav48_silence_trimmed/p300/p300_266_mic2.flac",
+    "wav48_silence_trimmed/p300/p300_104_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "f06f2156cac2f0e2d763fac0e4b1351c236e0b0f4737416b58da20c6ba99cef6",
+    "754eb1e0791df188489798373fe0d76501b025fecd0049430000a497ff0c9032",
+    "57b63a934fcc3f467ab2f136e255ef3140fb6849a49107f9dd13a099bf29abf7"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "12418bf3f14a2b98bac81f89a97da292eb1ef39ff0d1c1efd50db507bb245207",
+   "source_seconds": 14.872,
+   "source_rms_dbfs": -35.93,
+   "source_peak": 0.1736,
+   "source_gain_db": 14.3,
+   "embedding_sha256": "316abe9a569f60861251c5916aea64c4e389652530fada37abb71a2bce6bc6da",
+   "bytes": 9193272,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "California",
+    "line": "p300  23  F    American  California"
+   },
+   "export_seconds": 3.86
+  },
+  {
+   "voice": "vctk_p301",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p301",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p301/p301_270_mic2.flac",
+    "wav48_silence_trimmed/p301/p301_240_mic2.flac",
+    "wav48_silence_trimmed/p301/p301_274_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3c158806c47ebd39e5568f699bcb767b4bb022b37ce6dcbcce058492a66ff986",
+    "b738f15081236a2a2aae20386e3805644047be3e7fc4a53a3cb9ef8dc54a392a",
+    "d2ba6ee931aafdf1ac42d6a14fa0bd4dfa89ab21fe9c3d5d4fa4a5321639e080"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "1bd39ef9f619d88f0a17f647fdde34f2521931a327ff89b8229dc01c32697a6f",
+   "source_seconds": 14.833,
+   "source_rms_dbfs": -31.7,
+   "source_peak": 0.3195,
+   "source_gain_db": 8.99,
+   "embedding_sha256": "6120ef63b1adbe1311d6acb2f25af25267931b0fcaa4c233f334c48373d87ce9",
+   "bytes": 9193272,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "North Carolina",
+    "line": "p301  23  F    American  North  Carolina"
+   },
+   "export_seconds": 3.85
+  },
+  {
+   "voice": "vctk_p302",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p302",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p302/p302_269_mic2.flac",
+    "wav48_silence_trimmed/p302/p302_100_mic2.flac",
+    "wav48_silence_trimmed/p302/p302_140_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ccebaef21173a9ed93bd8ef723e4f766705d57bd6805bac89074d3476583dd0e",
+    "49462a482d75c70f3c6d090bc220a6cf9f2bc89677323cb6f193de7b9fe6f71e",
+    "fc4e421619425799abcfa385863531028560b2a0214289cc90003b3115a76cfa"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "37e20af273acb5cfb0699ef96765414afc1272547ec033a7bd65158274969904",
+   "source_seconds": 10.96,
+   "source_rms_dbfs": -32.64,
+   "source_peak": 0.2394,
+   "source_gain_db": 11.5,
+   "embedding_sha256": "78e84eb5e5d3d98921fc9b05205571d7251e4cce607613475f890f7d65d38f8a",
+   "bytes": 6784824,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 20,
+    "gender": "male",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Montreal",
+    "line": "p302  20  M    Canadian  Montreal"
+   },
+   "export_seconds": 2.68
+  },
+  {
+   "voice": "vctk_p303",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p303",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p303/p303_026_mic2.flac",
+    "wav48_silence_trimmed/p303/p303_053_mic2.flac",
+    "wav48_silence_trimmed/p303/p303_081_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1946533bf1ede5009fe555af1dafcf4b90666541ba59d14cbcec730490069c7f",
+    "4f32fa2892d15b2bc06e96d2b476b38f1624630ab8ad817d0e34c34a23c4d7f5",
+    "30c82447721ba40d2783e4936eaaea952db7e10df6396c6612ed29ea3ade940b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "2f30ddeaa38e0fa00eb158774acf61fe0c47edc202f1613280a7b38100a3f512",
+   "source_seconds": 11.02,
+   "source_rms_dbfs": -27.2,
+   "source_peak": 0.4294,
+   "source_gain_db": 6.43,
+   "embedding_sha256": "b969af65edf04a06d67e2cc00e7eba0429611918458ab3486d9b7584ea64b4fe",
+   "bytes": 6833976,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "female",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Toronto",
+    "line": "p303  24  F    Canadian  Toronto"
+   },
+   "export_seconds": 2.71
+  },
+  {
+   "voice": "vctk_p304",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p304",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p304/p304_176_mic2.flac",
+    "wav48_silence_trimmed/p304/p304_048_mic2.flac",
+    "wav48_silence_trimmed/p304/p304_328_mic2.flac",
+    "wav48_silence_trimmed/p304/p304_398_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6cf2f7cc4507843e3f1b1b500035998c65b84d4ac1dea3dc71b193253ee16ba3",
+    "35b275830435e55393f1e4a74b7570edbbd0cabc75a6874f7a6978f7d02a0ba0",
+    "f90f8039900a7da9487c7fc00714b254db7cdf25c55cd9525f3720b3e98671ee",
+    "232b97a911131400f564ccb42bbccd275b5c349d84e4dfaae2cf8484b6102c95"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "ccfd5df4b3a6ac121fa867dbd4d870b166d2b33b7d0f0ae6b7cfb75405954bfb",
+   "source_seconds": 10.62,
+   "source_rms_dbfs": -22.8,
+   "source_peak": 0.7686,
+   "source_gain_db": 1.37,
+   "embedding_sha256": "62c113995e159fafef829cb5dc17fdcf76b54ff953167f3e2b255f4608af4d20",
+   "bytes": 6588216,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Belfast",
+    "line": "p304  22  M    NorthernIrish  Belfast"
+   },
+   "export_seconds": 2.37
+  },
+  {
+   "voice": "vctk_p305",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p305",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p305/p305_129_mic2.flac",
+    "wav48_silence_trimmed/p305/p305_084_mic2.flac",
+    "wav48_silence_trimmed/p305/p305_397_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "967d236bd5c2c62e1cb71e1f4482cc005acef2a2677e16a9f89eb846d4d66fe3",
+    "5cc63a72ed07d52012f37b14421b78446de1811b5666788d67bbff62d66c2aa0",
+    "9e189eee51e7185cee4fb187bde27e5787d4fa5b6f977f3ad2d49fe68e0cc2ea"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b8622aacc969d5ce5110244b9cd331a015b4a3b0c06d531a4d7463efe6a3fa30",
+   "source_seconds": 12.699,
+   "source_rms_dbfs": -28.34,
+   "source_peak": 0.408,
+   "source_gain_db": 6.87,
+   "embedding_sha256": "da24fded76dd89b8e3967a43c9ef79e8dd6dce870cdf74de1717153fbc4f81d6",
+   "bytes": 7866168,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Philadelphia",
+    "line": "p305  19  F    American  Philadelphia"
+   },
+   "export_seconds": 2.97
+  },
+  {
+   "voice": "vctk_p306",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p306",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p306/p306_251_mic2.flac",
+    "wav48_silence_trimmed/p306/p306_322_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6daedf0b807223e112b894c5dc8cec89e07a45c55f435b5e320ec3287200c050",
+    "b1d3815d095da47b27655f7a59ef457fa4b42aa639dad7399138ac29dacdd6eb"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7412b3d2141a3241dde5e6a22cc7a420361ec206474555de57d3f846090a2b51",
+   "source_seconds": 11.4,
+   "source_rms_dbfs": -34.63,
+   "source_peak": 0.2147,
+   "source_gain_db": 12.45,
+   "embedding_sha256": "4c8e7e7dc3498ad737d937eb2c0cec461cbeb2fe64eb255de24adb3038c106f8",
+   "bytes": 7079736,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "New York",
+    "line": "p306  21  F    American  New  York"
+   },
+   "export_seconds": 2.7
+  },
+  {
+   "voice": "vctk_p307",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p307",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p307/p307_193_mic2.flac",
+    "wav48_silence_trimmed/p307/p307_159_mic2.flac",
+    "wav48_silence_trimmed/p307/p307_033_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "9c04a1550a6bd84324ef13e92bb632c534e9171c6ce9d44a4b8d52214839633c",
+    "c1fdd14f66446a6010169a5242624a9ea9f0f54683d279636d0a226ffa84af92",
+    "200bc66158f3f0b6a30e9ee240a933cf8861d3f1632ccc0921316f810b442cec"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "779667dc6225312e7612a95d82118c718bca365c9556ebb96b78712612e409ab",
+   "source_seconds": 11.53,
+   "source_rms_dbfs": -31.29,
+   "source_peak": 0.2281,
+   "source_gain_db": 11.29,
+   "embedding_sha256": "31c51932ea6b7a0ed339f5c8e94321d617b85e23507834321ce7d35a1240b26a",
+   "bytes": 7178040,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Ontario",
+    "line": "p307  23  F    Canadian  Ontario"
+   },
+   "export_seconds": 2.97
+  },
+  {
+   "voice": "vctk_p308",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p308",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p308/p308_083_mic2.flac",
+    "wav48_silence_trimmed/p308/p308_201_mic2.flac",
+    "wav48_silence_trimmed/p308/p308_324_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b8117e6c3e23d88bf789557a00926adb56c8d0708b7d68dc1ee83b19503a77f8",
+    "07684c0d840e2c78a60e4f4080dd468ca871ba0795e40c95a5e82f439d2b1e5d",
+    "75b6b177de467769fd4f7c39ec01fce343423f1757c69fb53a77ffa017de2a65"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "728cc83fe1ec291cf89a7b637bd282d52abd6a6406161f4acebfdaeb861f763d",
+   "source_seconds": 12.735,
+   "source_rms_dbfs": -38.24,
+   "source_peak": 0.1068,
+   "source_gain_db": 18.24,
+   "embedding_sha256": "95bd805d2d4e22b887223f371ba39d24a4ab13fe52a94bf6554316ca87628a87",
+   "bytes": 7915320,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 18,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Alabama",
+    "line": "p308  18  F    American  Alabama"
+   },
+   "export_seconds": 3.39
+  },
+  {
+   "voice": "vctk_p310",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p310",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p310/p310_045_mic2.flac",
+    "wav48_silence_trimmed/p310/p310_069_mic2.flac",
+    "wav48_silence_trimmed/p310/p310_249_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "82f57f119339fd731f480e0087337a325ab2c06f501bd5f6aa446da927bebe4f",
+    "da11ee8fcc05311334834015a91a80632a908e0c35c0524879616da94b79e1d0",
+    "e6f59aba23ad8dfb1353a619b44221edc555041c0228147f7d51fca41e91c6b0"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "eb4bf30dc1016650d1b12b63198a1a54013a52b6bdf707be8c95fa89d270af3b",
+   "source_seconds": 11.599,
+   "source_rms_dbfs": -27.04,
+   "source_peak": 0.547,
+   "source_gain_db": 4.33,
+   "embedding_sha256": "cfead316006a8338662f7e9d493f55dca8730f42733715a6b6eb639bf12cedab",
+   "bytes": 7178040,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Tennessee",
+    "line": "p310  21  F    American  Tennessee"
+   },
+   "export_seconds": 2.95
+  },
+  {
+   "voice": "vctk_p311",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p311",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p311/p311_332_mic2.flac",
+    "wav48_silence_trimmed/p311/p311_299_mic2.flac",
+    "wav48_silence_trimmed/p311/p311_234_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6fbe2a51da925eb103310573d5d141cb1e79e948bf0612b6d87fa2d5f8986d12",
+    "970560486910bdc1a983d27f82047048f402a441720b368610c66cc7a48b3c69",
+    "cb0225ce0b7cc78cf599215d81661ad440df9fd203a8955e6e596720afc111de"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "02e74a2b60922034b0f7fcf81a6b96771e5eabb5bf36d031dd31a1254d667284",
+   "source_seconds": 10.764,
+   "source_rms_dbfs": -27.89,
+   "source_peak": 0.5624,
+   "source_gain_db": 4.08,
+   "embedding_sha256": "f7bbff32bac6b6f8f9713945fe5f2336e2f74b87dee2cc662e0b49ea5ef3f609",
+   "bytes": 6686520,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "male",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Iowa",
+    "line": "p311  21  M    American  Iowa"
+   },
+   "export_seconds": 2.96
+  },
+  {
+   "voice": "vctk_p312",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p312",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p312/p312_191_mic2.flac",
+    "wav48_silence_trimmed/p312/p312_055_mic2.flac",
+    "wav48_silence_trimmed/p312/p312_188_mic2.flac",
+    "wav48_silence_trimmed/p312/p312_116_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d3935dc13996f721b4ea7c6ce44e8f86f919d2fc04066487833bf9ff93869c52",
+    "b1e4ce15d03a5be21d33638e6bc1df8d04f0b1c128e0a4016c397f2417fba675",
+    "7543b349e4d236730fc191395e6996186b54f324ce82ffff5a7660017f3ba535",
+    "a73e75455bc4643241d7d96d5747e1dcf8c5089b71c5018acd7858246d4c1033"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "9a2d8cb866f7548b6c6805b51d670e5a1e29904bc15bbf683cde1a90a80d6ef9",
+   "source_seconds": 10.934,
+   "source_rms_dbfs": -21.19,
+   "source_peak": 0.7139,
+   "source_gain_db": 1.19,
+   "embedding_sha256": "bc3f5700ba638bbaa4043da1331f38a935d266ab1abdfd35a2307f2826a6a87a",
+   "bytes": 6784824,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "female",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Hamilton",
+    "line": "p312  19  F    Canadian  Hamilton"
+   },
+   "export_seconds": 2.58
+  },
+  {
+   "voice": "vctk_p313",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p313",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p313/p313_236_mic2.flac",
+    "wav48_silence_trimmed/p313/p313_036_mic2.flac",
+    "wav48_silence_trimmed/p313/p313_038_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "217d356f45881da140f7137af9b608dcb1f2850d0725ff5f000440ca81379eb4",
+    "f4d1652fb99f62a06c9f5082ea365dafcbd06a1697e0bc6f4c94ac37bc001b5e",
+    "178cb65591c564558f0e2a0b2f81dc356fd22e638d10c682ec5d8918ad882684"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7907e6fccacbf991983d6b8875cc61c8074615dec5b814368ff0c95286155864",
+   "source_seconds": 12.573,
+   "source_rms_dbfs": -36.52,
+   "source_peak": 0.1696,
+   "source_gain_db": 14.49,
+   "embedding_sha256": "781add022055beaf154d5ddb0bb81009d1862a6fd9478aaae26f8fa4033923ad",
+   "bytes": 7817016,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 24,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "County Down",
+    "line": "p313  24  F    Irish  County  Down"
+   },
+   "export_seconds": 3.21
+  },
+  {
+   "voice": "vctk_p314",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p314",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p314/p314_088_mic2.flac",
+    "wav48_silence_trimmed/p314/p314_374_mic2.flac",
+    "wav48_silence_trimmed/p314/p314_267_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "cb80d966da0d30f856023015b90d68373d7b424bbbf77786459f2cba1e29bd04",
+    "aeba07c5134337099c9b543c76b9828d4451c983c623f64eccb8240b96b792ea",
+    "32a23753232fa68809e3dadcebc035dc6b045d5bf41a50738ef2b85207eef53f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "214497d32b0c1800e3b92af21b1f63937087b21d2281d1a0e569845a33d3fd7c",
+   "source_seconds": 10.714,
+   "source_rms_dbfs": -25.4,
+   "source_peak": 0.5136,
+   "source_gain_db": 4.87,
+   "embedding_sha256": "82de6a3c76f0096e1f0d73b8d29a98e66f139e8f064e070e8102b5374851befb",
+   "bytes": 6637368,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "female",
+    "accent_raw": "SouthAfrican",
+    "accent": "South African",
+    "region": "Cape Town",
+    "line": "p314  26  F    SouthAfrican  Cape  Town"
+   },
+   "export_seconds": 2.76
+  },
+  {
+   "voice": "vctk_p315",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p315",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p315/p315_176_mic1.flac",
+    "wav48_silence_trimmed/p315/p315_308_mic1.flac",
+    "wav48_silence_trimmed/p315/p315_310_mic1.flac",
+    "wav48_silence_trimmed/p315/p315_208_mic1.flac"
+   ],
+   "source_member_sha256": [
+    "2494dce04aeee524f073d068f6a7b52c90f1f528dc47efb25fdf8b703a213841",
+    "87133d8537a0fffa3514af7fc0d3796598b8924e41cfcdfed79aa63354bd2e70",
+    "ecda5e5b2c3adfd4c754487637d801f347412432dccb1ac0f97d3d2c8db9c3af",
+    "a63145e9a014ce80ba053a4998aaf3eb06e2c32516dfd45f56f5adda4da27d0c"
+   ],
+   "source_mic": "mic1",
+   "source_highpass_60hz": true,
+   "source_sha256": "8f3e6d2991badc6faaac7b5be7ff9203a90f6a94bb846559af16d47738e4943e",
+   "source_seconds": 12.062,
+   "source_rms_dbfs": -22.97,
+   "source_peak": 0.8489,
+   "source_gain_db": 0.51,
+   "embedding_sha256": "e8516e9a5dd973bc06ab16343bf682c10a4c01788c6dbdd4e6d731eb89c3eb66",
+   "bytes": 7472952,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 18,
+    "gender": "male",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "New England",
+    "line": "p315  18  M    American  New  England  (Text and mic2 files unavailable)"
+   },
+   "export_seconds": 3.07
+  },
+  {
+   "voice": "vctk_p316",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p316",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p316/p316_158_mic2.flac",
+    "wav48_silence_trimmed/p316/p316_250_mic2.flac",
+    "wav48_silence_trimmed/p316/p316_055_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "3675faf23dd691e7282cf6a24aba32300f0541d035e37675a1ec202bcd753f9c",
+    "7a2ad1e62d9327c047eaae6635a1a0d78f54ad09817de172aa193ba9789e4fe0",
+    "e33c9875a678d3e29b304010b02530099dc09db18706dfb8b9f51711d088b7b5"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "81323fbaf1a0c0c327c177eb653a3df02e9bbd63e0ca37322307f4c4fb3cfbdc",
+   "source_seconds": 11.638,
+   "source_rms_dbfs": -30.61,
+   "source_peak": 0.2266,
+   "source_gain_db": 10.61,
+   "embedding_sha256": "846c65ec002c847ec17213e5c321e9514b3d07a6e0e900e5e9ab41ec0fe2e1d0",
+   "bytes": 7227192,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 20,
+    "gender": "male",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Alberta",
+    "line": "p316  20  M    Canadian  Alberta"
+   },
+   "export_seconds": 3.37
+  },
+  {
+   "voice": "vctk_p317",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p317",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p317/p317_079_mic2.flac",
+    "wav48_silence_trimmed/p317/p317_335_mic2.flac",
+    "wav48_silence_trimmed/p317/p317_116_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "0f59f6da432b1160ec567fd6d074a424248b857a7fd88bcd8d86e73b6fff7daa",
+    "03dc7013354de6c28242e95e75f1da64ebcb1454cfe8b99cf070f20b92d0dfd5",
+    "637c559c63c5997da6bdecd0e6a3723296ed7c10f2ddc2c36e1271ae270d9017"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "07e638fb199a67f804657b91c5c7be10b3a9bbc75b1bad926312283327047411",
+   "source_seconds": 11.302,
+   "source_rms_dbfs": -29.21,
+   "source_peak": 0.3781,
+   "source_gain_db": 7.53,
+   "embedding_sha256": "39044f308000f6bbe2016c2333532a541217d4e58096832bf66a2e0a13c2fc51",
+   "bytes": 7030584,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Hamilton",
+    "line": "p317  23  F    Canadian  Hamilton"
+   },
+   "export_seconds": 3.26
+  },
+  {
+   "voice": "vctk_p318",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p318",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p318/p318_196_mic2.flac",
+    "wav48_silence_trimmed/p318/p318_083_mic2.flac",
+    "wav48_silence_trimmed/p318/p318_178_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "63e7b858b3348a88536f97872865be9bb9dc6a3013b2f37504a3b2b1b0337a74",
+    "f398d1bf360a09ec56ebeef3d424e3be5e30ca0b3ed151463e33a1dfb6191708",
+    "743d577b955cd9061c034be0b73a9b6760f50ca187adbb0ac68376f4bd95a9a8"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "38feed3122fcfcfed1b99ad6ebd25601334b335badc26627cd7275ec8c15b540",
+   "source_seconds": 11.582,
+   "source_rms_dbfs": -27.57,
+   "source_peak": 0.3308,
+   "source_gain_db": 7.57,
+   "embedding_sha256": "e17f43c26ccf89aad74fa4dc5da382d00e8fd3e050c7f9e302daab26bcf30b0d",
+   "bytes": 7178040,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 32,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Napa",
+    "line": "p318  32  F    American  Napa"
+   },
+   "export_seconds": 3.29
+  },
+  {
+   "voice": "vctk_p323",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p323",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p323/p323_243_mic2.flac",
+    "wav48_silence_trimmed/p323/p323_313_mic2.flac",
+    "wav48_silence_trimmed/p323/p323_386_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "888ddb48211f992574f4315953065cf99f901cd7d4e89ac6d586d9aa25812c89",
+    "6f999aba352005bc216e77e1d32af0adb26c7837525e2fc0860bd1c58c8ca4a6",
+    "012755e44695c9305debd6aff2bdfc7bbfee4f1d9b51b7b030672a48bd273f79"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "a4520758ac7205a65d5afc97d42cdab9707c48390fa418790df414302f989190",
+   "source_seconds": 10.306,
+   "source_rms_dbfs": -26.28,
+   "source_peak": 0.4094,
+   "source_gain_db": 6.28,
+   "embedding_sha256": "3262c1ecc1ce7b6d04c5d8af6b9720d124f8607f0b0b6ccdf6b56585af8edb0a",
+   "bytes": 6391608,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "female",
+    "accent_raw": "SouthAfrican",
+    "accent": "South African",
+    "region": "Pretoria",
+    "line": "p323  19  F    SouthAfrican  Pretoria"
+   },
+   "export_seconds": 2.6
+  },
+  {
+   "voice": "vctk_p326",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p326",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p326/p326_360_mic2.flac",
+    "wav48_silence_trimmed/p326/p326_066_mic2.flac",
+    "wav48_silence_trimmed/p326/p326_060_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1cc59735cc2a0e3bc9d9a583d2dd425647cb3cbe40f34fafb279f0c04f31cbac",
+    "ef9b8d137d60eb3d0bc375de10032d75fa93e09e665419c2d4daaa404706d86b",
+    "555489865af4c44a37e1df6496e0c7bb4b7717d9e00029dc7243db15e9ebef25"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b0a375625e698463087ca7f19cdf9c77a6294cfca4d6a633ce1da40f5e4e1ecb",
+   "source_seconds": 11.069,
+   "source_rms_dbfs": -32.96,
+   "source_peak": 0.2163,
+   "source_gain_db": 12.38,
+   "embedding_sha256": "719c3e0309acb3211c057f40316cb8c66130c501d1dfcb0822eedafd9bae803d",
+   "bytes": 6883128,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "male",
+    "accent_raw": "Australian",
+    "accent": "Australian",
+    "region": "Sydney",
+    "line": "p326  26  M    Australian  English  Sydney"
+   },
+   "export_seconds": 2.85
+  },
+  {
+   "voice": "vctk_p329",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p329",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p329/p329_080_mic2.flac",
+    "wav48_silence_trimmed/p329/p329_146_mic2.flac",
+    "wav48_silence_trimmed/p329/p329_237_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "1dbe277ea84455d9a100a3aa334c2fc65b469a52364c7844eb899b6c4dcc4316",
+    "c34e02b53d1b707fc7e45c6da0b4ada6f96692e38b0cfd617d86fd117b3a9ed4",
+    "69743b16da680a91756b47e330f71c7526d23a7124afc431595b11ceaba2ac38"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "1163e4b7832f520310afed3220aa84b0af12b51e84b4e253045a5182fc451d95",
+   "source_seconds": 13.368,
+   "source_rms_dbfs": -30.87,
+   "source_peak": 0.2544,
+   "source_gain_db": 10.87,
+   "embedding_sha256": "8902e323fec341360a09214834518f34ecc26a71f0938cc493b2db3e2821c44c",
+   "bytes": 8308536,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": null,
+    "line": "p329  23  F    American"
+   },
+   "export_seconds": 3.7
+  },
+  {
+   "voice": "vctk_p330",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p330",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p330/p330_287_mic2.flac",
+    "wav48_silence_trimmed/p330/p330_050_mic2.flac",
+    "wav48_silence_trimmed/p330/p330_263_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "7568b66ec05864e3c2364d64e660e336e8432429ea60c945b0d2be5499d83154",
+    "b09f6a1998997abaf27d35a360fa95a30898f90fd7016e55c099d6d60bd2da43",
+    "6336178c23968291f47301ea894806953230f67e38a520bfdbfa91d96a2b624f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "2b343b70529a468f5bafa467c90a37c0b10f2ea88345ae3e6aaffc6e4e70a6b5",
+   "source_seconds": 12.638,
+   "source_rms_dbfs": -33.31,
+   "source_peak": 0.1967,
+   "source_gain_db": 13.21,
+   "embedding_sha256": "254a1fc305b2272329a602f334dd44f0b90f06b2fb9aa1417fdbef25aa08d2a0",
+   "bytes": 7817016,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": null,
+    "line": "p330  26  F    American"
+   },
+   "export_seconds": 3.45
+  },
+  {
+   "voice": "vctk_p333",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p333",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p333/p333_057_mic2.flac",
+    "wav48_silence_trimmed/p333/p333_292_mic2.flac",
+    "wav48_silence_trimmed/p333/p333_277_mic2.flac",
+    "wav48_silence_trimmed/p333/p333_377_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ad5dbece238675fb17facb5d1a1835066027845fd168e102624cfcae9c1b1ad2",
+    "64a707e74de61b5096060cb93f3f100a3e1727f70cc03b04d286d496afaf060d",
+    "2deb7947386e2685dc25277cce7fc6dcb40917502a0c29d638c44307a1e9ea09",
+    "9aef4e6ac6f341e6498c0302bffc1db90935f08f3f922895b74b995af94b0a2f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "01d6988bc71197d5bdc4091011128e84a78e3fdff7c9922ecc41086cfae112ac",
+   "source_seconds": 11.997,
+   "source_rms_dbfs": -30.38,
+   "source_peak": 0.3089,
+   "source_gain_db": 9.29,
+   "embedding_sha256": "30fa6aaf666d16c82234c8b606cb06fb5f4bbaa8fc02ae88ea673f85ce1abf46",
+   "bytes": 7423800,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Indiana",
+    "line": "p333  19  F    American  Indiana"
+   },
+   "export_seconds": 3.2
+  },
+  {
+   "voice": "vctk_p334",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p334",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p334/p334_175_mic2.flac",
+    "wav48_silence_trimmed/p334/p334_007_mic2.flac",
+    "wav48_silence_trimmed/p334/p334_172_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "5a4923cd34d8decf8ead18f4b0546fec248345b6a9a439a3abffb2517c60bf9e",
+    "9889e28f4fa946f067fe0cc4a4c813b8a3b0ffd6ec021964ffac508fb4fb7163",
+    "be7889b710d473086b9e7b2efb16d76284afd05fb1286c9c70b59847a4ee4e92"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "2f4bbcc8a33f8a81058be26a0524a497804eb4a176ab520f259a143b99a4dd26",
+   "source_seconds": 10.752,
+   "source_rms_dbfs": -29.53,
+   "source_peak": 0.2811,
+   "source_gain_db": 9.53,
+   "embedding_sha256": "ad7087bdf711a2bc4c7787a57d5f41429412938b317a54e7952d21445c350318",
+   "bytes": 6686520,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 18,
+    "gender": "male",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Chicago",
+    "line": "p334  18  M    American  Chicago"
+   },
+   "export_seconds": 2.59
+  },
+  {
+   "voice": "vctk_p335",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p335",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p335/p335_191_mic2.flac",
+    "wav48_silence_trimmed/p335/p335_106_mic2.flac",
+    "wav48_silence_trimmed/p335/p335_295_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "34be6d820bf6a67ced81aa405e646d673a4e15da18cfecef3c473c401e256413",
+    "63fd92952c68dc6abca10c98ec8129dbfba2253032a2aacb721c4d5f88856913",
+    "345037ccb170f0686a60e758b853090c463aab5e507529b185a6f2304d715427"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b4865af33bd78b2133c9cd3dbb244e4941d9cf12a2f8142957a6af591b499e84",
+   "source_seconds": 12.041,
+   "source_rms_dbfs": -26.3,
+   "source_peak": 0.3596,
+   "source_gain_db": 6.3,
+   "embedding_sha256": "06c373acc95bd2cdd47a51d8beba54e1d1a523573d410bfbc105701eebcffd45",
+   "bytes": 7472952,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 25,
+    "gender": "female",
+    "accent_raw": "NewZealand",
+    "accent": "New Zealand",
+    "region": null,
+    "line": "p335  25  F    NewZealand  English"
+   },
+   "export_seconds": 3.4
+  },
+  {
+   "voice": "vctk_p336",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p336",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p336/p336_222_mic2.flac",
+    "wav48_silence_trimmed/p336/p336_225_mic2.flac",
+    "wav48_silence_trimmed/p336/p336_156_mic2.flac",
+    "wav48_silence_trimmed/p336/p336_334_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "15ee004271c43c661b4da2aec11752bbbfa2773f75ab79edf59cef1531eab898",
+    "8617cddbed692c0c8cbf739d9d6bd67354699f9b4fa2a8605b0fea9587310fd7",
+    "ed94e1ce92fb8b0938fb96bc9e46dea3fecd6b85b5fdb53c2a2d527fbcbb28aa",
+    "49ed5a53cd8e73fb904ee0659a0114e835a26fde0fcf4ede5374f39c36d1a73f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "39176b0f13f1dc252dffaa65bc379283eda6bd772ff4251e4db06bc6e0d6951c",
+   "source_seconds": 13.294,
+   "source_rms_dbfs": -24.75,
+   "source_peak": 0.9779,
+   "source_gain_db": -0.72,
+   "embedding_sha256": "e9398e2859d0fc652c836af9f52267f48b337b86fffa703cd12c070d74476e30",
+   "bytes": 8259384,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 18,
+    "gender": "female",
+    "accent_raw": "SouthAfrican",
+    "accent": "South African",
+    "region": "Johannesburg",
+    "line": "p336  18  F    SouthAfrican  Johannesburg"
+   },
+   "export_seconds": 3.54
+  },
+  {
+   "voice": "vctk_p339",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p339",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p339/p339_050_mic2.flac",
+    "wav48_silence_trimmed/p339/p339_046_mic2.flac",
+    "wav48_silence_trimmed/p339/p339_091_mic2.flac",
+    "wav48_silence_trimmed/p339/p339_103_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "20784b2de0e2b4bd366413a973a7f0b282f06c427219b16cc98daf040264f5cb",
+    "ad8cb2025dd7561112317632596ede20b9df594672e9da2adf8dc53b21d2b181",
+    "6044e26fd28efb953c6f542b1776eb42552e58792cdd9efcd1d88638c575ce3f",
+    "634ff09247abedec615637e8b82520439ad7ba2706b04fb612f13991f0f46097"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "56f6983f7ea76ce8f5fe54523aacfc3d659904b2f91a282543b6c14d792db513",
+   "source_seconds": 10.28,
+   "source_rms_dbfs": -24.7,
+   "source_peak": 0.778,
+   "source_gain_db": 1.27,
+   "embedding_sha256": "c904cfaea17a35b8f58ed0f769a658c533d5f599915bfd661d987cc45ee53209",
+   "bytes": 6391608,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Pennsylvania",
+    "line": "p339  21  F    American  Pennsylvania"
+   },
+   "export_seconds": 2.43
+  },
+  {
+   "voice": "vctk_p340",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p340",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p340/p340_104_mic2.flac",
+    "wav48_silence_trimmed/p340/p340_086_mic2.flac",
+    "wav48_silence_trimmed/p340/p340_380_mic2.flac",
+    "wav48_silence_trimmed/p340/p340_141_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "6e9317802784dfb34a9dbcec19c4a901b35a4d2cc9ded52bb26fb221faee00c0",
+    "8efdb260eea63326878732dad0983aa5d36d25fe4e27f7e2652b89c9603db3d7",
+    "a18908454f9b0aa54cb99bd59f9a6262e6943474d92a6131018ad2bb6425afa1",
+    "2e4d73ba9e4c8df31fe394238800addc87354f6028a6c4e663e9b3b79802e04f"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "ddc477aeef22bcf5c38a3d0a25b3b04e651de81216ce033819b8e40d1e478b21",
+   "source_seconds": 10.377,
+   "source_rms_dbfs": -28.9,
+   "source_peak": 0.4582,
+   "source_gain_db": 5.86,
+   "embedding_sha256": "b9965b6281b24ec57ced768e723ebbb691c0084cab1afaccdabdf05dd00e22d1",
+   "bytes": 6440760,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 18,
+    "gender": "female",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Dublin",
+    "line": "p340  18  F    Irish  Dublin"
+   },
+   "export_seconds": 2.42
+  },
+  {
+   "voice": "vctk_p341",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p341",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p341/p341_048_mic2.flac",
+    "wav48_silence_trimmed/p341/p341_367_mic2.flac",
+    "wav48_silence_trimmed/p341/p341_102_mic2.flac",
+    "wav48_silence_trimmed/p341/p341_151_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "d11752c006de5780324aa2173bb693088f28c02ead683df816187134c5f03c6c",
+    "b7c7f63981569c6d32d46d8ddf8471c9dce8bd01ba8a9239bac3d75c5a9acce1",
+    "aa9963b2f417dac1bde1dee36ba43e5c563a25fcc495ce044c4c19c5220bf711",
+    "aa429cca18269b7d0fcf0c65abd26c5a61007650285762c6802bf90b0714c195"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3acae5f830b08dfde4cc4ee6de659f26883c4c03456ce27e9eaf1376a64323e3",
+   "source_seconds": 14.405,
+   "source_rms_dbfs": -27.32,
+   "source_peak": 0.4889,
+   "source_gain_db": 5.3,
+   "embedding_sha256": "bb7356975091f44a93cda5c29a92366e26d4a0e9d0c9532caf30451ffd961b45",
+   "bytes": 8947512,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Ohio",
+    "line": "p341  26  F    American  Ohio"
+   },
+   "export_seconds": 4.06
+  },
+  {
+   "voice": "vctk_p343",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p343",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p343/p343_114_mic2.flac",
+    "wav48_silence_trimmed/p343/p343_205_mic2.flac",
+    "wav48_silence_trimmed/p343/p343_253_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "cdbac3d7db08e577fe38d7e374f940d3f834d8854aa5cc7f4868fce1e79251bc",
+    "0b73e54ff9cafaa5d8a5d0b57ce4d883917bbd3102f0a4d8576163631a3c4da8",
+    "bbfa775e6305cb25d847a178f955b317fd1e0732ecfcb2a2d395a0ae14911119"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "0ea6261988538453f9dead71a412ad04ddc63c45fa05d0a38f51548af92037a0",
+   "source_seconds": 11.738,
+   "source_rms_dbfs": -33.98,
+   "source_peak": 0.2659,
+   "source_gain_db": 10.59,
+   "embedding_sha256": "5a9a3ce99f06dcf2608136c657b55ceca1559723c84c81604883afffa4e24c0d",
+   "bytes": 7276344,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 27,
+    "gender": "female",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Alberta",
+    "line": "p343  27  F    Canadian  Alberta"
+   },
+   "export_seconds": 3.08
+  },
+  {
+   "voice": "vctk_p345",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p345",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p345/p345_124_mic2.flac",
+    "wav48_silence_trimmed/p345/p345_393_mic2.flac",
+    "wav48_silence_trimmed/p345/p345_132_mic2.flac",
+    "wav48_silence_trimmed/p345/p345_205_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "de7898dfb5f64998f073a987710bb4084705f0e465e2b7f010c7ddaa12b49344",
+    "445b7a58f29127ddbef6132d1c65a70886116d78828c113fbb0f16a1cf292561",
+    "75a146dfcb92e6cf1b93821b97122d343832932fb45b3e9713e25cb6135a5809",
+    "0f22babe8cfae1e7a24971007a1579f5e07ec170007b63be2aae8d4a8a68f82b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "999ab3806bb534acd538932bb3583c0f029fc46ba53f434780be4b25cf385c16",
+   "source_seconds": 11.58,
+   "source_rms_dbfs": -23.92,
+   "source_peak": 0.5925,
+   "source_gain_db": 3.63,
+   "embedding_sha256": "e5cd5ae4be5cd0072aa9f427c892d273a5a23e2d909df678e0894fe6164248b6",
+   "bytes": 7178040,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "Florida",
+    "line": "p345  22  M    American  Florida"
+   },
+   "export_seconds": 3.25
+  },
+  {
+   "voice": "vctk_p347",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p347",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p347/p347_294_mic2.flac",
+    "wav48_silence_trimmed/p347/p347_229_mic2.flac",
+    "wav48_silence_trimmed/p347/p347_206_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "bae3a6117f723e2f52d11485566b1c4341c1eb97bed072fb54005f1daf865329",
+    "a7104b12d0f35ac8658c0d26f01a8f049db63880141a3ae0ef739e1d906224ab",
+    "0e3a64731a7e34b4ac95855c7f9847ad18c93046445478b2170111d5508a16d7"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "d666d7fe5dec2f4b948c180b3bcbfe857c23ef6b5abb55acc0680edc16c1575d",
+   "source_seconds": 11.458,
+   "source_rms_dbfs": -32.99,
+   "source_peak": 0.2619,
+   "source_gain_db": 10.72,
+   "embedding_sha256": "5e9cd0ae6f99b965cbe38c9beb1cb156ff5c4b8f1a6c7597c62e53cbcbb850bd",
+   "bytes": 7128888,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 26,
+    "gender": "male",
+    "accent_raw": "SouthAfrican",
+    "accent": "South African",
+    "region": "Johannesburg",
+    "line": "p347  26  M    SouthAfrican  Johannesburg"
+   },
+   "export_seconds": 3.06
+  },
+  {
+   "voice": "vctk_p351",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p351",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p351/p351_059_mic2.flac",
+    "wav48_silence_trimmed/p351/p351_171_mic2.flac",
+    "wav48_silence_trimmed/p351/p351_060_mic2.flac",
+    "wav48_silence_trimmed/p351/p351_096_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b908be9513cdaa01b2d9cfdb0255e44757968084b2fe4660a550e809600c745b",
+    "757532f034f6ce411551c8431a76a9a8fcbff579356ad535ef753f1e612b1c92",
+    "c7924de2c36d0b04374631cab3cb9942cbd41bc533c15d5210a442c7153befe9",
+    "77790d0871057aa60a3b21fefb757a8ff1452c43982315737ded4b39a1b522eb"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "45a2f6aa25b541fbb8cee35ef2eb5d51ee39cf9e90e91fa63082235267acc19d",
+   "source_seconds": 12.973,
+   "source_rms_dbfs": -33.7,
+   "source_peak": 0.1867,
+   "source_gain_db": 13.66,
+   "embedding_sha256": "9cf4ef5573c79df55da24671d81dc1114902f60299a62d022be5769fcd890644",
+   "bytes": 8062776,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 21,
+    "gender": "female",
+    "accent_raw": "NorthernIrish",
+    "accent": "Northern Irish",
+    "region": "Derry",
+    "line": "p351  21  F    NorthernIrish  Derry"
+   },
+   "export_seconds": 3.4
+  },
+  {
+   "voice": "vctk_p360",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p360",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p360/p360_041_mic2.flac",
+    "wav48_silence_trimmed/p360/p360_130_mic2.flac",
+    "wav48_silence_trimmed/p360/p360_277_mic2.flac",
+    "wav48_silence_trimmed/p360/p360_188_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "586b114b77da907001fb4b7588f82c493d7e8353df5949864af52619d1ee1696",
+    "808dfd8d6e4b160ae9a4c006c4c6296443011bfcfdb9e723942b1a02aed3fa3d",
+    "408e09b17d5e3357c411425288d2584ccfae3034445828e55f44e5508552588e",
+    "6d9761f0a43440ea4a9b6882e017a7414edfb0100bdab524e1eacb1c42be5313"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "673d2123013d61c60d4050d0ee02567b3d590c6ccc365ba7c2a2da73c4a623b3",
+   "source_seconds": 11.346,
+   "source_rms_dbfs": -39.11,
+   "source_peak": 0.1079,
+   "source_gain_db": 18.42,
+   "embedding_sha256": "fd085f56abb86eb4f2f2b3321451b53f20680581a14d662e87d2748a4a5963fe",
+   "bytes": 7030584,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "male",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "New Jersey",
+    "line": "p360  19  M    American  New  Jersey"
+   },
+   "export_seconds": 3.08
+  },
+  {
+   "voice": "vctk_p361",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p361",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p361/p361_177_mic2.flac",
+    "wav48_silence_trimmed/p361/p361_048_mic2.flac",
+    "wav48_silence_trimmed/p361/p361_099_mic2.flac",
+    "wav48_silence_trimmed/p361/p361_226_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ac63d6711f803075b0a78550a242178e323dac52f3816971c4660e96431400ad",
+    "37c676c0ce2947718bc89bf452d34f48d06bfc93d053a1d17422d27b2a2a0001",
+    "4e24753769a41088d2cb5e47feccefd909d7d5f61e4905f2c71eaa4cb85c75c6",
+    "cf2d2dd8ed0330d46ccb003d3e051a5d912d161d51f1c5c9199ce5813991f840"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "3ecc11cae0ef36d38e623dd74cbbba9ef3af855e90956ef0a7034339d5648a47",
+   "source_seconds": 14.661,
+   "source_rms_dbfs": -36.4,
+   "source_peak": 0.148,
+   "source_gain_db": 15.68,
+   "embedding_sha256": "d2616eaeb50988e7b1160521fedb3d9e4311687691d33bc343cb16dd0a118a85",
+   "bytes": 9094968,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 19,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": "New Jersey",
+    "line": "p361  19  F    American  New  Jersey"
+   },
+   "export_seconds": 4.07
+  },
+  {
+   "voice": "vctk_p362",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p362",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p362/p362_380_mic2.flac",
+    "wav48_silence_trimmed/p362/p362_113_mic2.flac",
+    "wav48_silence_trimmed/p362/p362_168_mic2.flac",
+    "wav48_silence_trimmed/p362/p362_154_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "7031e9a0310763dee1995882011d42126341e28def0b6d4f76cb6e9cd9179995",
+    "5d97fe95495397e724444676fd6dbde1b85a9d1d1fe3270215caf951b606ccc6",
+    "d8a676bf0f14ebd0f3da83307197a459634a906508e81d490eb6054e789985be",
+    "3e9c54b327c66fb30c6cc3936512b4ab4d31c42f1363bdce0259fa494c7f0559"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b9c2cce1e6160a4a99940a3d59da1cf61e29fa4411393807907824940e6b3f31",
+   "source_seconds": 13.014,
+   "source_rms_dbfs": -24.66,
+   "source_peak": 0.6609,
+   "source_gain_db": 2.68,
+   "embedding_sha256": "f3f602ad5a19fc745c8f3587c44fbff119f1a6e21807d667be54ed0638adcd51",
+   "bytes": 8062776,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 29,
+    "gender": "female",
+    "accent_raw": "American",
+    "accent": "American",
+    "region": null,
+    "line": "p362  29  F    American"
+   },
+   "export_seconds": 3.76
+  },
+  {
+   "voice": "vctk_p363",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p363",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p363/p363_072_mic2.flac",
+    "wav48_silence_trimmed/p363/p363_422_mic2.flac",
+    "wav48_silence_trimmed/p363/p363_075_mic2.flac",
+    "wav48_silence_trimmed/p363/p363_383_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "c1cbeb5173f6b3d459761e8316fd22c9b1916ac49bbeb49e00d58267a5a91709",
+    "5e8b08eea0ba9db97126ecea16b8e57efd6ecf66b8bbb6b3b1b2e38e03e09cb6",
+    "94fca3a916c61e0010a70b47baae72b713f0319767953bdbffc7c87f9a5f46ea",
+    "a89bc1e74748a7d5ae8c6fac816d774e848e7ab0cef760c03d5dcac8f810afbe"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "a354a1a8601a4b3f043f118ff8c778a7f0a8772fe83e917e9aa3fad1de9cd7cb",
+   "source_seconds": 13.013,
+   "source_rms_dbfs": -34.47,
+   "source_peak": 0.1901,
+   "source_gain_db": 13.51,
+   "embedding_sha256": "72cf10d8ebfd4f1d9096ef968201d056be9377b669160746ffc0bdf290995530",
+   "bytes": 8062776,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Canadian",
+    "accent": "Canadian",
+    "region": "Toronto",
+    "line": "p363  22  M    Canadian  Toronto"
+   },
+   "export_seconds": 3.45
+  },
+  {
+   "voice": "vctk_p364",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p364",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p364/p364_193_mic2.flac",
+    "wav48_silence_trimmed/p364/p364_228_mic2.flac",
+    "wav48_silence_trimmed/p364/p364_166_mic2.flac",
+    "wav48_silence_trimmed/p364/p364_233_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "b2d57d28c08dcea70014bc33831d8322f56f757103dd4a3c40be8c31666bec1b",
+    "7ace7fcbf18c23292e31522202a2cd9986fcb19dac9c391cf0f927bead603740",
+    "387f6320c3e934eabd207dfe787eb6741be3257c024916ada2b60ee89c46bbb2",
+    "5399a23f54a36df544a0dde5702d308f930752a4513c33c61068673afe03c80d"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "7886c43b1d5dabc9902f54f9446044e6c16d34582388ad02237d11f334afa334",
+   "source_seconds": 13.033,
+   "source_rms_dbfs": -35.53,
+   "source_peak": 0.1537,
+   "source_gain_db": 15.35,
+   "embedding_sha256": "a38f26ab73c084b1245b7549919bce942ce2811a8c2890bff24054d9e92800fd",
+   "bytes": 8062776,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 23,
+    "gender": "male",
+    "accent_raw": "Irish",
+    "accent": "Irish",
+    "region": "Donegal",
+    "line": "p364  23  M    Irish  Donegal"
+   },
+   "export_seconds": 3.65
+  },
+  {
+   "voice": "vctk_p374",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p374",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p374/p374_032_mic2.flac",
+    "wav48_silence_trimmed/p374/p374_422_mic2.flac",
+    "wav48_silence_trimmed/p374/p374_159_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "52b66708e739b5da4fc2b037a5861c49a4eaccb21865a39d40851e4629cb888c",
+    "d64e6629423e3a083fdf95a5befadf5948a1450888b6445855a1762ef899855d",
+    "10a456abbd1a67dfbc988168527e83173050ef2bd1eac06eb587a1b6a5f3776b"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "a69dcc3b15639605adb29fdf84ca5378830dcaf991402e2064bcf6a3570b6ddf",
+   "source_seconds": 10.137,
+   "source_rms_dbfs": -28.03,
+   "source_peak": 0.5273,
+   "source_gain_db": 4.64,
+   "embedding_sha256": "af9803c2c02fe6747e0dfe91990bdf03981570b12bb4856f109c3a57a198c2e5",
+   "bytes": 6293304,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 28,
+    "gender": "male",
+    "accent_raw": "Australian",
+    "accent": "Australian",
+    "region": null,
+    "line": "p374  28  M    Australian  English"
+   },
+   "export_seconds": 2.49
+  },
+  {
+   "voice": "vctk_p376",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "p376",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/p376/p376_210_mic2.flac",
+    "wav48_silence_trimmed/p376/p376_391_mic2.flac",
+    "wav48_silence_trimmed/p376/p376_121_mic2.flac",
+    "wav48_silence_trimmed/p376/p376_058_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ce14a148f360c995dc7822e087c29acbeb8d3ed83d5fcc35c0b63e64940eb392",
+    "07b6f17abdffb34034fe3b628116c4ec457ceb5df63803ffb478f66976beef93",
+    "e757499dc2471cb9909490cde9a8a5bb6342bdab33d52840e8cb790738a8d17b",
+    "c1a15a8377790ec4f6d056534c88f98ce77c2e961c4bc1aa518a036087b9f035"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "b26855fe4cd9a75fdb3d2f4a98059c073e8f322c48e9c0ea51981a59a25cee9e",
+   "source_seconds": 12.467,
+   "source_rms_dbfs": -34.52,
+   "source_peak": 0.189,
+   "source_gain_db": 13.55,
+   "embedding_sha256": "5cd339b7b6f67e6e2cfc8afe53d040a0915b21c982086a93b4e736dfd2f046a2",
+   "bytes": 7718712,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "male",
+    "accent_raw": "Indian",
+    "accent": "Indian",
+    "region": null,
+    "line": "p376  22  M    Indian"
+   },
+   "export_seconds": 3.11
+  },
+  {
+   "voice": "vctk_s5",
+   "source_collection": "CSTR VCTK Corpus 0.92",
+   "source_id": "s5",
+   "source_url": "https://datashare.ed.ac.uk/bitstream/handle/10283/3443/VCTK-Corpus-0.92.zip",
+   "source_doi": "https://doi.org/10.7488/ds/2645",
+   "source_members": [
+    "wav48_silence_trimmed/s5/s5_185_mic2.flac",
+    "wav48_silence_trimmed/s5/s5_083_mic2.flac",
+    "wav48_silence_trimmed/s5/s5_220_mic2.flac"
+   ],
+   "source_member_sha256": [
+    "ec2fa86cf434b82031d59010ef1654415755b5088bd0181da780676a08c4f449",
+    "7086700bd3d1088c5aeb422a7362b9c5f597ad3036e952c99c65985bfe987398",
+    "3696945a037cccac710c3d6b15cd8b9bd9b62cffddc366b29b3278ba21d0e781"
+   ],
+   "source_mic": "mic2",
+   "source_highpass_60hz": false,
+   "source_sha256": "72049c8a47c56082e167353b99dbad887e3de0b6162f4fc66121513181e66cbc",
+   "source_seconds": 14.928,
+   "source_rms_dbfs": -24.25,
+   "source_peak": 0.6754,
+   "source_gain_db": 2.49,
+   "embedding_sha256": "187c03439e7b5d563b1781476431b79c577d014fcf47a4bab98a371fa4cb7b98",
+   "bytes": 9242424,
+   "license": "CC-BY-4.0",
+   "attribution": "Derived from the CSTR VCTK Corpus 0.92 (Yamagishi, Veaux, MacDonald; CSTR, University of Edinburgh), CC BY 4.0",
+   "provenance": "VCTK (CC BY 4.0)",
+   "speaker": {
+    "age": 22,
+    "gender": "female",
+    "accent_raw": "British",
+    "accent": "British",
+    "region": null,
+    "line": "s5    22  F    British (new speaker, more data would be released for training a speaker-dependent model)"
+   },
+   "export_seconds": 3.8
+  }
+ ]
+}
