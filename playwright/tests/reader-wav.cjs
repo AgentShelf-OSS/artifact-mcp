@@ -43,7 +43,9 @@ const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.ok(Math.abs(rewound - 3) < 0.4, `rewind currentTime was ${rewound}`);
     assert.ok(saved3 && Math.abs(saved3.current.offset - 3) < 0.4, `rewind checkpoint offset was ${saved3?.current?.offset}`);
     await page.reload({ waitUntil: 'domcontentloaded' }); await page.locator('#vreader-toggle').waitFor({ state: 'visible' }); await page.locator('#vreader-toggle').click(); await page.locator('#vreader-expand').click();
-    await page.locator('#vreader-resume').waitFor({ state: 'visible' }); await page.locator('#vreader-resume').click();
+    await page.locator('#vreader-resume').waitFor({ state: 'visible' });
+    // Play after a reload continues from the saved place, as the separate Resume button does.
+    await page.locator('#vreader-play').click();
     await page.waitForFunction(() => document.querySelector('#vreader-audio')?.readyState >= 1 && document.querySelector('#vreader-status')?.textContent?.includes('Reading'), null, { timeout: 10000 });
     const resumed = await page.evaluate(() => document.querySelector('#vreader-audio').currentTime);
     assert.ok(Math.abs(resumed - 3) < 0.6, `reload resume currentTime was ${resumed}`);

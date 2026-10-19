@@ -892,7 +892,7 @@
     function maybeAutoplay() {
       if (autoplayDone || !enabled || !ready || wants || new URLSearchParams(window.location.search).get('listen') !== 'autoplay') return;
       if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.hostHas) return;
-      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get('play').click(); });
+      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get(savedPlace() ? 'resume' : 'play').click(); });
     }
     function updateMediaSession(clear) {
       mirrorNative(clear);
@@ -1430,6 +1430,9 @@
       if (stream && audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
       if (stream) { stream.boxState = 'playing'; box.dataset.streamState = 'playing'; return; }
       if (extraction || loading) return;
+      // Nothing loaded yet: continue from the saved place when there is one (phone, browser, or car).
+      // Only for the same whole-page or section reading; an explicit view, detail, or "here" pick wins.
+      if (!queue.length && ['page','section'].includes(mode) && savedPlace()?.mode === mode) { get('resume').click(); return; }
       if (!queue.length) requestContent(false); else if (loaded === position) playLoaded(); else loadCurrent();
     };
     get('stop').onclick = () => { stop(); cancelSleep(); };
