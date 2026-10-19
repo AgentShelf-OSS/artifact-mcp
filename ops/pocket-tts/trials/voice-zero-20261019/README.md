@@ -177,3 +177,12 @@ With no Voice-Zero choices, the output equals the live 92-voice catalog
 `sources.json` (all 154 clips: checksums, narrator, reading, and the excluded
 clips with reasons), `export-manifest.json` (all 142 exports), and
 `voice-metrics.json` (QC report and selection).
+
+## Decision (2026-10-19)
+
+Neil kept all 50 selected voices ("add all of them"). He had marked 8 in the
+audition; `neil-choices-20261019.json` is the audition state with the other 42 set
+to Keep, and it is the state used for the live catalog (142 voices). Regenerate with
+`--state-file voices/pocket-voicezero-audition=trials/voice-zero-20261019/neil-choices-20261019.json`
+(and state files for the other two auditions), not `--from-ct220`, unless the
+audition page has been updated to match.
