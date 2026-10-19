@@ -845,8 +845,8 @@
         const row = document.createElement('div'); row.className = 'vreader-cast-role';
         const title = document.createElement('strong'); title.textContent = role.label;
         const description = document.createElement('p'); description.textContent = role.description || ('This is ' + role.label + '.');
-        const select = document.createElement('select'); select.setAttribute('aria-label', role.label + ' voice'); select.appendChild(new Option('Main voice',''));
-        availableVoices.forEach(item => select.appendChild(new Option(item.name || item.id,item.id))); select.value = roleVoices[role.id] || '';
+        const select = document.createElement('select'); select.setAttribute('aria-label', role.label + ' voice'); select.dataset.role = role.id; select.appendChild(new Option('Main voice',''));
+        appendVoiceOptions(select, {current: roleVoices[role.id] || ''}); select.value = roleVoices[role.id] || '';
         select.addEventListener('change', () => { roleVoices[role.id] = select.value; discardFutureVoiceAudio(); saveCastPreferences(); paint(); });
         const preview = document.createElement('button'); preview.type = 'button'; preview.className = 'vreader-control'; preview.textContent = 'Preview'; preview.addEventListener('click', () => previewRole(role));
         row.append(title, description, select, preview); rows.appendChild(row);
@@ -892,7 +892,7 @@
     function maybeAutoplay() {
       if (autoplayDone || !enabled || !ready || wants || new URLSearchParams(window.location.search).get('listen') !== 'autoplay') return;
       if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.hostHas) return;
-      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get('play').click(); });
+      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get(savedPlace() ? 'resume' : 'play').click(); });
     }
     function updateMediaSession(clear) {
       mirrorNative(clear);
@@ -1430,6 +1430,9 @@
       if (stream && audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
       if (stream) { stream.boxState = 'playing'; box.dataset.streamState = 'playing'; return; }
       if (extraction || loading) return;
+      // Nothing loaded yet: continue from the saved place when there is one (phone, browser, or car).
+      // Only for the same whole-page or section reading; an explicit view, detail, or "here" pick wins.
+      if (!queue.length && ['page','section'].includes(mode) && savedPlace()?.mode === mode) { get('resume').click(); return; }
       if (!queue.length) requestContent(false); else if (loaded === position) playLoaded(); else loadCurrent();
     };
     get('stop').onclick = () => { stop(); cancelSleep(); };
@@ -1589,23 +1592,39 @@
       const q = finder.query.trim().toLowerCase();
       return !q || [item.name, tags.accent, tags.style, tags.gender].filter(Boolean).join(' ').toLowerCase().includes(q);
     }
-    function renderVoiceOptions(keep) {
-      const select = get('voice'), current = keep || select.value, favorites = favoriteVoices(), groups = new Map();
+    // One builder for every voice menu (main voice and character roles), so they always offer the
+    // same voices, grouped and labelled the same way: saved voices first, then each engine, with
+    // the Pocket list alphabetical.
+    function voiceGroupLabel(item) { return item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /^raven_/.test(item.id) ? 'RAVEN trial' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro'); }
+    function voiceOptionLabel(item) { const tags = item.tags || {}, details = [tags.accent, tags.style].filter(Boolean).join(', '); return item.name.replace(/ · (Kokoro|Pocket|RAVEN|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, '') + (details ? ' (' + details + ')' : ''); }
+    function appendVoiceOptions(select, options) {
+      const opts = options || {}, favorites = favoriteVoices(), groups = new Map(), saved = [];
       let shown = 0;
-      select.textContent = '';
       for (const item of availableVoices) {
-        if (item.id !== current && !voiceMatches(item, favorites)) continue;
-        const label = item.provider || (/pocket/i.test(item.id + ' ' + item.name) ? 'Pocket TTS' : /^raven_/.test(item.id) ? 'RAVEN trial' : /qwen/i.test(item.id + ' ' + item.name) ? 'Qwen3-TTS' : /^moss_/.test(item.id) ? 'MOSS-TTS-Nano' : 'Kokoro');
-        if (!groups.has(label)) { const group = document.createElement('optgroup'); group.label = label; groups.set(label, group); }
-        const tags = item.tags || {}, details = [tags.accent, tags.style].filter(Boolean).join(', ');
-        const option = document.createElement('option'); option.value = item.id;
-        option.textContent = (favorites.includes(item.id) ? '★ ' : '') + item.name.replace(/ · (Kokoro|Pocket|RAVEN|Qwen|MOSS(?:-TTS Nano)?)(?: TTS)?/i, '') + (details ? ' (' + details + ')' : '');
-        groups.get(label).appendChild(option); if (item.id !== current || voiceMatches(item, favorites)) shown++;
+        const keep = item.id === opts.current;
+        if (!keep && opts.filter && !opts.filter(item, favorites)) continue;
+        if (!keep || !opts.filter || opts.filter(item, favorites)) shown++;
+        if (favorites.includes(item.id)) { saved.push(item); continue; }
+        const label = voiceGroupLabel(item); if (!groups.has(label)) groups.set(label, []); groups.get(label).push(item);
       }
-      groups.forEach(group => select.appendChild(group));
+      const add = (label, items) => { if (!items.length) return; const group = document.createElement('optgroup'); group.label = label; items.forEach(item => group.appendChild(new Option(voiceOptionLabel(item), item.id))); select.appendChild(group); };
+      add('Saved voices', saved.sort((a, b) => favorites.indexOf(a.id) - favorites.indexOf(b.id)));
+      groups.forEach((items, label) => add(label, label === 'Pocket TTS' ? items.slice().sort((a, b) => voiceOptionLabel(a).localeCompare(voiceOptionLabel(b))) : items));
+      return shown;
+    }
+    function renderVoiceOptions(keep) {
+      const select = get('voice'), current = keep || select.value;
+      select.textContent = '';
+      const shown = appendVoiceOptions(select, {current, filter: voiceMatches});
       if (current && Array.from(select.options).some(option => option.value === current)) select.value = current;
       const count = get('voice-count'); if (count) count.textContent = shown + ' of ' + availableVoices.length + ' voices';
-      const save = get('voice-save'); if (save) { const saved = favorites.includes(select.value); save.textContent = saved ? 'Saved voice' : 'Save this voice'; save.setAttribute('aria-pressed', String(saved)); }
+      const save = get('voice-save'); if (save) { const savedNow = favoriteVoices().includes(select.value); save.textContent = savedNow ? 'Saved voice' : 'Save this voice'; save.setAttribute('aria-pressed', String(savedNow)); }
+      refreshRoleOptions();
+    }
+    // Character role menus follow the same list; rebuilt when saved voices change.
+    function refreshRoleOptions() {
+      const rows = get('cast-roles'); if (!rows) return;
+      rows.querySelectorAll('select[data-role]').forEach(select => { const value = select.value; select.textContent = ''; select.appendChild(new Option('Main voice', '')); appendVoiceOptions(select, {current: value}); select.value = value; });
     }
     function setupFinder() {
       const box2 = get('finder'); if (!box2) return;
