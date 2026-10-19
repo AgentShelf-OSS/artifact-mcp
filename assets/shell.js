@@ -207,6 +207,8 @@
       var cut=function(v){return typeof v==='string'?v.slice(0,200):'';};
       var message=state.state==='none'?{type:'media.session',state:'none',title:'',artist:'',album:'',actions:[]}:
         {type:'media.session',state:state.state==='playing'?'playing':'paused',title:cut(state.title)||'Listen',artist:cut(state.artist),album:cut(state.album),actions:['play','pause','next','previous','stop']};
+      // Apps from before ADR-0021 reject unknown fields, so only hosts advertising media.rate get it.
+      if(message.state!=='none'&&has('media.rate')){message.actions=message.actions.concat(['rewind','speed']);if(typeof state.rate==='string'&&/^\d(?:\.\d{1,2})?$/.test(state.rate))message.rate=state.rate;}
       mediaHandlers=state.state==='none'?null:(state.handlers||null);
       var key=JSON.stringify(message);if(key===lastMirror)return;lastMirror=key;toHost(message);
     }
@@ -879,8 +881,10 @@
       if (clear) { nativeBroker.mirrorMedia({state:'none'}); return; }
       const entry = queue[position], voiceName = availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry) || 'Listen';
       const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role)?.label : '';
-      nativeBroker.mirrorMedia({state:wants ? 'playing' : 'paused', title:chapter?.label || entry?.sectionLabel || document.title || 'Listen', artist:role ? role + ' · ' + voiceName : voiceName, album:document.title || '',
-        handlers:{play:()=>{if(!wants)get('play').click();}, pause:()=>{if(wants)get('play').click();}, next:()=>skip(1), previous:()=>skip(-1), stop:()=>get('stop').click()}});
+      nativeBroker.mirrorMedia({state:wants ? 'playing' : 'paused', title:chapter?.label || entry?.sectionLabel || document.title || 'Listen', artist:role ? role + ' · ' + voiceName : voiceName, album:document.title || '', rate:get('rate').value,
+        handlers:{play:()=>{if(!wants)get('play').click();}, pause:()=>{if(wants)get('play').click();}, next:()=>skip(1), previous:()=>skip(-1), stop:()=>get('stop').click(),
+          rewind:()=>{const button = get('rewind'); if (button && !button.disabled) button.click();},
+          speed:()=>{const select = get('rate'), steps = ['1','1.25','1.5'], at = steps.indexOf(select.value); select.value = steps[(at + 1) % steps.length]; select.dispatchEvent(new Event('change', {bubbles:true})); paint();}}});
     }
     // `?listen=autoplay` starts reading once, but only inside the native host: the Android app uses
     // it when an artifact is picked from the car's media library (ADR-0019).

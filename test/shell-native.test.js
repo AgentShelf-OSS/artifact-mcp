@@ -135,7 +135,7 @@ const APP_FIELDS = {
   "audio.stop": ["v", "type", "artifactId"],
   "notify.show": ["v", "type", "artifactId", "requestId", "title", "body"],
   "played.ack": ["v", "type", "artifactId", "ids"],
-  "media.session": ["v", "type", "artifactId", "state", "title", "artist", "album", "actions"],
+  "media.session": ["v", "type", "artifactId", "state", "title", "artist", "album", "actions", "rate"],
 };
 const QUEUE_ITEM = ["id", "title", "text", "url", "voice"];
 const TRIGGER_ITEM = [...QUEUE_ITEM, "lat", "lon", "radius_m"];
@@ -197,4 +197,26 @@ test("hosts without media.mirror get no session messages", async () => {
   h.broker.mirrorMedia({ state: "playing", title: "x", handlers: {} });
   assert.equal(f.sent.some(m => m.type === "media.session"), false);
   assert.equal(await h.broker.hostHas("media.mirror"), false);
+});
+
+test("speed is mirrored only to apps advertising media.rate; rewind and speed buttons reach Listen", async () => {
+  const old = await readyHarness();
+  old.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "1.25", handlers: {} });
+  assert.equal("rate" in old.f.sent.filter(m => m.type === "media.session").at(-1), false, "v0.2 apps never see rate");
+
+  const f = fakeHost();
+  const h = harness({ host: f.host });
+  f.reply({ type: "ready", app: "0.3.0", capabilities: ["media.mirror", "media.rate"] });
+  await settle();
+  const calls = [];
+  h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "1.25", handlers: { rewind: () => calls.push("rewind"), speed: () => calls.push("speed") } });
+  assert.equal(f.sent.filter(m => m.type === "media.session").at(-1).rate, "1.25");
+  assert.deepEqual(f.sent.filter(m => m.type === "media.session").at(-1).actions, ["play", "pause", "next", "previous", "stop", "rewind", "speed"]);
+  assert.deepEqual(old.f.sent.filter(m => m.type === "media.session").at(-1).actions, ["play", "pause", "next", "previous", "stop"], "v0.2 apps keep the original five");
+  h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "fast; drop", handlers: {} });
+  assert.equal("rate" in f.sent.filter(m => m.type === "media.session").at(-1), false, "malformed rate dropped");
+  h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "1.5", handlers: { rewind: () => calls.push("rewind"), speed: () => calls.push("speed") } });
+  f.reply({ type: "media.command", artifactId: "trip", action: "rewind" });
+  f.reply({ type: "media.command", artifactId: "trip", action: "speed" });
+  assert.deepEqual(calls, ["rewind", "speed"]);
 });

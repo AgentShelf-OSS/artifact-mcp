@@ -49,7 +49,7 @@ function app(viewer) {
       listOrgArtifacts: (org) => org === "acme" ? rows : [],
       listAllGroupedByOrg: () => new Map([["acme", rows], ["beta", [{ id: "b1", title: "Beta", category: "", updated_at: "2026-10-02T00:00:00Z", hidden: false }]]])
     },
-    orgs: { names: () => ["acme", "beta", "empty"] },
+    orgs: { names: () => ["acme", "beta", "empty"], colorMap: () => ({ acme: "#1F5F8B", beta: "url(x)" }) },
     feedback: { listForArtifact: () => [] },
     pages: { notFound: () => "not found", notSignedIn: () => "not signed in", gallery: () => "", shell: () => "", settings: () => "" },
     logger: { error() {}, warn() {} }
@@ -59,7 +59,7 @@ function app(viewer) {
 test("library lists visible artifacts newest first and never hidden uploads", async () => {
   const response = await invoke(app({ email: "viewer@acme.test", org: "acme", isAdmin: false }), "get", "/api/library");
   assert.equal(response.status, 200);
-  assert.deepEqual(response.body, { orgs: [{ org: "acme", artifacts: [
+  assert.deepEqual(response.body, { orgs: [{ org: "acme", color: "#1F5F8B", artifacts: [
     { id: "new", title: "Road trip", category: "Family", updated_at: "2026-10-18T00:00:00Z" },
     { id: "old", title: "Old", category: "Family", updated_at: "2026-10-01T00:00:00Z" }
   ] }] });
@@ -67,7 +67,7 @@ test("library lists visible artifacts newest first and never hidden uploads", as
 
 test("administrators see every organization, including empty ones", async () => {
   const response = await invoke(app({ email: "admin@acme.test", org: "acme", isAdmin: true }), "get", "/api/library");
-  assert.deepEqual(response.body.orgs.map(o => [o.org, o.artifacts.map(a => a.id)]), [["acme", ["new", "old"]], ["beta", ["b1"]], ["empty", []]]);
+  assert.deepEqual(response.body.orgs.map(o => [o.org, o.color, o.artifacts.map(a => a.id)]), [["acme", "#1F5F8B", ["new", "old"]], ["beta", null, ["b1"]], ["empty", null, []]]);
 });
 
 test("signed-out viewers are refused", async () => {

@@ -220,8 +220,10 @@ async fn library(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
         )
             .into_response();
     }
-    match gallery_sections(&deps, &viewer).await {
-        Ok(sections) => (no_store, Json(library_body(sections))).into_response(),
+    let sections = gallery_sections(&deps, &viewer).await;
+    let colors = deps.admin.color_map().await.unwrap_or_default();
+    match sections {
+        Ok(sections) => (no_store, Json(library_body(sections, &colors))).into_response(),
         Err(error) => {
             let mut response = error.into_response();
             response
@@ -232,7 +234,22 @@ async fn library(State(deps): State<AppDeps>, headers: HeaderMap) -> Response {
     }
 }
 
-pub(crate) fn library_body(sections: Vec<OrgArtifacts>) -> serde_json::Value {
+/// An organization's gallery color as `#rrggbb`, or null when unset or not a plain hex color.
+fn library_color(
+    colors: &std::collections::BTreeMap<OrgId, Option<String>>,
+    org: &OrgId,
+) -> Option<String> {
+    colors.get(org).cloned().flatten().filter(|value| {
+        value.len() == 7
+            && value.starts_with('#')
+            && value[1..].bytes().all(|byte| byte.is_ascii_hexdigit())
+    })
+}
+
+pub(crate) fn library_body(
+    sections: Vec<OrgArtifacts>,
+    colors: &std::collections::BTreeMap<OrgId, Option<String>>,
+) -> serde_json::Value {
     let orgs = sections
         .into_iter()
         .map(|section| {
@@ -250,6 +267,7 @@ pub(crate) fn library_body(sections: Vec<OrgArtifacts>) -> serde_json::Value {
             items.truncate(LIBRARY_LIMIT);
             serde_json::json!({
                 "org": section.org.0,
+                "color": library_color(colors, &section.org),
                 "artifacts": items
                     .iter()
                     .map(|item| serde_json::json!({
@@ -520,17 +538,22 @@ mod library_tests {
 
     #[test]
     fn library_lists_visible_artifacts_newest_first() {
-        let body = library_body(vec![OrgArtifacts {
-            org: OrgId("acme".into()),
-            items: vec![
-                meta("old", "2026-10-01T00:00:00Z", false),
-                meta("new", "2026-10-18T00:00:00Z", false),
-                meta("draft", "2026-10-18T01:00:00Z", true),
-            ],
-        }]);
+        let colors =
+            std::collections::BTreeMap::from([(OrgId("acme".into()), Some("#1F5F8B".to_owned()))]);
+        let body = library_body(
+            vec![OrgArtifacts {
+                org: OrgId("acme".into()),
+                items: vec![
+                    meta("old", "2026-10-01T00:00:00Z", false),
+                    meta("new", "2026-10-18T00:00:00Z", false),
+                    meta("draft", "2026-10-18T01:00:00Z", true),
+                ],
+            }],
+            &colors,
+        );
         assert_eq!(
             body,
-            serde_json::json!({"orgs":[{"org":"acme","artifacts":[
+            serde_json::json!({"orgs":[{"org":"acme","color":"#1F5F8B","artifacts":[
                 {"id":"new","title":"Title new","category":"Family","updated_at":"2026-10-18T00:00:00Z"},
                 {"id":"old","title":"Title old","category":"Family","updated_at":"2026-10-01T00:00:00Z"}
             ]}]})
@@ -542,10 +565,16 @@ mod library_tests {
         let items = (0..250)
             .map(|i| meta(&format!("a{i:03}"), "2026-10-01T00:00:00Z", false))
             .collect();
-        let body = library_body(vec![OrgArtifacts {
-            org: OrgId("acme".into()),
-            items,
-        }]);
+        let colors =
+            std::collections::BTreeMap::from([(OrgId("acme".into()), Some("red; x".to_owned()))]);
+        let body = library_body(
+            vec![OrgArtifacts {
+                org: OrgId("acme".into()),
+                items,
+            }],
+            &colors,
+        );
+        assert_eq!(body["orgs"][0]["color"], serde_json::Value::Null);
         assert_eq!(body["orgs"][0]["artifacts"].as_array().unwrap().len(), 200);
     }
 }
