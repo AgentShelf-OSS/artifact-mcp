@@ -185,13 +185,17 @@
     function onHost(raw){
       var m;try{m=typeof raw==='string'?JSON.parse(raw):raw;}catch(_){return;}
       if(!m||m.v!==1||typeof m.type!=='string')return;
-      if(m.type==='ready'){ready=true;capabilities=Array.isArray(m.capabilities)?m.capabilities.filter(function(c){return typeof c==='string';}):[];waiters.splice(0).forEach(function(w){w();});return;}
+      if(m.type==='ready'){ready=true;capabilities=Array.isArray(m.capabilities)?m.capabilities.filter(function(c){return typeof c==='string';}):[];chaptersSent='';sendChapters();waiters.splice(0).forEach(function(w){w();});return;}
       if(m.artifactId!==artifact)return;
       if(m.type==='geo.position'&&Number.isFinite(m.lat)&&Number.isFinite(m.lon))send('geo:position',{requestId:String(m.requestId||''),lat:m.lat,lon:m.lon,accuracy:Number.isFinite(m.accuracy)?m.accuracy:null,timestamp:Number.isFinite(m.timestamp)?m.timestamp:Date.now()});
       else if(m.type==='geo.error'){if(m.reason==='denied')forget('location');send('geo:error',{requestId:String(m.requestId||''),reason:['denied','unavailable','timeout'].indexOf(m.reason)>=0?m.reason:'unavailable'});}
       else if(m.type==='audio.state'&&str(m.id,64)&&['queued','playing','done','error'].indexOf(m.state)>=0)send('audio:state',{id:m.id,state:m.state});
       else if(m.type==='audio.played'&&str(m.id,64)){if(!pendingPlayed.some(function(p){return p.id===m.id;}))pendingPlayed.push({id:m.id,at:Number.isFinite(m.at)?m.at:Date.now()});flushPlayed();}
-      else if(m.type==='media.command'&&typeof m.action==='string'){var run=mediaHandlers&&mediaHandlers[m.action];if(typeof run==='function'){try{run();}catch(_){}}}
+      else if(m.type==='media.command'&&typeof m.action==='string'){var run=mediaHandlers&&mediaHandlers[m.action];if(typeof run!=='function')return;
+        // ADR-0022: forward and chapter come only from apps advertising media.progress.
+        if((m.action==='forward'||m.action==='chapter')&&!has('media.progress'))return;
+        if(m.action==='chapter'){if(!Number.isInteger(m.index)||m.index<0||m.index>499||!chapters||m.index>=chapters.length)return;try{run(m.index);}catch(_){}return;}
+        try{run();}catch(_){}}
       else if(m.type==='error')send('native:error',{requestId:String(m.requestId||''),reason:typeof m.reason==='string'?m.reason.slice(0,40):'unavailable'});
     }
     function start(){
@@ -201,16 +205,44 @@
     }
     function whenReady(){if(ready||!host)return Promise.resolve(ready);return new Promise(function(resolve){var done=false;waiters.push(function(){if(!done){done=true;resolve(true);}});options.setTimer(function(){if(!done){done=true;resolve(ready);}},1500);});}
     function has(cap){return ready&&capabilities.indexOf(cap)>=0;}
-    var mediaHandlers=null,lastMirror='';
+    var mediaHandlers=null,lastMirror='',lastShape='',lastMirrorAt=-Infinity,chapters=null,chaptersSent='';
+    function now(){return typeof options.now==='function'?options.now():Date.now();}
+    function seconds(value){return Number.isFinite(value)?Math.round(Math.max(0,Math.min(86400,value))*10)/10:null;}
     function mirrorMedia(state){
       if(!options.enabled||!has('media.mirror')||!state)return;
-      var cut=function(v){return typeof v==='string'?v.slice(0,200):'';};
+      var progress=has('media.progress'),cut=function(v){return typeof v==='string'?v.slice(0,200):'';};
+      // Apps without media.progress know only playing and paused; buffering means "wants to play".
+      var live=state.state==='buffering'?(progress?'buffering':'playing'):state.state==='playing'?'playing':'paused';
       var message=state.state==='none'?{type:'media.session',state:'none',title:'',artist:'',album:'',actions:[]}:
-        {type:'media.session',state:state.state==='playing'?'playing':'paused',title:cut(state.title)||'Listen',artist:cut(state.artist),album:cut(state.album),actions:['play','pause','next','previous','stop']};
+        {type:'media.session',state:live,title:cut(state.title)||'Listen',artist:cut(state.artist),album:cut(state.album),actions:['play','pause','next','previous','stop']};
       // Apps from before ADR-0021 reject unknown fields, so only hosts advertising media.rate get it.
       if(message.state!=='none'&&has('media.rate')){message.actions=message.actions.concat(['rewind','speed']);if(typeof state.rate==='string'&&/^\d(?:\.\d{1,2})?$/.test(state.rate))message.rate=state.rate;}
+      // ADR-0022: progress, chapters and failure reasons only for hosts advertising media.progress.
+      if(progress){
+        if(message.state!=='none'){
+          message.actions=message.actions.concat(chapters&&chapters.length?['forward','chapter']:['forward']);
+          var position=seconds(state.position),duration=seconds(state.duration);
+          if(position!==null)message.position=position;
+          if(duration!==null)message.duration=duration;
+          if(Number.isInteger(state.chapterIndex)&&state.chapterIndex>=0&&chapters&&state.chapterIndex<chapters.length)message.chapterIndex=state.chapterIndex;
+        }
+        if((message.state==='paused'||message.state==='none')&&typeof state.error==='string'&&state.error.trim())message.error=state.error.trim().slice(0,120);
+      }
       mediaHandlers=state.state==='none'?null:(state.handlers||null);
-      var key=JSON.stringify(message);if(key===lastMirror)return;lastMirror=key;toHost(message);
+      var key=JSON.stringify(message);if(key===lastMirror)return;
+      // Position and duration alone are resent at most every 5 s; the app interpolates between.
+      var shape=JSON.stringify(Object.assign({},message,{position:undefined,duration:undefined})),at=now();
+      if(progress&&shape===lastShape&&at-lastMirrorAt<5000)return;
+      lastMirror=key;lastShape=shape;lastMirrorAt=at;toHost(message);
+    }
+    function sendChapters(){
+      if(!options.enabled||!chapters||!has('media.mirror')||!has('media.progress'))return;
+      var key=JSON.stringify(chapters);if(key===chaptersSent)return;chaptersSent=key;toHost({type:'media.chapters',chapters:chapters.slice()});
+    }
+    function mirrorChapters(list){
+      if(!Array.isArray(list))return;
+      chapters=list.slice(0,500).map(function(title,index){var text=typeof title==='string'?title.trim().slice(0,200):'';return text||'Chapter '+(index+1);});
+      sendChapters();
     }
     function fail(requestId,reason){send('native:error',{requestId:requestId,reason:reason});}
     function handleMessage(data){
@@ -232,7 +264,7 @@
       if(type==='notify:show'){if(!has('notify')){fail(requestId,'unsupported');return;}if(!str(data.title,120)||!str(data.body,500)){fail(requestId,'bad_request');return;}
         consent('notify').then(function(ok){if(!ok){fail(requestId,'declined');return;}toHost({type:'notify.show',requestId:requestId,title:data.title,body:data.body});});return;}
     }
-    return {start:start,mirrorMedia:mirrorMedia,hostHas:function(cap){return whenReady().then(function(){return has(cap);});},handle:function(event){
+    return {start:start,mirrorMedia:mirrorMedia,mirrorChapters:mirrorChapters,hostHas:function(cap){return whenReady().then(function(){return has(cap);});},handle:function(event){
       if(event.source!==options.frame())return false;var data=event.data;
       if(!data||typeof data!=='object'||Array.isArray(data)||typeof data.type!=='string')return false;
       if(!/^(native:hello|geo:watch|geo:unwatch|audio:queue|audio:geotrigger|audio:stop|notify:show)$/.test(data.type))return false;
@@ -591,7 +623,7 @@
     const box = document.createElement('section');
     box.className = 'vreader'; box.hidden = true;
     box.setAttribute('aria-label', 'Read aloud');
-    box.innerHTML = '<button id="vreader-toggle" type="button" class="vreader-toggle" aria-expanded="false" aria-controls="vreader-mini vreader-panel">Listen</button><div id="vreader-panel" class="vreader-panel" hidden><div class="vreader-head"><div><span class="vreader-kicker">Audio reader</span><strong>Read aloud</strong></div><button id="vreader-minimize" type="button" class="vreader-control vreader-minimize" aria-label="Minimize audio player">Minimize</button><span id="vreader-status" role="status" aria-live="polite">Ready</span></div><div class="vreader-actions" role="group" aria-label="Playback controls"><button id="vreader-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-prev" type="button" class="vreader-control vreader-skip" aria-label="Previous block">Previous</button><button id="vreader-next" type="button" class="vreader-control vreader-skip" aria-label="Next block">Next</button><button id="vreader-stop" type="button" class="vreader-control vreader-stop">Stop</button></div><div class="vreader-navigator"><label for="vreader-outline">Jump to</label><div class="vreader-navigator-row"><select id="vreader-outline" disabled><option value="">Loading sections…</option></select><button id="vreader-jump" type="button" class="vreader-control" aria-label="Start reading from selected section or chapter" disabled>Read</button></div><p class="vreader-pick-hint">Click text in the artifact to choose where to read.</p><div id="vreader-target" class="vreader-target" hidden><span id="vreader-target-label"></span><button id="vreader-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-target-details" type="button" class="vreader-control" hidden>Read details</button><button id="vreader-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div></div><div class="vreader-settings"><label>Read <select id="vreader-mode"><option value="page">Document / chapter</option><option value="view">Current view</option><option value="detail" hidden>Selected details</option><option value="selection">Selection</option><option value="here">From here</option><option value="section">This section</option></select></label><label>Voice <select id="vreader-voice"></select></label><label>Speed <select id="vreader-rate"><option value="0.8">0.8×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="2">2×</option></select></label></div><div id="vreader-finder" class="vreader-finder" hidden><input id="vreader-voice-search" type="search" placeholder="Find a voice" aria-label="Find a voice" autocomplete="off"><div class="vreader-chips" role="group" aria-label="Filter voices"><button type="button" data-voice-filter="all" aria-pressed="true">All</button><button type="button" data-voice-filter="female" aria-pressed="false">Female</button><button type="button" data-voice-filter="male" aria-pressed="false">Male</button><button type="button" data-voice-filter="saved" aria-pressed="false">Saved</button></div><select id="vreader-voice-accent" aria-label="Accent" hidden><option value="">Any accent</option></select><button type="button" id="vreader-voice-save" class="vreader-save" aria-pressed="false">Save this voice</button><p id="vreader-voice-count" class="vreader-voice-count" aria-live="polite"></p></div><div id="vreader-style-panel" class="vreader-style-panel" hidden><div class="vreader-style-row"><label for="vreader-style">Reading style<select id="vreader-style"><option value="calm">Calm audiobook</option><option value="neutral">Neutral</option><option value="expressive">Expressive</option><option value="default">Model default</option><option value="custom">Custom instructions</option></select></label></div><label id="vreader-custom-label" class="vreader-custom" hidden>Delivery instructions<textarea id="vreader-custom" rows="3" maxlength="500" placeholder="Describe the pacing, tone, and emphasis you want."></textarea></label><p id="vreader-style-hint" class="vreader-style-hint">Steady pacing, restrained emotion, gentle emphasis.</p></div><div class="vreader-utility-row"><button id="vreader-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15 seconds</button><button id="vreader-resume" type="button" class="vreader-control" hidden>Resume saved place</button></div><label class="vreader-sleep">Sleep timer<select id="vreader-sleep"><option value="off">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="section">End of section</option><option value="chapter" hidden disabled>End of chapter</option></select><span id="vreader-sleep-hint"></span></label><div class="vreader-preview-row"><button id="vreader-preview" type="button" class="vreader-control">Preview block</button></div><audio id="vreader-audio" preload="auto"></audio></div><div id="vreader-mini" class="vreader-mini" hidden role="region" aria-label="Compact audio player"><div id="vreader-mini-target" class="vreader-target" hidden><span id="vreader-mini-target-label"></span><button id="vreader-mini-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-mini-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div><div class="vreader-mini-row"><div class="vreader-mini-info"><span id="vreader-mini-meta" class="vreader-kicker">Listen</span><span id="vreader-mini-status" role="status" aria-live="polite">Ready</span></div><button id="vreader-mini-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15</button><button id="vreader-mini-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-mini-next" type="button" class="vreader-control" aria-label="Next block">Next</button><button id="vreader-expand" type="button" class="vreader-control" aria-label="Expand audio player" title="Voice, speed, and reading settings">Expand</button><button id="vreader-mini-close" type="button" class="vreader-control vreader-dismiss" aria-label="Stop and close audio player">×</button></div></div>';
+    box.innerHTML = '<button id="vreader-toggle" type="button" class="vreader-toggle" aria-expanded="false" aria-controls="vreader-mini vreader-panel">Listen</button><div id="vreader-panel" class="vreader-panel" hidden><div class="vreader-head"><div><span class="vreader-kicker">Audio reader</span><strong>Read aloud</strong></div><button id="vreader-minimize" type="button" class="vreader-control vreader-minimize" aria-label="Minimize audio player">Minimize</button><span id="vreader-status" role="status" aria-live="polite">Ready</span></div><div class="vreader-actions" role="group" aria-label="Playback controls"><button id="vreader-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-prev" type="button" class="vreader-control vreader-skip" aria-label="Previous block">Previous</button><button id="vreader-next" type="button" class="vreader-control vreader-skip" aria-label="Next block">Next</button><button id="vreader-stop" type="button" class="vreader-control vreader-stop">Stop</button></div><div class="vreader-navigator"><label for="vreader-outline">Jump to</label><div class="vreader-navigator-row"><select id="vreader-outline" disabled><option value="">Loading sections…</option></select><button id="vreader-jump" type="button" class="vreader-control" aria-label="Start reading from selected section or chapter" disabled>Read</button></div><p class="vreader-pick-hint">Click text in the artifact to choose where to read.</p><div id="vreader-target" class="vreader-target" hidden><span id="vreader-target-label"></span><button id="vreader-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-target-details" type="button" class="vreader-control" hidden>Read details</button><button id="vreader-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div></div><div class="vreader-settings"><label>Read <select id="vreader-mode"><option value="page">Document / chapter</option><option value="view">Current view</option><option value="detail" hidden>Selected details</option><option value="selection">Selection</option><option value="here">From here</option><option value="section">This section</option></select></label><label>Voice <select id="vreader-voice"></select></label><label>Speed <select id="vreader-rate"><option value="0.75">0.75×</option><option value="0.8">0.8×</option><option value="0.9">0.9×</option><option value="1" selected>1×</option><option value="1.1">1.1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option><option value="2.5">2.5×</option><option value="3">3×</option></select></label></div><div id="vreader-finder" class="vreader-finder" hidden><input id="vreader-voice-search" type="search" placeholder="Find a voice" aria-label="Find a voice" autocomplete="off"><div class="vreader-chips" role="group" aria-label="Filter voices"><button type="button" data-voice-filter="all" aria-pressed="true">All</button><button type="button" data-voice-filter="female" aria-pressed="false">Female</button><button type="button" data-voice-filter="male" aria-pressed="false">Male</button><button type="button" data-voice-filter="saved" aria-pressed="false">Saved</button></div><select id="vreader-voice-accent" aria-label="Accent" hidden><option value="">Any accent</option></select><button type="button" id="vreader-voice-save" class="vreader-save" aria-pressed="false">Save this voice</button><p id="vreader-voice-count" class="vreader-voice-count" aria-live="polite"></p></div><div id="vreader-style-panel" class="vreader-style-panel" hidden><div class="vreader-style-row"><label for="vreader-style">Reading style<select id="vreader-style"><option value="calm">Calm audiobook</option><option value="neutral">Neutral</option><option value="expressive">Expressive</option><option value="default">Model default</option><option value="custom">Custom instructions</option></select></label></div><label id="vreader-custom-label" class="vreader-custom" hidden>Delivery instructions<textarea id="vreader-custom" rows="3" maxlength="500" placeholder="Describe the pacing, tone, and emphasis you want."></textarea></label><p id="vreader-style-hint" class="vreader-style-hint">Steady pacing, restrained emotion, gentle emphasis.</p></div><div class="vreader-utility-row"><button id="vreader-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15 seconds</button><button id="vreader-forward" type="button" class="vreader-control" aria-label="Forward 30 seconds">30 seconds ↷</button><button id="vreader-resume" type="button" class="vreader-control" hidden>Resume saved place</button></div><label class="vreader-sleep">Sleep timer<select id="vreader-sleep"><option value="off">Off</option><option value="15">15 minutes</option><option value="30">30 minutes</option><option value="60">60 minutes</option><option value="section">End of section</option><option value="chapter" hidden disabled>End of chapter</option></select><span id="vreader-sleep-hint"></span></label><div class="vreader-preview-row"><button id="vreader-preview" type="button" class="vreader-control">Preview block</button></div><audio id="vreader-audio" preload="auto"></audio></div><div id="vreader-mini" class="vreader-mini" hidden role="region" aria-label="Compact audio player"><div id="vreader-mini-target" class="vreader-target" hidden><span id="vreader-mini-target-label"></span><button id="vreader-mini-target-read" type="button" class="vreader-control">Read from here</button><button id="vreader-mini-target-dismiss" type="button" class="vreader-control vreader-dismiss" aria-label="Dismiss reading suggestion">×</button></div><div class="vreader-mini-row"><div class="vreader-mini-info"><span id="vreader-mini-meta" class="vreader-kicker">Listen</span><span id="vreader-mini-status" role="status" aria-live="polite">Ready</span></div><button id="vreader-mini-rewind" type="button" class="vreader-control" aria-label="Rewind 15 seconds">↶ 15</button><button id="vreader-mini-play" type="button" class="vreader-control vreader-play">Play</button><button id="vreader-mini-next" type="button" class="vreader-control" aria-label="Next block">Next</button><button id="vreader-expand" type="button" class="vreader-control" aria-label="Expand audio player" title="Voice, speed, and reading settings">Expand</button><button id="vreader-mini-close" type="button" class="vreader-control vreader-dismiss" aria-label="Stop and close audio player">×</button></div></div>';
     box.querySelector('#vreader-mini').insertAdjacentHTML('beforeend', '<button id="vreader-mini-resume" type="button" class="vreader-mini-resume" hidden>Resume saved place</button>');
     // Tabler Icons player-play and player-pause, MIT, https://github.com/tabler/tabler-icons.
     box.insertAdjacentHTML('beforeend', '<button id="vreader-inline-read" class="vreader-inline-read" type="button" aria-label="Read from here" title="Read from here" hidden><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16l13 -8l-13 -8" /></svg><span>Read from here</span></button>');
@@ -626,12 +658,14 @@
     let playbackConfig = null;
     let contentFingerprint = '', readerScopeKey = '', restartScopeKey = '', queueKey = '', scopeStart = 0, scopeEnd = 0, restoring = null, pendingSeek = 0;
     const durations = new Map();
+    // ADR-0022: native progress (position, chapters, failure reason) for hosts with media.progress.
+    let nativeProgress = false, failure = '', chapterOrder = [], progressCache = null;
     let sleepDeadline = 0, sleepBoundary = null;
     let compact = false, outlineRequest = '', outlineTimer, outlineFingerprint = '', detailTargets = [], clickedTarget = null, targetGeometry = null;
     function readerVisible() { return !get('panel').hidden || compact; }
     function pickMode() { send('reader:pick-mode', {enabled:enabled && ready && readerVisible() && !commentMode}); }
     function refreshOutline() {
-      if (!enabled || !ready || !readerVisible()) return;
+      if (!enabled || !ready || !(readerVisible() || nativeProgress)) return;
       clearTimeout(outlineTimer); outlineRequest = 'outline-' + (++serial);
       get('outline').disabled = true; get('jump').disabled = true;
       send('reader:outline', {requestId:outlineRequest});
@@ -680,10 +714,99 @@
       const context = streamingVoice() ? ensureAudioContext() : null;
       if (context?.state === 'suspended') context.resume().catch(() => {});
       extraction = 'read-' + (++serial); send('reader:jump', Object.assign({requestId:extraction,mode}, fields));
-      extractionTimer = setTimeout(() => { if (extraction) stop('Could not open that position. Choose it again.'); }, 5000); paint();
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not open that position. Choose it again.', false, 'Could not open that position'); }, 5000); paint();
     }
 
-    function checkpointKey() { if (isBundle && !currentPage) return ''; return 'artifact-reader-place:' + JSON.stringify([artifactId, configLiteral('viewerId'), isBundle ? currentPage : '']); }
+    function checkpointKey() { if (isBundle && !currentPage) return ''; return placeKey(isBundle ? currentPage : ''); }
+    function placeKey(page) { return 'artifact-reader-place:' + JSON.stringify([artifactId, configLiteral('viewerId'), page]); }
+    function pageOfKey(key) { try { const parts = JSON.parse(key.slice('artifact-reader-place:'.length)); return typeof parts[2] === 'string' ? parts[2] : null; } catch (_) { return null; } }
+    // ADR-0022: the saved place follows a signed-in viewer across devices. The checkpoint is copied to
+    // viewer-scope state key "listen-place" ({version:1, pages:{<bundle page or "">:{savedAt, place}}});
+    // localStorage stays the offline cache and the newer copy (by savedAt) wins on load. Writes go at
+    // most every 30 s while playing, and at once on pause, stop, hide or page exit. Any failure, or
+    // state being unavailable, leaves Listen on its local copy.
+    const placeSync = (() => {
+      const url = '/' + encodeURIComponent(artifactId) + '/state/listen-place?scope=viewer', MAX_BYTES = 48 * 1024, MAX_PAGES = 16;
+      const pages = {};
+      let disabled = shellConfig.stateEnabled !== '1' || historicalView || !configLiteral('viewerEmail');
+      let started = false, settled = disabled, dirty = false, busy = false, timer = null, lastWrite = 0, blockedUntil = 0, settle;
+      const ready = disabled ? Promise.resolve() : new Promise(resolve => { settle = () => { settled = true; resolve(); }; });
+      const bytes = text => new TextEncoder().encode(text).length;
+      function validEntry(entry) { return !!(entry && typeof entry === 'object' && Number.isFinite(entry.savedAt) && entry.savedAt > 0 && entry.place && typeof entry.place === 'object' && entry.place.version === 2 && entry.place.current && typeof entry.place.current === 'object'); }
+      function readLocal(page) { try { const value = JSON.parse(localStorage.getItem(placeKey(page)) || 'null'); return value && value.version === 2 && value.current ? value : null; } catch (_) { return null; } }
+      function entryOf(stored) { return {savedAt:Number(stored.savedAt), place:{version:2, current:stored.current, scopes:stored.scopes && typeof stored.scopes === 'object' ? stored.scopes : {}}}; }
+      function load() {
+        if (disabled || started) return ready; started = true;
+        const timeout = setTimeout(settle, 2500);
+        fetch(url, {cache:'no-store', credentials:'same-origin'}).then(response => {
+          if (response.status === 404) return null;
+          if (!response.ok) { if ([400, 401, 403, 503].includes(response.status)) disabled = true; return null; }
+          return response.json();
+        }).then(body => {
+          const value = body && body.value;
+          if (value && value.version === 1 && value.pages && typeof value.pages === 'object' && !Array.isArray(value.pages)) {
+            for (const [page, entry] of Object.entries(value.pages).slice(0, MAX_PAGES)) {
+              if (page.length > 512 || !validEntry(entry)) continue;
+              pages[page] = entry;
+              const local = readLocal(page);
+              if (local && Number(local.savedAt) > entry.savedAt) { pages[page] = entryOf(local); dirty = true; continue; }
+              try { localStorage.setItem(placeKey(page), JSON.stringify({...entry.place, savedAt:entry.savedAt})); } catch (_) {}
+            }
+          }
+          // A place saved only on this device (for example while offline) is uploaded once.
+          const local = isBundle ? null : readLocal('');
+          if (local && Number(local.savedAt) > 0 && !pages['']) { pages[''] = entryOf(local); dirty = true; }
+        }).catch(() => {}).finally(() => { clearTimeout(timeout); settle(); refreshSaved(); if (dirty) schedule(); });
+        return ready;
+      }
+      function payload() {
+        const list = Object.entries(pages).sort((a, b) => b[1].savedAt - a[1].savedAt).slice(0, MAX_PAGES);
+        let text = JSON.stringify({version:1, pages:Object.fromEntries(list)});
+        while (bytes(text) > MAX_BYTES && list.length > 1) { list.pop(); text = JSON.stringify({version:1, pages:Object.fromEntries(list)}); }
+        if (bytes(text) > MAX_BYTES && list.length) {
+          const [page, entry] = list[0];
+          text = JSON.stringify({version:1, pages:{[page]:{savedAt:entry.savedAt, place:{version:2, current:entry.place.current, scopes:{}}}}});
+        }
+        return bytes(text) > MAX_BYTES ? null : text;
+      }
+      function write(keepalive) {
+        clearTimeout(timer); timer = null;
+        if (disabled || !dirty) return;
+        if (!settled || busy) { timer = setTimeout(() => { timer = null; write(keepalive); }, 1000); return; }
+        const wait = blockedUntil - Date.now(); if (wait > 0) { timer = setTimeout(() => write(false), wait); return; }
+        const remove = !Object.keys(pages).length, text = remove ? '' : payload();
+        dirty = false; if (!remove && !text) return;
+        busy = true; lastWrite = Date.now();
+        const init = remove ? {method:'DELETE', keepalive} : {method:'PUT', headers:{'content-type':'application/json'}, body:'{"value":' + text + '}', keepalive};
+        fetch(url, init).then(response => {
+          if (response.status === 429) { blockedUntil = Date.now() + 60000; dirty = true; }
+          else if (remove && response.status === 404) {}
+          else if ([400, 401, 403, 404, 409, 413].includes(response.status)) disabled = true;
+          else if (!response.ok) dirty = true;
+        }).catch(() => { dirty = true; }).finally(() => { busy = false; if (dirty) schedule(); });
+      }
+      function schedule() {
+        if (disabled || timer) return;
+        timer = setTimeout(() => { timer = null; write(false); }, Math.max(500, lastWrite + 30000 - Date.now(), blockedUntil - Date.now()));
+      }
+      return {
+        ready, load, settled: () => settled,
+        save(page, stored) {
+          if (disabled || page === null || !stored || !Number.isFinite(stored.savedAt)) return;
+          if (pages[page] && pages[page].savedAt === stored.savedAt) return;
+          pages[page] = entryOf(stored); dirty = true; schedule();
+        },
+        clear(page) { if (disabled || page === null || !settled || !pages[page]) return; delete pages[page]; dirty = true; write(true); },
+        flush(force) {
+          if (!dirty || disabled) return;
+          // Pause and stop write at once, but never more than one write every 2 s; hiding or
+          // leaving the page always writes, since the page may not run again.
+          const gap = lastWrite + 2000 - Date.now();
+          if (gap > 0 && !force) { clearTimeout(timer); timer = setTimeout(() => { timer = null; write(false); }, gap); return; }
+          write(true);
+        }
+      };
+    })();
     function validCheckpoint(value) {
       return value && (value.version === 1 || value.version === 2) && (value.chapterIndex === undefined || Number.isInteger(value.chapterIndex) && value.chapterIndex >= 0) && typeof value.fingerprint === 'string' && value.fingerprint.length <= 100 &&
         ['page','view','selection','here','section','detail'].includes(value.mode) && Number.isInteger(value.ordinal) && value.ordinal >= 0 &&
@@ -720,6 +843,34 @@
       for (const f of stream.frames) offset += f.played ? f.buffer.duration : Math.min(f.buffer.duration, f.offset + (f.source ? Math.max(0, audioContext.currentTime - f.start - (stream.latency || 0)) * f.rate : 0));
       return offset;
     }
+    // Synthesized durations are media seconds at 1×. Unplayed blocks are estimated from their text,
+    // calibrated against blocks already heard (about 15 characters a second before any are known).
+    function charsPerSecond() {
+      let chars = 0, secs = 0;
+      durations.forEach((seconds, index) => { if (queue[index] && seconds > 0) { chars += queue[index].text.length; secs += seconds; } });
+      return secs >= 5 && chars > 0 ? chars / secs : 15;
+    }
+    function blockSeconds(index, cps = charsPerSecond()) { return durations.get(index) ?? (queue[index] ? queue[index].text.length / cps : 0); }
+    function progressFields() {
+      if (!queue.length) return {};
+      if (!progressCache || progressCache.queue !== queue || progressCache.known !== durations.size) {
+        const cps = charsPerSecond(), starts = [0]; queue.forEach((_, index) => starts.push(starts[index] + blockSeconds(index, cps)));
+        progressCache = {queue, known:durations.size, starts};
+      }
+      const at = Math.min(position, queue.length), starts = progressCache.starts, total = starts[queue.length];
+      const within = at < queue.length ? Math.min(Math.max(0, mediaOffset()), Math.max(0, starts[at + 1] - starts[at])) : 0;
+      const result = {position:Math.min(total, starts[at] + within), duration:total};
+      const chapterAt = chapter && Number.isInteger(chapter.index) ? chapterOrder.indexOf(chapter.index) : -1;
+      if (chapterAt >= 0) result.chapterIndex = chapterAt;
+      return result;
+    }
+    function failureReason(error) {
+      const text = String(error && error.message || '');
+      if ((typeof navigator !== 'undefined' && navigator.onLine === false) || error?.name === 'TypeError' || /interrupted/i.test(text)) return 'No connection';
+      if (/busy/i.test(text)) return 'Speech is busy';
+      if (/Audio playback failed/i.test(text)) return 'Audio playback failed';
+      return 'Speech is unavailable';
+    }
     function savePlace() {
       const entry = queue[position];
       if (!entry || !queueKey || !contentFingerprint || (playbackConfig?.mode || mode) === 'selection' || previewEnd !== null || previewRequested || restoring || loaded !== position) return;
@@ -728,9 +879,11 @@
         let stored = null; try { stored = JSON.parse(localStorage.getItem(queueKey) || 'null'); } catch (_) {}
         if (!stored || stored.version !== 2 || !stored.scopes || typeof stored.scopes !== 'object') stored = {version:2, current:null, scopes:{}};
         const scopeId = checkpoint.mode + '\u0000' + checkpoint.scopeKey;
+        if (JSON.stringify(stored.current) !== JSON.stringify(checkpoint) || !Number.isFinite(stored.savedAt)) stored.savedAt = Date.now();
         stored.current = checkpoint; stored.scopes[scopeId] = checkpoint;
         const keys = Object.keys(stored.scopes); while (keys.length > 12) delete stored.scopes[keys.shift()];
         localStorage.setItem(queueKey, JSON.stringify(stored));
+        placeSync.save(pageOfKey(queueKey), stored);
       } catch (_) {}
       refreshSaved();
     }
@@ -746,9 +899,9 @@
       get('sleep-hint').textContent = sleepDeadline ? Math.ceil((sleepDeadline - Date.now()) / 60000) + ' min remaining' : '';
       return false;
     }
-    setInterval(() => { checkSleep(); savePlace(); }, 2000);
-    window.addEventListener('pagehide', () => stop('Paused', true));
-    document.addEventListener('visibilitychange', () => { checkSleep(); savePlace(); });
+    setInterval(() => { checkSleep(); savePlace(); if (nativeProgress && wants) mirrorNative(); }, 2000);
+    window.addEventListener('pagehide', () => { stop('Paused', true); placeSync.flush(true); });
+    document.addEventListener('visibilitychange', () => { checkSleep(); savePlace(); if (document.visibilityState === 'hidden') placeSync.flush(true); });
 
     const readingStyles = {
       calm: 'Read as a calm audiobook narrator. Use consistent pacing, restrained emotion, and natural sentence endings. Avoid exaggerated emphasis and dramatic pitch changes.',
@@ -812,6 +965,8 @@
     function discardFutureVoiceAudio() {
       for (const index of cache.keys()) if (index > position) cache.delete(index);
       for (const [index, work] of streamRequests) if (index > position) { work.then(response => response.body?.cancel()).catch(() => {}); streamRequests.delete(index); }
+      for (const index of [...aheadJobs.keys()]) if (index > position) forgetAhead(index);
+      fillAhead();
     }
     function saveCastPreferences() {
       if (!cast) return;
@@ -878,21 +1033,32 @@
     // notification show it, and route their buttons back to these controls.
     function mirrorNative(clear) {
       if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.mirrorMedia) return;
-      if (clear) { nativeBroker.mirrorMedia({state:'none'}); return; }
+      if (wants) failure = '';
+      if (clear) { nativeBroker.mirrorMedia({state:'none', error:failure}); return; }
       const entry = queue[position], voiceName = availableVoices.find(item => item.id === voiceFor(entry))?.name || voiceFor(entry) || 'Listen';
       const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role)?.label : '';
-      nativeBroker.mirrorMedia({state:wants ? 'playing' : 'paused', title:chapter?.label || entry?.sectionLabel || document.title || 'Listen', artist:role ? role + ' · ' + voiceName : voiceName, album:document.title || '', rate:get('rate').value,
+      // ADR-0022: "buffering" while Listen wants to play but waits for text, audio, or a reconnect.
+      const state = wants ? (loading || extraction || restoring ? 'buffering' : 'playing') : 'paused';
+      nativeBroker.mirrorMedia(Object.assign({state, title:chapter?.label || entry?.sectionLabel || document.title || 'Listen', artist:role ? role + ' · ' + voiceName : voiceName, album:document.title || '', rate:get('rate').value, error:failure,
         handlers:{play:()=>{if(!wants)get('play').click();}, pause:()=>{if(wants)get('play').click();}, next:()=>skip(1), previous:()=>skip(-1), stop:()=>get('stop').click(),
           rewind:()=>{const button = get('rewind'); if (button && !button.disabled) button.click();},
-          speed:()=>{const select = get('rate'), steps = ['1','1.25','1.5'], at = steps.indexOf(select.value); select.value = steps[(at + 1) % steps.length]; select.dispatchEvent(new Event('change', {bubbles:true})); paint();}}});
+          forward:()=>forward(30),
+          chapter:index=>{const target = chapterOrder[index]; if (Number.isInteger(target)) jumpTo({chapterIndex:target});},
+          speed:()=>{const select = get('rate'), steps = ['1','1.25','1.5','1.75','2'], at = steps.indexOf(select.value); select.value = steps[(at + 1) % steps.length]; select.dispatchEvent(new Event('change', {bubbles:true})); paint();}}}, nativeProgress ? progressFields() : {}));
     }
     // `?listen=autoplay` starts reading once, but only inside the native host: the Android app uses
     // it when an artifact is picked from the car's media library (ADR-0019).
     let autoplayDone = false;
+    // Hosts with media.progress also get the chapter list, so ask the bridge for the outline even
+    // while the player is closed (for example a car-started narration).
+    function watchNativeProgress() {
+      if (nativeProgress || typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.hostHas) return;
+      nativeBroker.hostHas('media.progress').then(ok => { if (!ok || nativeProgress) return; nativeProgress = true; refreshOutline(); paint(); });
+    }
     function maybeAutoplay() {
       if (autoplayDone || !enabled || !ready || wants || new URLSearchParams(window.location.search).get('listen') !== 'autoplay') return;
       if (typeof nativeBroker === 'undefined' || !nativeBroker || !nativeBroker.hostHas) return;
-      nativeBroker.hostHas('media.mirror').then(ok => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get(savedPlace() ? 'resume' : 'play').click(); });
+      Promise.all([nativeBroker.hostHas('media.mirror'), placeSync.ready]).then(([ok]) => { if (!ok || autoplayDone || wants) return; autoplayDone = true; get(savedPlace() ? 'resume' : 'play').click(); });
     }
     function updateMediaSession(clear) {
       mirrorNative(clear);
@@ -903,11 +1069,11 @@
         const role = cast && entry?.role ? cast.roles.find(item => item.id === entry.role)?.label : '';
         session.metadata = new MediaMetadata({title:chapter?.label || entry?.sectionLabel || document.title,artist:role ? role + ' · ' + voiceName : voiceName,album:document.title,artwork:[{src:'/icons/app-192.png',sizes:'192x192',type:'image/png'},{src:'/icons/app-512.png',sizes:'512x512',type:'image/png'}]});
         session.playbackState = wants ? 'playing' : 'paused';
-        const handlers={play:()=>get('play').click(),pause:()=>{if(wants)get('play').click();},stop:()=>get('stop').click(),seekbackward:()=>get('rewind').click(),seekforward:()=>skip(1),previoustrack:()=>skip(-1),nexttrack:()=>skip(1)};
+        const handlers={play:()=>get('play').click(),pause:()=>{if(wants)get('play').click();},stop:()=>get('stop').click(),seekbackward:()=>get('rewind').click(),seekforward:()=>forward(30),previoustrack:()=>skip(-1),nexttrack:()=>skip(1)};
         Object.entries(handlers).forEach(([action,handler]) => { try { session.setActionHandler(action,handler); } catch (_) {} });
       } catch (_) {}
     }
-    function paint() { updateMediaSession(!queue.length && !loading); get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
+    function paint() { updateMediaSession(!queue.length && !loading); get('replay').disabled = replaySentenceStart() === null; get('rewind').disabled = loaded < 0; get('forward').disabled = loaded < 0 || !!extraction; refreshSaved(); box.classList.toggle('is-playing', wants); box.classList.toggle('is-loading', loading); get('play').textContent = wants ? 'Pause' : loaded >= 0 || loading ? 'Resume' : 'Play'; get('play').setAttribute('aria-label', wants ? 'Pause reading' : loaded >= 0 || loading ? 'Resume reading' : 'Start reading'); get('play').disabled = !enabled || !ready || (!wants && supportsStyle() && get('style').value === 'custom' && !instructions()); get('preview').disabled = !enabled || !ready || (supportsStyle() && get('style').value === 'custom' && !instructions()); get('stop').disabled = !queue.length && !extraction;
       const icon = wants
         ? '<path d="M6 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" /><path d="M14 6a1 1 0 0 1 1 -1h2a1 1 0 0 1 1 1v12a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1l0 -12" />'
         : '<path d="M7 4v16l13 -8l-13 -8" />';
@@ -962,8 +1128,8 @@
       if (!audioContext) { try { audioContext = new (window.AudioContext || window.webkitAudioContext)(); limiter = audioContext.createDynamicsCompressor(); limiter.threshold.value=-3; limiter.knee.value=0; limiter.ratio.value=20; limiter.attack.value=.003; limiter.release.value=.25; limiter.connect(audioContext.destination); } catch (_) { return null; } }
       return audioContext;
     }
-    function stop(message, preserve) {
-      savePlace(); pendingSeek = 0; restoring = null;
+    function stop(message, preserve, reason) {
+      savePlace(); placeSync.flush(); pendingSeek = 0; restoring = null; failure = reason || ''; clearAhead();
       epoch++; wants = false; loading = false; extraction = ''; previewEnd = null; previewRequested = false; clearTimeout(extractionTimer);
       controller.abort(); controller = new AbortController(); clearTimeout(pauseTimer); pauseTimer = null; cache.clear();
       streamRequests.forEach(work => { work.then(response => response.body?.cancel()).catch(() => {}); });
@@ -1047,30 +1213,94 @@
         signal.addEventListener('abort', cancel, { once: true });
       });
     }
-    function synth(index) {
+    // Read ahead at least 3 blocks or about 60 s of listening, whichever is more, bounded to
+    // 8 blocks and 24 MB of audio. Worker slots are shared by every listener (TTS_WORKER_CONCURRENCY),
+    // so one viewer never runs more than 2 speech requests at once, and a 429 pauses read-ahead with
+    // exponential backoff instead of retrying it.
+    const AHEAD_MIN_BLOCKS = 3, AHEAD_SECONDS = 60, AHEAD_MAX_BLOCKS = 8, AHEAD_MAX_BYTES = 24 * 1024 * 1024, SPEECH_PARALLEL = 2;
+    const aheadJobs = new Map(), aheadBytes = new Map();
+    let aheadFrom = -1, aheadBackoff = 0, aheadRetryAt = 0, aheadTimer = null;
+    function linkedController() {
+      const local = new AbortController(), parent = controller.signal;
+      if (parent.aborted) local.abort(); else parent.addEventListener('abort', () => local.abort(), {once:true});
+      return local;
+    }
+    function aheadBusy() { aheadBackoff = Math.min(30000, aheadBackoff ? aheadBackoff * 2 : 2000); aheadRetryAt = Date.now() + aheadBackoff; }
+    function forgetAhead(index) { const job = aheadJobs.get(index); aheadJobs.delete(index); aheadBytes.delete(index); if (job) job.abort(); cache.delete(index); streamRequests.delete(index); }
+    function clearAhead() { clearTimeout(aheadTimer); aheadTimer = null; aheadFrom = -1; aheadJobs.clear(); aheadBytes.clear(); }
+    // The block about to play outranks read-ahead: free a slot by dropping the farthest prefetch.
+    function makeRoomFor(index) {
+      if (cache.has(index) || streamRequests.has(index)) return;
+      const far = [...aheadJobs.keys()].sort((a, b) => b - a);
+      while (aheadJobs.size > SPEECH_PARALLEL - 1 && far.length) forgetAhead(far.shift());
+    }
+    function aheadDone(index, job, ok) {
+      if (aheadJobs.get(index) !== job) return;
+      aheadJobs.delete(index); if (ok) aheadBackoff = 0;
+      fillAhead();
+    }
+    function fillAhead() {
+      clearTimeout(aheadTimer); aheadTimer = null;
+      if (captureActive || aheadFrom < 0 || aheadFrom !== position || !queue.length) return;
+      const wait = aheadRetryAt - Date.now();
+      if (wait > 0) { aheadTimer = setTimeout(fillAhead, wait); return; }
+      let bytes = 0;
+      for (const [index, size] of aheadBytes) { if (index > position && (cache.has(index) || streamRequests.has(index))) bytes += size; else aheadBytes.delete(index); }
+      const rate = Number(get('rate').value) || 1, cps = charsPerSecond();
+      let seconds = 0, count = 0;
+      for (let index = position + 1; index < queue.length && count < AHEAD_MAX_BLOCKS && (count < AHEAD_MIN_BLOCKS || seconds < AHEAD_SECONDS); index++) {
+        if (!mayContinue(index) || (previewEnd !== null && index >= previewEnd)) break;
+        count++; seconds += blockSeconds(index, cps) / rate;
+        if (cache.has(index) || streamRequests.has(index)) continue;
+        if (aheadJobs.size >= SPEECH_PARALLEL || bytes >= AHEAD_MAX_BYTES) break;
+        prefetch(index);
+      }
+    }
+    function synth(index, ahead = false) {
       if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (cache.has(index)) return cache.get(index);
-      const signal = controller.signal, entry = queue[index], chosenVoice = voiceFor(entry);
+      if (!ahead) makeRoomFor(index);
+      const job = linkedController(), signal = job.signal, entry = queue[index], chosenVoice = voiceFor(entry);
+      if (ahead) aheadJobs.set(index, job);
       const work = (async () => {
         for (let attempt = 0; attempt < 5; attempt++) {
           const response = await fetch('/' + encodeURIComponent(artifactId) + '/speech', { method: 'POST', headers: { 'content-type': 'application/json' }, body: speechBody(entry.text, chosenVoice), signal });
+          if (response.status === 429 && ahead) { aheadBusy(); throw new Error('Speech is busy.'); }
           if (response.status === 429 && attempt < 4) { await delay(1500, signal); continue; }
           if (!response.ok) throw new Error(response.status === 429 ? 'Speech is busy. Press Play to retry.' : 'Speech is unavailable. Press Play to retry.');
           if (!(response.headers.get('content-type') || '').startsWith('audio/wav')) throw new Error('Invalid audio response.');
-          return response.arrayBuffer();
+          const buffer = await response.arrayBuffer();
+          if (ahead) aheadBytes.set(index, buffer.byteLength);
+          return buffer;
         }
       })();
       cache.set(index, work); work.catch(() => { if (cache.get(index) === work) cache.delete(index); });
+      if (ahead) work.then(() => aheadDone(index, job, true), () => aheadDone(index, job, false));
       return work;
     }
     // RAVEN trial uses complete paragraph WAVs while its live-stream buzzing is investigated.
     function streamingVoice(entry = queue[position]) { return /^(qwen_|pocket_)/.test(voiceFor(entry)); }
-    // Voice roles can change engine between blocks, so prefetch the way the next block will play.
-    function prefetch(index) { if (streamingVoice(queue[index]) && ensureAudioContext()) fetchStream(index); else synth(index).catch(() => {}); }
-    function fetchStream(index) {
+    // Voice roles can change engine between blocks, so prefetch the way each block will play.
+    function prefetch(index) { if (streamingVoice(queue[index]) && ensureAudioContext()) fetchStream(index, true).catch(() => {}); else synth(index, true).catch(() => {}); }
+    // A read-ahead stream is read to the end so its worker slot is released, then replayed from memory.
+    async function bufferedResponse(response, index, signal) {
+      if (!response.ok || !response.body) return response;
+      const reader = response.body.getReader(), parts = []; let size = 0;
+      for (;;) {
+        if (signal.aborted) { reader.cancel().catch(() => {}); throw new DOMException('Cancelled', 'AbortError'); }
+        const step = await reader.read(); if (step.done) break;
+        size += step.value.byteLength; if (size > 5 * 1024 * 1024) { reader.cancel().catch(() => {}); throw new Error('Streaming audio is too large.'); }
+        parts.push(step.value);
+      }
+      aheadBytes.set(index, size);
+      return new Response(new Blob(parts), { status: response.status, headers: { 'content-type': response.headers.get('content-type') || '' } });
+    }
+    function fetchStream(index, ahead = false) {
       if (captureActive) return Promise.reject(new DOMException('Reader paused while casting.', 'AbortError'));
       if (streamRequests.has(index)) return streamRequests.get(index);
-      const signal = controller.signal, entry = queue[index], chosenVoice = voiceFor(entry);
+      if (!ahead) makeRoomFor(index);
+      const job = linkedController(), signal = job.signal, entry = queue[index], chosenVoice = voiceFor(entry);
+      if (ahead) aheadJobs.set(index, job);
       const work = (async () => {
         for (let attempt = 0; attempt < 10; attempt++) {
           const timed = /^pocket_/.test(chosenVoice);
@@ -1080,14 +1310,15 @@
             await response.body?.cancel();
             response = await fetch('/' + encodeURIComponent(artifactId) + '/speech/stream', options);
           }
-          if (response.status !== 429 || attempt === 9) return response;
+          if (response.status === 429 && ahead) { await response.body?.cancel(); aheadBusy(); throw new Error('Speech is busy.'); }
+          if (response.status !== 429 || attempt === 9) return ahead ? bufferedResponse(response, index, signal) : response;
           await response.body?.cancel(); await delay(500, signal);
         }
       })();
-      // Keep at most the current response and one upcoming response. Leaving the
-      // upcoming body unread preserves browser/network backpressure until playback.
       streamRequests.set(index, work);
-      work.catch(() => {}); // A prefetch failure is reported when this paragraph plays.
+      // A failed read-ahead is dropped, so the block is requested again (with retries) when it plays.
+      work.catch(() => { if (ahead && streamRequests.get(index) === work) streamRequests.delete(index); });
+      if (ahead) work.then(() => aheadDone(index, job, true), () => aheadDone(index, job, false));
       return work;
     }
     async function streamCurrent(index) {
@@ -1306,7 +1537,7 @@
         loading = false;
         // Generation is finished, but audio is still playing: give the next
         // paragraph that remaining playback time to prepare its first frames.
-        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) prefetch(index + 1);
+        if (token === epoch) { aheadFrom = index; fillAhead(); }
         if (!state.sources.size) state.finish.resolve();
         await state.finished;
         if (stream !== state || token !== epoch) return true;
@@ -1341,7 +1572,7 @@
       if (!mayContinue(index) || (index >= queue.length && ['section','chapter'].includes(get('sleep').value))) { stop('Sleep timer ended. Your place is saved.'); cancelSleep(); return; }
       if (index >= queue.length) {
         if (chapter && chapter.hasNext && ['page','here'].includes(mode)) { requestContent(true); return; }
-        const finishedKey = queueKey; stop('Finished'); try { if (finishedKey) localStorage.removeItem(finishedKey); } catch (_) {} refreshSaved(); return;
+        const finishedKey = queueKey; stop('Finished'); try { if (finishedKey) localStorage.removeItem(finishedKey); } catch (_) {} if (finishedKey) placeSync.clear(pageOfKey(finishedKey)); refreshSaved(); return;
       }
       playbackConfig = {voice, mode, style:get('style').value, custom:get('custom').value};
       loading = true; send('reader:highlight', {id:queue[index].id}); status('Preparing audio…'); paint();
@@ -1362,8 +1593,8 @@
         send('reader:highlight', { id: queue[index].id });
         status(readingMessage());
         paint(); if (wants) await playLoaded();
-        // Only begin prefetch after the current synthesis completes.
-        if (token === epoch && mayContinue(index + 1) && index + 1 < queue.length && (previewEnd === null || index + 1 < previewEnd)) prefetch(index + 1);
+        // Only begin read-ahead after the current synthesis completes.
+        if (token === epoch) { aheadFrom = index; fillAhead(); }
       } catch (error) {
         if (token !== epoch) return;
         if (error.retryable && retry < 2 && wants) {
@@ -1375,7 +1606,7 @@
           if (wants) return loadCurrent(retry + 1);
           status('Paused. Press Play to resume.'); paint(); return;
         }
-        loading = false; wants = false; status(error.message || 'Speech is unavailable. Press Play to resume.'); paint();
+        loading = false; wants = false; failure = failureReason(error); savePlace(); placeSync.flush(); status(error.message || 'Speech is unavailable. Press Play to resume.'); paint();
       }
     }
     function requestContent(nextChapter, preview = false) {
@@ -1384,7 +1615,7 @@
       const intended = wants; stop(nextChapter ? 'Opening next chapter…' : 'Reading page…'); wants = intended; previewRequested = preview; continuationPause = !!nextChapter;
       extraction = 'read-' + (++serial);
       send(nextChapter ? 'reader:next' : 'reader:extract', { requestId: extraction, mode: nextChapter ? 'page' : mode, scopeKey });
-      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read this page. Press Play to retry.'); }, 5000); paint();
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read this page. Press Play to retry.', false, 'Could not read this page'); }, 5000); paint();
     }
     function placePanel() { get('panel').style.top = innerWidth <= 760 ? (document.querySelector('.vbar').getBoundingClientRect().bottom + 6) + 'px' : ''; }
     get('toggle').onclick = () => { setPlayerView('compact'); get('mini-play').focus(); };
@@ -1412,7 +1643,7 @@
       const context = streamingVoice() ? ensureAudioContext() : null; if (context?.state === 'suspended') context.resume().catch(() => {});
       extraction = 'read-' + (++serial);
       send('reader:extract', {requestId:extraction, mode:'detail', scopeKey:target.scopeKey});
-      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read these details.'); }, 5000); paint();
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not read these details.', false, 'Could not read these details'); }, 5000); paint();
     }
     get('target-details').onclick = () => { if (clickedTarget?.detailAvailable) readDetails(clickedTarget); };
     get('target-dismiss').onclick = get('mini-target-dismiss').onclick = clearTarget;
@@ -1424,7 +1655,7 @@
       if (captureActive) return;
       try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (_) {}
       if (checkSleep()) return; armSleep();
-      if (wants) { savePlace(); wants = false; audio.pause(); if (audioContext && audioContext.state === 'running' && streamingVoice()) audioContext.suspend().catch(() => {}); if (stream) { stream.boxState = 'paused'; box.dataset.streamState = 'paused'; } status(readingMessage()); paint(); return; }
+      if (wants) { savePlace(); placeSync.flush(); wants = false; audio.pause(); if (audioContext && audioContext.state === 'running' && streamingVoice()) audioContext.suspend().catch(() => {}); if (stream) { stream.boxState = 'paused'; box.dataset.streamState = 'paused'; } status(readingMessage()); paint(); return; }
       wants = true; if (loaded >= 0 || stream) status(readingMessage()); paint();
       if (streamingVoice()) { const context = ensureAudioContext(); if (context && context.state === 'suspended') context.resume().catch(() => {}); }
       if (stream && audioContext && audioContext.state === 'suspended') audioContext.resume().catch(() => {});
@@ -1432,9 +1663,11 @@
       if (extraction || loading) return;
       // Nothing loaded yet: continue from the saved place when there is one (phone, browser, or car).
       // Only for the same whole-page or section reading; an explicit view, detail, or "here" pick wins.
-      if (!queue.length && ['page','section'].includes(mode) && savedPlace()?.mode === mode) { get('resume').click(); return; }
-      if (!queue.length) requestContent(false); else if (loaded === position) playLoaded(); else loadCurrent();
+      // A saved place from another device may still be loading; wait for it briefly (ADR-0022).
+      if (!queue.length && ['page','section'].includes(mode) && !placeSync.settled()) { paint(); placeSync.ready.then(() => { if (wants && !queue.length && !extraction && !loading) startFromSaved(); }); return; }
+      if (!queue.length) startFromSaved(); else if (loaded === position) playLoaded(); else loadCurrent();
     };
+    function startFromSaved() { if (['page','section'].includes(mode) && savedPlace()?.mode === mode) get('resume').click(); else requestContent(false); }
     get('stop').onclick = () => { stop(); cancelSleep(); };
     get('sleep').onchange = () => { sleepDeadline = 0; sleepBoundary = null; if (wants || loaded >= 0) armSleep(); checkSleep(); };
     get('replay').onclick = () => {
@@ -1454,6 +1687,26 @@
       if (target === position && !stream && loaded === position) { audio.currentTime = offset; savePlace(); return; }
       const playing = wants; stop('Rewinding…', true); position = target; pendingSeek = offset; wants = playing; loadCurrent();
     };
+    // Mirror of rewind: seek within the current block when its audio is there, otherwise carry the
+    // remainder into the following blocks (known durations first, then text-length estimates).
+    function forward(seconds) {
+      if (captureActive || !queue.length || extraction || position >= queue.length) return;
+      let target = position, offset = mediaOffset() + seconds;
+      if (stream && loaded === position) {
+        const received = stream.received / 24000;
+        if (offset < received - 0.05 && stream.seekTo(offset)) { stream.highlightedWord = -1; savePlace(); paint(); return; }
+        if (!stream.done) { const playing = wants; stop('Skipping ahead…', true); position = target; pendingSeek = Math.min(offset, 3599); wants = playing; loadCurrent(); return; }
+        offset -= received; target++;
+      } else if (!stream && loaded === position && Number.isFinite(audio.duration) && audio.duration > 0) {
+        if (offset < audio.duration - 0.05) { audio.currentTime = offset; savePlace(); paint(); return; }
+        offset -= audio.duration; target++;
+      }
+      const cps = charsPerSecond();
+      while (target < queue.length && offset >= blockSeconds(target, cps)) offset -= blockSeconds(target++, cps);
+      if (target >= queue.length) { if (wants) skip(1); return; }
+      const playing = wants; stop('Skipping ahead…', true); position = target; pendingSeek = Math.max(0, Math.min(offset, 3599)); wants = playing; loadCurrent();
+    }
+    get('forward').onclick = () => forward(30);
     get('resume').onclick = () => {
       const saved = savedPlace(); if (!saved) return;
       stop('Restoring saved place…'); restoring = saved;
@@ -1465,7 +1718,7 @@
       extraction = 'read-' + (++serial); const resume = {requestId:extraction, mode, fingerprint:saved.fingerprint, chapterIndex:saved.chapterIndex};
       if (['view','detail','section'].includes(mode) && saved.scopeKey) resume.scopeKey = saved.scopeKey;
       send('reader:resume', resume);
-      extractionTimer = setTimeout(() => { if (extraction) stop('Could not restore this place. Start reading again.'); }, 5000); paint();
+      extractionTimer = setTimeout(() => { if (extraction) stop('Could not restore this place. Start reading again.', false, 'Could not restore the saved place'); }, 5000); paint();
     };
     function skip(direction) {
       if (streamingVoice()) { const context = ensureAudioContext(); if (context && context.state === 'suspended') context.resume().catch(() => {}); }
@@ -1491,13 +1744,13 @@
     get('rate').onchange = () => { savePreferences(); const value = Number(get('rate').value); audio.playbackRate = value; if (stream && !pitchReady && value !== 1) {
         const offset = mediaOffset(), playing = wants; stop('Preparing audio…', true); pendingSeek = offset; wants = playing; loadCurrent();
       } else if (stream && stream.changeRate) stream.changeRate(value); paint(); };
-    audio.onerror = () => { if (audio.getAttribute('src')) stop('Could not play audio. Press Play to retry.'); };
+    audio.onerror = () => { if (audio.getAttribute('src')) stop('Could not play audio. Press Play to retry.', false, 'Audio playback failed'); };
     frame.addEventListener('load', () => { stop(); restartScopeKey = ''; clearTarget(); outlineRequest = ''; clearTimeout(outlineTimer); get('outline').replaceChildren(new Option('Loading sections…','')); get('outline').disabled = true; ready = false; send('reader:hello'); paint(); });
     window.addEventListener('message', event => {
       if (event.source !== frame.contentWindow || !event.data || typeof event.data !== 'object') return;
       const data = event.data;
       if (data.type === 'anchor:ready') setTimeout(() => { if (queue.length && !queueKey) queueKey = checkpointKey(); refreshSaved(); }, 0);
-      if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); maybeAutoplay(); return; }
+      if (data.type === 'reader:ready') { ready = true; pickMode(); refreshOutline(); paint(); maybeAutoplay(); watchNativeProgress(); return; }
       if (data.type === 'reader:changed') {
         const changedScope = typeof data.scopeKey === 'string' ? data.scopeKey : '';
         if ((!changedScope && !readerScopeKey) || (changedScope && changedScope === readerScopeKey)) { stop('Page changed. Press Play to read it.'); clearTarget(); refreshOutline(); }
@@ -1523,6 +1776,8 @@
         if (typeof data.fingerprint !== 'string' || data.fingerprint.length > 100 || !valid(data.sections,'ordinal') || !valid(data.chapters,'index') || !validDetails(data.details || [])) return;
         outlineFingerprint = data.fingerprint;
         renderCast(data.cast);
+        chapterOrder = data.chapters.map(item => item.index);
+        if (typeof nativeBroker !== 'undefined' && nativeBroker && nativeBroker.mirrorChapters) nativeBroker.mirrorChapters(data.chapters.map(item => item.label));
         detailTargets = data.details || [];
         const select = get('outline'); select.replaceChildren(new Option('Choose a section…',''));
         for (const [items, prefix, label, key] of [[data.chapters,'chapter','Chapters','index'],[data.sections,'section',data.chapters.length ? 'On this page' : 'Sections','ordinal']]) {
@@ -1542,9 +1797,9 @@
       }
       if ((data.type !== 'reader:content' && data.type !== 'reader:error') || !extraction || data.requestId !== extraction) return;
       extraction = ''; clearTimeout(extractionTimer);
-      if (data.type === 'reader:error') { stop(typeof data.message === 'string' ? data.message.slice(0,200) : 'Could not read this page.'); clearTarget(); refreshOutline(); return; }
+      if (data.type === 'reader:error') { stop(typeof data.message === 'string' ? data.message.slice(0,200) : 'Could not read this page.', false, 'Could not read this page'); clearTarget(); refreshOutline(); return; }
       let total = 0;
-      if (!Array.isArray(data.blocks) || data.blocks.length > 5000 || data.blocks.some(b => !b || typeof b.id !== 'string' || b.id.length > 80 || typeof b.text !== 'string' || (total += b.text.length) > 500000)) { stop('This page returned too much text.'); return; }
+      if (!Array.isArray(data.blocks) || data.blocks.length > 5000 || data.blocks.some(b => !b || typeof b.id !== 'string' || b.id.length > 80 || typeof b.text !== 'string' || (total += b.text.length) > 500000)) { stop('This page returned too much text.', false, 'This page is too long to read'); return; }
       renderCast(data.cast);
       const saved = restoring; restoring = null;
       queue = data.blocks.flatMap((b, index) => {
@@ -1558,21 +1813,21 @@
           return {id:b.id, text, textOffset, pronunciation, sourceOffset, sourceText, block:index, ordinal:Number.isInteger(b.ordinal) ? b.ordinal : index, chunk, pause:['heading','scene','segment','none','short','long'].includes(b.pause) ? b.pause : '', role:cast && typeof b.role === 'string' && cast.roles.some(role => role.id === b.role) ? b.role : cast?.default || '', sectionLabel:typeof b.sectionLabel === 'string' ? b.sectionLabel.slice(0,120) : '', sectionEndOrdinal:Number.isInteger(b.sectionEndOrdinal) ? b.sectionEndOrdinal : data.blocks.length - 1};
         });
       });
-      if (queue.reduce((size,entry)=>size+entry.text.length,0) > 500000) { stop('This page returned too much spoken text.'); return; }
-      if (typeof data.scopeKey !== 'string' || data.scopeKey.length > 500) { stop('This reading scope is invalid.'); return; }
+      if (queue.reduce((size,entry)=>size+entry.text.length,0) > 500000) { stop('This page returned too much spoken text.', false, 'This page is too long to read'); return; }
+      if (typeof data.scopeKey !== 'string' || data.scopeKey.length > 500) { stop('This reading scope is invalid.', false, 'Could not read this page'); return; }
       readerScopeKey = restartScopeKey = data.scopeKey; contentFingerprint = typeof data.fingerprint === 'string' && data.fingerprint.length <= 100 ? data.fingerprint : ''; queueKey = checkpointKey();
       if (saved) {
-        if (contentFingerprint !== saved.fingerprint || saved.version === 2 && saved.scopeKey !== readerScopeKey) { stop('Content changed or this place belongs to a different view. Start reading again.'); return; }
+        if (contentFingerprint !== saved.fingerprint || saved.version === 2 && saved.scopeKey !== readerScopeKey) { stop('Content changed or this place belongs to a different view. Start reading again.', false, 'The saved place has changed'); return; }
         queue = queue.filter(entry => entry.ordinal >= saved.start && entry.ordinal <= saved.end);
         position = queue.findIndex(entry => entry.ordinal === saved.ordinal && entry.chunk === saved.chunk);
-        if (position < 0) { stop('Saved place is no longer available. Start reading again.'); return; }
+        if (position < 0) { stop('Saved place is no longer available. Start reading again.', false, 'The saved place is unavailable'); return; }
         pendingSeek = saved.offset;
       } else position = 0;
       scopeStart = queue[0]?.ordinal || 0; scopeEnd = queue[queue.length - 1]?.ordinal || 0;
       chapter = data.chapter && typeof data.chapter.label === 'string' ? { index: Number.isInteger(data.chapter.index) ? data.chapter.index : undefined, label: data.chapter.label.slice(0,120), hasNext: data.chapter.hasNext === true } : null;
       const chapterOption = get('sleep').querySelector('[value=chapter]'); chapterOption.hidden = chapterOption.disabled = !chapter;
       if (!chapter && get('sleep').value === 'chapter') cancelSleep();
-      if (!queue.length) { stop(mode === 'selection' ? 'Select text in the artifact first.' : 'No readable text found.'); return; }
+      if (!queue.length) { stop(mode === 'selection' ? 'Select text in the artifact first.' : 'No readable text found.', false, mode === 'selection' ? 'No text is selected' : 'No readable text found'); return; }
       if (previewRequested) { previewRequested = false; preparePreview(); }
       status(data.truncated ? 'Long page shortened to the reading limit.' : chapter ? chapter.label + (['page','here'].includes(mode) ? ' · continues across chapters' : ' · this section') : 'Ready'); paint();
       clearTarget(); refreshOutline(); if (wants) loadCurrent();
@@ -1646,7 +1901,7 @@
       if (pendingCast) renderCast(pendingCast);
       renderVoiceOptions(savedVoice); setupFinder();
       if (Array.from(get('voice').options).some(option => option.value === savedVoice)) get('voice').value = savedVoice;
-      voice = get('voice').value; enabled = true; get('toggle').disabled = false; updateStyle(); send('reader:hello'); paint();
+      voice = get('voice').value; enabled = true; get('toggle').disabled = false; placeSync.load(); updateStyle(); send('reader:hello'); paint();
     }).catch(() => { box.hidden = true; }); }
     get('toggle').disabled = true; box.hidden = false; get('status').textContent = 'Loading voices…';
     paint();
