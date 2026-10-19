@@ -211,6 +211,8 @@ test("speed is mirrored only to apps advertising media.rate; rewind and speed bu
   const calls = [];
   h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "1.25", handlers: { rewind: () => calls.push("rewind"), speed: () => calls.push("speed") } });
   assert.equal(f.sent.filter(m => m.type === "media.session").at(-1).rate, "1.25");
+  assert.deepEqual(f.sent.filter(m => m.type === "media.session").at(-1).actions, ["play", "pause", "next", "previous", "stop", "rewind", "speed"]);
+  assert.deepEqual(old.f.sent.filter(m => m.type === "media.session").at(-1).actions, ["play", "pause", "next", "previous", "stop"], "v0.2 apps keep the original five");
   h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "fast; drop", handlers: {} });
   assert.equal("rate" in f.sent.filter(m => m.type === "media.session").at(-1), false, "malformed rate dropped");
   h.broker.mirrorMedia({ state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", rate: "1.5", handlers: { rewind: () => calls.push("rewind"), speed: () => calls.push("speed") } });

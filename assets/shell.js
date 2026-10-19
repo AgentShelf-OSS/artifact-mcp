@@ -208,7 +208,7 @@
       var message=state.state==='none'?{type:'media.session',state:'none',title:'',artist:'',album:'',actions:[]}:
         {type:'media.session',state:state.state==='playing'?'playing':'paused',title:cut(state.title)||'Listen',artist:cut(state.artist),album:cut(state.album),actions:['play','pause','next','previous','stop']};
       // Apps from before ADR-0021 reject unknown fields, so only hosts advertising media.rate get it.
-      if(message.state!=='none'&&has('media.rate')&&typeof state.rate==='string'&&/^\d(?:\.\d{1,2})?$/.test(state.rate))message.rate=state.rate;
+      if(message.state!=='none'&&has('media.rate')){message.actions=message.actions.concat(['rewind','speed']);if(typeof state.rate==='string'&&/^\d(?:\.\d{1,2})?$/.test(state.rate))message.rate=state.rate;}
       mediaHandlers=state.state==='none'?null:(state.handlers||null);
       var key=JSON.stringify(message);if(key===lastMirror)return;lastMirror=key;toHost(message);
     }
