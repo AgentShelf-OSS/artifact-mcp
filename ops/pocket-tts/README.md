@@ -36,7 +36,8 @@ than 16 MiB are skipped and logged. A bad entry does not stop the worker.
 
 The worker serves every loaded voice. Artifact MCP controls which voices users
 see, through its built-in list, `POCKET_TTS_EXTRA_VOICES`, and the voice catalog
-(`POCKET_TTS_VOICE_CATALOG`). The Voice-Zero states stay loadable but hidden.
+(`POCKET_TTS_VOICE_CATALOG`). Staged audition candidates stay loadable but hidden
+until Neil keeps them.
 [`voices/manifest.json`](voices/manifest.json) is the source copy for the nine
 original voices. `Dockerfile.voice-dir` builds the incremental image layer that
 the live workers use; see [voice-dir parity](trials/voice-dir-parity/README.md).
@@ -47,8 +48,13 @@ speaker consent. Do not add a cloned voice without that explicit written
 permission, with one documented exception: a corpus recorded expressly for
 building speech-synthesis voices and released under an attribution licence (CC
 BY) counts, provided its credit is kept wherever the voices are listed. Neil
-approved VCTK under this exception on 2026-10-19. Voice-Zero (LibriVox
-audiobook readings) does not qualify and stays hidden.
+approved VCTK under this exception on 2026-10-19. On 2026-10-19 Neil also
+approved Voice-Zero: narrator clips of volunteer LibriVox and Archive.org readings,
+released CC0 by <https://github.com/OwenTyme/voice-zero>. Voice-Zero voices are no
+longer hidden; they go through the audition like any other source. Keep the
+narrator credit (narrator name, reading, and Voice-Zero, CC0) wherever these voices
+are listed. Clips outside that approval (the synthetic `voices-emotion/` outputs,
+non-LibriVox/Archive.org clips) and child readers are not used.
 
 ## Voice sources and credits
 
@@ -56,7 +62,7 @@ audiobook readings) does not qualify and stays hidden.
 |---|---|---|---|
 | Kyutai Unmute voice donations | CC0-1.0, donor agreement covers voice transformation | `kyutai-donation` | [trials/kyutai-donations-20261018](trials/kyutai-donations-20261018/README.md) |
 | CSTR VCTK Corpus 0.92 | CC BY 4.0, attribution required | `custom` (manifest: `VCTK (CC BY 4.0)`) | [trials/vctk-20261019](trials/vctk-20261019/README.md) |
-| Voice-Zero | CC0 | `voice-zero` | [voices/README.md](voices/README.md) |
+| Voice-Zero narrator clips (LibriVox and Archive.org readings) | CC0, approved by Neil 2026-10-19; keep the narrator credit | `voice-zero` | [trials/voice-zero-20261019](trials/voice-zero-20261019/README.md); the first five: [voices/README.md](voices/README.md) |
 
 **VCTK credit.** Voices derived from the VCTK corpus, CSTR, University of
 Edinburgh, CC BY 4.0. Corpus: Junichi Yamagishi, Christophe Veaux, and Kirsten
@@ -71,12 +77,20 @@ VCTK was recorded for speaker-adaptive speech synthesis and is CC BY 4.0. There 
 no per-speaker written consent; Neil approved it under the corpus exception in the
 rule above (2026-10-19).
 
+**Voice-Zero credit.** Voices derived from Voice-Zero
+(<https://github.com/OwenTyme/voice-zero>), CC0 1.0. Voice-Zero cuts 7–12 s clips from
+volunteer LibriVox and Archive.org readings. Each voice is named after its narrator;
+the worker manifest entry records the narrator, the narrator page, the reading and
+its link, the pinned commit, and the clip checksum. CC0 asks for no credit, but keep
+the narrator credit wherever the voices are listed, as Neil asked.
+
 ## Adding voices: audition workflow
 
 1. Export candidate states with the donation procedure (verify `andrea.safetensors`
    reproduces first), synthesize the two audition sentences, and run the analyzer.
    See the trial READMEs for the commands.
-2. Select (`select_candidates.py` for donations, `select_vctk.py` for VCTK) to
+2. Select (`select_candidates.py` for donations, `select_vctk.py` for VCTK,
+   `select_voicezero.py` for Voice-Zero) to
    write `voice-metrics.json`. Build and publish the audition bundle with
    `build_audition.py` and `publish_bundle.py` (optional template, artifact key,
    and title arguments).
@@ -90,8 +104,13 @@ rule above (2026-10-19).
    python3 ops/pocket-tts/voice_catalog.py \
      --audition ops/pocket-tts/trials/kyutai-donations-20261018/voice-metrics.json \
      --audition ops/pocket-tts/trials/vctk-20261019/voice-metrics.json \
+     --audition ops/pocket-tts/trials/voice-zero-20261019/voice-metrics.json \
      --from-ct220 --worker-manifest ops/pocket-tts/voices/manifest.json --out /tmp/pocket-catalog
    ```
+
+   The five prepared Voice-Zero voices accepted before the audition (Andy, Karen
+   Savage, Kristin Hughes, Laura Caldwell, Simon Evers) are built into the generator,
+   so every regeneration keeps them.
 
    `catalog/label-overrides.json` (`{voice id: label}`) is applied last, so a
    rename made outside an audition survives every regeneration. Check

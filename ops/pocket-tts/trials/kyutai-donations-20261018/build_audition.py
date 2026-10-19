@@ -3,6 +3,8 @@
 Usage: build_audition.py <voice-metrics.json> <audio-dir> <out-dir> [template.html]
 The template defaults to audition.html next to this script. Candidates with "label",
 "accent", "region", or "age" (the VCTK audition) pass them to the page as lbl/acc/reg/age.
+Voice-Zero credit fields (narrator, narrator_url, reading, reading_url, source_file,
+readme_match) pass as nar/nurl/work/wurl/file/match.
 Writes out-dir/index.html and out-dir/audio-NN.js (base64 MP3 data URIs),
 plus out-dir/bundle.json ({path: content}) for publish_bundle.
 """
@@ -31,7 +33,9 @@ for i, r in enumerate(sel):
     v = {"id": r["voice"], "src": r["source_id"].removesuffix("_enhanced"), "c": c, "rank": r["rank"],
          "g": r["gender_estimate"], "f0": r["f0_median"], "wpm": round(r["wpm"]), "pace": wpm_tag(r["wpm"]),
          "wer": round(r["wer_mean"] * 100, 1), "gain": r["gain_db"]}
-    for key, short in (("label", "lbl"), ("accent", "acc"), ("region", "reg"), ("age", "age")):
+    for key, short in (("label", "lbl"), ("accent", "acc"), ("region", "reg"), ("age", "age"),
+                       ("narrator", "nar"), ("narrator_url", "nurl"), ("reading", "work"),
+                       ("reading_url", "wurl"), ("source_file", "file"), ("readme_match", "match")):
         if r.get(key) is not None:
             v[short] = r[key]
     voices.append(v)
