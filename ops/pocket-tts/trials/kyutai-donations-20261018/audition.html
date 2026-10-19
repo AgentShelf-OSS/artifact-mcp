@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pocket voice audition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#EDF1F5;--sheet:#FFFFFF;--ink:#1D2B45;--soft:#4A5872;--rule:#C9D2DE;
+  --keep:#17694A;--keep-bg:#E1F2EA;--maybe:#8A5A00;--maybe-bg:#FBEFD6;--skip:#9B3434;--skip-bg:#F7E3E3;
+  --focus:#2457C5;--btn:#E3E9F1;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root{
+  --paper:#121926;--sheet:#1A2333;--ink:#E7ECF4;--soft:#AEB9CB;--rule:#334158;
+  --keep:#5FD3A1;--keep-bg:#173A2D;--maybe:#F0BE5A;--maybe-bg:#3A2E14;--skip:#F08F8F;--skip-bg:#3D1F22;
+  --focus:#8FB2FF;--btn:#26324A;
+}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 1rem/1.55 "Atkinson Hyperlegible",system-ui,sans-serif}
+main{max-width:44rem;margin:0 auto;padding:1.5rem 1rem 5rem}
+h1{font-size:2rem;line-height:1.15;margin:0 0 .5rem;letter-spacing:-.01em}
+p{margin:.25rem 0 .75rem;max-width:38rem}
+.lede{color:var(--soft)}
+details.lines summary{cursor:pointer;color:var(--soft)}
+details.lines p{font-style:italic}
+.bar{position:sticky;top:0;z-index:5;background:var(--paper);border-bottom:1px solid var(--rule);margin:1rem -1rem 0;padding:.6rem 1rem;display:grid;grid-template-columns:minmax(0,1.4fr) repeat(3,minmax(0,1fr));gap:.4rem .6rem;align-items:end}
+.tally{font-weight:700;min-width:0;align-self:center}
+.tally span{white-space:nowrap}
+.bar label{font-size:.8rem;color:var(--soft);display:grid;gap:.1rem;min-width:0}
+.bar select{width:100%}
+select,input[type=text]{font:inherit;color:var(--ink);background:var(--sheet);border:1px solid var(--rule);border-radius:.4rem;padding:.35rem .5rem;min-width:0;max-width:100%}
+.status{font-size:.85rem;color:var(--soft);margin:.5rem 0 0}
+.status.warn{color:var(--maybe)}
+ol{list-style:none;margin:1rem 0 0;padding:0;display:grid;gap:.75rem}
+li.voice{background:var(--sheet);border:1px solid var(--rule);border-left:.4rem solid var(--rule);border-radius:.5rem;padding:.85rem 1rem;min-width:0}
+li.voice[data-c=keep]{border-left-color:var(--keep)}
+li.voice[data-c=maybe]{border-left-color:var(--maybe)}
+li.voice[data-c=skip]{border-left-color:var(--skip)}
+li.voice[data-c=skip] .name{color:var(--soft)}
+.head{display:flex;flex-wrap:wrap;align-items:baseline;gap:.25rem .75rem}
+.name{font-size:1.2rem;font-weight:700;margin:0;overflow-wrap:anywhere}
+.facts{color:var(--soft);font-size:.9rem;margin:0}
+.row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:.65rem;align-items:center}
+button{font:inherit;color:var(--ink);background:var(--btn);border:1px solid transparent;border-radius:.4rem;padding:.45rem .8rem;cursor:pointer;min-height:2.6rem}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:3px solid var(--focus);outline-offset:2px}
+.play{display:inline-flex;gap:.45rem;align-items:center}
+.play svg{width:.9rem;height:.9rem;fill:currentColor}
+.play[aria-pressed=true]{background:var(--ink);color:var(--sheet)}
+.decide{display:inline-flex;margin-left:auto;border:1px solid var(--rule);border-radius:.45rem;overflow:hidden}
+.decide button{border-radius:0;background:transparent;border:0;border-left:1px solid var(--rule);min-width:4.6rem}
+.decide button:first-child{border-left:0}
+.decide button[aria-pressed=true][data-v=keep]{background:var(--keep-bg);color:var(--keep);font-weight:700}
+.decide button[aria-pressed=true][data-v=maybe]{background:var(--maybe-bg);color:var(--maybe);font-weight:700}
+.decide button[aria-pressed=true][data-v=skip]{background:var(--skip-bg);color:var(--skip);font-weight:700}
+details.more{margin-top:.6rem}
+details.more summary{cursor:pointer;color:var(--soft);font-size:.92rem}
+.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,10rem),1fr));gap:.6rem;margin-top:.6rem}
+.fields label{display:grid;gap:.2rem;font-size:.88rem;color:var(--soft);min-width:0}
+.empty{color:var(--soft);padding:1rem 0}
+footer{margin-top:2rem;color:var(--soft);font-size:.88rem}
+@media (max-width:40rem){.bar{grid-template-columns:repeat(3,minmax(0,1fr))}.tally{grid-column:1/-1}}
+@media (max-width:30rem){.decide{margin-left:0;width:100%}.decide button{flex:1;min-width:0}h1{font-size:1.65rem}}
+@media (prefers-reduced-motion:no-preference){li.voice{transition:border-left-color .2s}}
+</style>
+</head>
+<body>
+<main>
+<h1>Pocket voice audition</h1>
+<p class="lede">__NSEL__ of __NCAND__ donated voices passed the automatic checks for clear speech, clean audio, and distinct sound. Play each one, then choose Keep, Maybe, or Skip. Kept voices join the Listen voice picker after the next catalog update.</p>
+<details class="lines"><summary>What the voices read</summary><p>Neutral: “__SENT_N__”</p><p>Story: “__SENT_S__”</p></details>
+<div class="bar" role="region" aria-label="Progress and filters">
+  <div class="tally" id="tally" aria-live="polite"></div>
+  <label>Show <select id="filter" aria-label="Show voices">
+    <option value="all">All</option><option value="todo">Not decided</option><option value="keep">Kept</option><option value="maybe">Maybe</option><option value="skip">Skipped</option></select></label>
+  <label>Voice <select id="gfilter" aria-label="Filter by estimated voice">
+    <option value="all">Any</option><option value="female">Female (est.)</option><option value="male">Male (est.)</option><option value="none">Unsure</option></select></label>
+  <label>Order <select id="sort" aria-label="Sort order">
+    <option value="rank">Clearest</option><option value="low">Lowest pitch</option><option value="high">Highest pitch</option></select></label>
+</div>
+<p class="status" id="status" role="status">Connecting…</p>
+<ol id="list"></ol>
+<p class="empty" id="empty" hidden>No voices match these filters.</p>
+<footer>Voices come from the Kyutai Unmute voice donation project (CC0, donor consent for voice transformation). Pitch, pace, and word error rate are measured from these two samples; the voice estimate uses median pitch only and can be wrong. Choices save for everyone in this organization.</footer>
+</main>
+<audio id="player" preload="none"></audio>
+<script>
+(function(){
+'use strict';
+var VOICES=__VOICES__;
+var KEY='audition',ACCENTS=['American','British','Irish','Scottish','Australian','Canadian','Indian','South African','Other/unsure'];
+var STYLES=['warm','bright','deep','calm','energetic','storyteller','other'];
+var GENDERS=[['','Use estimate'],['female','Female'],['male','Male'],['neutral','Neutral']];
+var data={v:1,u:0,d:{}},mode='pending',dirty=false,saveTimer=null,readyTimer=null;
+var embedded=window.parent&&window.parent!==window;
+var $=function(id){return document.getElementById(id);};
+function post(m){try{window.parent.postMessage(m,'*');}catch(_){}}
+function status(t,warn){var s=$('status');s.textContent=t;s.className='status'+(warn?' warn':'');}
+function entry(id){return data.d[id]||(data.d[id]={});}
+function cleanLabel(s){return String(s||'').replace(/[^\x20-\x7e]/g,'').replace(/[,:]/g,'').slice(0,40);}
+function valid(v){return v&&typeof v==='object'&&v.d&&typeof v.d==='object';}
+function merge(server){
+  if(!valid(server))return;
+  Object.keys(server.d).forEach(function(id){var s=server.d[id],l=data.d[id];if(!l||(s.t||0)>(l.t||0))data.d[id]=s;});
+  data.u=Math.max(data.u||0,server.u||0);
+}
+function localKey(){return 'pocket-audition-fallback';}
+function localLoad(){try{var v=JSON.parse(localStorage.getItem(localKey())||'null');if(valid(v))merge(v);}catch(_){}}
+function localSave(){try{localStorage.setItem(localKey(),JSON.stringify(data));return true;}catch(_){return false;}}
+function save(){
+  data.u=Date.now();dirty=true;clearTimeout(saveTimer);
+  saveTimer=setTimeout(function(){
+    if(mode==='sync'){status('Saving…');post({type:'state:set',key:KEY,value:data});}
+    else{dirty=false;status(localSave()?'Saved in this browser only. Open this page from the Artifacts app to share choices.':'Not saved. Open this page from the Artifacts app to keep choices.',true);}
+  },400);
+}
+function startLocal(){mode='local';localLoad();render();status(localSave()?'Saved in this browser only. Open this page from the Artifacts app to share choices.':'Choices are not saved here. Open this page from the Artifacts app to keep them.',true);}
+window.addEventListener('message',function(e){
+  if(e.source!==window.parent)return;var d=e.data;if(!d||typeof d.type!=='string'||d.type.indexOf('state:')!==0)return;
+  if(d.key!==undefined&&d.key!==KEY&&d.key!=='')return;
+  if(d.scope&&d.scope!=='org')return;
+  if(d.type==='state:ready'){clearTimeout(readyTimer);if(mode!=='pending')return;if(!d.enabled){startLocal();return;}mode='sync';status('Loading choices…');post({type:'state:get',key:KEY});}
+  else if(d.type==='state:value'){
+    var before=JSON.stringify(data.d);if(d.value!=null)merge(d.value);
+    if(JSON.stringify(data.d)!==before&&!document.activeElement.matches('input,select'))render();else tally();
+    if(d.conflict){post({type:'state:set',key:KEY,value:data});return;}
+    if(!dirty)status('Choices saved for your organization.');
+  }else if(d.type==='state:saved'){dirty=false;status('Saved at '+new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})+'.');}
+  else if(d.type==='state:error'){
+    if(d.reason==='network')status('Offline. Choices are kept on this device and save when you reconnect.',true);
+    else if(d.reason==='disabled')startLocal();
+    else if(d.reason!=='conflict')status('Saving failed ('+d.reason+'). Reload the page to try again.',true);
+  }
+});
+document.addEventListener('visibilitychange',function(){if(document.visibilityState==='visible'&&mode==='sync'&&!dirty)post({type:'state:get',key:KEY});});
+
+/* audio chunks: loaded on demand from audio-NN.js */
+var AUD={},waiting={},loading={};
+window.__aud=function(c,map){Object.keys(map).forEach(function(k){AUD[k]=map[k];});(waiting[c]||[]).forEach(function(f){f();});waiting[c]=[];};
+function chunk(c,cb){
+  if(loading[c]==='done'){cb&&cb();return;}
+  if(cb)(waiting[c]=waiting[c]||[]).push(cb);
+  if(loading[c])return;loading[c]=true;
+  var s=document.createElement('script');s.src='audio-'+(c<10?'0':'')+c+'.js';
+  s.onload=function(){loading[c]='done';};s.onerror=function(){loading[c]=false;status('A sample failed to load. Check the connection and press play again.',true);};
+  document.head.appendChild(s);
+}
+var player=$('player'),playing=null;
+function stopUi(){if(playing){playing.setAttribute('aria-pressed','false');face(playing,playing.dataset.label,ICON);}playing=null;}
+player.addEventListener('ended',stopUi);player.addEventListener('pause',stopUi);
+function play(btn,v,which){
+  if(playing===btn){player.pause();return;}
+  player.pause();stopUi();
+  face(btn,'Loading',ICON);
+  chunk(v.c,function(){
+    var src=AUD[v.id]&&AUD[v.id][which];if(!src){face(btn,btn.dataset.label,ICON);return;}
+    player.src=src;playing=btn;btn.setAttribute('aria-pressed','true');face(btn,'Stop',STOP);
+    var p=player.play();if(p&&p.catch)p.catch(function(){stopUi();});
+  });
+}
+var ICON='<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1l7 4-7 4z"/></svg>',STOP='<svg viewBox="0 0 10 10" aria-hidden="true"><path d="M2 2h6v6H2z"/></svg>';
+function face(btn,label,icon){btn.innerHTML=icon+'<span>'+label+'</span>';}
+function el(tag,attrs,html){var e=document.createElement(tag);for(var k in attrs)e.setAttribute(k,attrs[k]);if(html!=null)e.innerHTML=html;return e;}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function genderText(v){return v.g==='female'?'Higher voice (female est.)':v.g==='male'?'Lower voice (male est.)':'Voice estimate unsure';}
+function select(id,label,opts,val){
+  var l=el('label',{for:id}),s=el('select',{id:id});l.appendChild(document.createTextNode(label));
+  opts.forEach(function(o){var op=el('option',{value:o[0]});op.textContent=o[1];if(o[0]===(val||''))op.selected=true;s.appendChild(op);});
+  l.appendChild(s);return [l,s];
+}
+var observer='IntersectionObserver' in window?new IntersectionObserver(function(es){es.forEach(function(x){if(x.isIntersecting){chunk(+x.target.dataset.chunk);observer.unobserve(x.target);}});},{rootMargin:'400px'}):null;
+function card(v){
+  var e=data.d[v.id]||{},li=el('li',{'class':'voice','data-c':e.c||'','data-chunk':v.c});
+  var name=e.l||v.src.replace(/_/g,' ');
+  var head=el('div',{'class':'head'});
+  head.appendChild(el('h2',{'class':'name'},esc(name)));
+  head.appendChild(el('p',{'class':'facts'},esc(genderText(v))+', '+Math.round(v.f0)+' Hz. '+esc(v.pace[0].toUpperCase()+v.pace.slice(1))+' pace, '+v.wpm+' words a minute. Word errors '+v.wer+'%.'));
+  li.appendChild(head);
+  var row=el('div',{'class':'row'});
+  [['Neutral',0],['Story',1]].forEach(function(p){
+    var b=el('button',{type:'button','class':'play','aria-pressed':'false','aria-label':'Play '+p[0].toLowerCase()+' sample for '+name,'data-label':p[0]},ICON+'<span>'+p[0]+'</span>');
+    b.addEventListener('click',function(){play(b,v,p[1]);});row.appendChild(b);
+  });
+  var dec=el('div',{'class':'decide',role:'group','aria-label':'Decision for '+name});
+  [['keep','Keep'],['maybe','Maybe'],['skip','Skip']].forEach(function(o){
+    var b=el('button',{type:'button','data-v':o[0],'aria-pressed':String(e.c===o[0])},o[1]);
+    b.addEventListener('click',function(){var en=entry(v.id);en.c=en.c===o[0]?undefined:o[0];en.t=Date.now();save();refresh(li,v);tally();});
+    dec.appendChild(b);
+  });
+  row.appendChild(dec);li.appendChild(row);
+  var more=el('details',{'class':'more'}),sum=el('summary',{},'Name, accent, and style');more.appendChild(sum);
+  var f=el('div',{'class':'fields'});
+  var nl=el('label',{for:'n-'+v.id}),ni=el('input',{type:'text',id:'n-'+v.id,maxlength:'40',autocomplete:'off',placeholder:v.src.replace(/_/g,' ').slice(0,40)});
+  nl.appendChild(document.createTextNode('Name in the picker'));ni.value=e.l||'';nl.appendChild(ni);f.appendChild(nl);
+  ni.addEventListener('input',function(){var c=cleanLabel(ni.value);if(c!==ni.value)ni.value=c;var en=entry(v.id);en.l=c.trim()||undefined;en.t=Date.now();save();li.querySelector('.name').textContent=en.l||v.src.replace(/_/g,' ');});
+  var a=select('a-'+v.id,'Accent',[['','Not set']].concat(ACCENTS.map(function(x){return[x,x];})),e.a);
+  var s=select('s-'+v.id,'Style',[['','Not set']].concat(STYLES.map(function(x){return[x,x[0].toUpperCase()+x.slice(1)];})),e.s);
+  var g=select('g-'+v.id,'Voice',GENDERS,e.g);
+  [[a,'a'],[s,'s'],[g,'g']].forEach(function(p){f.appendChild(p[0][0]);p[0][1].addEventListener('change',function(){var en=entry(v.id);en[p[1]]=p[0][1].value||undefined;en.t=Date.now();save();});});
+  more.appendChild(f);li.appendChild(more);
+  if(observer)observer.observe(li);
+  return li;
+}
+function refresh(li,v){var e=data.d[v.id]||{};li.dataset.c=e.c||'';li.querySelectorAll('.decide button').forEach(function(b){b.setAttribute('aria-pressed',String(e.c===b.dataset.v));});}
+function tally(){
+  var n={keep:0,maybe:0,skip:0};VOICES.forEach(function(v){var c=(data.d[v.id]||{}).c;if(n[c]!=null)n[c]++;});
+  var todo=VOICES.length-n.keep-n.maybe-n.skip;
+  $('tally').innerHTML='<span>Kept '+n.keep+'</span>, <span>maybe '+n.maybe+'</span>, <span>skipped '+n.skip+'</span>, <span>'+todo+' to hear</span>';
+}
+function render(){
+  var f=$('filter').value,gf=$('gfilter').value,so=$('sort').value,list=$('list');
+  player.pause();list.textContent='';
+  var vs=VOICES.filter(function(v){var e=data.d[v.id]||{},c=e.c,g=e.g||v.g;
+    if(f==='todo'&&c)return false;if(f!=='all'&&f!=='todo'&&c!==f)return false;
+    if(gf==='none'?(g==='female'||g==='male'):(gf!=='all'&&g!==gf))return false;return true;});
+  vs.sort(function(a,b){return so==='low'?a.f0-b.f0:so==='high'?b.f0-a.f0:a.rank-b.rank;});
+  var frag=document.createDocumentFragment();vs.forEach(function(v){frag.appendChild(card(v));});list.appendChild(frag);
+  $('empty').hidden=vs.length>0;tally();
+}
+['filter','gfilter','sort'].forEach(function(id){$(id).addEventListener('change',render);});
+render();
+if(embedded){post({type:'state:hello'});readyTimer=setTimeout(function(){if(mode==='pending')startLocal();},1200);}else startLocal();
+})();
+</script>
+</body>
+</html>
