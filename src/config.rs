@@ -1504,7 +1504,7 @@ pub fn valid_web_push_subject(subject: &str) -> bool {
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
-// Stale-base guard (ADR-0016)
+// Stale-base guard (ADR-0023)
 // ---------------------------------------------------------------------------
 
 /// `STALE_GUARD` default floor of lost segments.
@@ -1532,7 +1532,7 @@ impl StaleGuardMode {
     }
 }
 
-/// ADR-0016 stale-base guard settings.
+/// ADR-0023 stale-base guard settings.
 #[derive(Clone, Copy, Debug)]
 pub struct StaleGuardConfig {
     /// `STALE_GUARD` — default `warn`.
@@ -1641,7 +1641,7 @@ pub struct AppConfig {
     pub cast_ids: BTreeSet<(String, u64)>,
     /// ADR-0012 Web Push reminders. See [`AppConfig::web_push_enabled`].
     pub web_push: WebPushConfig,
-    /// ADR-0016 stale-base guard for full-content updates.
+    /// ADR-0023 stale-base guard for full-content updates.
     pub stale_guard: StaleGuardConfig,
 }
 

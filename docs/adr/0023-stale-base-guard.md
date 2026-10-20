@@ -1,4 +1,4 @@
-# 16. Stale-base guard for full-content updates
+# 23. Stale-base guard for full-content updates
 
 Date: 2026-10-16
 

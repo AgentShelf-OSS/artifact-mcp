@@ -1,4 +1,4 @@
-"""Reference implementation of the ADR-0016 stale-base guard (v1). Node and Rust must match it exactly.
+"""Reference implementation of the ADR-0023 stale-base guard (v1). Node and Rust must match it exactly.
 
 Bodies are bytes. A single-file body is [(None, bytes)]; a bundle is [(path, bytes), ...].
 """

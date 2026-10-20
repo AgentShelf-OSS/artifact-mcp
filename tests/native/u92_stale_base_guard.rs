@@ -1,4 +1,4 @@
-//! ADR-0016: stale-base guard for full-content updates, on production adapters.
+//! ADR-0023: stale-base guard for full-content updates, on production adapters.
 
 use std::{
     path::{Path, PathBuf},

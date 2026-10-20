@@ -1089,7 +1089,7 @@ async fn keyed_update(
     tool_result(with_warning(OrderedJson::Object(payload), warning))
 }
 
-/// ADR-0016 invalid-params text for a non-boolean `discard_newer`.
+/// ADR-0023 invalid-params text for a non-boolean `discard_newer`.
 pub const DISCARD_NEWER_INVALID: &str = "Invalid arguments: discard_newer must be a boolean";
 
 fn discard_newer_argument(arguments: &OrderedJson) -> Result<bool, McpError> {
@@ -1154,7 +1154,7 @@ async fn stored_digests(
     Ok(Some(set))
 }
 
-/// ADR-0016: decide whether a full-content update is based on an older revision. Runs only after
+/// ADR-0023: decide whether a full-content update is based on an older revision. Runs only after
 /// the caller is authorized to update the artifact. Returns the warning text to attach in `warn`
 /// mode, refuses the update in `enforce` mode, and does nothing in `off` mode.
 async fn stale_base_guard(
@@ -1669,7 +1669,7 @@ async fn update_artifact(
             entry: Some(entry.to_owned()),
         })
     };
-    // ADR-0016: only full-content updates are checked, and a mismatched expected_revision keeps
+    // ADR-0023: only full-content updates are checked, and a mismatched expected_revision keeps
     // the existing conflict error.
     let full_content = html.is_some() || files_value.is_some();
     let warning = match &content {

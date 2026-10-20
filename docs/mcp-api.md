@@ -169,7 +169,7 @@ creates an artifact.
 
 Each stale detection writes one log line, `stale_base_detected id=<id> base=<n> current=<n>
 newer=<n> lost=<n> mode=<mode> discard_newer=<true|false>`. It does not log content. See
-[ADR-0016](adr/0016-stale-base-guard.md) for the segment and comparison rules.
+[ADR-0023](adr/0023-stale-base-guard.md) for the segment and comparison rules.
 
 ## Organization folders
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Neil Blackman
-// ADR-0016: stale-base guard for full-content updates.
+// ADR-0023: stale-base guard for full-content updates.
 import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";

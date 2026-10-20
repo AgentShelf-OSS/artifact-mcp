@@ -1,4 +1,4 @@
-//! ADR-0016 stale-base guard: pure segment digests and base/stale evaluation.
+//! ADR-0023 stale-base guard: pure segment digests and base/stale evaluation.
 //!
 //! This module performs no I/O. `conformance/stale-guard-reference.py` is the reference; the
 //! Node runtime and this module must reproduce `conformance/stale-guard-vectors.json` exactly.
@@ -121,7 +121,7 @@ fn range_text(base: u64, current: u64) -> String {
     }
 }
 
-/// The fixed ADR-0016 text for a stale update.
+/// The fixed ADR-0023 text for a stale update.
 #[must_use]
 pub fn message(base: u64, current: u64) -> String {
     format!(

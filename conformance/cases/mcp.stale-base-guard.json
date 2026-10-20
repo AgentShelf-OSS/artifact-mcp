@@ -3,13 +3,13 @@
   "tags": [
     "mcp",
     "tools",
-    "adr-0016",
+    "adr-0023",
     "stale-base-guard",
     "artifact-key",
     "parity"
   ],
   "fixture": "empty-v21",
-  "note": "ADR-0016 stale-base guard in the default warn mode: normal edits and keyed republishes have no warnings; a body based on an older revision is written with the fixed warning; discard_newer true suppresses it; a non-boolean discard_newer is invalid params.",
+  "note": "ADR-0023 stale-base guard in the default warn mode: normal edits and keyed republishes have no warnings; a body based on an older revision is written with the fixed warning; discard_newer true suppresses it; a non-boolean discard_newer is invalid params.",
   "steps": [
     {
       "name": "keyed publish creates revision 1",
