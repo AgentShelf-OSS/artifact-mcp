@@ -104,11 +104,14 @@ Checkpoint checks use the current version-2 `current.offset` field.
 | `reader-word-highlights` | Chromium | Long and multiline selections; nested markup; chunk offsets and accented words; passage-to-word highlighting; native selection clearing; persistent playback maps; mismatched timing fallback; highlight clearing; page scope; mutation invalidation. |
 | `reader-controls` | Node + Rust | Section scope and chapter-control visibility; section-end prefetch boundary; checkpointed sleep; background sleep deadline; paused rewind without new synthesis; preview checkpoint isolation; completed-chunk resume to Finished. |
 | `reader-player-scopes` | Node + Rust | Viewer injection and current-view scope; outside and inside mutations; literal code detail playback; scoped checkpoints and detail resume; keyboard chart navigation; desktop and mobile overflow. |
-| `reader-prefetch` | Node + Rust | Prefetch before playback ends; bounded lookahead; actual scheduled audio buffers; transition gap below 100 ms; Stop aborts current and prefetched requests. |
+| `reader-prefetch` | Node + Rust | Prefetch before playback ends; read-ahead of a later block during the first; at most 2 concurrent worker requests; actual scheduled audio buffers; transition gap below 100 ms; Stop aborts current and prefetched requests. |
 | `reader-pronunciation` | Node + Rust | Enabled real voices; spoken replacements without changing source DOM; source-word highlights; first-audio diagnostics; sentence replay; pronunciation mutation invalidation; partial literal and whole-word overridden selections. |
 | `reader-pacing` | Node + Rust | Scheduled silences after a heading, between paragraphs and at an `<hr>` scene break; Pauses Off; Media Session metadata and artwork while reading; an overlapping speech request accepted under worker concurrency. |
 | `reader-wav` | Node + Rust | First-click WAV playback and Reading state; pause offset; rewind and checkpoint offset; reload resume; paused state; completion and checkpoint deletion. |
 | `reader-voice-cast` | Node + Rust | Cast-declared Voices section; per-role voice on tagged blocks; inline dialogue split into role segments; ereader heading summary and intro read once in the narrator voice; untagged artifacts show no Voices section. |
+| `reader-place-sync` | Node + Rust | Full speed list; a new speed kept in the checkpoint; paused place uploaded to viewer state; a second browser with empty storage shows and plays the synced place at the synced speed; Finished clears local and server copies. |
+| `reader-forward` | Node + Rust | Forward 30 s button label and disabled state; paused seek inside the current block without a state change; remainder carried into the next block. |
+| `reader-read-ahead` | Node + Rust | At least 3 and at most 8 blocks read ahead during the first block; no block synthesized twice; at most 2 concurrent worker requests. |
 
 Every program also asserts that Chromium reports no uncaught page errors. The fixture probes
 enabled voices, WAV, PCM and timed PCM through the application routes, and checks reader injection

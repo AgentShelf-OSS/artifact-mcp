@@ -22,6 +22,9 @@ const cases = [
   ["reader-pacing", "both"],
   ["reader-wav", "both"],
   ["reader-voice-cast", "both"],
+  ["reader-place-sync", "both"],
+  ["reader-forward", "both"],
+  ["reader-read-ahead", "both"],
 ];
 const caseTimeoutMs = 90_000;
 const runTimeoutMs = 10 * 60_000;

@@ -220,3 +220,110 @@ test("speed is mirrored only to apps advertising media.rate; rewind and speed bu
   f.reply({ type: "media.command", artifactId: "trip", action: "speed" });
   assert.deepEqual(calls, ["rewind", "speed"]);
 });
+
+// ADR-0022: fields and messages that only apps advertising media.progress accept.
+const PROGRESS_FIELDS = {
+  ...APP_FIELDS,
+  "media.session": [...APP_FIELDS["media.session"], "position", "duration", "chapterIndex", "error"],
+  "media.chapters": ["v", "type", "artifactId", "chapters"],
+};
+
+async function progressHarness(capabilities = ["media.mirror", "media.rate", "media.progress"]) {
+  const f = fakeHost();
+  let clock = 1000;
+  const messages = [], frame = {};
+  const broker = createBroker({
+    enabled: true, artifactId: "trip", origin: "https://artifacts.example", host: () => f.host, frame: () => frame,
+    storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }, post: m => messages.push(m), setTimer: () => {}, ask: () => "deny",
+    now: () => clock,
+  });
+  broker.start();
+  f.reply({ type: "ready", app: "0.4.0", capabilities });
+  await settle();
+  return { broker, f, sessions: () => f.sent.filter(m => m.type === "media.session"), tick: ms => { clock += ms; } };
+}
+
+test("apps without media.progress see no progress fields, buffering as playing, and no chapter list", async () => {
+  const old = await readyHarness();
+  old.broker.mirrorChapters(["One", "Two"]);
+  old.broker.mirrorMedia({ state: "buffering", title: "Ch 1", artist: "Andrea", album: "Trip", position: 12.34, duration: 99, chapterIndex: 1, error: "No connection", handlers: {} });
+  const sent = old.f.sent.filter(m => m.type === "media.session").at(-1);
+  assert.deepEqual(sent, { v: 1, artifactId: "trip", type: "media.session", state: "playing", title: "Ch 1", artist: "Andrea", album: "Trip", actions: ["play", "pause", "next", "previous", "stop"] });
+  assert.equal(old.f.sent.some(m => m.type === "media.chapters"), false);
+  old.broker.mirrorMedia({ state: "none", error: "No connection" });
+  assert.deepEqual(old.f.sent.at(-1), { v: 1, artifactId: "trip", type: "media.session", state: "none", title: "", artist: "", album: "", actions: [] });
+  const rateOnly = await progressHarness(["media.mirror", "media.rate"]);
+  rateOnly.broker.mirrorMedia({ state: "paused", title: "Ch 1", rate: "1.75", position: 3, error: "x", handlers: {} });
+  assert.deepEqual(Object.keys(rateOnly.sessions().at(-1)).sort(), ["actions", "album", "artifactId", "artist", "rate", "state", "title", "type", "v"]);
+});
+
+test("media.progress hosts get chapters, position, buffering, errors and new actions", async () => {
+  const h = await progressHarness();
+  h.broker.mirrorChapters(["Prologue", "", "x".repeat(300)]);
+  assert.deepEqual(h.f.sent.at(-1), { v: 1, artifactId: "trip", type: "media.chapters", chapters: ["Prologue", "Chapter 2", "x".repeat(200)] });
+  h.broker.mirrorChapters(["Prologue", "", "x".repeat(300)]);
+  assert.equal(h.f.sent.filter(m => m.type === "media.chapters").length, 1, "an unchanged list is not resent");
+  h.broker.mirrorMedia({ state: "buffering", title: "Prologue", artist: "Andrea", album: "Book", rate: "1.75", position: 12.345, duration: 100000, chapterIndex: 0, error: "ignored while buffering", handlers: {} });
+  assert.deepEqual(h.sessions().at(-1), { v: 1, artifactId: "trip", type: "media.session", state: "buffering", title: "Prologue", artist: "Andrea", album: "Book", actions: ["play", "pause", "next", "previous", "stop", "rewind", "speed", "forward", "chapter"], rate: "1.75", position: 12.3, duration: 86400, chapterIndex: 0 });
+  assert.ok(h.sessions().at(-1).actions.length <= 12);
+  h.broker.mirrorMedia({ state: "paused", title: "Prologue", position: 13, chapterIndex: 7, error: "  Speech is unavailable  ", handlers: {} });
+  const paused = h.sessions().at(-1);
+  assert.equal(paused.error, "Speech is unavailable");
+  assert.equal("chapterIndex" in paused, false, "an index outside the last chapter list is dropped");
+  h.broker.mirrorMedia({ state: "none", error: "E".repeat(200) });
+  assert.deepEqual(h.sessions().at(-1), { v: 1, artifactId: "trip", type: "media.session", state: "none", title: "", artist: "", album: "", actions: [], error: "E".repeat(120) });
+  h.broker.mirrorChapters([]);
+  h.broker.mirrorMedia({ state: "playing", title: "T", position: 1, handlers: {} });
+  assert.deepEqual(h.sessions().at(-1).actions.slice(-1), ["forward"], "no chapter action without chapters");
+});
+
+test("position-only changes are throttled to one update every 5 s", async () => {
+  const h = await progressHarness();
+  const at = position => h.broker.mirrorMedia({ state: "playing", title: "T", position, duration: 60, handlers: {} });
+  at(1); at(2); h.tick(4000); at(3);
+  assert.deepEqual(h.sessions().map(m => m.position), [1]);
+  h.tick(1000); at(4);
+  assert.deepEqual(h.sessions().map(m => m.position), [1, 4]);
+  h.broker.mirrorMedia({ state: "paused", title: "T", position: 4.2, duration: 60, handlers: {} });
+  assert.equal(h.sessions().at(-1).state, "paused", "state changes are sent at once");
+  h.broker.mirrorMedia({ state: "paused", title: "Next chapter", position: 0, duration: 60, handlers: {} });
+  assert.equal(h.sessions().at(-1).title, "Next chapter", "title changes are sent at once");
+});
+
+test("forward and chapter commands reach Listen only from media.progress apps", async () => {
+  const calls = [];
+  const handlers = { forward: () => calls.push("forward"), chapter: index => calls.push("chapter:" + index) };
+  const old = await readyHarness();
+  old.broker.mirrorChapters(["A", "B"]);
+  old.broker.mirrorMedia({ state: "playing", title: "T", handlers });
+  old.f.reply({ type: "media.command", artifactId: "trip", action: "forward" });
+  old.f.reply({ type: "media.command", artifactId: "trip", action: "chapter", index: 1 });
+  assert.deepEqual(calls, []);
+  const h = await progressHarness();
+  h.broker.mirrorChapters(["A", "B"]);
+  h.broker.mirrorMedia({ state: "playing", title: "T", handlers });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "forward" });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "chapter", index: 1 });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "chapter", index: 2 });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "chapter", index: "1" });
+  h.f.reply({ type: "media.command", artifactId: "trip", action: "chapter" });
+  assert.deepEqual(calls, ["forward", "chapter:1"]);
+});
+
+test("chapters set before the app is ready are sent after ready, and every message fits the progress allowlist", async () => {
+  const f = fakeHost();
+  const frame = {};
+  const broker = createBroker({ enabled: true, artifactId: "trip", origin: "https://artifacts.example", host: () => f.host, frame: () => frame,
+    storage: { getItem: () => null, setItem: () => {}, removeItem: () => {} }, post: () => {}, setTimer: () => {}, ask: () => "deny" });
+  broker.start();
+  broker.mirrorChapters(["One"]);
+  assert.equal(f.sent.some(m => m.type === "media.chapters"), false);
+  f.reply({ type: "ready", app: "0.4.0", capabilities: ["media.mirror", "media.rate", "media.progress"] });
+  await settle();
+  assert.deepEqual(f.sent.at(-1), { v: 1, artifactId: "trip", type: "media.chapters", chapters: ["One"] });
+  broker.mirrorMedia({ state: "paused", title: "One", position: 2, duration: 30, chapterIndex: 0, error: "No connection", rate: "2.5", handlers: {} });
+  for (const m of f.sent) {
+    assert.ok(PROGRESS_FIELDS[m.type], "unknown host message " + m.type);
+    assert.ok(subset(m, PROGRESS_FIELDS[m.type]), m.type + " has fields the app rejects: " + Object.keys(m));
+  }
+});

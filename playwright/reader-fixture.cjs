@@ -134,8 +134,10 @@ function makeTimedBody(text, durationSeconds) {
 }
 
 function createWorker() {
-  let options = { durationSeconds: 1, latencyMs: 0 };
+  let options = { durationSeconds: 1, latencyMs: 0, latencyFor: null };
   const requests = [];
+  // Speech requests the worker is serving right now, and the most it ever served at once.
+  const load = { active: 0, max: 0 };
   const token = randomKey(24);
   const timers = new Set();
   const worker = http.createServer((request, response) => {
@@ -159,7 +161,10 @@ function createWorker() {
       }
       const record = { path: url.pathname, body, at: Date.now() };
       requests.push(record);
-      const delay = Math.max(0, Number(options.latencyMs) || 0);
+      load.active += 1; load.max = Math.max(load.max, load.active);
+      response.once('close', () => { load.active -= 1; });
+      const custom = typeof options.latencyFor === 'function' ? options.latencyFor(body) : undefined;
+      const delay = Math.max(0, Number(custom ?? options.latencyMs) || 0);
       const requestOptions = { ...options };
       const timer = setTimeout(() => {
         timers.delete(timer);
@@ -194,8 +199,10 @@ function createWorker() {
     configure(next = {}) {
       if (next.durationSeconds !== undefined) options.durationSeconds = Number(next.durationSeconds);
       if (next.latencyMs !== undefined) options.latencyMs = Number(next.latencyMs);
+      if (next.latencyFor !== undefined) options.latencyFor = next.latencyFor;
     },
-    reset() { requests.splice(0, requests.length); },
+    load,
+    reset() { requests.splice(0, requests.length); load.max = load.active; },
   };
 }
 
@@ -212,6 +219,8 @@ function baseEnvironment({ runtime, dataDir, port, base, apiKey, workerUrl, toke
     AUDIT_LEDGER_HMAC_KEY: randomBytes(32).toString('base64'),
     WEBHOOK_ENC_KEY: randomBytes(32).toString('base64'),
     TTS_ENABLED: '1', TTS_ARTIFACT_IDS: '', PREVIEW_RENDERER_URL: '',
+    // Listen place sync and the checks' own state reads share one source address.
+    INGRESS_STATE_PER_WINDOW: '1000',
     TTS_WORKER_URL: workerUrl, TTS_WORKER_TOKEN_FILE: tokenFile,
     POCKET_TTS_WORKER_URL: workerUrl, POCKET_TTS_WORKER_TOKEN_FILE: tokenFile,
     QWEN_TTS_WORKER_URL: workerUrl, QWEN_TTS_WORKER_TOKEN_FILE: tokenFile,

@@ -5,9 +5,11 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
   const fixture = await createReaderFixture({ audio: { durationSeconds: 2, latencyMs: 300 } });
   let browser;
   try {
-    const html = '<!doctype html><html><body><main><h1>Gap test</h1><p>First paragraph deliberately lasts long enough to reveal network gaps.</p><p>Second paragraph should already be prefetched before the first ends.</p><p>Third paragraph verifies that prefetch stays bounded to one lookahead.</p></main></body></html>';
+    const html = '<!doctype html><html><body><main><h1>Gap test</h1><p>First paragraph deliberately lasts long enough to reveal network gaps.</p><p>Second paragraph should already be prefetched before the first ends.</p><p>Third paragraph verifies that read-ahead starts before the second paragraph plays.</p></main></body></html>';
     const body = await fixture.publish({ title: 'paragraph gap synthetic', html });
     await fixture.assertSpeechRoutes(body.id);
+    // Keep the third request in flight so Stop must cancel a real pending HTTP request.
+    fixture.worker.configure({ latencyFor: request => /^Third/.test(request.text) ? 10000 : undefined });
     browser = await launchChromium();
     const context = await browser.newContext({ viewport: { width: 1200, height: 800 }, extraHTTPHeaders: fixture.viewerHeaders });
     await context.addInitScript(() => {
@@ -46,8 +48,6 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     const prefetchDeadline = Date.now() + 5000;
     while (fixture.worker.requests.length < 2 && Date.now() < prefetchDeadline) await sleep(20);
     assert.ok(fixture.worker.requests.length >= 2, 'second request did not reach the worker');
-    // Keep the third request in flight so Stop must cancel a real pending HTTP request.
-    fixture.worker.configure({ latencyMs: 10000 });
     // Let the first 2-second paragraph play through and allow the second transition to be scheduled.
     await sleep(3800);
     const result = await page.evaluate(() => ({ gap: window.__gap, status: document.querySelector('#vreader-status')?.textContent, errors: [], now: performance.now() }));
@@ -61,7 +61,9 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     assert.equal(starts[1].duration, 2, 'fixture must schedule one complete paragraph per buffer');
     const firstEndWall = starts[0].wall + (starts[0].duration - starts[0].offset) * 1000 / starts[0].rate;
     assert.ok(second.at < firstEndWall, `second request at ${second.at.toFixed(1)}ms was not prefetched before first playback ended at ${firstEndWall.toFixed(1)}ms`);
-    if (result.gap.requests[2]) assert.ok(result.gap.requests[2].at >= starts[1].wall - 20, 'third request began before second paragraph playback started');
+    // Read-ahead covers several blocks: the third paragraph is requested while the first still plays.
+    assert.ok(result.gap.requests[2] && result.gap.requests[2].at < firstEndWall, 'third paragraph was not read ahead during the first');
+    assert.ok(fixture.worker.load.max <= 2, `viewer ran ${fixture.worker.load.max} concurrent speech requests`);
     const transitionGap = (starts[1].start - starts[0].start) - (starts[0].duration - starts[0].offset) / starts[0].rate;
     assert.ok(transitionGap < 0.1, `paragraph transition gap ${transitionGap}s exceeds 100ms`);
     await page.locator('#vreader-stop').click();
