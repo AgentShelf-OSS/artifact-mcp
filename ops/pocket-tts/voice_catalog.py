@@ -13,7 +13,14 @@ Auditions (repeat --audition; the metrics file's "source" field picks the kind)
   vctk    voice-metrics.json with "source": "vctk"; artifact key voices/pocket-vctk-audition;
           catalog source "custom" (the worker manifest records "VCTK (CC BY 4.0)");
           gender and accent from VCTK speaker-info, name from the audition
+  voicezero  voice-metrics.json with "source": "voice-zero"; artifact key
+          voices/pocket-voicezero-audition; catalog source "voice-zero"; name (the
+          narrator) from the audition, style "audiobook" unless Neil sets one
   --metrics PATH is the same as --audition PATH (kept for the original command line).
+
+The five prepared Voice-Zero voices that Neil accepted before the Voice-Zero audition
+(PREPARED_VOICE_ZERO) are always listed. They come just before the Voice-Zero
+audition's kept voices, or last when that audition is not given.
 
 Choices
   --state-file [KEY=]PATH  audition state value (JSON) for the audition with artifact key
@@ -50,7 +57,18 @@ SPEECH_RS = HERE.parent.parent / "src" / "http" / "routes" / "speech.rs"
 AUDITIONS = {
     "kyutai": {"key": "voices/pocket-donated-audition", "source": "kyutai-donation"},
     "vctk": {"key": "voices/pocket-vctk-audition", "source": "custom"},
+    "voicezero": {"key": "voices/pocket-voicezero-audition", "source": "voice-zero", "style": "audiobook"},
 }
+METRICS_SOURCE = {"vctk": "vctk", "voice-zero": "voicezero"}  # voice-metrics.json "source" -> kind
+# Prepared Voice-Zero voices accepted by Neil (live since before the Voice-Zero audition):
+# (id, label, gainDb, gender). Voice-Zero clips are CC0 LibriVox/Archive.org readings.
+PREPARED_VOICE_ZERO = [
+    ("andy", "Andy", 3, None),
+    ("karen_savage2", "Karen Savage", 2.5, "female"),
+    ("kristin_hughes_expressive", "Kristin Hughes", 2, "female"),
+    ("laura_caldwell", "Laura Caldwell", 2, "female"),
+    ("simon_evers", "Simon Evers", 4, "male"),
+]
 LABEL_OVERRIDES = HERE / "catalog" / "label-overrides.json"
 ORG = "homelab"
 STATE_KEY = "audition"
@@ -187,7 +205,7 @@ def main():
     auditions = []
     for path in args.metrics + args.audition:
         metrics = json.loads(Path(path).read_text())
-        kind = metrics.get("source", "kyutai")
+        kind = METRICS_SOURCE.get(metrics.get("source"), metrics.get("source", "kyutai"))
         if kind not in AUDITIONS:
             fail(f"{path}: unknown audition source {kind!r}")
         auditions.append({"kind": kind, "path": path, "metrics": metrics, **AUDITIONS[kind]})
@@ -247,8 +265,17 @@ def main():
     exposed = {v["id"] for v in voices}
     fixed = len(voices)
 
+    def add_prepared_voice_zero():
+        for vid, label, gain, gender in PREPARED_VOICE_ZERO:
+            if vid not in exposed:
+                voices.append({"id": vid, "label": label, "gainDb": number(gain), "gender": gender,
+                               "accent": None, "style": "audiobook", "source": "voice-zero"})
+                exposed.add(vid)
+
     per_audition = {}
     for a in auditions:
+        if a["kind"] == "voicezero":
+            add_prepared_voice_zero()
         metrics, choices = a["metrics"], a["state"].get("d", {}) if isinstance(a["state"], dict) else {}
         candidates = metrics["candidates"]
         kept, maybe, skipped = [], [], []
@@ -265,11 +292,14 @@ def main():
             voices.append({"id": vid, "label": label,
                            "gainDb": number(cand["gain_db"] if cand.get("gain_db") is not None else 0),
                            "gender": gender, "accent": None if accent == "Other/unsure" else accent,
-                           "style": short(choice.get("s")), "source": a["source"]})
+                           "style": short(choice.get("s")) or a.get("style"), "source": a["source"]})
             exposed.add(vid)
         per_audition[a["key"]] = {"kind": a["kind"], "provenance": a["provenance"], "kept": kept, "maybe": maybe,
                                   "skipped": skipped,
                                   "undecided": len(metrics["selected"]) - len(kept) - len(maybe) - len(skipped)}
+
+    add_prepared_voice_zero()
+    prepared = len(PREPARED_VOICE_ZERO)
 
     overrides = load_overrides(args.label_overrides)
     applied = []
@@ -297,6 +327,7 @@ def main():
 
     counts = Counter(v["label"].lower() for v in voices)
     summary = {"catalog_entries": len(voices), "built_in": len(builtin_ids), "extra": fixed - len(builtin_ids),
+               "prepared_voice_zero": prepared,
                "label_overrides_applied": applied,
                "label_overrides_unused": sorted(set(overrides) - {v["id"] for v in voices}),
                "duplicate_labels": sorted(k for k, n in counts.items() if n > 1),

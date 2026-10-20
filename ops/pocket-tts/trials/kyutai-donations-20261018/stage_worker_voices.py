@@ -7,13 +7,18 @@ atomically and keeps manifest.json.pre-audition-<timestamp> as a rollback copy.
 Loading a voice in the worker does not expose it: artifact-mcp's catalog does.
 A VCTK report ("source": "vctk") stages its suggested names as labels and records the
 speaker-info gender and accent; the export rows carry the CC BY 4.0 attribution.
+A Voice-Zero report ("source": "voice-zero") stages the narrator-name labels with
+source "voice-zero"; the export rows carry the narrator, reading, and CC0 provenance.
 """
 import hashlib, json, shutil, sys, time
 from pathlib import Path
 
 export = {r["voice"]: r for r in json.loads(Path(sys.argv[1]).read_text())["results"]}
 metrics = json.loads(Path(sys.argv[2]).read_text())
-vctk = metrics.get("source") == "vctk"
+kind = metrics.get("source", "kyutai")
+vctk = kind == "vctk"
+named = kind in ("vctk", "voice-zero")
+SOURCE = {"vctk": "vctk", "voice-zero": "voice-zero"}.get(kind, "kyutai-donation")
 states, voices = Path(sys.argv[3]), Path(sys.argv[4])
 path = voices / "manifest.json"
 manifest = json.loads(path.read_text())
@@ -29,17 +34,19 @@ for vid in metrics["selected"]:
     dest = voices / src.name
     shutil.copyfile(src, dest)
     dest.chmod(0o644)
-    label = cand["label"] if vctk else row["source_id"].removesuffix("_enhanced").replace("_", " ")
+    label = cand["label"] if named else row["source_id"].removesuffix("_enhanced").replace("_", " ")
     audition = {"rank": cand["rank"], "gain_db": cand["gain_db"], "gender_estimate": cand["gender_estimate"]}
     if vctk:
         audition.update({"accent": cand["accent"], "region": cand["region"], "f0_check": cand["f0_check"]})
+    elif named:
+        audition.update({"accent": cand["accent"], "region": cand["region"]})
     entry = {"voice": vid, "label": label[:40], **{k: v for k, v in row.items() if k != "voice"},
-             "source": "vctk" if vctk else "kyutai-donation", "audition": audition}
+             "source": SOURCE, "audition": audition}
     entry.pop("export_seconds", None)
     manifest["results"].append(entry)
     added += 1
 if added:
-    shutil.copyfile(path, voices / f"manifest.json.pre-{'vctk' if vctk else 'audition'}-{time.strftime('%Y%m%d-%H%M%S')}")
+    shutil.copyfile(path, voices / f"manifest.json.pre-{SOURCE if named else 'audition'}-{time.strftime('%Y%m%d-%H%M%S')}")
     tmp = voices / ".manifest.json.tmp"
     tmp.write_text(json.dumps(manifest, indent=2) + "\n")
     tmp.chmod(0o644)

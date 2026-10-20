@@ -270,6 +270,1014 @@
    "accent": null,
    "style": null,
    "source": "kyutai-donation"
+  },
+  {
+   "id": "donor_30c5",
+   "label": "Mason",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "donor_3973",
+   "label": "Clara",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "donor_8935",
+   "label": "Owen",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "allen",
+   "label": "Allen",
+   "gainDb": 4.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "cicada",
+   "label": "Cicada",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "hillbilly_jim",
+   "label": "Hillbilly Jim",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "jeffrey",
+   "label": "Jeffrey",
+   "gainDb": 0.5,
+   "gender": "male",
+   "accent": null,
+   "style": null,
+   "source": "kyutai-donation"
+  },
+  {
+   "id": "vctk_p231",
+   "label": "Harriet",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p255",
+   "label": "Callum",
+   "gainDb": 4,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p248",
+   "label": "Priya",
+   "gainDb": 4.5,
+   "gender": "female",
+   "accent": "Indian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p292",
+   "label": "Seamus",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Northern Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p253",
+   "label": "Rhian",
+   "gainDb": 6,
+   "gender": "female",
+   "accent": "Welsh",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p298",
+   "label": "Ciaran",
+   "gainDb": 4,
+   "gender": "male",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p280",
+   "label": "Amelie",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": null,
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p326",
+   "label": "Bruce",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Australian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p303",
+   "label": "Chantal",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p345",
+   "label": "Tyler",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p323",
+   "label": "Thandi",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "South African",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p227",
+   "label": "Alfie",
+   "gainDb": 4.5,
+   "gender": "male",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p263",
+   "label": "Angus",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p266",
+   "label": "Siobhan",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p374",
+   "label": "Darcy",
+   "gainDb": 6,
+   "gender": "male",
+   "accent": "Australian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p333",
+   "label": "Madison",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p376",
+   "label": "Vikram",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "Indian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p270",
+   "label": "Rupert",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p262",
+   "label": "Fiona",
+   "gainDb": 7,
+   "gender": "female",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p283",
+   "label": "Aoife",
+   "gainDb": 4.5,
+   "gender": "female",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p236",
+   "label": "Imogen",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p265",
+   "label": "Isla",
+   "gainDb": 4.5,
+   "gender": "female",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p271",
+   "label": "Hamish",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p240",
+   "label": "Poppy",
+   "gainDb": 1,
+   "gender": "female",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p275",
+   "label": "Euan",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p269",
+   "label": "Beatrice",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p276",
+   "label": "Rosie",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "British",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p281",
+   "label": "Fraser",
+   "gainDb": 1.5,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p285",
+   "label": "Alasdair",
+   "gainDb": 4.5,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p363",
+   "label": "Mathieu",
+   "gainDb": 1.5,
+   "gender": "male",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p245",
+   "label": "Cormac",
+   "gainDb": 4,
+   "gender": "male",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p334",
+   "label": "Cody",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p251",
+   "label": "Rohan",
+   "gainDb": 0.5,
+   "gender": "male",
+   "accent": "Indian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p364",
+   "label": "Eoin",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p297",
+   "label": "Savannah",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p312",
+   "label": "Kendra",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p317",
+   "label": "Shannon",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p304",
+   "label": "Colm",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": "Northern Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p335",
+   "label": "Aroha",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "New Zealand",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p347",
+   "label": "Pieter",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "South African",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p339",
+   "label": "Brooke",
+   "gainDb": 7.5,
+   "gender": "female",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p238",
+   "label": "Caoimhe",
+   "gainDb": 4,
+   "gender": "female",
+   "accent": "Northern Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p340",
+   "label": "Niamh",
+   "gainDb": 6,
+   "gender": "female",
+   "accent": "Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p336",
+   "label": "Annelie",
+   "gainDb": 8.5,
+   "gender": "female",
+   "accent": "South African",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p261",
+   "label": "Bronagh",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": "Northern Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p360",
+   "label": "Dustin",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p351",
+   "label": "Deirdre",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": "Northern Irish",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p311",
+   "label": "Garrett",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "American",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p302",
+   "label": "Brayden",
+   "gainDb": 1,
+   "gender": "male",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "vctk_p316",
+   "label": "Kyle",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "Canadian",
+   "style": null,
+   "source": "custom"
+  },
+  {
+   "id": "andy",
+   "label": "Andy",
+   "gainDb": 3,
+   "gender": null,
+   "accent": null,
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "karen_savage2",
+   "label": "Karen Savage",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": null,
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "kristin_hughes_expressive",
+   "label": "Kristin Hughes",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": null,
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "laura_caldwell",
+   "label": "Laura Caldwell",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": null,
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "simon_evers",
+   "label": "Simon Evers",
+   "gainDb": 4,
+   "gender": "male",
+   "accent": null,
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_a_janelle_risa",
+   "label": "A. Janelle Risa",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_caden_vaughn_clegg_gravel",
+   "label": "Caden Vaughn Clegg",
+   "gainDb": 5.5,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_anna_simon",
+   "label": "Anna Simon",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "Dutch",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_delibab",
+   "label": "Delibab",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "Northern Irish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_diana_majlinger2",
+   "label": "Diana Majlinger 2",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "Hungarian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_lars_rolander",
+   "label": "Lars Rolander",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "Swedish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_elli",
+   "label": "Elli",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": "Austrian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_padraig_o_hiceadha_lyrical",
+   "label": "Padraig O'hIceadha (Lyrical)",
+   "gainDb": 6,
+   "gender": "male",
+   "accent": "Irish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_linda_jenner",
+   "label": "Linda Jenner",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "Australian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_marianne_coleman_hipkins",
+   "label": "Marianne Coleman-Hipkins",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "New Zealand",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_alan_davis_drake",
+   "label": "Alan Davis Drake",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_mezzogal",
+   "label": "Mezzogal",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "Chinese",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_david_clark",
+   "label": "David Clark",
+   "gainDb": 5,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_ernst_pattynama",
+   "label": "Ernst Pattynama",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Dutch",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_julia_niedermaier",
+   "label": "Julia Niedermaier",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "Austrian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_timothy_ferguson",
+   "label": "Timothy Ferguson",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Australian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_andi",
+   "label": "Andi",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_cori_samuel",
+   "label": "Cori Samuel",
+   "gainDb": 1,
+   "gender": "female",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_tony_pettit",
+   "label": "Tony Pettit",
+   "gainDb": 2.5,
+   "gender": "male",
+   "accent": "Australian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_annie_coleman_rothenberg",
+   "label": "Annie Coleman Rothenberg",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_david_cole",
+   "label": "David Cole",
+   "gainDb": 4.5,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_may_low",
+   "label": "May Low",
+   "gainDb": 4,
+   "gender": "female",
+   "accent": "Australian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_alec_daitsman",
+   "label": "Alec Daitsman",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_bev_j_stevens",
+   "label": "Bev J. Stevens",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_david_jaquay_english",
+   "label": "David Jaquay",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_browneyedgirl32382",
+   "label": "Browneyedgirl32382",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_carrie_mae_streb",
+   "label": "Carrie Mae Streb",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_jason_mills",
+   "label": "Jason Mills",
+   "gainDb": 4,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_devorah_allen",
+   "label": "Devorah Allen",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_mil_nicholson",
+   "label": "Mil Nicholson",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_j_rebecca_franklin",
+   "label": "J. Rebecca Franklin",
+   "gainDb": 1.5,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_peter_bishop",
+   "label": "Peter Bishop",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_jeanni_hall",
+   "label": "Jeanni Hall",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_kara_shallenberg",
+   "label": "Kara Shallenberg",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_kristin_barkhurst",
+   "label": "Kristin Barkhurst",
+   "gainDb": 3,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_alexander_hatton",
+   "label": "Alexander Hatton",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_lily_took",
+   "label": "Lily Took",
+   "gainDb": 2.5,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_bill_mosley",
+   "label": "Bill Mosley",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_maria_kasper",
+   "label": "Maria Kasper",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_brett_condron",
+   "label": "Brett Condron",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_miranda_stinson",
+   "label": "Miranda Stinson",
+   "gainDb": 2,
+   "gender": "female",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_clayton_j_smith",
+   "label": "Clayton J. Smith",
+   "gainDb": 2,
+   "gender": "male",
+   "accent": "American",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_diana_majlinger",
+   "label": "Diana Majlinger",
+   "gainDb": 2.5,
+   "gender": null,
+   "accent": "Hungarian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_rachael_nowotny",
+   "label": "Rachael Nowotny",
+   "gainDb": 2.5,
+   "gender": null,
+   "accent": "Scottish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_rebecca_braunert_plunkett",
+   "label": "Rebecca Braunert-Plunkett",
+   "gainDb": 3.5,
+   "gender": "female",
+   "accent": "German",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_graeme_dunlop",
+   "label": "Graeme Dunlop",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "Australian",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_ian_skillen",
+   "label": "Ian Skillen",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "Scottish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_padraig_o_hiceadha",
+   "label": "Padraig O'hIceadha",
+   "gainDb": 3.5,
+   "gender": "male",
+   "accent": "Irish",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_steve_c",
+   "label": "Steve C",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
+  },
+  {
+   "id": "vz_steve_lawrence",
+   "label": "Steve Lawrence",
+   "gainDb": 3,
+   "gender": "male",
+   "accent": "British",
+   "style": "audiobook",
+   "source": "voice-zero"
   }
  ]
 }

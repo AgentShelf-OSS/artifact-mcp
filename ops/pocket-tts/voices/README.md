@@ -20,3 +20,14 @@ derived from the VCTK corpus, CSTR, University of Edinburgh, CC BY 4.0
 the corpus members used, their checksums, speaker-info gender, accent, and region,
 the licence, the attribution, and `"provenance": "VCTK (CC BY 4.0)"`. See
 `../trials/vctk-20261019/README.md`.
+
+## Voice-Zero candidates (not exposed)
+
+Fifty `vz_*` states were staged on 2026-10-19 for the Voice-Zero narrator audition.
+They are loaded by the workers but hidden until Neil keeps them in the catalog.
+Voices derived from Voice-Zero (<https://github.com/OwenTyme/voice-zero>, CC0)
+clips of volunteer LibriVox and Archive.org readings. Neil approved the source on
+2026-10-19. Each manifest entry records the narrator, the narrator page, the reading
+and its link, the pinned commit, the clip checksum, `license: CC0-1.0`, and
+`"provenance": "Voice-Zero (CC0)"`. Keep the narrator credit wherever these voices
+are listed. See `../trials/voice-zero-20261019/README.md`.
