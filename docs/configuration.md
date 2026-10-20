@@ -150,6 +150,9 @@ and [ingress controls](ops/ingress-controls.md).
 | `MAX_BUNDLE_FILES` | 100 | Maximum number of files in one bundle. |
 | `MAX_HISTORY` | 20 | Retained revisions per artifact. |
 | `FEEDBACK_MAX_BODY` | 4000 | Maximum feedback body length. |
+| `STALE_GUARD` | `warn` | Stale-base guard mode for full-content updates: `warn`, `enforce`, or `off`. See ADR-0023. |
+| `STALE_GUARD_MIN_SEGMENTS` | 20 | Minimum discarded segments before an update counts as stale. |
+| `STALE_GUARD_MIN_SHARE` | 0.10 | Minimum share of the newer work that must be discarded, in (0, 1]. |
 
 ## Discord
 

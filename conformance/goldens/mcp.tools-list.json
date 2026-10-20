@@ -185,6 +185,10 @@
                       "description": "One-line description shown next to the link on the index.",
                       "type": "string"
                     },
+                    "discard_newer": {
+                      "description": "Set true to write even when the content looks based on an older revision and would discard newer changes. Omit normally.",
+                      "type": "boolean"
+                    },
                     "html": {
                       "description": "Full self-contained HTML document to host.",
                       "type": "string"
@@ -221,6 +225,10 @@
                     "description": {
                       "description": "One-line description shown on the index.",
                       "type": "string"
+                    },
+                    "discard_newer": {
+                      "description": "Set true to write even when the content looks based on an older revision and would discard newer changes. Omit normally.",
+                      "type": "boolean"
                     },
                     "entry": {
                       "description": "The HTML file to open first. Defaults to index.html, or the first .html file.",
@@ -287,6 +295,10 @@
                     "description": {
                       "description": "New description (omit to keep current; empty string clears it).",
                       "type": "string"
+                    },
+                    "discard_newer": {
+                      "description": "Set true to write even when the content looks based on an older revision and would discard newer changes. Omit normally.",
+                      "type": "boolean"
                     },
                     "entry": {
                       "description": "Entry file for a bundle (defaults to the current entry, then index.html).",

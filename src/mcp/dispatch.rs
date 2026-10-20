@@ -6,8 +6,10 @@ use crate::{
     AppDeps,
     artifacts::{
         lifecycle::{ARTIFACT_KEY_TAKEN, normalize_category},
+        stale_guard::{self, DigestSet},
         validation::{js_trim, sanitize_relative_path},
     },
+    config::StaleGuardMode,
     error::{AppError, JsonRpcError, McpError},
     model::{
         ArtifactContent, ArtifactId, ArtifactMeta, ArtifactRevision, ArtifactUpdate, CreateShare,
@@ -15,7 +17,7 @@ use crate::{
         Timestamp, ViewerView,
     },
     security::{
-        access::{AccessPolicy, OwnedArtifact, PUBLISH_PERMISSION_ERROR},
+        access::{AccessPolicy, AuthorizedArtifact, OwnedArtifact, PUBLISH_PERMISSION_ERROR},
         audit::MutationAudit,
     },
 };
@@ -784,6 +786,7 @@ async fn publish_artifact(
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
     let artifact_key = artifact_key_argument(arguments)?;
+    discard_newer_argument(arguments)?;
     ensure_can_publish(auth)?;
     let target_org = target_org(arguments, auth, deps).await?;
     if let Some(artifact_key) = artifact_key {
@@ -830,6 +833,7 @@ async fn publish_bundle(
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
     let artifact_key = artifact_key_argument(arguments)?;
+    discard_newer_argument(arguments)?;
     ensure_can_publish(auth)?;
     let target_org = target_org(arguments, auth, deps).await?;
     if let Some(artifact_key) = artifact_key {
@@ -1048,6 +1052,8 @@ async fn keyed_update(
             )
         }
     };
+    let warning =
+        stale_base_guard(&owned, &content, discard_newer_argument(arguments)?, deps).await?;
     let update = ArtifactUpdate {
         expected_revision: pre.revision,
         acting_client_id: Some(auth.client_id.clone()),
@@ -1080,7 +1086,157 @@ async fn keyed_update(
         ("artifact_key".to_owned(), OrderedJson::string(artifact_key)),
         ("created".to_owned(), OrderedJson::Bool(false)),
     ]);
-    tool_result(OrderedJson::Object(payload))
+    tool_result(with_warning(OrderedJson::Object(payload), warning))
+}
+
+/// ADR-0023 invalid-params text for a non-boolean `discard_newer`.
+pub const DISCARD_NEWER_INVALID: &str = "Invalid arguments: discard_newer must be a boolean";
+
+fn discard_newer_argument(arguments: &OrderedJson) -> Result<bool, McpError> {
+    match arguments.get("discard_newer") {
+        None => Ok(false),
+        Some(OrderedJson::Bool(value)) => Ok(*value),
+        Some(_) => Err(JsonRpcError::InvalidParams(DISCARD_NEWER_INVALID.to_owned()).into()),
+    }
+}
+
+fn content_digests(content: &ArtifactContent) -> DigestSet {
+    match content {
+        ArtifactContent::SingleHtml(html) => stale_guard::digests([(None, html.as_bytes())]),
+        ArtifactContent::Bundle { files, .. } => {
+            // Digest new files under the same sanitized path the store will write them to.
+            let mut set = DigestSet::new();
+            for (path, body) in files {
+                let path = sanitize_relative_path(path).unwrap_or_else(|| path.clone());
+                stale_guard::add_file_digests(Some(&path), body.as_bytes(), &mut set);
+            }
+            set
+        }
+    }
+}
+
+/// Digest the current body (`revision` = `None`) or one retained revision. A body that is not
+/// available yields `None`, so the caller skips that candidate.
+async fn stored_digests(
+    deps: &AppDeps,
+    artifact: &AuthorizedArtifact,
+    revision: Option<u64>,
+    is_bundle: bool,
+) -> Result<Option<DigestSet>, McpError> {
+    if !is_bundle {
+        let file = match revision {
+            Some(revision) => {
+                deps.artifacts
+                    .read_revision_body(artifact, revision, None)
+                    .await?
+            }
+            None => deps.artifacts.read_body(artifact).await?,
+        };
+        return Ok(file.map(|file| stale_guard::digests([(None, file.content.as_slice())])));
+    }
+    let Some(listing) = deps.artifacts.list_bundle_files(artifact, revision).await? else {
+        return Ok(None);
+    };
+    let mut set = DigestSet::new();
+    for (path, _bytes) in listing {
+        let file = match revision {
+            Some(revision) => {
+                deps.artifacts
+                    .read_revision_body(artifact, revision, Some(&path))
+                    .await?
+            }
+            None => deps.artifacts.read_bundle_file(artifact, &path).await?,
+        };
+        if let Some(file) = file {
+            stale_guard::add_file_digests(Some(&path), &file.content, &mut set);
+        }
+    }
+    Ok(Some(set))
+}
+
+/// ADR-0023: decide whether a full-content update is based on an older revision. Runs only after
+/// the caller is authorized to update the artifact. Returns the warning text to attach in `warn`
+/// mode, refuses the update in `enforce` mode, and does nothing in `off` mode.
+async fn stale_base_guard(
+    owned: &OwnedArtifact,
+    content: &ArtifactContent,
+    discard_newer: bool,
+    deps: &AppDeps,
+) -> Result<Option<String>, McpError> {
+    let settings = deps.config.stale_guard;
+    if settings.mode == StaleGuardMode::Off {
+        return Ok(None);
+    }
+    let new = content_digests(content);
+    if new.is_empty() {
+        return Ok(None);
+    }
+    let artifact = owned.clone().into_authorized();
+    let current_meta = artifact.meta().clone();
+    let current_revision = current_meta.revision;
+    let Some(current) = stored_digests(deps, &artifact, None, current_meta.is_bundle).await? else {
+        return Ok(None);
+    };
+    if current.is_empty() {
+        return Ok(None);
+    }
+    let retained = deps.artifacts.list_revisions(&artifact).await?;
+    let mut history = Vec::new();
+    for row in retained.revisions {
+        if row.revision >= current_revision {
+            continue;
+        }
+        if let Some(set) =
+            stored_digests(deps, &artifact, Some(row.revision), row.is_bundle).await?
+        {
+            history.push((row.revision, set));
+        }
+    }
+    let evaluation = stale_guard::evaluate(
+        &new,
+        &current,
+        current_revision,
+        &history,
+        stale_guard::Thresholds {
+            min_segments: settings.min_segments,
+            min_share: settings.min_share,
+        },
+    );
+    let Some(message) = evaluation.message.filter(|_| evaluation.stale) else {
+        return Ok(None);
+    };
+    tracing::warn!(
+        "stale_base_detected id={} base={} current={} newer={} lost={} mode={} discard_newer={}",
+        current_meta.id.0,
+        evaluation.base,
+        current_revision,
+        evaluation.newer_segments,
+        evaluation.lost_segments,
+        settings.mode.as_str(),
+        discard_newer
+    );
+    if discard_newer {
+        return Ok(None);
+    }
+    match settings.mode {
+        StaleGuardMode::Enforce => Err(AppError::Conflict(message).into()),
+        StaleGuardMode::Warn => Ok(Some(message)),
+        StaleGuardMode::Off => Ok(None),
+    }
+}
+
+/// Append `warnings` only when the stale-base guard produced one, so other output is unchanged.
+fn with_warning(payload: OrderedJson, warning: Option<String>) -> OrderedJson {
+    match (payload, warning) {
+        (OrderedJson::Object(mut entries), Some(warning)) => {
+            entries.push((
+                "warnings".to_owned(),
+                OrderedJson::Array(vec![OrderedJson::string(warning)]),
+            ));
+            OrderedJson::Object(entries)
+        }
+        (payload, _) => payload,
+    }
 }
 
 /// Shared `update_artifact` execution and error mapping, also used by keyed publish.
@@ -1470,6 +1626,7 @@ async fn update_artifact(
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
     let id = nonempty_protocol_string(arguments, "id")?;
+    let discard_newer = discard_newer_argument(arguments)?;
     let owned = publisher_write(id, auth, deps).await?;
     let pre = owned.meta().clone();
     let expected_revision = match arguments.get("expected_revision") {
@@ -1512,6 +1669,20 @@ async fn update_artifact(
             entry: Some(entry.to_owned()),
         })
     };
+    // ADR-0023: only full-content updates are checked, and a mismatched expected_revision keeps
+    // the existing conflict error.
+    let full_content = html.is_some() || files_value.is_some();
+    let warning = match &content {
+        // A body of the wrong type is skipped so the existing type error wins.
+        Some(content)
+            if full_content
+                && matches!(content, ArtifactContent::Bundle { .. }) == pre.is_bundle
+                && expected_revision == pre.revision =>
+        {
+            stale_base_guard(&owned, content, discard_newer, deps).await?
+        }
+        _ => None,
+    };
     let update = ArtifactUpdate {
         expected_revision,
         acting_client_id: Some(auth.client_id.clone()),
@@ -1521,14 +1692,17 @@ async fn update_artifact(
         content,
     };
     let result = run_update(owned, update, auth, deps).await?;
-    tool_result(object! {
-        "id" => OrderedJson::string(result.meta.id.0.clone()),
-        "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),
-        "revision" => OrderedJson::number_u64(result.meta.revision),
-        "bytes" => OrderedJson::number_u64(result.meta.bytes),
-        "entry" => OrderedJson::string(result.meta.entry),
-        "category" => OrderedJson::string(result.meta.category),
-    })
+    tool_result(with_warning(
+        object! {
+            "id" => OrderedJson::string(result.meta.id.0.clone()),
+            "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),
+            "revision" => OrderedJson::number_u64(result.meta.revision),
+            "bytes" => OrderedJson::number_u64(result.meta.bytes),
+            "entry" => OrderedJson::string(result.meta.entry),
+            "category" => OrderedJson::string(result.meta.category),
+        },
+        warning,
+    ))
 }
 
 async fn set_visibility(
