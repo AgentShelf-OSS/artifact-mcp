@@ -303,10 +303,9 @@ fn anchor_bridge_injection_matches_the_frozen_node_output() {
         );
     }
 
-    // Node spliced the page literal in with `String.prototype.replace`, so `$&`, `$$`, `` $` ``
-    // and `$'` in a page path expand to the marker, `$`, the bridge before the marker and the
-    // bridge after it. The port keeps that quirk byte for byte.
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // `$` in a page path is data. The retired Node runtime spliced the literal in with
+    // `String.prototype.replace`, which expanded `$&`, `$$`, `` $` `` and `$'` and could paste
+    // bridge source into the page string. The page literal must stay exactly the JSON encoding.
     let (before, after) = ANCHOR_BRIDGE.split_once(marker).expect("marker");
     let injected = String::from_utf8(inject_anchor_bridge(
         b"<body>x</body>",
@@ -316,7 +315,7 @@ fn anchor_bridge_injection_matches_the_frozen_node_output() {
     assert_eq!(
         injected,
         format!(
-            "<body>x{before}var d=document,w=window,page=\"cash/{marker}/$/{before}/{after}.html\"{after}</body>"
+            "<body>x{before}var d=document,w=window,page=\"cash/$&/$$/$`/$'.html\"{after}</body>"
         )
     );
 }
