@@ -1,10 +1,7 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import vm from 'node:vm';
+import { test, assert, readText, runInNewContext, setImmediate } from './harness.js';
 
-const source = fs.readFileSync(new URL('../assets/cast.js', import.meta.url), 'utf8');
-const shellSource = fs.readFileSync(new URL('../assets/shell.js', import.meta.url), 'utf8');
+const source = await readText('assets/cast.js');
+const shellSource = await readText('assets/shell.js');
 
 function harness(options = {}) {
   const posted = [];
@@ -37,13 +34,16 @@ function harness(options = {}) {
     navigator: {},
     location: { origin: 'https://artifact.neilblackman.dev', href: 'https://artifact.neilblackman.dev/abc', protocol: 'https:' },
     crypto: { getRandomValues(bytes) { bytes.fill(7); } },
-    setTimeout,
-    clearTimeout,
-    setInterval,
-    clearInterval,
+    // cast.js calls these as `win.setTimeout(...)`. Browser timers reject a plain object as their
+    // receiver ("Illegal invocation"), so the stub window holds receiver-free wrappers, as Node's
+    // timers are.
+    setTimeout: (...args) => setTimeout(...args),
+    clearTimeout: (...args) => clearTimeout(...args),
+    setInterval: (...args) => setInterval(...args),
+    clearInterval: (...args) => clearInterval(...args),
     addEventListener() {},
   };
-  vm.runInNewContext(source, { window: win, AbortSignal, URL });
+  runInNewContext(source, { window: win, AbortSignal, URL });
   const bridge = win.createArtifactCastBridge({
     window: win,
     document: doc,

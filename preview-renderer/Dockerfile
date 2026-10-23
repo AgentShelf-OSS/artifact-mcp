@@ -17,6 +17,7 @@ RUN apk add --no-cache build-base \
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 COPY src ./src
+COPY cdp ./cdp
 ENV RUSTUP_TOOLCHAIN=1.97.1 \
     RUSTFLAGS="-C strip=symbols"
 RUN cargo build --release --locked --target x86_64-unknown-linux-musl --bin artifact-preview

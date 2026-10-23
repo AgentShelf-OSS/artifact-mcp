@@ -127,7 +127,7 @@ The main real seam is `build_router()`: `src/main.rs` assembles the production a
 
 ## Verification and operations
 
-- `npm test` runs unit, persistence integration, MCP, and HTTP integration tests.
-- Every changed JavaScript file must pass `node --check`.
+- `cargo test --workspace --all-targets --locked` runs unit, persistence integration, MCP, and HTTP integration tests.
+- `cargo test --manifest-path browser-tests/Cargo.toml --locked` runs the browser-asset tests in `chrome-headless-shell`; its `browser-assets-parse` case requires every shipped `assets/*.js` file to parse.
 - Build with `docker compose build`; `.dockerignore` must prevent `.env` and `data/` from entering the image.
 - Deployment is an owner-run operation; repository changes should not deploy automatically.

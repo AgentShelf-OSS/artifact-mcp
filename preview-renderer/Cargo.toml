@@ -2,9 +2,10 @@
 # Copyright 2026 Neil Blackman
 #
 # The preview renderer is a separate, network-isolated service. This crate is deliberately NOT a
-# member of the root workspace: the empty `[workspace]` table below makes this directory its own
+# member of the root workspace: the `[workspace]` table below makes this directory its own
 # workspace root, with its own Cargo.lock, so the server build never compiles it and the
-# `./preview-renderer` Docker build context is self-contained.
+# `./preview-renderer` Docker build context is self-contained. Its only other member is `cdp/`
+# (`artifact-cdp`), the DevTools transport and launcher it shares with `../browser-tests`.
 [package]
 name = "artifact-preview"
 version = "2.0.0"
@@ -21,14 +22,17 @@ path = "src/main.rs"
 name = "artifact_preview"
 path = "src/lib.rs"
 
+# `cargo test`, `cargo clippy` and `cargo build` in this directory cover both members.
 [workspace]
+members = ["cdp"]
+default-members = [".", "cdp"]
 
 [dependencies]
+artifact-cdp = { path = "cdp" }
 base64 = "0.22"
 http-body-util = "0.1"
 hyper = { version = "1", features = ["client", "http1", "server"] }
 hyper-util = { version = "0.1", features = ["tokio"] }
-libc = "0.2"
 serde_json = { version = "1", features = ["float_roundtrip"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt", "signal", "time"] }
 

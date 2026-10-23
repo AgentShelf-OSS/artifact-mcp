@@ -1,11 +1,7 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
-
-const root = new URL("../", import.meta.url);
+import { test, assert, readText } from "./harness.js";
 
 test("Rust gallery template places every collection control in the top toolbar", async () => {
-  const template = await readFile(new URL("templates/gallery.html", root), "utf8");
+  const template = await readText("templates/gallery.html");
 
   assert.match(template, /<section class="collection-tools" aria-label="Artifact library controls">/);
   assert.match(template, /data-filter-view="all"/);
@@ -22,8 +18,8 @@ test("Rust gallery template places every collection control in the top toolbar",
 
 test("gallery foundation keeps three, two, then one responsive columns and stateful controls", async () => {
   const [css, script] = await Promise.all([
-    readFile(new URL("assets/portal.css", root), "utf8"),
-    readFile(new URL("assets/portal.js", root), "utf8"),
+    readText("assets/portal.css"),
+    readText("assets/portal.js"),
   ]);
 
   assert.match(css, /\.artifact-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);
@@ -44,7 +40,7 @@ test("gallery foundation keeps three, two, then one responsive columns and state
 });
 
 test("gallery keeps the approved brand block and organization-colored card stripe", async () => {
-  const css = await readFile(new URL("assets/portal.css", root), "utf8");
+  const css = await readText("assets/portal.css");
 
   assert.match(css, /\.brand-mark::after\{[^}]*inset:4px -5px -5px 4px;[^}]*z-index:-1;[^}]*background:var\(--brass\)[^}]*\}/);
   assert.doesNotMatch(css, /\.brand-mark::after\{[^}]*border-(?:right|bottom):/);
@@ -54,7 +50,7 @@ test("gallery keeps the approved brand block and organization-colored card strip
 });
 
 test("active primary navigation paints one short accent indicator", async () => {
-  const css = await readFile(new URL("assets/portal.css", root), "utf8");
+  const css = await readText("assets/portal.css");
 
   assert.doesNotMatch(css, /\.nav-link\.active\{[^}]*border-bottom-color:var\(--brass\)/);
   assert.match(css, /\.nav-link\.active::after\{background:var\(--brass\)\}/);

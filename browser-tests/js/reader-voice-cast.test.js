@@ -1,12 +1,9 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import {runInNewContext} from 'node:vm';
+import { test, assert, readText, runInNewContext } from './harness.js';
 
-const bridgeSource = readFileSync(new URL('../assets/reader-bridge.js', import.meta.url), 'utf8');
+const bridgeSource = await readText('assets/reader-bridge.js');
 const bridgeHelpers = bridgeSource.slice(bridgeSource.indexOf('  function sanitizeReaderCast('), bridgeSource.indexOf('  function allowed('));
 const {sanitizeReaderCast, resolveReaderRole, splitReaderRoleSegments} = runInNewContext(`${bridgeHelpers};({sanitizeReaderCast,resolveReaderRole,splitReaderRoleSegments})`, {TextEncoder});
-const shellSource = readFileSync(new URL('../assets/shell.js', import.meta.url), 'utf8');
+const shellSource = await readText('assets/shell.js');
 const shellHelpers = shellSource.slice(shellSource.indexOf('    function defaultRoleVoices('), shellSource.indexOf('    function styleChanged('));
 const {defaultRoleVoices} = runInNewContext(`${shellHelpers};({defaultRoleVoices})`);
 

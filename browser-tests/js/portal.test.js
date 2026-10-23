@@ -1,11 +1,8 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
+import { test, assert, readText, readBytes, runInNewContext } from "./harness.js";
 
 // Browser-side contracts of the viewer shell assets and the page templates. Server-rendered page
 // markup is covered by the Rust render and route suites.
-const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
+const SHELL_ASSET = await readText("assets/shell.js");
 
 function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false, stateEnabled, windowExtras = {}, navigatorImpl = {}, search = "" } = {}) {
   const created = [];
@@ -271,13 +268,13 @@ test("anchor repaint requests coalesce into one frame", () => {
   assert.equal(shell.frameMessages.filter((message) => message.type === "anchor:repaint").length, 2);
 });
 
-test("early state handshake accepts only the artifact frame and drains once", () => {
+test("early state handshake accepts only the artifact frame and drains once", async () => {
   const frameWindow = {}, listeners = new Map();
   const window = {
     addEventListener(type, listener) { listeners.set(type, listener); },
     removeEventListener(type, listener) { if (listeners.get(type) === listener) listeners.delete(type); }
   };
-  runInNewContext(readFileSync(new URL("../assets/viewer-boot.js", import.meta.url), "utf8"), {
+  runInNewContext(await readText("assets/viewer-boot.js"), {
     window, document: { getElementById: () => ({ contentWindow: frameWindow }) }, Array
   });
   const receive = listeners.get("message"), boot = window.__artifactMcpStateBoot;
@@ -384,22 +381,22 @@ test("shell rejects non-http(s) outbound hrefs before rendering a confirmation",
   assert.deepEqual(shell.opens, []);
 });
 
-test("viewer shell template links the web app manifest and touch icon and carries the bell and prompt region", () => {
-  const template = readFileSync(new URL("../templates/artifact-shell.html", import.meta.url), "utf8");
+test("viewer shell template links the web app manifest and touch icon and carries the bell and prompt region", async () => {
+  const template = await readText("templates/artifact-shell.html");
   for (const fragment of ['<link rel="manifest" href="/{{ artifact_id }}/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="{{ install_name }}">', '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', 'id="vpush-toggle"', 'id="vpush-banner"', 'id="vpush-reason"', 'id="vpush-enable"', 'id="vpush-dismiss"']) {
     assert.ok(template.includes(fragment), `viewer shell template keeps ${fragment}`);
   }
 });
 
-test("the library template links the site manifest and the generic Home Screen title", () => {
-  const template = readFileSync(new URL("../templates/gallery.html", import.meta.url), "utf8");
+test("the library template links the site manifest and the generic Home Screen title", async () => {
+  const template = await readText("templates/gallery.html");
   for (const fragment of ['<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="Artifacts">']) {
     assert.ok(template.includes(fragment), `gallery template keeps ${fragment}`);
   }
 });
 
-test("manifest and service worker assets match the Web Push contract", () => {
-  const manifest = JSON.parse(readFileSync(new URL("../assets/manifest.webmanifest", import.meta.url), "utf8"));
+test("manifest and service worker assets match the Web Push contract", async () => {
+  const manifest = JSON.parse(await readText("assets/manifest.webmanifest"));
   assert.equal(manifest.start_url, "/");
   assert.equal(manifest.scope, "/");
   assert.equal(manifest.display, "standalone");
@@ -407,10 +404,10 @@ test("manifest and service worker assets match the Web Push contract", () => {
     ["/icons/app-192.png", "192x192", "any"], ["/icons/app-512.png", "512x512", "any"], ["/icons/maskable-512.png", "512x512", "maskable"]
   ]);
   for (const name of ["app-192.png", "app-512.png", "maskable-512.png", "apple-touch-icon.png", "badge-72.png"]) {
-    const bytes = readFileSync(new URL(`../assets/icons/${name}`, import.meta.url));
-    assert.equal(bytes.subarray(1, 4).toString("latin1"), "PNG", name);
+    const bytes = await readBytes(`assets/icons/${name}`);
+    assert.equal(String.fromCharCode(...bytes.subarray(1, 4)), "PNG", name);
   }
-  const worker = readFileSync(new URL("../assets/push-sw.js", import.meta.url), "utf8");
+  const worker = await readText("assets/push-sw.js");
   for (const event of ["push", "notificationclick", "pushsubscriptionchange"]) assert.match(worker, new RegExp(`addEventListener\\("${event}"`));
   assert.doesNotMatch(worker, /addEventListener\("(fetch|install)"|importScripts\(|caches\./);
   assert.match(worker, /"x-artifact-mutation": "1"/);

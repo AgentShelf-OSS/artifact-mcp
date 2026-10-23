@@ -1,16 +1,13 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
+import { test, assert, readText, runInNewContext, setImmediate } from "./harness.js";
 
 // ADR-0017: the viewer shell relays streaming operations as data:chunk messages.
-const shell = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
-const sdk = readFileSync(new URL("../assets/artifact-data-client.js", import.meta.url), "utf8");
+const shell = await readText("assets/shell.js");
+const sdk = await readText("assets/artifact-data-client.js");
 const start = shell.indexOf("  function createViewerDataBroker(options)");
 const end = shell.indexOf("\n  var dataBroker=", start);
 let brokerFetch = () => Promise.reject(new Error("missing fetch"));
 const context = { AbortController, Map, Promise, encodeURIComponent, JSON, Error, Object, TextDecoder, setTimeout, clearTimeout, fetch: (...args) => brokerFetch(...args), EventSource: class {} };
-const createDataBroker = vm.runInNewContext(shell.slice(start, end) + "\ncreateViewerDataBroker", context);
+const createDataBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerDataBroker", context);
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 function ndjsonResponse(lines, { status = 200 } = {}) {
@@ -86,7 +83,7 @@ test("SDK stream() forwards chunks to the callback and resolves with the last", 
   const messages = [], handlers = [];
   const parent = { postMessage: message => messages.push(message) };
   const window = { parent, addEventListener: (type, handler) => { if (type === "message") handlers.push(handler); }, setTimeout: () => 1 };
-  vm.runInNewContext(sdk, { window, setTimeout: window.setTimeout, clearTimeout: () => {}, Map, Set, Promise, Error, Object, AbortController });
+  runInNewContext(sdk, { window, setTimeout: window.setTimeout, clearTimeout: () => {}, Map, Set, Promise, Error, Object, AbortController });
   const receive = data => handlers.forEach(handler => handler({ data, source: parent }));
   receive({ type: "data:ready", enabled: true, bindings: { concierge: { operations: ["chat"] } } });
   const chunks = [];

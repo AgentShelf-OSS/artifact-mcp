@@ -1,9 +1,7 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { test, assert, readText } from "./harness.js";
 
-test("Docker build context excludes deployment secrets and persistent data", () => {
-  const patterns = readFileSync(new URL("../.dockerignore", import.meta.url), "utf8")
+test("Docker build context excludes deployment secrets and persistent data", async () => {
+  const patterns = (await readText(".dockerignore"))
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter((line) => line && !line.startsWith("#"));

@@ -1,8 +1,6 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
-import {runInNewContext} from 'node:vm';
-const source=readFileSync(new URL('../assets/shell.js',import.meta.url),'utf8');
+import { test, assert, readText, runInNewContext } from './harness.js';
+
+const source=await readText('assets/shell.js');
 const helpers=source.slice(source.indexOf('    function pronunciationPlan('),source.indexOf('    function splitLongText('));
 const {pronunciationPlan:plan,pronunciationRange:range}=runInNewContext(helpers+';({pronunciationPlan,pronunciationRange})');
 const plain=value=>JSON.parse(JSON.stringify(value));

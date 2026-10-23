@@ -16,7 +16,7 @@
 //! * Workers, service workers and shared workers stay paused before their first statement and
 //!   never run (Playwright resumed dedicated workers).
 //! * Launch flags route all browser traffic to an unreachable proxy and disable DNS
-//!   (see [`crate::browser`]).
+//!   (see [`crate::browser`] and `artifact_cdp::LOCKDOWN_SWITCHES`).
 
 use std::collections::HashMap;
 use std::fmt;
@@ -27,8 +27,9 @@ use std::time::Duration;
 use base64::Engine;
 use serde_json::{Value, json};
 
+use artifact_cdp::{CdpError, DEFAULT_MAX_MESSAGE_BYTES, Incoming, Pipe, encode_command};
+
 use crate::browser::{Browser, Hardening};
-use crate::cdp::{CdpError, DEFAULT_MAX_MESSAGE_BYTES, Incoming, Pipe, encode_command};
 use crate::config::DEVICE_SCALE_FACTOR;
 use crate::image_info::PNG_SIGNATURE;
 
@@ -191,23 +192,21 @@ impl Renderer {
         inspect: impl FnOnce(&Browser),
     ) -> Result<Vec<u8>, RenderError> {
         let started = tokio::time::Instant::now();
-        let mut browser = Browser::launch(&self.executable, self.hardening, self.max_message_bytes)
-            .map_err(RenderError::Launch)?;
+        let (browser, mut pipe) = Browser::launch(
+            &self.executable,
+            &self.hardening.launch_options(self.max_message_bytes),
+        )
+        .map_err(RenderError::Launch)?;
         let remaining = self.timeout.saturating_sub(started.elapsed());
         let outcome = tokio::time::timeout(
             remaining,
-            drive(
-                &mut browser.pipe,
-                self.hardening,
-                self.settle,
-                html,
-                width,
-                height,
-            ),
+            drive(&mut pipe, self.hardening, self.settle, html, width, height),
         )
         .await;
         inspect(&browser);
         browser.shutdown().await;
+        // The pipe outlives the kill, as it did when the browser owned it.
+        drop(pipe);
         match outcome {
             Err(_) => Err(RenderError::TimedOut),
             Ok(Err(DriveError::Cdp(error))) => Err(RenderError::Protocol(error.to_string())),

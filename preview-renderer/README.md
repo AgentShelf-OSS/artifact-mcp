@@ -185,7 +185,11 @@ same `ENOSYS` stub, but the image has not been run under Docker itself.
 
 ## Development
 
-The crate is its own workspace. It is not a member of the root workspace.
+The crate is its own workspace. It is not a member of the root workspace. The workspace has a
+second member, `cdp/` (`artifact-cdp`): the DevTools pipe transport and the process-group
+launcher, with the crate's only `unsafe` code (`cdp/src/sys.rs`). The browser test harness in
+`../browser-tests` uses the same crate. The renderer chooses its launch policy in
+`src/browser.rs`; a unit test there pins the production launch line byte for byte.
 
 ```sh
 cd preview-renderer
@@ -198,8 +202,10 @@ cargo test
 Tests that need a browser are skipped (with a message) when `CHROME_HEADLESS_SHELL` is unset.
 When `CI` is set, they fail instead, so a CI job cannot pass by skipping them. The suite covers:
 
-* `src/` unit tests: JavaScript number rules, configuration, CDP framing, clip maths,
-  `/proc` parsing;
+* `cdp/` unit tests: CDP framing, `/proc` parsing, launch switches per network policy, private
+  temporary directories;
+* `src/` unit tests: JavaScript number rules, configuration, clip maths, the pinned launch
+  line;
 * `src/tests.rs`: 37 network vectors per canary address, run with all defences, with each
   layer alone, and with none (the control). Also checks that every browser process stays in the
   process group and that none survives;

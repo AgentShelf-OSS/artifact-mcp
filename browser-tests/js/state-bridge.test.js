@@ -1,14 +1,12 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
+import { test, assert, readText, runInNewContext } from "./harness.js";
 
 // The state bridge example in GETTING_STARTED.md is browser code that artifact authors copy.
 // Exact-byte raw, bundle and public-share delivery is covered by the conformance `raw.*` and
 // `share.public-delivery` cases.
 
+const guide = await readText("GETTING_STARTED.md");
+
 function documentedExample() {
-  const guide = readFileSync(new URL("../GETTING_STARTED.md", import.meta.url), "utf8");
   const section = guide.split("## Persisting state from an artifact")[1];
   const source = section.match(/<script>([\s\S]*?)<\/script>/)[1];
   const note = { value: "" }, status = { textContent: "Notes are temporary on this page." };
@@ -17,7 +15,7 @@ function documentedExample() {
   const parent = { postMessage(message, origin) {
     assert.equal(origin, "*"); messages.push(JSON.parse(JSON.stringify(message)));
   } };
-  vm.runInNewContext(source, {
+  runInNewContext(source, {
     parent,
     document: { querySelector: selector => selector === "#note" ? note : status },
     addEventListener(type, handler) { assert.equal(type, "message"); receive = handler; },

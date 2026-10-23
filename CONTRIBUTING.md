@@ -20,12 +20,21 @@ cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
 cargo test --workspace --all-targets --locked   # includes HTTP conformance and the MCP surface check
 cargo test --doc --locked
 cargo xtask historical-fixture --verify-against-committed
-npm test                                        # browser-asset tests; no npm install needed
+
+# Browser-asset tests in chrome-headless-shell (see browser-tests/README.md)
+export CHROME_HEADLESS_SHELL=/path/to/chrome-headless-shell-linux64/chrome-headless-shell
+cargo fmt --manifest-path browser-tests/Cargo.toml --check
+cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
+cargo test --manifest-path browser-tests/Cargo.toml --locked
 ```
 
 - `rust-toolchain.toml` pins the Rust toolchain. Repository tooling is `cargo xtask` (run
-  `cargo xtask --help`). Node 22.16 or later still runs the browser-asset tests and Playwright
-  until those move to Rust. Node does not run the server (ADR-0024).
+  `cargo xtask --help`). The browser-asset tests in `browser-tests/` run the JavaScript in real
+  Chrome for Testing, driven from Rust; use the version pinned in `preview-renderer/Dockerfile`.
+  Without `CHROME_HEADLESS_SHELL` they are skipped. Node 22.16 or later still runs the Playwright
+  journeys in `playwright/` until those move to Rust. Node does not run the server (ADR-0024).
+- Changed browser JavaScript in `assets/` needs a test in `browser-tests/js/` when its behaviour
+  changes; `browser-assets-parse` checks that every asset still parses.
 - Match the surrounding style: small modules behind the traits in `src/ports/`, and production or
   test adapters passed to `build_router()` through `AppDeps`.
 - Add or update tests for any behavior change. Prefer the deterministic adapters in `tests/native/`

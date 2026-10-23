@@ -8,8 +8,11 @@
 //! WebSocket: no other local process can reach this channel.
 //!
 //! Every incoming message is size-capped. The largest legitimate message is a full-size
-//! screenshot (a 3840×2160 PNG, base64-encoded); anything above the cap fails the render instead
+//! screenshot (a 3840×2160 PNG, base64-encoded); anything above the cap fails the caller instead
 //! of growing memory without bound.
+//!
+//! [`Pipe`] owns both ends. [`Pipe::into_split`] separates them, so one task can read events and
+//! replies while others write commands.
 
 use std::fmt;
 use std::io;
@@ -20,10 +23,10 @@ use tokio::net::unix::pipe;
 
 /// Default cap for one incoming message. A worst-case 3840×2160 screenshot (incompressible
 /// pixels) is about 33 MB of PNG and 45 MB of base64.
-pub(crate) const DEFAULT_MAX_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
+pub const DEFAULT_MAX_MESSAGE_BYTES: usize = 64 * 1024 * 1024;
 
 #[derive(Debug)]
-pub(crate) enum CdpError {
+pub enum CdpError {
     Io(io::Error),
     /// The browser closed its end of the pipe (it exited or crashed).
     Closed,
@@ -61,7 +64,7 @@ impl From<io::Error> for CdpError {
 
 /// One parsed incoming message.
 #[derive(Debug, PartialEq)]
-pub(crate) enum Incoming {
+pub enum Incoming {
     Response {
         id: u64,
         result: Result<Value, String>,
@@ -74,7 +77,7 @@ pub(crate) enum Incoming {
 }
 
 impl Incoming {
-    pub(crate) fn parse(value: Value) -> Result<Self, CdpError> {
+    pub fn parse(value: Value) -> Result<Self, CdpError> {
         let Value::Object(mut object) = value else {
             return Err(CdpError::Malformed("message is not an object".into()));
         };
@@ -114,12 +117,7 @@ fn error_message(error: &Value) -> String {
 }
 
 /// Serialize one command, without the trailing NUL.
-pub(crate) fn encode_command(
-    id: u64,
-    session_id: Option<&str>,
-    method: &str,
-    params: Value,
-) -> Vec<u8> {
+pub fn encode_command(id: u64, session_id: Option<&str>, method: &str, params: Value) -> Vec<u8> {
     let mut message = Map::new();
     message.insert("id".into(), Value::from(id));
     message.insert("method".into(), Value::from(method));
@@ -131,8 +129,60 @@ pub(crate) fn encode_command(
 }
 
 /// The parent's two pipe ends.
-pub(crate) struct Pipe {
+pub struct Pipe {
+    sender: PipeSender,
+    receiver: PipeReceiver,
+}
+
+impl Pipe {
+    pub fn new(sender: pipe::Sender, receiver: pipe::Receiver, max_message_bytes: usize) -> Self {
+        Self {
+            sender: PipeSender { sender },
+            receiver: PipeReceiver {
+                receiver,
+                buffer: Vec::new(),
+                start: 0,
+                scanned: 0,
+                max_message_bytes,
+            },
+        }
+    }
+
+    /// Write one message and its NUL terminator.
+    pub async fn send(&mut self, message: &[u8]) -> Result<(), CdpError> {
+        self.sender.send(message).await
+    }
+
+    /// Read the next message.
+    pub async fn recv(&mut self) -> Result<Incoming, CdpError> {
+        self.receiver.recv().await
+    }
+
+    /// Separate the write end from the read end.
+    pub fn into_split(self) -> (PipeSender, PipeReceiver) {
+        (self.sender, self.receiver)
+    }
+}
+
+/// The write end: commands to the browser.
+pub struct PipeSender {
     sender: pipe::Sender,
+}
+
+impl PipeSender {
+    /// Write one message and its NUL terminator.
+    pub async fn send(&mut self, message: &[u8]) -> Result<(), CdpError> {
+        self.sender
+            .write_all(message)
+            .await
+            .map_err(map_write_error)?;
+        self.sender.write_all(&[0]).await.map_err(map_write_error)?;
+        Ok(())
+    }
+}
+
+/// The read end: replies and events from the browser, framed and size-capped.
+pub struct PipeReceiver {
     receiver: pipe::Receiver,
     buffer: Vec<u8>,
     /// Start of the first unconsumed byte in `buffer`.
@@ -142,34 +192,9 @@ pub(crate) struct Pipe {
     max_message_bytes: usize,
 }
 
-impl Pipe {
-    pub(crate) fn new(
-        sender: pipe::Sender,
-        receiver: pipe::Receiver,
-        max_message_bytes: usize,
-    ) -> Self {
-        Self {
-            sender,
-            receiver,
-            buffer: Vec::new(),
-            start: 0,
-            scanned: 0,
-            max_message_bytes,
-        }
-    }
-
-    /// Write one message and its NUL terminator.
-    pub(crate) async fn send(&mut self, message: &[u8]) -> Result<(), CdpError> {
-        self.sender
-            .write_all(message)
-            .await
-            .map_err(map_write_error)?;
-        self.sender.write_all(&[0]).await.map_err(map_write_error)?;
-        Ok(())
-    }
-
+impl PipeReceiver {
     /// Read the next message.
-    pub(crate) async fn recv(&mut self) -> Result<Incoming, CdpError> {
+    pub async fn recv(&mut self) -> Result<Incoming, CdpError> {
         loop {
             if let Some(offset) = self.buffer[self.scanned..]
                 .iter()
@@ -296,6 +321,27 @@ mod tests {
         ));
         writer.write_all(&[b' '; 100]).await.unwrap();
         assert!(matches!(channel.recv().await, Err(CdpError::TooLarge)));
+    }
+
+    #[tokio::test]
+    async fn split_halves_write_and_read_independently() {
+        let (to_parent, reader) = pipe::pipe().unwrap();
+        let (sender, from_parent) = pipe::pipe().unwrap();
+        let (mut commands, mut replies) = Pipe::new(sender, reader, 64).into_split();
+        commands.send(b"{\"id\":1}").await.unwrap();
+        let mut written = vec![0; 9];
+        let mut from_parent = from_parent;
+        from_parent.read_exact(&mut written).await.unwrap();
+        assert_eq!(written, b"{\"id\":1}\0");
+        let mut to_parent = to_parent;
+        to_parent
+            .write_all(b"{\"method\":\"A.b\"}\0")
+            .await
+            .unwrap();
+        assert!(matches!(
+            replies.recv().await.unwrap(),
+            Incoming::Event { .. }
+        ));
     }
 
     #[tokio::test]

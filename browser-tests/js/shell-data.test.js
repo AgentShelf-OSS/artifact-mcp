@@ -1,21 +1,18 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
+import { test, assert, readText, runInNewContext, setImmediate } from "./harness.js";
 
-const sdk = readFileSync(new URL("../assets/artifact-data-client.js", import.meta.url), "utf8");
-const shell = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
+const sdk = await readText("assets/artifact-data-client.js");
+const shell = await readText("assets/shell.js");
 const brokerStart = shell.indexOf("  function createViewerDataBroker(options)");
 const brokerEnd = shell.indexOf("\n  var dataBroker=", brokerStart);
 let brokerFetch = () => Promise.reject(new Error("missing fetch"));
 const brokerContext = { AbortController, Map, Promise, encodeURIComponent, JSON, Error, setTimeout, clearTimeout, fetch: (...args) => brokerFetch(...args), EventSource: class {} };
-const createDataBroker = vm.runInNewContext(shell.slice(brokerStart, brokerEnd) + "\ncreateViewerDataBroker", brokerContext);
+const createDataBroker = runInNewContext(shell.slice(brokerStart, brokerEnd) + "\ncreateViewerDataBroker", brokerContext);
 
 function harness() {
   const messages = [], handlers = [], timers = [];
   const parent = { postMessage: message => messages.push(message) };
   const window = { parent, addEventListener: (type, handler) => { if (type === "message") handlers.push(handler); }, setTimeout: (fn, ms) => { timers.push({ fn, ms }); return timers.length; } };
-  vm.runInNewContext(sdk, { window, setTimeout: window.setTimeout, clearTimeout: () => {}, Map, Promise, Error, AbortController });
+  runInNewContext(sdk, { window, setTimeout: window.setTimeout, clearTimeout: () => {}, Map, Promise, Error, AbortController });
   return { window, parent, messages, handlers, timers, receive(data, source = parent) { handlers.forEach(handler => handler({ data, source })); } };
 }
 

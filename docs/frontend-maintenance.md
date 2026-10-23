@@ -56,9 +56,12 @@ All request-derived values in templates must be escaped. Keep CSRF/mutation prot
 From the repository root:
 
 ```sh
-node --test test/gallery-library-layout.test.js test/admin-access-visual-contract.test.js test/portal.test.js test/feedback.test.js
+export CHROME_HEADLESS_SHELL=/path/to/chrome-headless-shell-linux64/chrome-headless-shell
+cargo test --manifest-path browser-tests/Cargo.toml --test js -- gallery-library-layout admin-access-visual-contract portal
 cargo test --test native u15_render
 ```
+
+The browser-asset tests run in Chrome for Testing `chrome-headless-shell`, driven from Rust. Use the version pinned in `preview-renderer/Dockerfile`. See [`browser-tests/README.md`](../browser-tests/README.md).
 
 For browser behavior, use the isolated Playwright harness described in [`playwright/README.md`](../playwright/README.md). Run the focused suites after starting a disposable Rust server:
 
@@ -67,7 +70,7 @@ cd playwright
 npx playwright test tests/01-gallery.spec.mjs tests/02-viewer.spec.mjs tests/08-settings.spec.mjs -c playwright.config.mjs
 ```
 
-Use separate throwaway data directories and disposable test keys. Never point the harness at production data. For a broad contract check, run `npm test` and `cargo test --all-targets --locked` from the repository root.
+Use separate throwaway data directories and disposable test keys. Never point the harness at production data. For a broad contract check, run `cargo test --manifest-path browser-tests/Cargo.toml --locked` and `cargo test --all-targets --locked` from the repository root.
 
 ## Screenshot refresh
 

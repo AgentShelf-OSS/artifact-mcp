@@ -5,7 +5,8 @@
 //!
 //! * [`spawn_with_devtools_pipe`] installs the two DevTools pipe ends as fds 3 and 4 in the child
 //!   (`--remote-debugging-pipe` reads commands from fd 3 and writes replies to fd 4) and arms
-//!   `PR_SET_PDEATHSIG`, so the browser dies if this service dies.
+//!   `PR_SET_PDEATHSIG`, so the browser dies if the process (strictly, the thread) that launched
+//!   it dies.
 //! * [`kill_process_group`] sends `SIGKILL` to a whole process group.
 //!
 //! Every block carries a `// SAFETY:` comment. The rest of the crate is `#![deny(unsafe_code)]`.

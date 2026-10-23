@@ -1,25 +1,11 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { runInNewContext } from "node:vm";
+import { test, assert, fixture, runInNewContext } from "./harness.js";
 
 // The anchor bridge is browser code that the Rust server injects into artifact HTML. Exercise the
-// exact bytes it serves: the raw-string constant in src/http/artifact_response.rs. Injection
-// placement, response headers and the raw.anchor-bridge golden are covered by the Rust suite
+// exact bytes it serves: the raw-string constant in src/http/artifact_response.rs, which the Rust
+// side of the harness extracts (browser-tests/src/suite.rs, `fixture`). Injection placement,
+// response headers and the raw.anchor-bridge golden are covered by the Rust suite
 // (tests/native/u14_response.rs) and the conformance oracle.
-function rustRawString(source, constant) {
-  const marker = `pub const ${constant}: &str = r###"`;
-  const start = source.indexOf(marker);
-  assert.ok(start >= 0, `could not find ${constant}`);
-  const end = source.indexOf("\"###;", start + marker.length);
-  assert.ok(end >= 0, `could not find the end of ${constant}`);
-  return source.slice(start + marker.length, end);
-}
-
-const ANCHOR_BRIDGE = rustRawString(
-  readFileSync(new URL("../src/http/artifact_response.rs", import.meta.url), "utf8"),
-  "ANCHOR_BRIDGE",
-);
+const ANCHOR_BRIDGE = await fixture("ANCHOR_BRIDGE");
 
 function anchorBridgeHarness({
   querySelector,

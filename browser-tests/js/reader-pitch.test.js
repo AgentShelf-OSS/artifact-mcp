@@ -1,11 +1,8 @@
-import test from 'node:test';
-import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { test, assert, readText, createContext, runInContext } from './harness.js';
 
 // Exercise the shipped DSP, not a mock of its time-stretching algorithm.
-const processorSource = readFileSync(new URL('../assets/vendor/soundtouch-processor.js', import.meta.url), 'utf8')
-  + '\n' + readFileSync(new URL('../assets/reader-pitch-worklet.js', import.meta.url), 'utf8');
+const processorSource = await readText('assets/vendor/soundtouch-processor.js')
+  + '\n' + await readText('assets/reader-pitch-worklet.js');
 
 for (const sampleRate of [24000, 44100, 48000]) for (const rate of [0.8, 1.25, 1.5, 2]) {
   test(`streaming ${rate}x at ${sampleRate}Hz preserves pitch, amplitude and the 120ms tail`, () => {
@@ -13,7 +10,7 @@ for (const sampleRate of [24000, 44100, 48000]) for (const rate of [0.8, 1.25, 1
     const scope = { sampleRate, console, AudioWorkletProcessor: class {
       constructor() { this.port = { postMessage: message => errors.push(message) }; }
     }, registerProcessor: (name, processor) => { registered[name] = processor; } };
-    vm.createContext(scope); vm.runInContext(processorSource, scope);
+    createContext(scope); runInContext(processorSource, scope);
     const processor = new registered['artifact-pitch']({ processorOptions: {} });
     const frequency = 440, start = 0.2, end = start + 0.8 / rate;
     const output = new Float32Array(Math.ceil((end + 0.5) * sampleRate / 128) * 128);

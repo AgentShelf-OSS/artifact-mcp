@@ -1,12 +1,9 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
+import { test, assert, readText, runInNewContext } from "./harness.js";
 
-const shell = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
+const shell = await readText("assets/shell.js");
 const start = shell.indexOf("  function createViewerStateBroker(options)");
 const end = shell.indexOf("  // End viewer state broker.", start);
-const createBroker = vm.runInNewContext(shell.slice(start, end) + "\ncreateViewerStateBroker", { TextEncoder });
+const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerStateBroker", { TextEncoder });
 const settle = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 
 function harness({ enabled = true, entries = new Map(), viewerId = "", viewerName = "" } = {}) {

@@ -1,18 +1,16 @@
-import test from "node:test";
-import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import vm from "node:vm";
+import { test, assert, readText, runInNewContext } from "./harness.js";
 
-const shell = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
+const shell = await readText("assets/shell.js");
 const start = shell.indexOf("  function createViewerReminderBroker(options)");
 const end = shell.indexOf("  // End viewer reminder broker.", start);
 assert.ok(start > 0 && end > start, "reminder broker is delimited in shell.js");
-const createBroker = vm.runInNewContext(shell.slice(start, end) + "\ncreateViewerReminderBroker", {});
+const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerReminderBroker", {});
 const settle = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 const plain = value => JSON.parse(JSON.stringify(value));
 // Uncompressed P-256 point shape: 65 bytes starting with 0x04.
 const VAPID_BYTES = Uint8Array.from({ length: 65 }, (_, i) => (i === 0 ? 4 : i));
-const VAPID_KEY = Buffer.from(VAPID_BYTES).toString("base64url");
+// Unpadded base64url, as Buffer.toString("base64url") produces.
+const VAPID_KEY = btoa(String.fromCharCode(...VAPID_BYTES)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 
 function harness({
   enabled = true,
@@ -53,7 +51,7 @@ function harness({
     register: async (url) => { events.push(["register", url]); return registration; },
     needsInstall: () => needsInstall,
     label: () => "iPhone",
-    atob: (value) => Buffer.from(value, "base64").toString("binary"),
+    atob: (value) => atob(value),
   };
   const broker = createBroker({
     enabled, artifactId: "artifact", frame: () => frame, platform,
