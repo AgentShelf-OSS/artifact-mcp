@@ -32,7 +32,7 @@ See [live-data setup](live-data.md) and the [PR Watch example](../ops/data-sourc
 | `MCP_OAUTH_MAX_TOKEN_LIFETIME_S` | Maximum accepted access-token lifetime. Defaults to `3600`. |
 | `MCP_OAUTH_CLOCK_TOLERANCE_S` | Clock tolerance for token checks. Defaults to `30`. |
 
-Node and Rust require HTTPS for both the issuer and verification-key URL. These URLs must not
+The server requires HTTPS for both the issuer and verification-key URL. These URLs must not
 contain credentials or fragments. Verification-key retrieval rejects every redirect, including
 HTTPS-to-HTTPS redirects, so a redirect cannot downgrade the connection to HTTP. Direct HTTPS
 retrieval retains the existing key cache and rotation behavior.
@@ -79,10 +79,10 @@ scope.
 Viewer organization resolution checks configured administrators, explicit email mappings,
 registered domains, `ORG_EMAIL_DOMAINS`, and finally the verified email domain. An explicit member
 mapping assigns an already authenticated viewer to an organization. By default it does not change
-Cloudflare Access or send an invitation. The Rust runtime can optionally synchronize explicit
-members as described below. The Node reference runtime still requires manual Cloudflare updates.
+Cloudflare Access or send an invitation. The server can optionally synchronize explicit
+members as described below.
 
-### Automatic explicit-email login access (Rust)
+### Automatic explicit-email login access
 
 When enabled, adding or removing a specific email, or deleting an organization, wakes a background
 task that synchronizes the union of all organizations' explicit member emails to one dedicated
@@ -98,7 +98,7 @@ application's existing domain mapping. Cloudflare sessions are not explicitly re
 Membership changes and edge-policy changes are not atomic; allow time for reconciliation and
 Cloudflare propagation. A successful sync confirms the policy contents, not email delivery.
 
-Configure this on the Rust server:
+Configure this on the server:
 
 | Variable | Meaning |
 | --- | --- |
@@ -175,7 +175,7 @@ Encrypted and plaintext rows can coexist during rollout.
 
 Artifacts can schedule reminders that reach opted-in viewers as Web Push notifications, also when
 the phone is locked ([ADR-0012](adr/0012-scheduled-reminders-via-web-push.md),
-[contract](web-push-reminders.md)). Only the Rust runtime sends them.
+[contract](web-push-reminders.md)).
 
 | Variable | Default | Purpose |
 |---|---|---|

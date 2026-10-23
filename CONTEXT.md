@@ -6,7 +6,7 @@ This document is the domain and architecture source of truth for maintainers and
 
 artifact-mcp is a private, multi-tenant publishing gallery. Authorized AI agents publish HTML through MCP, and authenticated people browse only the artifacts belonging to their organization. An administrator can browse all organizations and manage publisher keys.
 
-The application is a dependency-light modular monolith: one server process, one SQLite database, one artifact directory, and server-rendered HTML/CSS/JavaScript. Rust serves production; Node is the reference implementation.
+The application is a dependency-light modular monolith: one server process, one SQLite database, one artifact directory, and server-rendered HTML/CSS/JavaScript. The server is written in Rust. The Node compatibility twin was retired in ADR-0024.
 
 ## Domain language
 
@@ -43,7 +43,7 @@ The application is a dependency-light modular monolith: one server process, one 
 - **Viewer state**: JSON values belonging to an artifact in a chosen viewer state scope. State survives artifact revisions. An artifact treats state as disabled when no viewer shell answers its `state:hello` within about one second.
 - **Viewer state scope**: The audience for a state key. `org` shares the value with viewers who can access the artifact and is the default. `viewer` restricts the value to the authenticated person who owns it, including when that person is an administrator.
 - **Viewer handle**: An opaque, stable viewer ID and a display name that an artifact can use for attribution. A handle does not grant access to another viewer's private state.
-- **Reminder**: A named, scheduled notification for an artifact in `org` or `viewer` scope. Setting the key again replaces its time and text. When it fires, the Rust runtime sends it by Web Push to opted-in viewers. An artifact can have at most 16 armed reminders.
+- **Reminder**: A named, scheduled notification for an artifact in `org` or `viewer` scope. Setting the key again replaces its time and text. When it fires, the server sends it by Web Push to opted-in viewers. An artifact can have at most 16 armed reminders.
 - **Push subscription**: One browser or device that a viewer registered for Web Push. The endpoint is stored encrypted and must belong to an allowlisted push service. A viewer can have at most 10.
 - **Push opt-in**: A viewer's per-artifact consent to receive that artifact's reminders. A reminder reaches a viewer only with an opt-in and at least one push subscription.
 - **Raw delivery** — artifact bytes served from `/raw/:id` or `/raw/:id/*`.
@@ -70,28 +70,28 @@ The application is a dependency-light modular monolith: one server process, one 
 There are two ingress paths:
 
 - `POST /mcp` is bypassed by Cloudflare Access and authenticated by a publisher bearer key.
-- Human routes are protected by Cloudflare Access. In production, `lib/identity.js` verifies the Access JWT before deriving viewer email, organization, and administrator status.
+- Human routes are protected by Cloudflare Access. In production, `src/security/identity.rs` verifies the Access JWT before deriving viewer email, organization, and administrator status.
 
 The application shell is trusted code. Published artifact code is untrusted. CSP sandboxing gives raw HTML an opaque origin, including when it is opened directly, but the current deployment still delivers trusted and untrusted documents from one hostname. A separate artifact-delivery origin remains a defense-in-depth option; see ADR-0003.
 
 ## Module map
 
-- `server.js` — production composition entrypoint: configuration, adapters, startup reconciliation, health check, and listener.
-- `lib/app.js` — HTTP application module. `createApp()` accepts production or test adapters and never starts a listener.
-- `lib/access.js` — organization and administrator policy, including concealed-read decisions.
-- `lib/auth.js` / `lib/identity.js` — publisher-key authentication and Cloudflare viewer identity. These are security-critical modules.
-- `lib/mcp.js` / `lib/contracts.js` — MCP method dispatch, declared tool schemas, and request validation.
-- `lib/config.js` — shared upload and HTTP-envelope limits.
-- `lib/store.js` — artifact lifecycle module: publication, reads, deletion, and storage reconciliation.
-- `lib/db.js` / `lib/migrations.js` — SQLite opening, runtime database adapter, and ordered schema evolution.
-- `lib/keys.js` / `lib/reactions.js` — publisher-key and reaction persistence.
-- `lib/state.js` / `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
-- `lib/app.js` / `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. `assets/shell.js` brokers state messages, caches reads, and debounces writes.
+- `src/main.rs` — production composition entrypoint: configuration, adapters, startup reconciliation, health check, and listener.
+- `src/app.rs` — HTTP application module. `build_router()` takes `AppDeps` with production or test adapters and never binds a listener.
+- `src/security/access.rs` — organization and administrator policy, including concealed-read decisions.
+- `src/security/auth.rs` / `src/security/identity.rs` — publisher-key authentication and Cloudflare viewer identity. These are security-critical modules.
+- `src/mcp/dispatch.rs` / `src/mcp/tool_defs.rs` / `src/mcp/validation.rs` — MCP method dispatch, declared tool schemas, and request validation.
+- `src/config.rs` — runtime configuration, including the upload and HTTP-envelope limits.
+- `src/artifacts/` — artifact lifecycle module: publication, reads, deletion, and storage reconciliation.
+- `src/persistence/db.rs` / `src/persistence/migrations.rs` — SQLite opening, the connection pool, and ordered schema evolution. Some migrations load shared SQL from `migrations/`.
+- `src/persistence/keys.rs` / `src/persistence/reactions.rs` — publisher-key and reaction persistence.
+- `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
+- `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. `assets/shell.js` brokers state messages, caches reads, and debounces writes.
 - `src/ports/state.rs` / `src/persistence/viewer_state_service.rs`: the authorization-gated viewer-state interface and its shared-pool SQLite adapter.
-- `lib/artifact-http.js` — raw-delivery response policy, including HTML sandbox headers. Viewer state does not alter raw, historical, or public-share response bodies. Those views have no shell; artifacts treat state as disabled if no `state:ready` arrives within about one second of `state:hello`.
-- `lib/portal.js` / `lib/settings.js` — server-rendered gallery, viewer shell, not-found, and key-management pages.
+- `src/http/artifact_response.rs` — raw-delivery response policy, including HTML sandbox headers. Viewer state does not alter raw, historical, or public-share response bodies. Those views have no shell; artifacts treat state as disabled if no `state:ready` arrives within about one second of `state:hello`.
+- `src/render/portal.rs` / `src/render/settings.rs` with `templates/` — server-rendered gallery, viewer shell, not-found, and key-management pages.
 
-The main real seam is `createApp()`: production adapters are assembled in `server.js`, while HTTP tests provide in-memory adapters. Storage also exposes `createArtifactStore()` so lifecycle tests can use temporary SQLite/filesystem adapters.
+The main real seam is `build_router()`: `src/main.rs` assembles the production adapters, while the HTTP tests in `tests/native/` provide deterministic adapters. Storage also exposes `ArtifactStore::new_for_test()` so lifecycle tests can use temporary SQLite and filesystem adapters.
 
 ## Supported workflows
 

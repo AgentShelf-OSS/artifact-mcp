@@ -5,8 +5,8 @@ approve or perform a deployment.
 
 ## Public release flow
 
-1. The workflow accepts an annotated `vMAJOR.MINOR.PATCH` tag. The tag must match both
-   `Cargo.toml` and `package.json`, and its commit must be on the default branch.
+1. The workflow accepts an annotated `vMAJOR.MINOR.PATCH` tag. The tag must match the `Cargo.toml`
+   version, and its commit must be on the default branch.
 2. A successful `CI` push run must already exist for the exact tagged commit.
 3. The workflow builds one candidate image, boots every frozen historical fixture with that exact
    digest, generates source and image SBOMs, and rejects high or critical vulnerability findings.

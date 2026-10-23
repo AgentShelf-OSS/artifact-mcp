@@ -9,29 +9,38 @@ Thanks for your interest in artifact-mcp. Issues, ideas, and pull requests are w
 - **Keep the security model intact.** This is a multi-tenant server; tenant isolation, the fail-closed
   identity default, the sandboxed rendering, and the SSRF-limited webhooks are load-bearing. If a
   change touches any of them, call it out explicitly in the PR.
-- **No new runtime dependencies** without discussion. The server is intentionally small (Express +
-  better-sqlite3, ESM, no build step) and easy to audit.
+- **No new runtime dependencies** without discussion. The server is one Rust binary (Axum, Askama,
+  rusqlite) and should stay small and easy to audit.
 
 ## Development
 
 ```bash
-npm install
-npm test          # node --test; all suites must pass
+cargo fmt --check
+cargo clippy --all-targets --all-features --locked -- -D warnings
+cargo test --all-targets --locked
+cargo test --doc --locked
+cargo build --release --locked
+node conformance/runner.mjs   # HTTP conformance against target/release/artifact-mcp
+npm test                      # browser-asset and tooling tests; no npm install needed
 ```
 
-- Node 22+. No build step — it runs from source.
-- Match the surrounding style: small modules, a DI factory (`createApp`, `createArtifactStore`), and
-  the module-singleton pattern already in `lib/`.
-- Add or update tests for any behavior change. Prefer the existing DI/in-memory harness in `test/`
+- `rust-toolchain.toml` pins the Rust toolchain. Node 22.16 or later runs the browser-asset tests,
+  the tooling scripts, the conformance runner, and Playwright. Node does not run the server
+  (ADR-0024).
+- Match the surrounding style: small modules behind the traits in `src/ports/`, and production or
+  test adapters passed to `build_router()` through `AppDeps`.
+- Add or update tests for any behavior change. Prefer the deterministic adapters in `tests/native/`
   over anything that needs real sockets or a real Cloudflare.
-- Schema changes go through a new versioned migration in `lib/migrations.js` (append-only; never edit
-  a shipped migration).
+- Schema changes go through a new versioned migration in `src/persistence/migrations.rs`
+  (append-only; never edit a shipped migration).
+- A change to HTTP or MCP behavior can change a conformance golden. Record it with
+  `node conformance/runner.mjs --record` and review the golden diff as a contract change.
 
 ## Pull requests
 
 - Keep PRs focused — one concern each.
 - Describe **what** changed, **why**, and **how you verified it** (tests, manual steps).
-- Confirm `npm test` is green.
+- Confirm the commands in [Development](#development) are green.
 - By contributing, you agree your contributions are licensed under the project's Apache License 2.0.
 
 ## Sign your commits (DCO)

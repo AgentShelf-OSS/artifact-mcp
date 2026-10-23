@@ -94,10 +94,6 @@ docker compose up -d --build
 docker logs artifact-mcp 2>&1 | grep "viewer identity mode ready"
 ```
 
-> Need the compatibility twin for development? `npm install && npm run dev` starts the Node
-> reference runtime directly with loopback header-trust already enabled. The shipped Compose
-> service and production image use Rust.
-
 You should see a structured log with `"identity_mode":"header-trust"`. Publish a test artifact:
 
 ```bash

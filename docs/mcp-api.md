@@ -22,7 +22,7 @@ before the method runs. Omitting the ID remains a notification with no JSON-RPC 
 Errors with an unreadable ID use `id: null` in the legacy contract and omit `id` in the modern
 contract. Malformed requests with a valid ID preserve it in the error response.
 Use string IDs for values outside JavaScript's safe integer range (`±9007199254740991`) to
-preserve the same identifier in both runtimes.
+preserve the identifier exactly.
 
 Clients without the newer capabilities receive the ordinary text and structured result fallback.
 Artifact resources use private-cache-aware responses through `resources/list`, `resources/read`,

@@ -1,6 +1,6 @@
 # Frontend maintenance
 
-This guide describes the current Artifact MCP UI contract. Keep the Node and Rust renderers, their shared assets, and browser behavior aligned when changing a surface.
+This guide describes the current Artifact MCP UI contract. Keep the Rust renderer, the shared assets, and browser behavior aligned when changing a surface.
 
 ## Design and layout contract
 
@@ -13,7 +13,7 @@ The visual language is a restrained slate / paper / copper system: cool slate ap
 
 ## Renderer and state boundaries
 
-Node is the reference server-rendered implementation; Rust mirrors it through Askama templates and the native renderer. Changes to HTML structure, inline assets, escaping, or sandbox attributes require parity checks in both runtimes. Do not introduce a renderer-only visual behavior.
+The Rust server renders pages through Askama templates and the native renderer. A change to HTML structure, inline assets, escaping, or sandbox attributes changes the HTTP conformance goldens and the Playwright journeys. Review those diffs as contract changes.
 
 Gallery and viewer chrome include their CSS and JavaScript in the page HTML. Keep viewer identity, permissions, feedback, and artifact configuration in the private page HTML. Keep theme startup before paint. Changes to an embedded Rust asset require a new binary build.
 
@@ -43,10 +43,10 @@ All request-derived values in templates must be escaped. Keep CSRF/mutation prot
 
 ## Ownership and file map
 
-- Gallery markup: `templates/gallery.html`; Node/Rust composition and projections: `lib/portal.js`, `src/render/portal.rs`, and `templates/gallery.html`.
+- Gallery markup: `templates/gallery.html`; composition and projections: `src/render/portal.rs` and `src/render/view_models.rs`.
 - Gallery behavior and layout: `assets/portal.js`, `assets/portal.css`.
-- Full viewer shell and feedback inspector: `templates/artifact-shell.html`, `assets/shell.js`, `assets/shell.css`, with Node/Rust shell projections in `lib/portal.js` and `src/render/portal.rs`.
-- Administration: `templates/settings.html`, `lib/settings.js`, `assets/settings.js`, `assets/settings.css`.
+- Full viewer shell and feedback inspector: `templates/artifact-shell.html`, `assets/shell.js`, `assets/shell.css`, with shell projections in `src/render/portal.rs`.
+- Administration: `templates/settings.html`, `src/render/settings.rs`, `assets/settings.js`, `assets/settings.css`.
 - Access states: `templates/not-found.html`, `templates/not-signed-in.html`, `templates/access-retry.html` and their matching `assets/not-found.css`, `assets/not-signed-in.css`, `assets/access-retry.css`.
 - Trusted MCP review surface: `assets/mcp-review-app.html`.
 - Anchored comment interactions are owned by PBI-086. Coordinate changes to marker, composer, inspector, and feedback projection behavior with that implementation rather than duplicating it in Gallery code.
@@ -60,7 +60,7 @@ node --test test/gallery-library-layout.test.js test/admin-access-visual-contrac
 cargo test --test native u15_render
 ```
 
-For browser behavior, use the isolated two-runtime Playwright harness described in [`playwright/README.md`](../playwright/README.md). Run the focused suites after starting disposable Node and Rust instances:
+For browser behavior, use the isolated Playwright harness described in [`playwright/README.md`](../playwright/README.md). Run the focused suites after starting a disposable Rust server:
 
 ```sh
 cd playwright

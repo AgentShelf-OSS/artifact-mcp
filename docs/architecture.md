@@ -4,8 +4,7 @@ Artifact MCP is a modular monolith. The production image runs a static Rust bina
 Askama in a non-root distroless container. SQLite stores metadata, and ordinary files store
 artifact bodies, bundles, retained revisions, and optional previews.
 
-The Node implementation remains an independent compatibility twin and test oracle. Docker Compose
-uses the Rust server by default.
+Rust is the only server implementation. ADR-0024 retired the Node compatibility twin.
 
 ## Request paths
 
@@ -61,9 +60,8 @@ Bundle path handling rejects traversal, absolute paths, and configured size or f
 
 ### Scheduled reminders
 
-Both runtimes store reminders, opt-ins, and push subscriptions with identical routes, MCP tool,
-validation, and schema (ADR-0012). Only the Rust runtime runs the reminder sweeper and the Web Push
-sender, next to the Discord delivery worker. The Node reference stores reminders but never sends them.
+The server stores reminders, opt-ins, and push subscriptions (ADR-0012). The reminder sweeper and
+the Web Push sender run next to the Discord delivery worker.
 
 ## Storage and lifecycle
 
@@ -89,7 +87,6 @@ the [durability runbook](ops/durability.md).
 | `src/render/`, `templates/`, and `assets/` | Gallery, viewer, and administration UI. |
 | `src/integrations/` | Notifications and preview rendering. |
 | `src/observability.rs` | Privacy-safe metrics. |
-| `server.js` and `lib/` | Node compatibility twin. |
 
 Read [CONTEXT.md](../CONTEXT.md) for domain language and module responsibilities. The decision
 records under [docs/adr](adr/) explain why the server uses a modular monolith, SQLite plus files,

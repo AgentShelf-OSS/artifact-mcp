@@ -28,8 +28,7 @@ image through authenticated `/mcp`, with 20
 warmups and 200 measured publish/update operations for 64 KiB single bodies and ten-file 640 KiB
 bundles, reporting p50/p95/max plus inspected image ID, OCI labels, host, and mount identity. A
 local image tag is valid for before/after comparison; release evidence must name an immutable OCI
-digest. `benchmark-durability.mjs` is a Node-reference compatibility twin only and is not
-production performance evidence.
+digest.
 
 ## Backups
 
@@ -50,7 +49,7 @@ pass. Restore into a fresh data directory and run normal startup reconciliation 
 backup.
 
 The verifier is a Python 3 standard-library helper (`scripts/backup-coherence.py`), so restore and
-backup operators do not need the application’s Node native modules. It requires the staged database
+backup operators need only Python 3. It requires the staged database
 when the source has one, rejects pending durability intents and missing current/retained bodies,
 and verifies canonical bundle manifests and SHA-256 digests. It fsyncs copied files and directories
 before the staging directory is atomically renamed; the destination directory is then synced. Each

@@ -3,7 +3,7 @@
 > A self-hosted MCP server and gallery for HTML made by AI agents.
 
 [![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
-![CI](https://img.shields.io/badge/CI-Rust%20%2B%20Node-2088FF.svg)
+![CI](https://img.shields.io/badge/CI-Rust-2088FF.svg)
 ![MCP 2026](https://img.shields.io/badge/MCP-2025--06--18%20%2B%202026--07--28-6E56CF.svg)
 
 [![Arty, the Artifact MCP mascot, beside the words Give agent-made pages a home](docs/screenshots/00-arty-hero.png)](https://artifact-mcp.neilblackman.dev)
@@ -25,7 +25,7 @@ feedback on exact points or regions, inspect older revisions, and create revocab
 - Persist org-shared notes and other JSON through the [viewer state bridge](GETTING_STARTED.md#persisting-state-from-an-artifact).
 - Connect artifacts to several APIs through [named live-data sources](docs/live-data.md), with JSON queries, polling, event streams, and producer updates through MCP. Manage saved sources and artifact bindings in the admin [Connections workspace](docs/live-data.md#manage-connections-in-administration).
 - Schedule [reminders](docs/web-push-reminders.md) from an artifact or through MCP that reach
-  opted-in viewers as Web Push notifications, also on a locked phone (Rust runtime).
+  opted-in viewers as Web Push notifications, also on a locked phone.
 - Read HTML aloud from the viewer with optional [local narration](ops/tts/README.md), including
   a mini player, saved positions, and automatic chapter continuation for supported ereaders.
 - Search and organize artifacts by organization, category, owner, review state, and visibility.

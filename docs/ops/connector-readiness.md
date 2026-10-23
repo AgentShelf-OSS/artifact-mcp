@@ -59,8 +59,8 @@ the checklist itself is not evidence.
 
 ## Testing and operations
 
-- [ ] `cargo fmt --check`, clippy with warnings denied, the complete Rust suite, and the complete
-      Node parity suite pass.
+- [ ] `cargo fmt --check`, clippy with warnings denied, the complete Rust suite, and the HTTP
+      conformance suite pass.
 - [ ] Browser QA passes for the MCP review App at desktop and mobile sizes with no console errors.
 - [ ] Prometheus scrape succeeds and `ops/prometheus/artifact-mcp-alerts.yml` passes `promtool`.
 - [ ] A success, authentication failure, authorization failure, validation failure, server
