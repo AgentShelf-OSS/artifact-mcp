@@ -51,13 +51,14 @@ impl BrowserOptions {
     }
 }
 
+/// Events of the browser target (no session), for example `Target.targetCreated`.
 #[derive(Default)]
-struct BrowserEvents {
-    hub: EventHub,
+pub(crate) struct BrowserEvents {
+    pub(crate) hub: EventHub,
 }
 
 impl EventSink for BrowserEvents {
-    fn on_event(&self, method: &str, params: &Value) {
+    fn on_event(&self, _session: Option<&str>, method: &str, params: &Value) {
         self.hub.publish(method, params);
     }
 }
@@ -103,6 +104,14 @@ impl Browser {
                 options.executable.display()
             )));
         }
+        // `Target.targetCreated` events let pages wait for their popups.
+        if let Err(error) = browser
+            .command("Target.setDiscoverTargets", json!({"discover": true}))
+            .await
+        {
+            browser.close().await;
+            return Err(Error::Launch(format!("target discovery: {error}")));
+        }
         Ok(browser)
     }
 
@@ -119,7 +128,31 @@ impl Browser {
     /// A new tab in a new browser context (no shared cookies, storage or cache), with a
     /// 1280×720 viewport.
     pub async fn new_page(&self) -> Result<Page, Error> {
-        Page::open(Arc::clone(&self.connection), self.timeout).await
+        Page::open(
+            Arc::clone(&self.connection),
+            Arc::clone(&self.events),
+            self.timeout,
+        )
+        .await
+    }
+
+    /// Dispose of every browser context the harness created (each page's own context, with all
+    /// its tabs and popups). Pages of those contexts stop working.
+    pub async fn dispose_contexts(&self) -> Result<(), Error> {
+        let contexts = self.command("Target.getBrowserContexts", json!({})).await?;
+        for context in contexts
+            .get("browserContextIds")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            self.command(
+                "Target.disposeBrowserContext",
+                json!({"browserContextId": context}),
+            )
+            .await?;
+        }
+        Ok(())
     }
 
     /// Send a raw DevTools command to the browser target.

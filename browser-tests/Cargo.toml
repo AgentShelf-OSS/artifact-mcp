@@ -24,6 +24,14 @@ name = "js"
 path = "tests/js.rs"
 harness = false
 
+# `tests/e2e` drives the artifact-mcp release binary (`ARTIFACT_MCP_BIN`) in the browser: the
+# journeys ported from `playwright/tests`. One server and one browser serve every case, so it has
+# its own `main` with a global setup and teardown.
+[[test]]
+name = "e2e"
+path = "tests/e2e/main.rs"
+harness = false
+
 [workspace]
 
 [dependencies]

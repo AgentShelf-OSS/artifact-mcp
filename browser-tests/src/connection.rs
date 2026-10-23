@@ -24,8 +24,16 @@ type Reply = Result<Value, Error>;
 
 /// Receives the events of one session (or of the browser target).
 pub(crate) trait EventSink: Send + Sync {
-    /// Called on the reader task, in arrival order. Must not block.
-    fn on_event(&self, method: &str, params: &Value);
+    /// Called on the reader task, in arrival order. Must not block. `session` is the session the
+    /// event came from (`None` for the browser target).
+    fn on_event(&self, session: Option<&str>, method: &str, params: &Value);
+
+    /// Whether targets auto-attached to one of this sink's sessions (out-of-process iframes and
+    /// workers) send their events here too. The child session is registered on the reader task,
+    /// before its first event is read, so nothing it sends is lost.
+    fn adopts_children(&self) -> bool {
+        false
+    }
 }
 
 /// Event subscriptions by method name.
@@ -42,6 +50,13 @@ impl EventHub {
             method: method.to_owned(),
             receiver,
         }
+    }
+
+    /// Whether anyone listens for `method`, so callers can skip building an event nobody reads.
+    pub(crate) fn has_subscribers(&self, method: &str) -> bool {
+        lock(&self.subscribers)
+            .iter()
+            .any(|(wanted, sender)| wanted == method && !sender.is_closed())
     }
 
     pub(crate) fn publish(&self, method: &str, params: &Value) {
@@ -173,8 +188,16 @@ impl Connection {
             Some(session) => lock(&self.shared).sessions.get(session).cloned(),
             None => Some(Arc::clone(&self.browser_events)),
         };
+        if method == "Target.attachedToTarget"
+            && session.is_some()
+            && let Some(sink) = &sink
+            && sink.adopts_children()
+            && let Some(child) = params.get("sessionId").and_then(Value::as_str)
+        {
+            self.register_session(child, Arc::clone(sink));
+        }
         if let Some(sink) = sink {
-            sink.on_event(method, params);
+            sink.on_event(session, method, params);
         }
         match method {
             "Target.detachedFromTarget" => {

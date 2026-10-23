@@ -26,13 +26,26 @@
 //! # }
 //! ```
 //!
-//! The JavaScript unit tests in `js/` run through [`suite`]; see `README.md`.
+//! Pages also have a Playwright-style layer: [`Locator`]s ([`Page::locator`],
+//! [`Page::get_by_role`], [`Page::frame_locator`], ...) with auto-waiting actions, auto-retrying
+//! [`expect`]ations, keyboard, mouse and touch input, network waiters and routes.
+//!
+//! The JavaScript unit tests in `js/` run through [`suite`]; the end-to-end journeys against the
+//! server run through [`e2e`]; see `README.md`.
 #![forbid(unsafe_code)]
 
 mod browser;
 mod connection;
+pub mod e2e;
+mod expect;
+pub mod http;
+mod input;
+mod locator;
+mod network;
 mod page;
 mod route;
+pub mod server;
+mod state;
 pub mod suite;
 
 use std::fmt;
@@ -42,8 +55,17 @@ use std::time::Duration;
 pub use artifact_cdp::Network;
 pub use browser::{Browser, BrowserOptions, TEMP_DIR_PREFIX};
 pub use connection::Subscription;
-pub use page::{LogEntry, Page, ScriptError};
-pub use route::{Request, Response, StaticFiles, content_type};
+pub use expect::{
+    LocatorAssertions, begin_step, current_step, expect, expect_timeout, failure_screenshot, poll,
+    set_current_test, set_expect_timeout, set_failure_dir,
+};
+pub use input::{Keyboard, Mouse, MouseButton, Touchscreen};
+pub use locator::{
+    BoundingBox, ClickOptions, FrameLocator, Locator, Pattern, Role, WaitState, exact, regex,
+};
+pub use network::{NetworkRequest, NetworkResponse, Waiter};
+pub use page::{Dialog, DialogAction, Frame, LogEntry, Page, PopupWaiter, ScriptError};
+pub use route::{Request, Response, Route, StaticFiles, content_type, glob_matches};
 
 /// Everything that can go wrong while driving the browser.
 #[derive(Debug)]
@@ -62,6 +84,11 @@ pub enum Error {
     Navigation(String),
     /// A reply did not have the expected shape.
     Protocol(String),
+    /// An expectation ([`expect`]) did not hold in time. The text names the locator, the
+    /// expected and received values, and a screenshot.
+    Assertion(String),
+    /// A locator that must select one element selected several (Playwright's strict mode).
+    Strict(String),
 }
 
 impl fmt::Display for Error {
@@ -74,6 +101,8 @@ impl fmt::Display for Error {
             Self::Evaluation(detail) => write!(formatter, "JavaScript error: {detail}"),
             Self::Navigation(detail) => write!(formatter, "navigation failed: {detail}"),
             Self::Protocol(detail) => write!(formatter, "unexpected DevTools reply: {detail}"),
+            Self::Assertion(detail) => formatter.write_str(detail),
+            Self::Strict(detail) => write!(formatter, "strict mode violation: {detail}"),
         }
     }
 }

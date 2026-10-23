@@ -6,34 +6,6 @@ on:
   pull_request:
 
 jobs:
-  browser-tests:
-    # Browser-asset tests run in the pinned chrome-headless-shell, driven from Rust. No Node.
-    runs-on: ubuntu-latest
-    env:
-      CI: "1"
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy, rustfmt
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: browser-tests
-      - name: Download the pinned chrome-headless-shell from preview-renderer/Dockerfile
-        run: |
-          set -euo pipefail
-          version="$(sed -nE 's/^ARG CHROME_VERSION=(.+)$/\1/p' preview-renderer/Dockerfile)"
-          sha256="$(sed -nE 's/^ARG CHROME_SHA256=(.+)$/\1/p' preview-renderer/Dockerfile)"
-          [ -n "$version" ] && [ -n "$sha256" ]
-          curl -fsSL --retry 3 -o "$RUNNER_TEMP/chs.zip" \
-            "https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-headless-shell-linux64.zip"
-          echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
-          unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
-          echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
-      - run: cargo fmt --manifest-path browser-tests/Cargo.toml --check
-      - run: cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
-      - run: cargo test --manifest-path browser-tests/Cargo.toml --locked
-
   rust:
     # `cargo test` is the whole server gate: unit and native tests, the HTTP conformance replay
     # (tests/conformance), the derived MCP surface check (tests/mcp_surface), and the frozen
@@ -98,21 +70,47 @@ jobs:
       - run: cargo test --manifest-path preview-renderer/Cargo.toml --locked
 
   browser:
-    # Real Chromium journeys run against the Rust release binary. The instance has an isolated
-    # database, and global teardown removes the synthetic organization and artifacts.
+    # Browser tests run in the pinned chrome-headless-shell, driven from Rust: the browser-asset
+    # tests and the journeys against the Rust release binary (browser-tests/). Each journey run
+    # has an isolated database, and teardown removes the synthetic organization and artifacts.
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [browser-tests, rust]
+    timeout-minutes: 30
+    needs: [rust]
+    env:
+      CI: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            browser-tests
+      - run: cargo build --release --locked
+      - name: Download the pinned chrome-headless-shell from preview-renderer/Dockerfile
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^ARG CHROME_VERSION=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          sha256="$(sed -nE 's/^ARG CHROME_SHA256=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          [ -n "$version" ] && [ -n "$sha256" ]
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/chs.zip" \
+            "https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-headless-shell-linux64.zip"
+          echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
+          echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
+          echo "ARTIFACT_MCP_BIN=$GITHUB_WORKSPACE/target/release/artifact-mcp" >> "$GITHUB_ENV"
+      - run: cargo fmt --manifest-path browser-tests/Cargo.toml --check
+      - run: cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path browser-tests/Cargo.toml --locked
+      # Temporary: Playwright specs 10-18 and the reader suite still run under Node until they move
+      # to browser-tests.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
           cache: npm
           cache-dependency-path: playwright/package-lock.json
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
       - run: npm --prefix playwright ci
       - run: npm --prefix playwright exec -- playwright install --with-deps chromium
       - name: Run browser journeys against the Rust server

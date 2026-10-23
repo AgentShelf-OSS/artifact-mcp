@@ -63,12 +63,15 @@ cargo test --test native u15_render
 
 The browser-asset tests run in Chrome for Testing `chrome-headless-shell`, driven from Rust. Use the version pinned in `preview-renderer/Dockerfile`. See [`browser-tests/README.md`](../browser-tests/README.md).
 
-For browser behavior, use the isolated Playwright harness described in [`playwright/README.md`](../playwright/README.md). Run the focused suites after starting a disposable Rust server:
+For browser behavior, run the end-to-end journeys in `browser-tests/tests/e2e`. They start a disposable Rust server with its own data directory; see [`browser-tests/README.md`](../browser-tests/README.md). Run the focused suites:
 
 ```sh
-cd playwright
-npx playwright test tests/01-gallery.spec.mjs tests/02-viewer.spec.mjs tests/08-settings.spec.mjs -c playwright.config.mjs
+cargo build --release --locked
+ARTIFACT_MCP_BIN=$PWD/target/release/artifact-mcp \
+  cargo test --manifest-path browser-tests/Cargo.toml --locked --test e2e -- 01-gallery 02-viewer 08-settings
 ```
+
+Specs that are not ported yet still run in the isolated Playwright harness described in [`playwright/README.md`](../playwright/README.md), after starting a disposable Rust server.
 
 Use separate throwaway data directories and disposable test keys. Never point the harness at production data. For a broad contract check, run `cargo test --manifest-path browser-tests/Cargo.toml --locked` and `cargo test --all-targets --locked` from the repository root.
 
