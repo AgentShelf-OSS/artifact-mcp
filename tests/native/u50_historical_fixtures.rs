@@ -109,6 +109,203 @@ fn file_bytes(path: &Path) -> u64 {
         .sum()
 }
 
+/// Every regular file under `root`, as (`/`-separated relative path, bytes, SHA-256), sorted by
+/// path. Symbolic links and other special files are not fixture content and are skipped.
+fn file_manifest(root: &Path) -> Vec<(String, u64, String)> {
+    fn visit(base: &Path, directory: &Path, entries: &mut Vec<(String, u64, String)>) {
+        for entry in std::fs::read_dir(directory).expect("read fixture directory") {
+            let entry = entry.expect("fixture directory entry");
+            let kind = entry.file_type().expect("fixture entry type");
+            let path = entry.path();
+            if kind.is_dir() {
+                visit(base, &path, entries);
+            } else if kind.is_file() {
+                let bytes = std::fs::read(&path).expect("read fixture file");
+                let relative = path
+                    .strip_prefix(base)
+                    .expect("fixture file under its root")
+                    .components()
+                    .map(|part| part.as_os_str().to_string_lossy().into_owned())
+                    .collect::<Vec<_>>()
+                    .join("/");
+                entries.push((
+                    relative,
+                    bytes.len() as u64,
+                    artifact_mcp::artifacts::digest::sha256_hex(&bytes),
+                ));
+            }
+        }
+    }
+    let mut entries = Vec::new();
+    visit(root, root, &mut entries);
+    entries.sort();
+    entries
+}
+
+/// SQLite side files that a read-only verification must never leave behind.
+const SQLITE_SIDE_FILES: [&str; 3] = ["-shm", "-wal", "-journal"];
+
+/// Verify a frozen fixture before anything opens it for writing (formerly
+/// `scripts/verify-historical-fixtures.mjs`): the manifest is a synthetic schema-1 manifest, the
+/// database bytes match its digest, the body manifest lists exactly the bytes and SHA-256 of every
+/// file under `artifacts/`, the database passes `PRAGMA integrity_check` read-only, and that
+/// read-only check leaves no SQLite side file next to the source.
+fn verify_frozen_fixture(root: &Path) -> Result<(), String> {
+    let name = root
+        .file_name()
+        .map_or_else(String::new, |name| name.to_string_lossy().into_owned());
+    let manifest: Value = serde_json::from_slice(
+        &std::fs::read(root.join("fixture.json"))
+            .map_err(|error| format!("{name}: read fixture.json: {error}"))?,
+    )
+    .map_err(|error| format!("{name}: fixture.json: {error}"))?;
+    if manifest["synthetic"] != Value::Bool(true) || manifest["schemaVersion"].as_f64() != Some(1.0)
+    {
+        return Err(format!("{name}: invalid fixture manifest"));
+    }
+    let database_name = manifest["database"]["path"]
+        .as_str()
+        .ok_or_else(|| format!("{name}: manifest names no database"))?;
+    let database = root.join(database_name);
+    let digest = artifact_mcp::artifacts::digest::sha256_hex(
+        &std::fs::read(&database).map_err(|error| format!("{name}: read database: {error}"))?,
+    );
+    if Some(digest.as_str()) != manifest["database"]["sha256"].as_str() {
+        return Err(format!("{name}: artifacts.db digest changed"));
+    }
+
+    // Order is not part of the contract (the generator sorted with a locale collation), so both
+    // sides are compared sorted by path; every entry must carry exactly path, bytes and sha256.
+    let mut recorded = Vec::new();
+    for entry in manifest["bodies"]
+        .as_array()
+        .ok_or_else(|| format!("{name}: manifest has no body list"))?
+    {
+        let fields = entry.as_object().map(|fields| {
+            let mut keys = fields.keys().map(String::as_str).collect::<Vec<_>>();
+            keys.sort_unstable();
+            keys
+        });
+        let parsed = (
+            entry["path"].as_str(),
+            entry["bytes"].as_u64(),
+            entry["sha256"].as_str(),
+        );
+        match (fields.as_deref(), parsed) {
+            (Some(["bytes", "path", "sha256"]), (Some(path), Some(bytes), Some(sha256))) => {
+                recorded.push((path.to_owned(), bytes, sha256.to_owned()));
+            }
+            _ => return Err(format!("{name}: malformed body manifest entry {entry}")),
+        }
+    }
+    recorded.sort();
+    let artifacts = root.join("artifacts");
+    let actual = if artifacts.is_dir() {
+        file_manifest(&artifacts)
+    } else {
+        Vec::new()
+    };
+    if actual != recorded {
+        let changed = actual
+            .iter()
+            .filter(|entry| !recorded.contains(entry))
+            .chain(recorded.iter().filter(|entry| !actual.contains(entry)))
+            .map(|(path, _, _)| path.as_str())
+            .collect::<Vec<_>>();
+        return Err(format!("{name}: body manifest changed: {changed:?}"));
+    }
+
+    // Integrity before the application touches a copy catches bad fixture snapshots instead of
+    // allowing migration to mask the defect.
+    let integrity = Connection::open_with_flags(&database, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .and_then(|raw| raw.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0)))
+        .map_err(|error| format!("{name}: pre-migration integrity_check failed: {error}"))?;
+    if integrity != "ok" {
+        return Err(format!(
+            "{name}: pre-migration integrity_check is {integrity}"
+        ));
+    }
+    for suffix in SQLITE_SIDE_FILES {
+        let side_file = root.join(format!("{database_name}{suffix}"));
+        if side_file.exists() {
+            return Err(format!(
+                "{name}: read-only verification left {}",
+                side_file.display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn the_frozen_fixture_verifier_rejects_changed_bytes_flags_and_side_files() {
+    let (name, manifest) = case_names()
+        .into_iter()
+        .find_map(|name| {
+            let manifest: Value = serde_json::from_slice(
+                &std::fs::read(fixture_root().join(&name).join("fixture.json"))
+                    .expect("read fixture manifest"),
+            )
+            .expect("fixture manifest JSON");
+            manifest["bodies"]
+                .as_array()
+                .is_some_and(|bodies| !bodies.is_empty())
+                .then_some((name, manifest))
+        })
+        .expect("a frozen fixture with artifact bodies");
+    let body = manifest["bodies"][0]["path"]
+        .as_str()
+        .expect("body path")
+        .to_owned();
+    let copy = |label: &str| {
+        let copied = TempDataDir::new(&format!("historical-verify-{label}"));
+        copy_tree(&fixture_root().join(&name), copied.path());
+        copied
+    };
+    let flip_byte = |path: &Path| {
+        let mut bytes = std::fs::read(path).expect("read copied file");
+        let middle = bytes.len() / 2;
+        bytes[middle] ^= 0x01;
+        std::fs::write(path, bytes).expect("write copied file");
+    };
+    let rejected = |copied: &TempDataDir, expected: &str| {
+        let error = verify_frozen_fixture(copied.path()).expect_err("verification must fail");
+        assert!(error.contains(expected), "{expected:?} not in {error:?}");
+    };
+
+    let faithful = copy("faithful");
+    verify_frozen_fixture(faithful.path()).expect("an exact copy verifies");
+
+    let body_byte = copy("body-byte");
+    flip_byte(&body_byte.path().join("artifacts").join(&body));
+    rejected(&body_byte, "body manifest changed");
+
+    let extra_body = copy("extra-body");
+    std::fs::write(
+        extra_body.path().join("artifacts/unlisted.html"),
+        "<p>x</p>",
+    )
+    .expect("add unlisted body");
+    rejected(&extra_body, "body manifest changed");
+
+    let database_byte = copy("database-byte");
+    flip_byte(&database_byte.path().join("artifacts.db"));
+    rejected(&database_byte, "artifacts.db digest changed");
+
+    let not_synthetic = copy("not-synthetic");
+    let manifest_path = not_synthetic.path().join("fixture.json");
+    let mut edited: Value =
+        serde_json::from_slice(&std::fs::read(&manifest_path).expect("read copied manifest"))
+            .expect("copied manifest JSON");
+    edited["synthetic"] = Value::Bool(false);
+    std::fs::write(&manifest_path, edited.to_string()).expect("write copied manifest");
+    rejected(&not_synthetic, "invalid fixture manifest");
+
+    let side_file = copy("side-file");
+    std::fs::write(side_file.path().join("artifacts.db-wal"), b"").expect("add stray WAL");
+    rejected(&side_file, "read-only verification left");
+}
+
 #[tokio::test]
 async fn every_frozen_historical_database_boots_recovers_and_serves_without_mutating_the_source() {
     let names = case_names();
@@ -120,6 +317,8 @@ async fn every_frozen_historical_database_boots_recovers_and_serves_without_muta
 
     for name in names {
         let source = fixture_root().join(&name);
+        let source_tree = file_manifest(&source);
+        verify_frozen_fixture(&source).unwrap_or_else(|error| panic!("{error}"));
         let manifest: Value = serde_json::from_slice(
             &std::fs::read(source.join("fixture.json")).expect("read fixture manifest"),
         )
@@ -136,26 +335,9 @@ async fn every_frozen_historical_database_boots_recovers_and_serves_without_muta
             manifest["origin"]["sourceRef"].is_object(),
             "{name}: immutable source ref"
         );
+        // `verify_frozen_fixture` already proved the digest and read-only integrity.
         let original_db = source.join("artifacts.db");
         let before = source_digest(&original_db);
-        assert_eq!(
-            before,
-            manifest["database"]["sha256"]
-                .as_str()
-                .expect("database digest")
-        );
-
-        // Integrity before the application touches a copy catches bad fixture snapshots instead
-        // of allowing migration to mask the defect.
-        {
-            let raw = Connection::open_with_flags(&original_db, OpenFlags::SQLITE_OPEN_READ_ONLY)
-                .expect("open frozen database read-only test");
-            assert_eq!(
-                raw.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))
-                    .expect("pre integrity"),
-                "ok"
-            );
-        }
 
         let copied = TempDataDir::new(&format!("historical-{name}"));
         copy_tree(&source, copied.path());
@@ -481,6 +663,13 @@ async fn every_frozen_historical_database_boots_recovers_and_serves_without_muta
             source_digest(&original_db),
             before,
             "{name}: checked-in database was never mutated"
+        );
+        // No file was added, removed or changed anywhere in the source fixture (this includes
+        // SQLite -shm/-wal/-journal side files and every artifact body).
+        assert_eq!(
+            file_manifest(&source),
+            source_tree,
+            "{name}: checked-in fixture tree was never mutated"
         );
     }
 }

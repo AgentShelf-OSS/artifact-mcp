@@ -7,8 +7,26 @@ Working notes that started with U00 (M0). Everything here is deliberate scope, n
 The oracle was built to prove that the Rust rewrite behaves like the Node reference server
 (`server.js` + `lib/`). Both ran every case until the Node twin was removed from the build. The
 goldens in `goldens/` were recorded from Node and replayed byte-for-byte against Rust; they are now
-the contract for the Rust server alone. `--record` records from Rust, which freezes current
-behavior, so a re-recorded golden must be reviewed as a deliberate behavior change.
+the contract for the Rust server alone. `CONFORMANCE_RECORD=1` records from Rust, which freezes
+current behavior, so a re-recorded golden must be reviewed as a deliberate behavior change.
+
+## The runner is a Rust integration test
+
+The Node runner (`runner.mjs`, `comparators.mjs`, `testkit.mjs`, `rust-driver.mjs`) was ported to
+`tests/conformance/` so that `cargo test` alone gates the server. The case schema, normalization
+rules, comparators, post-state checks, base environment, credentials and audit key are unchanged,
+and the port was accepted only after a Rust record run produced goldens byte-identical to a Node
+record run of the same server. Two details exist only to keep that equivalence:
+
+- `tests/conformance/js.rs` reproduces JavaScript JSON semantics (property order, number
+  formatting, `JSON.stringify` escaping) because comparisons and goldens are defined as
+  `JSON.stringify` output.
+- `tests/conformance/http.rs` sends the request headers `node:http` sent (`Host`,
+  `Connection: keep-alive`, and an empty chunked body for a body-less `POST`, `PUT` or `PATCH`)
+  and folds duplicate response headers with the `node:http` rules.
+
+Cases now run on up to four worker threads (`CONFORMANCE_JOBS`); each still has its own server
+process, port and data dir.
 
 ## Resolved — the invariant-3 golden (blueprint §B6)
 
@@ -60,17 +78,18 @@ publisher tenant-lock. Deferred:
   empty `DATA_DIR` migrates it to the current schema and creates `artifacts/`. That keeps the
   fixture implementation-neutral and avoids an opaque, drift-prone SQLite blob in git. See
   `fixtures/README.md`.
-- **Request paths are sent verbatim.** `testkit.httpRequest` parses only the origin out of
-  `baseUrl` and passes `path` straight to `node:http`. Running paths through the WHATWG URL
-  parser would collapse dot-segments and percent-decode `%2e`, silently defusing the bundle
-  traversal cases before they reached the server.
-- **No npm dependencies.** Post-state SQL uses the built-in `node:sqlite` module. Post-state
-  reads open the database read-only after the server stops; `afterSql` fixture shaping is the
-  only writer, and it uses a busy timeout because the server is still running.
-- **`--record` refuses to write when runtime assertions fail**, so a regression can never be
-  laundered into a golden by re-recording.
+- **Request paths are sent verbatim.** `tests/conformance/http.rs` writes the request-target
+  bytes as the case wrote them. Running paths through a URL parser would collapse dot-segments
+  and percent-decode `%2e`, silently defusing the bundle traversal cases before they reached the
+  server.
+- **No extra dependencies.** The runner uses only crates the server already depends on;
+  post-state SQL uses `rusqlite`. Post-state reads open the database read-only after the server
+  stops; `afterSql` fixture shaping is the only writer, and it uses a busy timeout because the
+  server is still running.
+- **`CONFORMANCE_RECORD=1` refuses to write when runtime assertions fail**, so a regression can
+  never be laundered into a golden by re-recording.
 - **`sameAsStep` is golden-independent.** Uniformity/concealment contracts are checked
   within a single run, so they hold even if someone re-records the goldens.
-- **A run that ends without reporting results fails.** The runner exits through one function;
-  a natural exit (for example a server handle that never settled) is reported as a failure, not
-  a silent success.
+- **Every failure is reported, together.** All cases run even after one fails, and the test
+  panics once with every failed case and its details. A case with no golden, a server that does
+  not become healthy, and a server that exits early are failures, not skips.

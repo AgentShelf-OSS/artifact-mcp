@@ -10,22 +10,27 @@ conformance families).
 
 ## Running
 
+The runner is a Rust integration test, `tests/conformance/`. It starts the `artifact-mcp`
+binary that Cargo builds for the same test run (`CARGO_BIN_EXE_artifact-mcp`), so no separate
+build step or binary path is needed.
+
 ```bash
-cargo build --release --locked
-node conformance/runner.mjs                  # gate: replay every recorded golden
-node conformance/runner.mjs --filter raw     # subset by case id or tag
-node conformance/runner.mjs --record         # regenerate goldens (see discipline)
+cargo test --test conformance                                 # gate: replay every recorded golden
+CONFORMANCE_FILTER=raw cargo test --test conformance          # subset by case id or tag
+CONFORMANCE_RECORD=1 cargo test --test conformance            # regenerate goldens (see discipline)
+cargo test --test conformance -- --nocapture                  # also print every case result
 ```
 
-The runner starts `target/release/artifact-mcp`, or the executable named by
-`RUST_ARTIFACT_MCP_BIN`. `--impl rust` is still accepted for older scripts; any other
-`--impl` value is a usage error.
+| Variable | Effect |
+|---|---|
+| `CONFORMANCE_FILTER=<text>` | Run only cases whose id or any tag contains `<text>`. No match is a failure. |
+| `CONFORMANCE_RECORD=1` | Write goldens instead of comparing. Any other non-empty value except `0` is a usage error. |
+| `CONFORMANCE_JOBS=<n>` | Number of cases that run at the same time (default: CPU count, at most 4). Each case still has its own server and data dir. |
 
-Exit codes: `0` all good, `1` a diff / failed assertion / runner error / missing binary,
-`2` bad usage. A missing binary is a failure, because nothing ran is not success.
-
-Requires Node 22.16 or newer for the built-in `node:sqlite` module. Node prints an
-`ExperimentalWarning` for that module; it does not affect the result.
+The test fails on any diff, failed assertion, missing golden, or runner error. All case
+failures are reported together in one panic message. A server that does not start, exits
+before `/health` answers, or misses the 15 s health deadline fails its case, and the failure
+includes the server output.
 
 ### Per case, the runner
 
@@ -38,8 +43,10 @@ Requires Node 22.16 or newer for the built-in `node:sqlite` module. Node prints 
 7. stops the server **cleanly**, then
 8. runs post-state SQL / file-hash / directory assertions.
 
-Cases never share a data directory: each run gets its own `mkdtemp` copy of the fixture, and
-the temp dir is removed afterwards.
+Cases never share a data directory: each run gets its own temporary copy of the fixture, and
+the temp dir is removed afterwards. The server binds its port only after it migrates the data
+dir, so a start that fails with `Address already in use` is retried (at most 3 times) with a
+new port and a fresh data dir. No other failure is retried.
 
 ## Case schema
 
@@ -48,7 +55,7 @@ One JSON file per case in `cases/`. The file name is the case id.
 ```jsonc
 {
   "id": "raw.single-html.delivery",
-  "tags": ["raw", "csp", "invariant-4"],   // --filter matches id or any tag
+  "tags": ["raw", "csp", "invariant-4"],   // CONFORMANCE_FILTER matches id or any tag
   "fixture": "empty-v21",                   // directory under fixtures/
   "env": { "MCP_JSON_LIMIT": "1mb" },       // merged over the base env, per case
   "pending": "reason",                      // present => reported PEND, never gates
@@ -98,7 +105,7 @@ workflow mechanism.
 
 `${name}` is substituted into paths, header values, JSON bodies and SQL queries.
 
-- **Constants** (`testkit.mjs`): publisher secrets `${key_acme}`, `${key_acme2}`,
+- **Constants** (`tests/conformance/main.rs`): publisher secrets `${key_acme}`, `${key_acme2}`,
   `${key_beta}`, `${key_admin}`; client ids; viewer emails `${viewer_acme}`,
   `${viewer_beta}`, `${admin_email}`; `${public_base}`. Forward-substituted only.
 - **Captures**: values pulled out of a response via `capture` (a dot path into the parsed
@@ -164,7 +171,7 @@ it means a change in bytes.
 - Goldens are recorded from the Rust server, which is now the only implementation. Recording
   is therefore circular by construction: it freezes whatever the server does today. Record
   only to adopt an intended behavior change, and review the golden diff as that change.
-- **`--record` is forbidden in CI.** CI only replays the goldens.
+- **`CONFORMANCE_RECORD=1` is forbidden in CI.** CI only replays the goldens.
 - Recording is refused for any case whose runtime assertions fail, so a broken state can
   never be frozen as "expected".
 - A golden diff is a **contract change**. Regenerating a golden to make a build pass is only
@@ -179,14 +186,26 @@ manifest does not name its golden file.
 
 | File | Role |
 |---|---|
-| `runner.mjs` | CLI, orchestration, substitution/capture, golden compare, post-state |
-| `rust-driver.mjs` | Boots the Rust server binary against the case data dir and port |
-| `comparators.mjs` | The B3 modes as pure normalizers |
-| `testkit.mjs` | Credentials, base env, SQLite access, HTTP client |
+| `../tests/conformance/main.rs` | Test entry point, case loading, substitution/capture, assertions, golden compare, record mode, post-state |
+| `../tests/conformance/server.rs` | Boots the server binary against the case data dir and port; SIGTERM, then SIGKILL after 3 s |
+| `../tests/conformance/http.rs` | HTTP/1.1 client that sends the request-target verbatim and folds response headers as `node:http` does |
+| `../tests/conformance/comparators.rs` | The B3 modes as pure normalizers |
+| `../tests/conformance/js.rs` | JSON with JavaScript semantics (key order, number format, `JSON.stringify` output) |
 | `cases/` | Case manifests |
 | `goldens/` | Recorded expectations |
 | `fixtures/` | Starting `DATA_DIR` states (see `fixtures/README.md`) |
 | `NOTES.md` | Deferrals, stubs, and source changes wanted but out of scope |
 
-Node stdlib only — no npm dependencies. Post-state SQL uses the built-in `node:sqlite`
-module; post-state reads open the database read-only after the server stops.
+The runner uses only crates the server already depends on. Post-state SQL uses `rusqlite`, opened
+the way `node:sqlite` opened it for the original recordings (foreign keys on, double-quoted string
+literals rejected, 5 s busy timeout). Post-state reads open the database read-only after the
+server stops.
+
+### Golden format
+
+The goldens were first written by a Node runner as `JSON.stringify(normal, null, 2)`. The Rust
+runner keeps that format byte for byte: JavaScript property order (array-index keys first, then
+insertion order), JavaScript number formatting, and `JSON.stringify` string escaping. A record run
+with no behavior change therefore rewrites only files that were edited by hand.
+`goldens/publisher.write-concealment.json` is such a file: it has hand-wrapped arrays, so record
+mode reformats it without changing its content.
