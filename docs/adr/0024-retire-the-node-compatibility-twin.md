@@ -53,14 +53,24 @@ Rust is the only server implementation. Remove the Node twin.
 - Remove the historical fixture generator, because it ran `lib/migrations.js`. The committed
   fixtures stay frozen.
 
-Node stays only where it is the correct tool:
+Then remove Node from the repository entirely. JavaScript remains only as browser code in
+`assets/`, and as test bodies that exercise that code inside a real browser.
 
-- unit tests for the browser code in `assets/`;
-- tooling scripts: the release manifest and SBOM, the MCP surface check, the Anthropic tunnel, the
-  Cloudflare Access setup, data publishing, and the OCI durability benchmark;
-- the conformance HTTP runner, which drives language-neutral cases and goldens;
-- Playwright browser tests;
-- the separate `preview-renderer/` service, which uses Playwright Chromium.
+| Former Node user | Replacement |
+| --- | --- |
+| Conformance runner (`conformance/*.mjs`) | `tests/conformance`, a Cargo test target; `CONFORMANCE_RECORD=1` records |
+| MCP surface check | `tests/mcp_surface`; `MCP_SURFACE_BASE=<ref>` prints the changed-path report |
+| Historical fixture verifier | checks inside `tests/native/u50_historical_fixtures.rs` |
+| Historical fixture generator | `cargo xtask historical-fixture`, which also verifies the committed corpus |
+| Release scripts (`scripts/release/*.mjs`) | `cargo xtask release source-sbom`, `manifest`, `verify-manifest`, `verify-fixtures-in-image`; outputs are byte-identical |
+| Operator scripts | `cargo xtask cf-access-setup`, `tunnel`, `publish-data-artifact`, `benchmark-durability` |
+| `backup.sh`, `backup-coherence.py`, `web-push-keys.mjs` | `artifact-mcp backup`, `verify-backup`, `web-push-keys` |
+| `preview-renderer/` (Node + Playwright) | the Rust `artifact-preview` binary driving a pinned Chrome for Testing `chrome-headless-shell` over a DevTools pipe |
+| Browser-asset tests (`test/*.js`) | `browser-tests/`, which runs the same test bodies in headless Chrome from Rust |
+| Playwright journeys and reader suites | Rust tests on the same harness |
+
+The preview renderer keeps the same HTTP contract. It adds network defences that close
+speculation-rules prefetch and WebRTC paths, which the Node renderer let through.
 
 ## Evidence
 
@@ -98,12 +108,14 @@ The Rust suite lost 52 test functions and gained 43. Most of the new ones hold t
   the Rust tests. Review a golden diff as a contract change.
 - Many comments in `src/` cite `lib/*.js` or "Node". They describe the retired twin. To read those
   files, use `git show 7211de0:lib/<file>.js`.
-- The next schema migration is blocked until a Rust-side fixture generator exists.
-  `tests/native/u50_historical_fixtures.rs` requires one boundary fixture for every schema
-  version, and the removed generator was the only tool that made them.
+- A new migration needs a boundary fixture: `cargo xtask historical-fixture` adds it.
+  `boundary-v31` and `boundary-v36` were frozen from pre-release drafts and cannot be regenerated;
+  the verifier lists their known draft objects.
+- CI needs no `setup-node`. Repository tooling needs a Rust toolchain instead of Node.
+- Callers outside this repository move with it. The homelab publish wrapper runs the built `xtask`
+  binary, and deploy scripts call `cargo xtask release verify-manifest`.
 
 ## Follow-up work
 
-- Add a Rust-side generator for historical fixtures. The next migration needs it.
-- Optionally port the release `.mjs` scripts to a `cargo xtask`.
+- Cut CT222 over to the Rust preview renderer with `preview-renderer/DEPLOY-CT222.md`.
 - Optionally rewrite the `src/` comments that cite the retired twin.
