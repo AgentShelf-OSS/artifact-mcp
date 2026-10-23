@@ -14,7 +14,7 @@ routes, the sweeper, and the push sender.
 The feature is **enabled** only when the VAPID key parses as a valid P-256 scalar, the subject is valid, and
 `WEBHOOK_ENC_KEY` (the existing encryption key) is configured. An invalid VAPID key or subject is a startup
 configuration error, matching other config validation. The public key is derived from the private key
-(uncompressed point, 65 bytes, base64url). `node scripts/web-push-keys.mjs` prints a new key pair.
+(uncompressed point, 65 bytes, base64url). `artifact-mcp web-push-keys` prints a new key pair.
 
 ## Schema (migration 39 `web-push-reminders`, shared SQL file)
 

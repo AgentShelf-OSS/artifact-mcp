@@ -13,6 +13,8 @@ pub mod integrations;
 pub mod mcp;
 pub mod model;
 pub mod observability;
+#[cfg(unix)]
+pub mod ops;
 pub mod persistence;
 pub mod ports;
 pub mod render;

@@ -185,10 +185,11 @@ the phone is locked ([ADR-0012](adr/0012-scheduled-reminders-via-web-push.md),
 
 The feature is enabled only when the key and subject are valid and `WEBHOOK_ENC_KEY` is also set,
 because subscription endpoints are stored encrypted with that key. An invalid key, subject, or host
-list stops startup. Generate a key pair with:
+list stops startup. Generate a key pair with the server binary (with the container image:
+`docker run --rm artifact-mcp:local web-push-keys`):
 
 ```bash
-node scripts/web-push-keys.mjs
+artifact-mcp web-push-keys
 ```
 
 Put the printed `WEB_PUSH_VAPID_PRIVATE_KEY` line in the deployment's protected credentials. The

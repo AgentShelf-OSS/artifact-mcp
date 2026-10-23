@@ -32,39 +32,107 @@ digest.
 
 ## Backups
 
-Run `scripts/backup.sh` against the persistent data directory. The backup takes a consistent SQLite
-`VACUUM INTO` cut first, copies artifact bodies, retained history, and optional previews afterward,
-then verifies every current and retained body against the copied database snapshot and recorded
-digest. A concurrent lifecycle mutation can make verification fail; the script removes its
-incomplete staging directory and returns nonzero so it can be retried after the mutation settles.
-Pending durability intents are treated the same way because they represent concealed, recoverable
-transitions rather than a ready recovery point. Previews are optional caches: their absence does not
-fail the backup. Any regular, non-symlink preview copied into a backup is checked against a SHA-256
-manifest captured before copying; a changed included preview fails that attempt. This verifies file
-bytes only and does not decode or validate image formats. A preview cache disappearing after capture
-is allowed, because preview availability is optional.
+The server binary makes and checks backups itself, so the data host needs no shell, Python,
+`sqlite3`, or Node. This also works in the distroless container image.
 
-The final backup directory is published only after SQLite integrity and body/history coherence checks
-pass. Restore into a fresh data directory and run normal startup reconciliation before relying on the
-backup.
+```text
+artifact-mcp backup [DATA_DIR] [DEST_ROOT] [KEEP]
+artifact-mcp verify-backup [--database-required] [--preview-manifest-required] DIR
+```
 
-The verifier is a Python 3 standard-library helper (`scripts/backup-coherence.py`), so restore and
-backup operators need only Python 3. It requires the staged database
-when the source has one, rejects pending durability intents and missing current/retained bodies,
-and verifies canonical bundle manifests and SHA-256 digests. It fsyncs copied files and directories
-before the staging directory is atomically renamed; the destination directory is then synced. Each
-run uses a unique staging and final name, and `KEEP` must be a positive integer. A failed check
-leaves no completed backup. Pending intents are retained in the live data directory for the normal
-startup reconciliation path and must be resolved before retrying the backup.
+`DATA_DIR` defaults to `$ARTIFACT_MCP_DATA_DIR`, else `./data`. `DEST_ROOT` defaults to
+`$ARTIFACT_MCP_BACKUP_DIR`, else `./backups`. `KEEP` defaults to 14 and must be a positive integer.
+An empty argument counts as unset. Pass the server's `DATA_DIR` explicitly: the backup command does
+not read the server's `DATA_DIR` variable.
+
+In the container, mount a backup directory and run the binary inside the running container. With
+the bundled `docker-compose.yml`, `DATA_DIR` is `/data`. Add a volume such as `./backups:/backups`
+that the image user (`nonroot`, UID 65532) can write, then run:
+
+```bash
+docker exec artifact-mcp /artifact-mcp backup /data /backups 7
+docker exec artifact-mcp /artifact-mcp verify-backup --database-required /backups/backup-<stamp>
+```
+
+On a native host, run the installed binary as the service user, so that any SQLite `-wal` or `-shm`
+file it creates belongs to the server's user:
+
+```bash
+sudo -u artifact-mcp /usr/local/bin/artifact-mcp backup /var/lib/artifact-mcp /var/backups/artifact-mcp 14
+```
+
+Adjust the user, binary path, and both directories to the deployment. A cron job or systemd timer
+can run the same command; it prints one line per completed or pruned backup and exits nonzero on
+any failure.
+
+A run does these steps in this order:
+
+1. It takes a consistent SQLite `VACUUM INTO` snapshot first. This is the recovery point. The live
+   database is not stopped.
+2. After that cut, it copies `artifacts/` (bodies, bundle files, retained history, and the hidden
+   staging and trash evidence) and the optional `previews/` cache. Regular files, directories, and
+   symlinks are copied with their mode, times, and, where the process may set it, owner.
+3. It verifies the snapshot against the copied files: no pending durability intent, no missing
+   current or retained body, no required body that depends on a symlink, and canonical bundle
+   manifests and SHA-256 digests equal to the recorded `body_sha256`. Then `PRAGMA quick_check`
+   must report `ok`.
+4. It fsyncs the copied files and directories, renames the staging directory
+   (`.incomplete-<stamp>-<suffix>`) atomically to `backup-<stamp>-<suffix>`, and syncs the
+   destination directory.
+5. It removes the oldest `backup-*` directories beyond `KEEP`.
+
+The stamp is UTC (`YYYYMMDD-HHMMSS-nanoseconds`), so names sort in creation order. The random
+suffix makes concurrent runs unique.
+
+A concurrent lifecycle mutation can make verification fail, but it can never publish a database row
+whose required body is absent from the completed backup. On any failure, and on `SIGINT`, `SIGTERM`,
+or `SIGHUP`, the command removes its staging directory and exits nonzero (1 for a failure, 128 plus
+the signal number for a signal), so a later run can retry after the mutation settles. Pending
+durability intents fail the run in the same way: they are concealed, recoverable transitions, not a
+ready recovery point. The intents stay in the live data directory for the normal startup
+reconciliation path.
+
+Previews are optional caches. A missing preview cache, or a preview that disappears or cannot be
+copied, does not fail the backup. The command records the SHA-256 of the bytes it read for each
+regular, non-symlink preview it copies in `preview-sha256.json`; verification fails if an included
+preview differs from that digest. This checks file bytes only and does not decode image formats. A
+`previews` path that is not a directory, or that holds a device, FIFO, or socket, fails the run.
+
+A data directory without `artifacts.db` is backed up without a snapshot, and the summary line says
+`artifacts=0 (no database)`.
+
+Failures print the same messages as the former scripts, for example
+`backup: coherence check failed: required body missing: artifacts/<id>.html`,
+`backup: coherence check failed: 1 pending durability intent(s)`, and
+`backup: KEEP must be a positive integer`.
+
+### Verify and restore
+
+`verify-backup DIR` repeats the coherence and integrity checks on a completed backup and changes
+nothing. Add `--database-required` unless the source data directory had no database. Every backup
+this command writes has a preview manifest, so `--preview-manifest-required` is also safe for them.
+
+To restore:
+
+1. Run `verify-backup --database-required` on the backup.
+2. Stop the server.
+3. Copy the backup directory into a fresh, empty data directory on the target volume, for example
+   `cp -a /var/backups/artifact-mcp/backup-<stamp> /var/lib/artifact-mcp-restored`. The extra
+   `preview-sha256.json` file is ignored by the server.
+4. Point `DATA_DIR` at the new directory and start the server. Normal startup reconciliation runs
+   before the server accepts requests. Check `/health` and the artifact list before relying on it.
+
+### Tests
 
 Run the focused backup regressions from the repository root:
 
 ```bash
-node --test test/backup.test.js
+cargo test --locked --test backup --test web_push_keys
 ```
 
 These tests use temporary databases and directories. They cover writes and missing required
-content around the SQLite snapshot, pending lifecycle intents, optional previews, publication
-cleanup, and retention. Before deploying a change to this workflow, also restore a completed
-backup into fresh data directories and verify current bodies, retained revisions, and bundles
-through both application runtimes.
+content around the SQLite snapshot, pending lifecycle intents, optional previews, symlinks, SQL and
+URI punctuation in paths, publication failure, signal cleanup, concurrency, and retention. The
+signal test uses a pause hook that only debug builds compile. Before deploying a change to this
+workflow, also restore a completed backup into a fresh data directory and verify current bodies,
+retained revisions, and bundles through the server.
