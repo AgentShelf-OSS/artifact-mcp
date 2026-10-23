@@ -125,7 +125,8 @@ pub fn valid_png(value: &[u8], max_bytes: u64) -> bool {
 ///    only the **first UTF-16 code unit** of each one. For an astral character the trailing
 ///    surrogate is silently dropped: `"🎉"` contributes `0xD83C` alone. Iterating
 ///    `str::encode_utf16` instead would feed both surrogates in and produce a different hue —
-///    verified against the Node oracle in `tests/native/u16_node_parity.rs`.
+///    frozen from the retired Node runtime in
+///    `tests/native/u16_thumbnails.rs` (`the_placeholder_matches_the_frozen_node_bytes`).
 #[must_use]
 pub fn safe_color(accent: Option<&str>, org: &str) -> String {
     let color = accent.unwrap_or_default().trim();

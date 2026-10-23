@@ -246,7 +246,7 @@ impl Fixture {
         self.try_publish_request(publish_request(content)).await
     }
 
-    /// Publish an explicitly built request — used by the metadata-normalization parity proof.
+    /// Publish an explicitly built request — used by the frozen metadata-normalization vectors.
     pub async fn try_publish_request(
         &self,
         request: PublishArtifact,
@@ -315,7 +315,7 @@ pub fn bundle_update(revision: u64, files: &[(&str, &str)], entry: Option<&str>)
     }
 }
 
-/// Node's `sha256(content)` for a single body. [lib/store.js:77-79]
+/// The SHA-256 hex digest of a single body's UTF-8 bytes. [lib/store.js:77-79]
 pub fn sha256_hex(content: &str) -> String {
     artifact_mcp::artifacts::digest::sha256_hex(content.as_bytes())
 }

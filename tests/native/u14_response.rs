@@ -4,7 +4,7 @@ use artifact_mcp::{
         artifact_response::{
             ANCHOR_BRIDGE, ArtifactResponseOptions, DOCUMENT_SANDBOX, RawCachePolicy,
             artifact_response, download_name, inject_anchor_bridge, inject_data_client,
-            raw_artifact_headers, strip_scripts,
+            is_html_content_type, raw_artifact_headers, strip_scripts,
         },
         middleware::{append_no_transform, mcp_body_limit, prevent_response_transforms, weak_etag},
     },
@@ -245,5 +245,154 @@ async fn native_reader_is_explicit_html_only_and_keeps_sandbox_policy() {
             assert!(text.contains("__artifactEreader"));
             assert!(text.ends_with("</script></body>"));
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Frozen vectors from the retired Node runtime (`lib/artifact-http.js`)
+// ---------------------------------------------------------------------------
+
+#[test]
+fn anchor_bridge_injection_matches_the_frozen_node_output() {
+    // `(content, pagePath, output with the bridge shown as {BRIDGE}, JS literal for the page)`.
+    // The last `</body>` wins, U+FEFF counts as whitespace in `</body >`, and the page path is a
+    // JSON string with `<` escaped.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let cases: [(&str, Option<&str>, &str, &str); 5] = [
+        (
+            "<!doctype html><html><body><p>anchor me</p></body></html>",
+            None,
+            "<!doctype html><html><body><p>anchor me</p>{BRIDGE}</body></html>",
+            "null",
+        ),
+        (
+            "<p>no body tag</p>",
+            None,
+            "<p>no body tag</p>{BRIDGE}",
+            "null",
+        ),
+        (
+            "<BODY class=x>upper</BODY\u{feff}>",
+            None,
+            "<BODY class=x>upper{BRIDGE}</BODY\u{feff}>",
+            "null",
+        ),
+        (
+            "<body><script>const fake='</body>'</script><!-- </body> --><p>x</p></body>",
+            Some("deep/page.html"),
+            "<body><script>const fake='</body>'</script><!-- </body> --><p>x</p>{BRIDGE}</body>",
+            r#""deep/page.html""#,
+        ),
+        (
+            "<body>x</body>",
+            Some("quote\"/<tag>/\u{2028}.html"),
+            "<body>x{BRIDGE}</body>",
+            "\"quote\\\"/\\u003ctag>/\u{2028}.html\"",
+        ),
+    ];
+    let marker = "var d=document,w=window,page=null";
+    assert_eq!(ANCHOR_BRIDGE.matches(marker).count(), 1);
+    for (content, page_path, template, page) in cases {
+        let bridge = ANCHOR_BRIDGE.replace(marker, &format!("var d=document,w=window,page={page}"));
+        let injected = String::from_utf8(inject_anchor_bridge(content.as_bytes(), page_path))
+            .expect("bridge output is UTF-8");
+        assert_eq!(
+            injected,
+            template.replace("{BRIDGE}", &bridge),
+            "{content:?} / {page_path:?}"
+        );
+    }
+
+    // Node spliced the page literal in with `String.prototype.replace`, so `$&`, `$$`, `` $` ``
+    // and `$'` in a page path expand to the marker, `$`, the bridge before the marker and the
+    // bridge after it. The port keeps that quirk byte for byte.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let (before, after) = ANCHOR_BRIDGE.split_once(marker).expect("marker");
+    let injected = String::from_utf8(inject_anchor_bridge(
+        b"<body>x</body>",
+        Some("cash/$&/$$/$`/$'.html"),
+    ))
+    .expect("bridge output is UTF-8");
+    assert_eq!(
+        injected,
+        format!(
+            "<body>x{before}var d=document,w=window,page=\"cash/{marker}/$/{before}/{after}.html\"{after}</body>"
+        )
+    );
+}
+
+#[test]
+fn script_stripping_and_html_detection_match_the_frozen_node_output() {
+    // JavaScript's `\s` includes U+FEFF but not U+0085, so only the first closes the tag.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (input, expected) in [
+        ("<p>plain</p>", "<p>plain</p>"),
+        ("<script>alert(1)</script><p>after</p>", "<p>after</p>"),
+        ("<SCRIPT type=x>one</ScRiPt><script>two</script>", ""),
+        (
+            "<scriptx>keep</script><script>drop</script>",
+            "<scriptx>keep</script>",
+        ),
+        ("<script>unclosed", "<script>unclosed"),
+        ("a<script>b</script\u{feff}>c", "ac"),
+        ("a<script>b</script\u{85}>c", "a<script>b</script\u{85}>c"),
+        ("<script>first<script>nested</script>tail", "tail"),
+    ] {
+        assert_eq!(
+            String::from_utf8(strip_scripts(input.as_bytes())).expect("UTF-8"),
+            expected,
+            "{input:?}"
+        );
+    }
+
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (content_type, html) in [
+        ("text/html", true),
+        ("text/html; charset=utf-8", true),
+        ("TEXT/HTML;CHARSET=UTF-8", true),
+        ("text/htmlx", false),
+        (" text/html", false),
+        ("image/svg+xml", false),
+        ("application/xml", false),
+        ("text/css; charset=utf-8", false),
+        ("image/png", false),
+        ("application/octet-stream", false),
+    ] {
+        assert_eq!(is_html_content_type(content_type), html, "{content_type:?}");
+        let headers = raw_artifact_headers(content_type, None).expect("trusted MIME");
+        assert_eq!(headers.len(), 5, "{content_type:?}");
+        assert_eq!(headers[header::CONTENT_TYPE], content_type);
+        assert_eq!(headers[header::CONTENT_SECURITY_POLICY], DOCUMENT_SANDBOX);
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+        assert_eq!(headers["referrer-policy"], "no-referrer");
+        assert_eq!(headers[header::CACHE_CONTROL], "private, max-age=60");
+    }
+}
+
+#[test]
+fn download_names_match_the_frozen_node_output() {
+    // `(title, download name)`; the Content-Disposition header quotes the name verbatim.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (title, expected) in [
+        ("", "artifact.html"),
+        ("Raw Case", "Raw-Case.html"),
+        ("  Quarterly 🔥 report  ", "Quarterly-report.html"),
+        ("---", "artifact.html"),
+        ("a - b", "a---b.html"),
+        ("résumé.2026", "r-sum-.2026.html"),
+        ("safe_name-v2.1", "safe_name-v2.1.html"),
+        (
+            "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.--------------------tail",
+            "1234567890abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ.-----------------.html",
+        ),
+    ] {
+        let name = download_name(title);
+        assert_eq!(name, expected, "{title:?}");
+        let headers =
+            raw_artifact_headers("text/html; charset=utf-8", Some(&name)).expect("safe name");
+        assert_eq!(
+            headers[header::CONTENT_DISPOSITION],
+            format!("attachment; filename=\"{expected}\"").as_str()
+        );
     }
 }

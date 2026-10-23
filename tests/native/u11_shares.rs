@@ -7,7 +7,8 @@
 use std::collections::BTreeSet;
 
 use artifact_mcp::config::{
-    IdSource, NanoIdSource, SHARE_TOKEN_ALPHABET, SHARE_TOKEN_LENGTH, SequentialIdSource,
+    FixedClock, IdSource, NanoIdSource, SHARE_TOKEN_ALPHABET, SHARE_TOKEN_LENGTH,
+    SequentialIdSource,
 };
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{CreateShare, ShareGrant, ShareToken};
@@ -200,6 +201,99 @@ fn expiry_rejects_impossible_calendar_dates_and_bad_shapes() {
         shares::expiry_for(clock, "2027-05-01T24:00Z"),
         Ok(Some("2027-05-02T00:00:00.000Z".to_owned()))
     );
+}
+
+/// The full `expires` acceptance matrix at a pinned "now". Expiry decides when a share link stops
+/// granting access, so every outcome is literal: the stored instant, or the exact rejection.
+#[test]
+fn expiry_matrix_matches_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    const FORMAT: &str = EXPIRES_FORMAT_MESSAGE;
+    const FUTURE: &str = EXPIRES_FUTURE_MESSAGE;
+    const CALENDAR: &str = EXPIRES_CALENDAR_MESSAGE;
+    // `Date.now()` pinned to 2026-06-01T00:00:00.000Z.
+    let clock = FixedClock::from_millis(1_780_272_000_000);
+    let matrix: [(&str, Result<Option<&str>, &str>); 41] = [
+        ("never", Ok(None)),
+        ("24h", Ok(Some("2026-06-02T00:00:00.000Z"))),
+        ("", Err(FORMAT)),
+        ("24H", Err(FORMAT)),
+        ("Never", Err(FORMAT)),
+        ("tomorrow", Err(FORMAT)),
+        ("2027-1-1", Err(FORMAT)),
+        ("20270101", Err(FORMAT)),
+        ("2027-01-01T10", Err(FORMAT)),
+        ("2027-01-01 10:00Z", Err(FORMAT)),
+        ("2027-01-01T10:00:00.1234Z", Err(FORMAT)),
+        ("+2027-01-01", Err(FORMAT)),
+        ("2020-01-01", Err(FUTURE)),
+        ("2026-06-01", Err(FUTURE)),
+        ("2027-01-01", Ok(Some("2027-01-01T00:00:00.000Z"))),
+        ("2026-13-01", Err(FUTURE)),
+        ("2026-00-10", Err(FUTURE)),
+        ("2027-01-32", Err(FUTURE)),
+        ("2027-01-00", Err(FUTURE)),
+        ("2027-02-31", Err(CALENDAR)),
+        ("2027-02-30", Err(CALENDAR)),
+        ("2027-04-31", Err(CALENDAR)),
+        ("2028-02-29", Ok(Some("2028-02-29T00:00:00.000Z"))),
+        ("2027-02-28", Ok(Some("2027-02-28T00:00:00.000Z"))),
+        ("2027-02-31T00:00Z", Ok(Some("2027-03-03T00:00:00.000Z"))),
+        ("2027-05-01T24:00Z", Ok(Some("2027-05-02T00:00:00.000Z"))),
+        ("2027-05-01T24:01Z", Err(FUTURE)),
+        ("2027-05-01T25:00Z", Err(FUTURE)),
+        ("2027-05-01T10:60Z", Err(FUTURE)),
+        ("2027-05-01T10:00:60Z", Err(FUTURE)),
+        ("2027-05-01T10:00+24:00", Err(FUTURE)),
+        ("2027-05-01T10:00+00:60", Err(FUTURE)),
+        (
+            "2027-05-01T10:00+23:59",
+            Ok(Some("2027-04-30T10:01:00.000Z")),
+        ),
+        (
+            "2027-05-01T10:00-23:59",
+            Ok(Some("2027-05-02T09:59:00.000Z")),
+        ),
+        (
+            "2027-05-01T10:00+02:00",
+            Ok(Some("2027-05-01T08:00:00.000Z")),
+        ),
+        (
+            "2027-05-01T10:00-0230",
+            Ok(Some("2027-05-01T12:30:00.000Z")),
+        ),
+        (
+            "2027-05-01T10:00:00.5Z",
+            Ok(Some("2027-05-01T10:00:00.500Z")),
+        ),
+        (
+            "2027-05-01T10:00:00.05Z",
+            Ok(Some("2027-05-01T10:00:00.050Z")),
+        ),
+        (
+            "2027-05-01T10:00:00.123Z",
+            Ok(Some("2027-05-01T10:00:00.123Z")),
+        ),
+        ("2027-05-01T10:00Z", Ok(Some("2027-05-01T10:00:00.000Z"))),
+        ("2027-05-01T10:00:30Z", Ok(Some("2027-05-01T10:00:30.000Z"))),
+    ];
+    for (input, expected) in matrix {
+        let expected = expected
+            .map(|stored| stored.map(str::to_owned))
+            .map_err(|message| AppError::Validation(message.to_owned()));
+        assert_eq!(
+            shares::expiry_for(&clock, input),
+            expected,
+            "expires {input:?}"
+        );
+    }
+    // The three messages themselves are part of the API's 400 contract.
+    assert_eq!(
+        FORMAT,
+        "expires must be '24h', 'never', or a future ISO date"
+    );
+    assert_eq!(FUTURE, "expires must be a valid future ISO date");
+    assert_eq!(CALENDAR, "expires is not a real calendar date");
 }
 
 #[test]

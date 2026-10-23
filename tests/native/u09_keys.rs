@@ -1,7 +1,9 @@
 //! U09 publisher-key persistence: validation, uniqueness, revocation, the `ARTIFACT_API_KEYS`
 //! bootstrap matrix, and the guarantee that a raw secret never reaches storage, logs, or errors.
 //!
-//! Node oracle: `lib/keys.js` and `seedKeysFromEnv` ([lib/db.js:30-59]).
+//! Behaviour ported from the retired Node runtime's `lib/keys.js` and `seedKeysFromEnv`
+//! ([lib/db.js:30-59]). `seeded_rows_and_hashes_match_the_frozen_node_vector` pins the persisted
+//! `api_keys` rows that runtime wrote, hashes included.
 
 use std::sync::Arc;
 
@@ -425,6 +427,95 @@ fn seeding_never_touches_an_existing_row() {
         )
         .expect("read");
     assert!(revoked.is_some(), "a seeded entry must not un-revoke a key");
+}
+
+/// The `ARTIFACT_API_KEYS` seeding matrix, replayed in order, and the exact rows it persists.
+///
+/// The hashes are literal so a change to the seed parser or to the hash encoding cannot pass by
+/// agreeing with itself: a row the retired runtime seeded must keep authenticating.
+#[test]
+fn seeded_rows_and_hashes_match_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let db = TestDb::new("u09-seed-frozen");
+    let conn = db.conn();
+
+    for (raw, seeded) in [
+        ("", 0),
+        ("   ", 0),
+        ("\u{feff}", 0),
+        ("onlyone", 0),
+        (":acme:orphan", 0),
+        ("noSecret:acme:", 0),
+        ("full:acme:s1", 1),
+        ("short:s2", 1),
+        (" spaced : acme : a : b ", 1),
+        ("empty::s4", 1),
+        ("placeholder1:acme:CHANGE_ME", 0),
+        ("placeholder2:acme:REPLACE_WITH_LONG_RANDOM_SECRET", 0),
+        ("placeholder3:acme:CHANGE_ME_NOW", 1),
+        ("placeholder4:CHANGE_ME", 0),
+        ("full:other:different-secret", 0),
+        ("multi1:acme:m1,,multi2:m2, multi3 : org3 : m:3 ", 3),
+    ] {
+        assert_eq!(
+            keys::seed_keys_from_env(&conn, raw).expect("seed"),
+            seeded,
+            "seed {raw:?}"
+        );
+    }
+
+    let expected = [
+        (
+            "empty",
+            "default",
+            "5b840157e7e86aef3b3fd0fc24f3add34d3e7f210370d429475ed1bcd3e7fca2",
+        ),
+        (
+            "full",
+            "acme",
+            "e8bc163c82eee18733288c7d4ac636db3a6deb013ef2d37b68322be20edc45cc",
+        ),
+        (
+            "multi1",
+            "acme",
+            "ca0df2c95aa144c1d0ff2ff3c8f967fdc1de9ef0c4120b3726416701b519d619",
+        ),
+        (
+            "multi2",
+            "default",
+            "29c1b289e7522195b362e44f54e05470b69ad20540ab60a18a05e5bf6951f13d",
+        ),
+        (
+            "multi3",
+            "org3",
+            "88639893dfd9b487a3e2728fc3daef220b9d209ddfb86bc4dd990fb57f3c1e73",
+        ),
+        (
+            "placeholder3",
+            "acme",
+            "d1e47cfc5b8eeaee72789781cf13ccf57d6f133e16dc7ee478c65a346e465fd3",
+        ),
+        (
+            "short",
+            "default",
+            "ad328846aa18b32a335816374511cac1063c704b8c57999e51da9f908290a7a4",
+        ),
+        (
+            "spaced",
+            "acme",
+            "6783a31eabf68ccc0660f935c0826282bdd2241f3a80a9f2d10d59aea9ebb5d8",
+        ),
+    ]
+    .map(|(client_id, org, hash)| (client_id.to_owned(), org.to_owned(), hash.to_owned()));
+    assert_eq!(seeded_rows(&conn), expected);
+
+    // A revoked row is still a conflict: re-seeding neither resurrects nor rewrites it.
+    assert!(keys::revoke_key(&conn, "full").expect("revoke"));
+    assert_eq!(
+        keys::seed_keys_from_env(&conn, "full:acme:s1-again").expect("seed"),
+        0
+    );
+    assert_eq!(seeded_rows(&conn), expected);
 }
 
 #[test]

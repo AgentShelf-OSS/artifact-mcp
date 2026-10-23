@@ -3,6 +3,9 @@
 //! The two modes are not "supported" and "legacy" — `WEBHOOK_ENC_KEY` is currently **unset** in
 //! production, so the plaintext column is what live rows use today, and the encrypted column is
 //! what they will use after the key is set. Both are exercised end to end here.
+//!
+//! The final section holds frozen vectors from the retired Node runtime: rows it wrote, the
+//! allowlist decision it reached for each URL shape, and its display mask.
 
 use artifact_mcp::error::AppError;
 use artifact_mcp::integrations::delivery_worker::{WebhookResolutionFailure, WorkerWebhooks};
@@ -10,7 +13,7 @@ use artifact_mcp::model::{CreateWebhook, OrgId, WebhookEvent, WebhookId};
 use artifact_mcp::persistence::db;
 use artifact_mcp::persistence::migrations::mask_webhook_url;
 use artifact_mcp::persistence::webhooks::{
-    INVALID_URL_MESSAGE, WebhookDeliveryResolutionFailure, mask_url,
+    INVALID_URL_MESSAGE, WebhookDeliveryResolutionFailure, event_name, mask_url,
 };
 
 use crate::u12_support::{fixture, raw_url_columns, seed_org, store_with, test_key};
@@ -680,4 +683,240 @@ async fn create_never_names_the_rejected_url_in_its_error() {
         .expect_err("rejected");
     assert_eq!(error, AppError::Validation(INVALID_URL_MESSAGE.to_owned()));
     assert!(!error.to_string().contains(TOKEN));
+}
+
+// ---------------------------------------------------------------------------
+// Frozen vectors from the retired Node runtime
+// ---------------------------------------------------------------------------
+
+/// Rows that `lib/webhooks.js` wrote with `WEBHOOK_ENC_KEY` set to [`test_key`]:
+/// `(id, original URL, url column, url_cipher, url_nonce, url_tag)`. Databases created before the
+/// Rust cutover hold rows in exactly this layout, so Rust must keep reading them.
+// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+const NODE_ENCRYPTED_ROWS: &[(&str, &str, &str, &str, &str, &str)] = &[
+    (
+        "uuv19a84w1wt",
+        "https://discord.com/api/webhooks/1/token",
+        "https://discord.com/…oken",
+        "fUGT9MGQgVep8APR9PgKaPPwxranNyqznB5cP+rsGko5R5f+58gMcA==",
+        "VD7pPM+Oq0Ifkb5b",
+        "gJQ7ukw4W60LVLfdrMvPNQ==",
+    ),
+    (
+        "fkc7ditvz3te",
+        "https://discordapp.com/api/webhooks/1/token",
+        "https://discordapp.com/…oken",
+        "Ug/ZicHO1MPQbMBckNtzSfGWIzQrahtC16h4JyTv0xF9/z4Qi/HZqYlEoA==",
+        "qei+ZeeEc0zPYWJ0",
+        "pKVQ3D4mj6BDhHl8wCRrOw==",
+    ),
+    (
+        "m1zsgxtssems",
+        "HTTPS://DISCORD.COM/API/WEBHOOKS/1/token",
+        "https://discord.com/…oken",
+        "sn5Wk+587w8XZeb7y3FL1we92R1zltlqUI9kB2ap/i1AdbG8h6cwuA==",
+        "F9vwm9zhXSKOOBAY",
+        "ngthniLofC+a+oAAc6dW6Q==",
+    ),
+];
+
+#[tokio::test]
+async fn node_written_encrypted_rows_decrypt_with_the_key_and_fail_closed_without_it() {
+    let (_dir, pool, with_key) = fixture("node-rows", "parity", Some(&test_key())).await;
+    for &(id, _, stored, cipher, nonce, tag) in NODE_ENCRYPTED_ROWS {
+        let row = [id, stored, cipher, nonce, tag].map(str::to_owned);
+        db::interact(&pool, move |conn| {
+            conn.execute(
+                "INSERT INTO org_webhooks (id, org, url, url_cipher, url_nonce, url_tag, label)
+                 VALUES (?1, 'parity', ?2, ?3, ?4, ?5, 'Ops channel')",
+                (&row[0], &row[1], &row[2], &row[3], &row[4]),
+            )
+            .map_err(|_| AppError::Internal)?;
+            Ok(())
+        })
+        .await
+        .expect("insert a node-written row");
+    }
+    let without_key = store_with(pool, None);
+
+    for &(id, original, stored, ..) in NODE_ENCRYPTED_ROWS {
+        let id = WebhookId(id.to_owned());
+        let delivery = with_key
+            .delivery(&id)
+            .await
+            .expect("rust decrypts a node-written row")
+            .expect("row exists");
+        assert_eq!(delivery.url, original);
+        assert_eq!(delivery.org, OrgId("parity".to_owned()));
+        assert_eq!(delivery.events.len(), 6);
+
+        assert_eq!(
+            without_key.delivery(&id).await,
+            Err(AppError::Internal),
+            "an encrypted node row must fail closed without the key"
+        );
+        let summary = without_key
+            .summary(&id)
+            .await
+            .expect("masked read needs no key")
+            .expect("row exists");
+        assert_eq!(summary.url, mask_url(stored));
+        assert!(
+            !summary.url.contains("token"),
+            "mask leaked: {}",
+            summary.url
+        );
+    }
+}
+
+/// `(display mask, plaintext url column, encrypted url column)` of an accepted webhook.
+type Accepted = (&'static str, &'static str, &'static str);
+
+/// Every `create()` decision of `lib/webhooks.js`: `Some(Accepted)` when accepted, `None` when
+/// rejected with [`INVALID_URL_MESSAGE`].
+// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+const NODE_CREATE_DECISIONS: &[(&str, Option<Accepted>)] = &[
+    (
+        "https://discord.com/api/webhooks/1/token",
+        Some((
+            "https://discord.com…oken",
+            "https://discord.com/api/webhooks/1/token",
+            "https://discord.com/…oken",
+        )),
+    ),
+    (
+        "https://discordapp.com/api/webhooks/1/token",
+        Some((
+            "https://discordapp.com…oken",
+            "https://discordapp.com/api/webhooks/1/token",
+            "https://discordapp.com/…oken",
+        )),
+    ),
+    (
+        "HTTPS://DISCORD.COM/API/WEBHOOKS/1/token",
+        Some((
+            "https://discord.com…oken",
+            "HTTPS://DISCORD.COM/API/WEBHOOKS/1/token",
+            "https://discord.com/…oken",
+        )),
+    ),
+    ("http://discord.com/api/webhooks/1/token", None),
+    ("https://discord.com.evil.tld/api/webhooks/1/token", None),
+    ("https://discordapp.com.evil.tld/api/webhooks/1/token", None),
+    ("https://sub.discord.com/api/webhooks/1/token", None),
+    ("https://evil-discord.com/api/webhooks/1/token", None),
+    ("https://discord.com@evil.tld/api/webhooks/1/token", None),
+    (
+        "https://evil.tld/https://discord.com/api/webhooks/1/t",
+        None,
+    ),
+    ("https://169.254.169.254/api/webhooks/1/token", None),
+    ("https://127.0.0.1/api/webhooks/1/token", None),
+    ("https://[::1]/api/webhooks/1/token", None),
+    ("https://discord.com/api/webhook/1/token", None),
+    (
+        "  https://discord.com/api/webhooks/1/trimmed  ",
+        Some((
+            "https://discord.com…mmed",
+            "https://discord.com/api/webhooks/1/trimmed",
+            "https://discord.com/…mmed",
+        )),
+    ),
+    ("file:///etc/passwd", None),
+    ("", None),
+];
+
+#[tokio::test]
+async fn create_reaches_the_frozen_allowlist_and_at_rest_decisions() {
+    assert_eq!(
+        INVALID_URL_MESSAGE,
+        "Webhook URL must be an HTTPS Discord webhook URL."
+    );
+    for key in [None, Some(test_key())] {
+        let (_dir, pool, store) = fixture("node-create", "parity", key.as_deref()).await;
+        for &(url, expected) in NODE_CREATE_DECISIONS {
+            let outcome = store
+                .create(CreateWebhook {
+                    org: OrgId("parity".to_owned()),
+                    url: url.to_owned(),
+                    label: "  Ops channel  ".to_owned(),
+                    events: None,
+                })
+                .await;
+            match (expected, outcome) {
+                (None, Err(error)) => assert_eq!(
+                    error,
+                    AppError::Validation(INVALID_URL_MESSAGE.to_owned()),
+                    "{url:?}"
+                ),
+                (None, Ok(summary)) => panic!("{url:?} was accepted as {}", summary.url),
+                (Some(_), Err(error)) => panic!("{url:?} was rejected: {error}"),
+                (Some((display, plaintext, encrypted)), Ok(summary)) => {
+                    assert_eq!(summary.url, display, "{url:?}");
+                    assert_eq!(summary.label, "Ops channel", "{url:?}");
+                    assert_eq!(
+                        summary
+                            .events
+                            .iter()
+                            .map(event_name)
+                            .collect::<Vec<&str>>()
+                            .join(","),
+                        "published,updated,restored,deleted,feedback,resolved",
+                        "{url:?}"
+                    );
+                    let (stored, cipher, _, _) = raw_url_columns(&pool, &summary.id.0).await;
+                    let column = if key.is_some() { encrypted } else { plaintext };
+                    assert_eq!(stored, column, "{url:?}");
+                    assert_eq!(cipher.is_some(), key.is_some(), "{url:?}");
+                }
+            }
+        }
+    }
+}
+
+/// `maskUrl` display values, including userinfo, default ports, non-URLs and UTF-16 slicing.
+// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+const NODE_DISPLAY_MASKS: &[(&str, &str)] = &[
+    (
+        "https://discord.com/api/webhooks/123456789012345678/secret-token",
+        "https://discord.com…oken",
+    ),
+    ("https://discord.com/…oken", "https://discord.com…oken"),
+    (
+        "https://discordapp.com/api/webhooks/1/t",
+        "https://discordapp.com…/1/t",
+    ),
+    (
+        "https://hooks.example.com:8443/abc/secret",
+        "https://hooks.example.com:8443…cret",
+    ),
+    (
+        "https://example.test:443/abc/secret",
+        "https://example.test…cret",
+    ),
+    ("http://localhost:3480/x", "http://localhost:3480…80/x"),
+    (
+        "https://user:pass@example.test/path",
+        "https://example.test…path",
+    ),
+    ("https://[::1]:9000/path", "https://[::1]:9000…path"),
+    ("not a url", "… url"),
+    ("abc", "…abc"),
+    ("", "…"),
+    ("https://example.test/", "https://example.test…est/"),
+    (
+        "https://example.test/\u{1F389}\u{1F389}\u{1F389}",
+        "https://example.test…\u{1F389}\u{1F389}",
+    ),
+    (
+        "https://example.test/ab\u{1F389}",
+        "https://example.test…ab\u{1F389}",
+    ),
+];
+
+#[test]
+fn display_masks_match_the_frozen_node_values() {
+    for &(value, expected) in NODE_DISPLAY_MASKS {
+        assert_eq!(mask_url(value), expected, "{value:?}");
+    }
 }

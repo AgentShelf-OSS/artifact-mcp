@@ -49,5 +49,9 @@ twilight-gateway = { version = "0.17.1", default-features = false, features = ["
 twilight-model = "0.17.1"
 url = "2"
 
+[dev-dependencies]
+# In-process TLS fixture for the JWKS transport tests; pinned to the version reqwest already locks.
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["aws-lc-rs"] }
+
 [profile.release]
 panic = "abort"

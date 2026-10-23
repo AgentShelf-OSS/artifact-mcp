@@ -1,9 +1,8 @@
 //! U07 native tests: the frozen path layout, the bundle path sanitizer, the MIME table, the
 //! limit boundaries, entry selection, id validation, and the on-disk read APIs.
 //!
-//! The hostile-path table lives here and is *shared* with `u07_node_parity`, which replays the
-//! exact same strings through the Node reference. A case added here is automatically proved
-//! against the oracle.
+//! The hostile-path expectations and the bundle-digest vectors were captured from the retired
+//! Node runtime, so they pin the behaviour that persisted rows and preview file names rely on.
 
 use std::fs;
 use std::path::Path;
@@ -24,11 +23,11 @@ use artifact_mcp::config::StorageLimits;
 
 use crate::u03_support::TempDataDir;
 
-/// Adversarial relative paths. Every entry is replayed against Node in `u07_node_parity`, so
-/// the expectations below are claims about the *reference*, not about a Rust-only opinion.
+/// Adversarial relative paths. The expectations were verified against the retired Node runtime,
+/// so they are claims about the shipped behaviour, not about a Rust-only opinion.
 ///
 /// `None` = the sanitizer must reject; `Some(rel)` = it must normalise to exactly `rel`.
-pub const TRAVERSAL_CASES: &[(&str, Option<&str>)] = &[
+const TRAVERSAL_CASES: &[(&str, Option<&str>)] = &[
     // --- plain traversal ---------------------------------------------------
     ("../secret", None),
     ("../../etc/passwd", None),
@@ -94,30 +93,6 @@ pub const TRAVERSAL_CASES: &[(&str, Option<&str>)] = &[
     ("nl\nfile.txt", Some("nl\nfile.txt")),
     ("   ", Some("   ")),
 ];
-
-/// MIME probes replayed against Node. Covers the whole frozen table plus the `split(".").pop()`
-/// edge cases.
-pub fn mime_probes() -> Vec<String> {
-    let mut probes: Vec<String> = Vec::new();
-    for (extension, _) in MIME_TABLE {
-        probes.push(format!("file.{extension}"));
-        probes.push(format!("dir/FILE.{}", extension.to_uppercase()));
-    }
-    probes.extend(
-        [
-            "noextension",
-            "archive.tar.gz",
-            "trailing.",
-            ".hidden",
-            "a.b.c.html",
-            "weird.HtMl",
-            "x.unknownext",
-        ]
-        .into_iter()
-        .map(str::to_owned),
-    );
-    probes
-}
 
 fn id() -> SafeArtifactId {
     SafeArtifactId::parse("abc123def456").expect("valid id")
@@ -383,9 +358,18 @@ fn mime_table_covers_every_frozen_extension() {
         "",
         ".hidden",
         "x.unknownext",
+        // Names of `Object.prototype` members: Node's object-literal lookup leaked inherited
+        // values for some of these; Rust always falls back.
+        "x.constructor",
+        "x.__proto__",
+        "x.toString",
+        "x.valueOf",
     ] {
         assert_eq!(mime_for(rel), DEFAULT_CONTENT_TYPE, "{rel}");
     }
+    // Only the last dot-segment counts, case-insensitively.
+    assert_eq!(mime_for("a.b.c.html"), "text/html; charset=utf-8");
+    assert_eq!(mime_for("weird.HtMl"), "text/html; charset=utf-8");
     assert_eq!(SINGLE_BODY_CONTENT_TYPE, "text/html; charset=utf-8");
 }
 
@@ -415,7 +399,21 @@ fn single_body_limits_are_enforced_at_the_boundary() {
             .to_string(),
         "html exceeds 8 bytes (got 9)"
     );
-    for blank in ["", " ", "\t\n\r ", "\u{feff}", "\u{a0}\u{2028}"] {
+    // U+0085 is Unicode White_Space but not ECMAScript whitespace, so it is not trimmed.
+    assert_eq!(
+        validate_single_body("\u{85}x", &limits)
+            .expect("U+0085 is content")
+            .bytes,
+        3
+    );
+    for blank in [
+        "",
+        " ",
+        "\t\n\r ",
+        "\u{feff}",
+        "\u{a0}\u{2028}",
+        "\u{a0}\u{2028}\u{3000}",
+    ] {
         assert_eq!(
             validate_single_body(blank, &limits)
                 .unwrap_err()
@@ -631,6 +629,80 @@ fn bundle_digest_is_independent_of_enumeration_order_on_disk() {
         None
     );
     assert_eq!(body_digest_at_path(&single, true), None);
+}
+
+/// The manifest digest is persisted in `artifacts.body_sha256` and names preview files, so its
+/// exact value is a storage format: UTF-16 sort order (`𝕏` before U+E000), `JSON.stringify`
+/// escaping, non-ASCII emitted literally, and duplicate keys kept in input order.
+#[test]
+fn bundle_manifest_digests_match_frozen_vectors() {
+    /// `(files, entry, file count, total bytes, manifest digest)`.
+    type DigestCase = (
+        &'static [(&'static str, &'static str)],
+        &'static str,
+        usize,
+        u64,
+        &'static str,
+    );
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let cases: [DigestCase; 5] = [
+        (
+            &[("index.html", "<h1>hi</h1>")],
+            "index.html",
+            1,
+            11,
+            "9feb895b4a01e1e75f4378eba3e6903f43c869b964c5a46c67ad10a2827d2518",
+        ),
+        (
+            &[
+                ("index.html", "a"),
+                ("\u{1d54f}/a.html", "b"),
+                ("\u{e000}/b.html", "c"),
+                ("he\"llo.txt", "d"),
+                ("tab\tfile.txt", "e"),
+                ("nl\nfile.txt", "f"),
+                ("ünïcode/файл.html", "g"),
+                ("back\\slash", "h"),
+            ],
+            "index.html",
+            8,
+            8,
+            "e515466cd3b4a4471b2b2c7ecdc884454af8f4f937ac4e6c1ad6e05633abbb41",
+        ),
+        (
+            &[("index.html", "aa"), ("./index.html", "bbb")],
+            "index.html",
+            2,
+            5,
+            "dfdaccd3f99fe93126e414953bcb060ebc527a2b277aa3afa40c654afd3e5e2b",
+        ),
+        (
+            &[("z.html", "z"), ("a.html", "a")],
+            "z.html",
+            2,
+            2,
+            "9492fcc909dff057453380c3e6705f1ae4ed759847e7c1671dc2348553c119a8",
+        ),
+        (
+            &[("deep/nested/index.html", "d")],
+            "deep/nested/index.html",
+            1,
+            1,
+            "e87c3058a28d4afea1eb6dd12f7fa5bcb06e002f0207a14eb100ee0322da646f",
+        ),
+    ];
+    for (files, entry, count, bytes, digest) in cases {
+        let validated = validate_bundle(&bundle(files), None, None, &StorageLimits::default())
+            .unwrap_or_else(|error| panic!("{files:?} is a valid bundle: {error}"));
+        assert_eq!(validated.entry, entry, "{files:?}");
+        assert_eq!(validated.files.len(), count, "{files:?}");
+        assert_eq!(validated.total_bytes, bytes, "{files:?}");
+        assert_eq!(
+            bundle_manifest_digest(&validated.files),
+            digest,
+            "{files:?}"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------

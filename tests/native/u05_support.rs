@@ -1,4 +1,4 @@
-//! Shared fixtures for the U05 suites: real signing keys, a real JWKS, and the Node oracle seam.
+//! Shared fixtures for the U05 suites: real signing keys and a real JWKS.
 //!
 //! Every JWT in these suites is genuinely signed with a private key that lives in this file, so
 //! "the signature verifies" and "the signature was tampered with" are both real outcomes rather
@@ -10,19 +10,11 @@
     reason = "each U05 suite uses a different subset of these fixtures"
 )]
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
-
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64URL;
 use jsonwebtoken::jwk::Jwk;
 use jsonwebtoken::{Algorithm, EncodingKey};
 use serde_json::{Value, json};
-
-/// Setting this to `1` turns "Node is unavailable" from a skip into a failure.
-///
-/// Mandated for every cross-runtime proof by the U01 contract's M2 delta.
-pub const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
 
 /// The Access team domain every fixture token is issued for.
 pub const TEAM_DOMAIN: &str = "u05.cloudflareaccess.test";
@@ -227,99 +219,4 @@ fn merge(target: &mut Value, patch: Value) {
             target.insert(key, value);
         }
     }
-}
-
-// ---------------------------------------------------------------------------
-// Node oracle
-// ---------------------------------------------------------------------------
-
-/// The repository root, which is also the Node reference's working directory.
-#[must_use]
-pub fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-/// Whether `REQUIRE_NODE_REFERENCE=1` is set.
-#[must_use]
-pub fn require_node_reference() -> bool {
-    std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1")
-}
-
-/// Node reference availability, following `tests/native/u04_crypto.rs`.
-///
-/// Returns `false` (skip) only when `REQUIRE_NODE_REFERENCE=1` is unset; otherwise it fails, so a
-/// CI job cannot green-pass without ever having run the cross-runtime proof. The U01 contract
-/// requires this of every cross-runtime proof added after M2.
-#[must_use]
-pub fn node_reference_available(root: &Path, modules: &[&str]) -> bool {
-    let missing = modules
-        .iter()
-        .find(|module| !root.join(module).is_file())
-        .map(|module| format!("{module} is missing"));
-    let unavailable = missing.or_else(|| match Command::new("node").arg("--version").output() {
-        Ok(output) if output.status.success() => None,
-        _ => Some("node is not on PATH".to_owned()),
-    });
-
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !require_node_reference(),
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node reference is unavailable ({reason}); \
-                 the Node/Rust parity proof did not run"
-            );
-            eprintln!("skipping U05 Node parity proof: {reason}");
-            eprintln!("set {REQUIRE_NODE_REFERENCE}=1 to make this a failure instead");
-            false
-        }
-    }
-}
-
-/// Run a `node -e` driver with `request` as `process.argv[1]` and parse its JSON stdout.
-///
-/// `env` supplies the module-load-time environment `lib/identity.js` reads. `DATA_DIR` must be
-/// among it: importing any `lib/` module transitively imports `lib/db.js`, which opens a database
-/// on import.
-#[must_use]
-pub fn run_node(root: &Path, driver: &str, request: &Value, env: &[(&str, &str)]) -> Value {
-    let mut command = Command::new("node");
-    command
-        .current_dir(root)
-        .arg("-e")
-        .arg(driver)
-        .arg(request.to_string());
-    // Start from a clean slate so a developer's shell cannot change what the oracle reports.
-    for key in [
-        "CF_ACCESS_TEAM_DOMAIN",
-        "CF_ACCESS_AUD",
-        "TRUST_ACCESS_HEADERS",
-        "REQUIRE_ACCESS_JWT",
-        "HEADER_TRUST_ALLOW_INSECURE",
-        "ACCESS_CLOCK_TOLERANCE_S",
-        "ORG_EMAIL_DOMAINS",
-        "ADMIN_EMAILS",
-        "ADMIN_EMAIL_DOMAINS",
-        "ARTIFACT_API_KEYS",
-        "LISTEN_HOST",
-    ] {
-        command.env_remove(key);
-    }
-    for (key, value) in env {
-        command.env(key, value);
-    }
-    let output = command.output().expect("run the node reference");
-    assert!(
-        output.status.success(),
-        "node reference failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
-        panic!(
-            "node reference emitted non-JSON ({error}):\n{}\n{}",
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
-        )
-    })
 }

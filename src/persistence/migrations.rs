@@ -3,9 +3,10 @@
 //! The Node reference `lib/migrations.js` is the behavioural oracle for this module. Every
 //! statement below is a verbatim copy of the SQL it executes so that `sqlite_master.sql` text,
 //! column order, index names, check constraints, and composite foreign keys are identical
-//! between a Node-created and a Rust-created database. Do not "tidy" the SQL: the cross-runtime
-//! schema comparison in `tests/native/u03_cross_runtime.rs` compares normalised statement text,
-//! and a reformatted statement is a real divergence in a shared production database.
+//! between a Node-created and a Rust-created database. Do not "tidy" the SQL: the schema
+//! comparison in `tests/native/u03_migrations.rs` checks normalised statement text against a
+//! database the Node runtime wrote, and a reformatted statement is a real divergence in a shared
+//! production database.
 //!
 //! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run
 //! them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no

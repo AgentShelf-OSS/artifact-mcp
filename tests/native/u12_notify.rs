@@ -8,7 +8,8 @@ use artifact_mcp::integrations::notify::{
     WebhookTransport, build_embed, multipart_request,
 };
 use artifact_mcp::model::{
-    CreateWebhook, DeliveryResult, OrgId, WebhookDelivery, WebhookEvent, WebhookId,
+    CreateWebhook, DeliveryResult, NotificationPayload, OrgId, WebhookDelivery, WebhookEvent,
+    WebhookId,
 };
 use artifact_mcp::ports::NotificationSink;
 
@@ -492,6 +493,124 @@ fn every_event_uses_its_own_color_and_shape() {
             r#""description":"Feedback resolved"}]}"#
         )
     );
+}
+
+/// The embed bytes for the fallback, escaping, byte-size, revision and truncation edge cases.
+#[test]
+fn edge_case_embeds_match_the_frozen_node_bytes() {
+    let embed = |event: WebhookEvent, org: &str, payload: &NotificationPayload| {
+        serde_json::to_string(&build_embed(&event, &OrgId(org.to_owned()), payload))
+            .expect("serialize")
+    };
+
+    let mut empty = payload();
+    empty.title = String::new();
+    empty.description = "   ".to_owned();
+    empty.uploader_label = String::new();
+    empty.category = String::new();
+    empty.url = String::new();
+    empty.revision = 0;
+    empty.body = None;
+    empty.viewer_email = None;
+    empty.resolver = None;
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    assert_eq!(
+        embed(WebhookEvent::Published, "", &empty),
+        concat!(
+            r#"{"embeds":[{"color":3120756,"author":{"name":"Artifact Index"},"title":"Artifact","#,
+            r#""fields":[{"name":"Publisher","value":"Unknown","inline":true},"#,
+            r#"{"name":"Category","value":"Uncategorized","inline":true},"#,
+            r#"{"name":"Revision","value":"1","inline":true},"#,
+            r#"{"name":"Size","value":"2.0 KB","inline":true}],"#,
+            r#""description":"Published artifact"}]}"#
+        )
+    );
+    assert_eq!(
+        embed(WebhookEvent::Feedback, "", &empty),
+        concat!(
+            r#"{"embeds":[{"color":16096779,"author":{"name":"Artifact Index"},"#,
+            r#""title":"New feedback","fields":[{"name":"Viewer","value":"Unknown","inline":true},"#,
+            r#"{"name":"Revision","value":"1","inline":true}],"description":"(No message)"}]}"#
+        )
+    );
+    assert_eq!(
+        embed(WebhookEvent::Resolved, "", &empty),
+        concat!(
+            r#"{"embeds":[{"color":1483594,"author":{"name":"Artifact Index"},"#,
+            r#""title":"Feedback resolved","#,
+            r#""fields":[{"name":"Resolver","value":"Unknown","inline":true}],"#,
+            r#""description":"Feedback resolved"}]}"#
+        )
+    );
+
+    // JSON escaping: control characters escaped, DEL and non-ASCII left raw, U+2028/U+2029 trimmed
+    // by `String.prototype.trim`, and `</script>` left alone.
+    let mut escaping = payload();
+    escaping.title = "quote \" backslash \\ newline \n tab \t control \u{1} del \u{7f}".to_owned();
+    escaping.description = "ünïcødé — 🎉 — トークン — \u{2028}\u{2029}".to_owned();
+    escaping.uploader_label = "</script><script>alert(1)</script>".to_owned();
+    escaping.category = "a/b".to_owned();
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    assert_eq!(
+        embed(WebhookEvent::Published, "acme & co", &escaping),
+        concat!(
+            r#"{"embeds":[{"color":3120756,"author":{"name":"acme & co"},"#,
+            r#""title":"quote \" backslash \\ newline \n tab \t control \u0001 del "#,
+            "\u{7f}",
+            r#"","url":"https://example.test/abc123def456","fields":["#,
+            r#"{"name":"Publisher","value":"</script><script>alert(1)</script>","inline":true},"#,
+            r#"{"name":"Category","value":"a/b","inline":true},"#,
+            r#"{"name":"Revision","value":"3","inline":true},"#,
+            r#"{"name":"Size","value":"2.0 KB","inline":true}],"#,
+            r#""description":"ünïcødé — 🎉 — トークン —"}]}"#
+        )
+    );
+
+    let field = |payload: &NotificationPayload, name: &str| -> String {
+        let value: serde_json::Value =
+            serde_json::from_str(&embed(WebhookEvent::Published, "acme", payload))
+                .expect("embed JSON");
+        value["embeds"][0]["fields"]
+            .as_array()
+            .expect("fields")
+            .iter()
+            .find(|field| field["name"] == name)
+            .and_then(|field| field["value"].as_str())
+            .expect("field value")
+            .to_owned()
+    };
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (bytes, size) in [
+        (1, "1 B"),
+        (1_024 + 768, "1.8 KB"),
+        (1_048_576 + 786_432, "1.8 MB"),
+        (123_456_789, "117.7 MB"),
+        (u64::from(u32::MAX), "4096.0 MB"),
+    ] {
+        let mut sized = payload();
+        sized.bytes = bytes;
+        assert_eq!(field(&sized, "Size"), size, "{bytes} bytes");
+    }
+    let mut big = payload();
+    big.revision = 9_007_199_254_740_991;
+    assert_eq!(field(&big, "Revision"), "9007199254740991");
+
+    // Truncation: 256 / 2048 / 1024 / 1024 UTF-16 units, the last one an ellipsis.
+    let mut long = payload();
+    long.title = "T".repeat(400);
+    long.description = "D".repeat(3000);
+    long.uploader_label = "U".repeat(1200);
+    long.category = "C".repeat(1200);
+    let value: serde_json::Value =
+        serde_json::from_str(&embed(WebhookEvent::Published, "acme", &long)).expect("embed JSON");
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    assert_eq!(value["embeds"][0]["title"], format!("{}…", "T".repeat(255)));
+    assert_eq!(
+        value["embeds"][0]["description"],
+        format!("{}…", "D".repeat(2047))
+    );
+    assert_eq!(field(&long, "Publisher"), format!("{}…", "U".repeat(1023)));
+    assert_eq!(field(&long, "Category"), format!("{}…", "C".repeat(1023)));
 }
 
 #[tokio::test]

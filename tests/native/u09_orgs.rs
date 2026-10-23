@@ -1,9 +1,10 @@
 //! U09 organization persistence: validation order, normalization, uniqueness, cascade, and the
 //! `COLLATE NOCASE` membership semantics introduced by migration v21.
 //!
-//! Node oracle: `lib/orgs.js`. Messages asserted here are the literal 400 bodies the admin routes
-//! return ([lib/app.js:308-310] and siblings); `u09_node_parity.rs` proves them against the real
-//! Node implementation.
+//! Behaviour ported from the retired Node runtime's `lib/orgs.js`. Messages asserted here are the
+//! literal 400 bodies the admin routes return. The frozen vectors at the end pin the Unicode and
+//! JavaScript-string normalization that decides org membership, with values captured from that
+//! runtime.
 
 use std::collections::BTreeMap;
 
@@ -656,4 +657,153 @@ async fn the_pooled_store_exposes_the_same_behaviour_as_the_sync_layer() {
         validation_message(store.add_domain(&acme, "x.example").await),
         "Unknown organization \"acme\"."
     );
+}
+
+// ---------------------------------------------------------------------------
+// frozen vectors
+// ---------------------------------------------------------------------------
+
+/// Domain and email normalization decides which org a viewer resolves to, so the Unicode case
+/// folding and the `\s` rejection are pinned with literal values rather than re-derived.
+#[test]
+fn unicode_domain_and_email_normalization_match_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let db = TestDb::new("u09-frozen-unicode");
+    let mut conn = db.conn();
+    seed_org(&mut conn, "acme");
+
+    for (input, message) in [
+        (
+            ".example.com",
+            "\".example.com\" is not a valid email domain.",
+        ),
+        (
+            "example.com.",
+            "\"example.com.\" is not a valid email domain.",
+        ),
+        // `toLowerCase` turns U+0130 into "i" + U+0307, which the domain pattern refuses.
+        (
+            "\u{130}.C\u{d6}M",
+            "\"i\u{307}.c\u{f6}m\" is not a valid email domain.",
+        ),
+    ] {
+        assert_eq!(
+            validation_message(orgs::add_domain(&conn, "acme", input)),
+            message,
+            "input {input:?}"
+        );
+    }
+    // The Kelvin sign folds to ASCII "k", so this is stored as an ordinary domain.
+    assert_eq!(
+        orgs::add_domain(&conn, "acme", "EXAMPLE.\u{212a}OM").expect("add"),
+        "example.kom"
+    );
+    for lookup in ["example.kom", " EXAMPLE.\u{212a}OM "] {
+        assert_eq!(
+            orgs::org_for_domain(&conn, lookup).expect("lookup"),
+            Some(OrgId("acme".to_owned())),
+            "lookup {lookup:?}"
+        );
+    }
+
+    for (input, message) in [
+        (
+            "a b@example.com",
+            "\"a b@example.com\" is not a valid email address.",
+        ),
+        (
+            "a\u{a0}b@example.com",
+            "\"a\u{a0}b@example.com\" is not a valid email address.",
+        ),
+    ] {
+        assert_eq!(
+            validation_message(orgs::add_email_member(&conn, "acme", input)),
+            message,
+            "input {input:?}"
+        );
+    }
+    assert_eq!(
+        orgs::add_email_member(&conn, "acme", "Person@EXAMPLE.\u{212a}OM").expect("add"),
+        "person@example.kom"
+    );
+    for lookup in ["person@example.kom", "PERSON@EXAMPLE.\u{212a}OM"] {
+        assert_eq!(
+            orgs::org_for_email(&conn, lookup).expect("lookup"),
+            Some(OrgId("acme".to_owned())),
+            "lookup {lookup:?}"
+        );
+    }
+
+    // U+0085 is not JavaScript whitespace, so it survives category normalization.
+    assert_eq!(
+        orgs::add_category(&conn, "acme", "\u{85}kept").expect("add"),
+        "\u{85}kept"
+    );
+}
+
+/// `trim`, `toLowerCase`, `.length`, and the category collapse differ between JavaScript and
+/// Rust's standard library; these are the values org and category normalization must produce.
+#[test]
+fn javascript_string_primitives_match_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // (input, trim(), toLowerCase(), length, trim().replace(/\s+/g, " ").slice(0, 60))
+    let cases: [(&str, &str, &str, usize, &str); 11] = [
+        (" padded ", "padded", " padded ", 8, "padded"),
+        (
+            "\u{feff}zwnbsp\u{feff}",
+            "zwnbsp",
+            "\u{feff}zwnbsp\u{feff}",
+            8,
+            "zwnbsp",
+        ),
+        (
+            "\u{85}nel\u{85}",
+            "\u{85}nel\u{85}",
+            "\u{85}nel\u{85}",
+            5,
+            "\u{85}nel\u{85}",
+        ),
+        (
+            "\u{3000}ideographic\u{3000}",
+            "ideographic",
+            "\u{3000}ideographic\u{3000}",
+            13,
+            "ideographic",
+        ),
+        ("\u{a0}nbsp\u{a0}", "nbsp", "\u{a0}nbsp\u{a0}", 6, "nbsp"),
+        ("\n\ttabs\r\n", "tabs", "\n\ttabs\r\n", 8, "tabs"),
+        ("MiXeD CaSe", "MiXeD CaSe", "mixed case", 10, "MiXeD CaSe"),
+        (
+            "\u{130}STANBUL",
+            "\u{130}STANBUL",
+            "i\u{307}stanbul",
+            8,
+            "\u{130}STANBUL",
+        ),
+        (
+            "\u{212a}elvin",
+            "\u{212a}elvin",
+            "kelvin",
+            6,
+            "\u{212a}elvin",
+        ),
+        ("STRASSE", "STRASSE", "strasse", 7, "STRASSE"),
+        (
+            "no  collapse",
+            "no  collapse",
+            "no  collapse",
+            12,
+            "no collapse",
+        ),
+    ];
+    for (input, trimmed, lowered, length, collapsed) in cases {
+        assert_eq!(orgs::js_trim(input), trimmed, "trim({input:?})");
+        assert_eq!(input.to_lowercase(), lowered, "toLowerCase({input:?})");
+        assert_eq!(orgs::utf16_len(input), length, "length({input:?})");
+        assert_eq!(
+            orgs::norm_category(input),
+            collapsed,
+            "normCategory({input:?})"
+        );
+    }
 }

@@ -1,54 +1,14 @@
-//! PBI-056 provider-contract parity: the future Rust worker and Node reference classify the same
-//! Discord response without leaking webhook credentials.
+//! PBI-056 provider contract: the Rust worker builds Discord execution URLs and classifies Discord
+//! responses and transport faults exactly as the frozen vectors below require, without leaking
+//! webhook credentials. The vectors were captured from the retired Node runtime.
 
-use std::{collections::BTreeMap, path::PathBuf, process::Command};
+use std::collections::BTreeMap;
 
 use artifact_mcp::integrations::discord_delivery::{
     DeliveryClassification, DiscordHttpResponse, DuplicateRisk, ProviderFault, RateLimitScope,
     RetryReason, TerminalReason, classify_fault, classify_http_response, execution_url,
 };
 use serde_json::{Value, json};
-
-const NODE_DRIVER: &str = r#"
-const root = process.argv[1];
-const input = JSON.parse(process.argv[2]);
-import(`file://${root}/lib/discord-delivery.js`).then((provider) => {
-  process.stdout.write(JSON.stringify({
-    urls: input.urls.map((item) => { try { return { ok: true, url: provider.executionUrl(item.url, { threadId: item.threadId }) }; } catch (error) { return { ok: false, error: error.message }; } }),
-    outcomes: input.responses.map((item) => provider.classifyDiscordResponse(item)),
-    faults: input.faults.map((fault) => provider.classifyDiscordFault(fault))
-  }));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
-
-fn root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn node_available() -> bool {
-    root().join("lib/discord-delivery.js").is_file()
-        && Command::new("node")
-            .arg("--version")
-            .output()
-            .is_ok_and(|output| output.status.success())
-}
-
-fn node(input: &Value) -> Value {
-    let output = Command::new("node")
-        .current_dir(root())
-        .arg("-e")
-        .arg(NODE_DRIVER)
-        .arg(root().to_string_lossy().as_ref())
-        .arg(input.to_string())
-        .output()
-        .expect("run node provider contract");
-    assert!(
-        output.status.success(),
-        "node provider contract failed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("node emitted provider contract JSON")
-}
 
 fn response(value: &Value) -> DiscordHttpResponse {
     DiscordHttpResponse {
@@ -132,11 +92,7 @@ fn rate_limit_json(
 }
 
 #[test]
-fn rust_and_node_provider_contracts_match_for_urls_responses_and_faults() {
-    if !node_available() {
-        eprintln!("skipping PBI-056 Node parity: node is unavailable");
-        return;
-    }
+fn provider_contract_matches_frozen_urls_responses_and_faults() {
     let input = json!({
         "urls": [
             { "url": "https://discord.com/api/webhooks/1/token?thread_id=12&wait=false&junk=x&with_components=true", "threadId": "34" },
@@ -168,7 +124,45 @@ fn rust_and_node_provider_contracts_match_for_urls_responses_and_faults() {
         ],
         "faults": ["invalid_secret", "decrypt_failed", "allowlist_rejected", "network", "timeout", "ambiguous"]
     });
-    let actual = node(&input);
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let expected = json!({
+        "urls": [
+            {"ok": true, "url": "https://discord.com/api/webhooks/1/token?thread_id=34&with_components=true&wait=true"},
+            {"ok": true, "url": "https://discordapp.com/api/webhooks/1/token?wait=true"},
+            {"ok": false, "error": "allowlist_rejected"},
+        ],
+        "outcomes": [
+            {"state": "accepted", "messageId": "123456789012345678", "rateLimit": {"webhookRef": "webhook:wh-secret-ref-1", "retryAfterMs": null, "bucket": "bucket-a", "remaining": 0, "resetAfterMs": 250, "scope": "shared"}},
+            {"state": "terminal", "reason": "invalid_secret"},
+            {"state": "retry", "reason": "rate_limited", "duplicateRisk": "none", "rateLimit": {"webhookRef": "webhook:wh-secret-ref-1", "retryAfterMs": 251, "bucket": "bucket-a", "remaining": null, "resetAfterMs": 9000, "scope": "global"}},
+            {"state": "retry", "reason": "rate_limited", "duplicateRisk": "none", "rateLimit": {"webhookRef": "webhook:wh-secret-ref-1", "retryAfterMs": 1500, "bucket": null, "remaining": null, "resetAfterMs": null, "scope": "global"}},
+            {"state": "terminal", "reason": "invalid_rate_limit_delay"},
+            {"state": "terminal", "reason": "invalid_secret"},
+            {"state": "terminal", "reason": "invalid_rate_limit_delay"},
+            {"state": "terminal", "reason": "invalid_rate_limit_delay"},
+            {"state": "terminal", "reason": "invalid_rate_limit_delay"},
+            {"state": "terminal", "reason": "invalid_rate_limit_delay"},
+            {"state": "retry", "reason": "rate_limited", "duplicateRisk": "none", "rateLimit": {"webhookRef": "webhook:wh-secret-ref-1", "retryAfterMs": 86400000, "bucket": null, "remaining": null, "resetAfterMs": null, "scope": null}},
+            {"state": "terminal", "reason": "redirect"},
+            {"state": "terminal", "reason": "bad_request"},
+            {"state": "terminal", "reason": "unauthorized"},
+            {"state": "terminal", "reason": "forbidden"},
+            {"state": "terminal", "reason": "not_found"},
+            {"state": "terminal", "reason": "client_error"},
+            {"state": "retry", "reason": "server_error", "duplicateRisk": "possible", "rateLimit": null},
+            {"state": "retry", "reason": "server_error", "duplicateRisk": "possible", "rateLimit": null},
+            {"state": "retry", "reason": "server_error", "duplicateRisk": "possible", "rateLimit": null},
+            {"state": "retry", "reason": "server_error", "duplicateRisk": "possible", "rateLimit": null},
+        ],
+        "faults": [
+            {"state": "terminal", "reason": "invalid_secret"},
+            {"state": "terminal", "reason": "decrypt_failed"},
+            {"state": "terminal", "reason": "allowlist_rejected"},
+            {"state": "retry", "reason": "network", "duplicateRisk": "possible", "rateLimit": null},
+            {"state": "retry", "reason": "timeout", "duplicateRisk": "possible", "rateLimit": null},
+            {"state": "retry", "reason": "ambiguous", "duplicateRisk": "possible", "rateLimit": null},
+        ]
+    });
 
     let rust_urls: Vec<Value> = input["urls"]
         .as_array()
@@ -188,7 +182,7 @@ fn rust_and_node_provider_contracts_match_for_urls_responses_and_faults() {
             }
         })
         .collect();
-    assert_eq!(actual["urls"], json!(rust_urls));
+    assert_eq!(json!(rust_urls), expected["urls"]);
 
     let rust_responses: Vec<Value> = input["responses"]
         .as_array()
@@ -196,7 +190,7 @@ fn rust_and_node_provider_contracts_match_for_urls_responses_and_faults() {
         .iter()
         .map(|item| rust_outcome(classify_http_response(&response(item))))
         .collect();
-    assert_eq!(actual["outcomes"], json!(rust_responses));
+    assert_eq!(json!(rust_responses), expected["outcomes"]);
 
     let rust_faults: Vec<Value> = [
         ProviderFault::InvalidSecret,
@@ -209,7 +203,7 @@ fn rust_and_node_provider_contracts_match_for_urls_responses_and_faults() {
     .into_iter()
     .map(|fault| rust_outcome(classify_fault(fault)))
     .collect();
-    assert_eq!(actual["faults"], json!(rust_faults));
+    assert_eq!(json!(rust_faults), expected["faults"]);
 }
 
 #[test]

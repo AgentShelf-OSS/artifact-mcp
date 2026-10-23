@@ -18,6 +18,8 @@
 //! 4. Share grants are org-scoped and every failure is the same concealed answer.
 //! 5. The wrappers cannot be built outside `security::access` — see the `compile_fail` doctests
 //!    on that module, and `wrapper_construction_is_module_private` below for the argument.
+//! 6. The full viewer × artifact × concealment and publisher × artifact decision matrices match
+//!    frozen values captured from the retired Node runtime.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -459,7 +461,7 @@ fn the_ledger_of_artifact_scoped_surfaces_is_covered_by_one_gate() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Un-concealed parity (Node still exports it) and the admin-role decision
+// 2. Un-concealed mode (kept from the retired Node runtime) and the admin-role decision
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -850,4 +852,203 @@ async fn share_access_is_org_scoped_and_fails_concealed() {
         AppError::ConcealedNotFound
     );
     assert!(AccessPolicy::authorize_share(&grant, Some(acme_artifact())).is_ok());
+}
+
+// ---------------------------------------------------------------------------
+// 6. Frozen decision matrix
+// ---------------------------------------------------------------------------
+
+/// `(label, email, org, is_admin)`. `None` is an absent value and `Some("")` the empty string,
+/// which must behave like "absent".
+const MATRIX_VIEWERS: [(&str, Option<&str>, Option<&str>, bool); 8] = [
+    ("unsigned-null", None, None, false),
+    ("unsigned-empty-email", Some(""), Some("acme"), false),
+    ("same-org", Some("a@acme.test"), Some("acme"), false),
+    ("cross-org", Some("b@globex.test"), Some("globex"), false),
+    ("empty-org", Some("c@nowhere.test"), Some(""), false),
+    ("admin", Some("root@admin.test"), Some("admin"), true),
+    ("admin-no-org", Some("root@admin.test"), None, true),
+    (
+        "flagged-cross-org",
+        Some("d@globex.test"),
+        Some("globex"),
+        true,
+    ),
+];
+
+/// `(label, (org, client_id))`; `None` is the absent artifact. Every artifact uses the id
+/// `EXISTING_FOREIGN`, so `Unknown artifact: …` messages are comparable.
+const MATRIX_ARTIFACTS: [(&str, Option<(&str, &str)>); 5] = [
+    ("missing", None),
+    ("acme", Some(("acme", "acme-key"))),
+    ("globex", Some(("globex", "globex-key"))),
+    ("acme-key-in-globex", Some(("globex", "acme-key"))),
+    ("empty-org", Some(("", ""))),
+];
+
+/// `(label, client_id, org, role)`.
+const MATRIX_PUBLISHERS: [(&str, &str, &str, &str); 7] = [
+    ("acme-author", "acme-key", "acme", "author"),
+    ("acme-reader", "acme-key", "acme", "reader"),
+    ("acme-collaborator", "acme-key", "acme", "collaborator"),
+    ("globex-author", "globex-key", "globex", "author"),
+    ("admin-reader", "root-key", "admin", "reader"),
+    ("empty-org-author", "", "", "author"),
+    ("acme-key-wrong-org", "acme-key", "globex", "author"),
+];
+
+/// `(viewer label, admin decision, (revealed, concealed) per artifact)`.
+type ViewerRow = (
+    &'static str,
+    &'static str,
+    [(&'static str, &'static str); 5],
+);
+
+const NF: &str = "404 Not found";
+const UNSIGNED: &str = "401 Not signed in";
+const FORBIDDEN: &str = "403 Forbidden";
+
+/// Per viewer: the admin-role decision, then `(revealed, concealed)` for each artifact in
+/// `MATRIX_ARTIFACTS` order. A decision is `ok` or `<status> <message>`.
+// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+#[rustfmt::skip]
+const VIEWER_MATRIX: [ViewerRow; 8] = [
+    ("unsigned-null", "403 Not signed in",
+        [(NF, NF), (UNSIGNED, NF), (UNSIGNED, NF), (UNSIGNED, NF), (UNSIGNED, NF)]),
+    ("unsigned-empty-email", "403 Not signed in",
+        [(NF, NF), (UNSIGNED, NF), (UNSIGNED, NF), (UNSIGNED, NF), (UNSIGNED, NF)]),
+    ("same-org", "403 Admins only",
+        [(NF, NF), ("ok", "ok"), (FORBIDDEN, NF), (FORBIDDEN, NF), (FORBIDDEN, NF)]),
+    ("cross-org", "403 Admins only",
+        [(NF, NF), (FORBIDDEN, NF), ("ok", "ok"), ("ok", "ok"), (FORBIDDEN, NF)]),
+    ("empty-org", "403 Admins only",
+        [(NF, NF), (FORBIDDEN, NF), (FORBIDDEN, NF), (FORBIDDEN, NF), (FORBIDDEN, NF)]),
+    ("admin", "ok",
+        [(NF, NF), ("ok", "ok"), ("ok", "ok"), ("ok", "ok"), ("ok", "ok")]),
+    ("admin-no-org", "ok",
+        [(NF, NF), ("ok", "ok"), ("ok", "ok"), ("ok", "ok"), ("ok", "ok")]),
+    ("flagged-cross-org", "ok",
+        [(NF, NF), ("ok", "ok"), ("ok", "ok"), ("ok", "ok"), ("ok", "ok")]),
+];
+
+const UNKNOWN: &str = "Unknown artifact: acmeartifact";
+const CANNOT_READ: &str = "Permission denied: this API key cannot read this artifact";
+
+/// Per publisher and artifact (in `MATRIX_ARTIFACTS` order): the read/write/delete
+/// capabilities as `rwd` flags (`-` = denied, empty for the absent artifact), then the
+/// concealed publisher-read decision.
+// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+#[rustfmt::skip]
+const PUBLISHER_MATRIX: [(&str, [(&str, &str); 5]); 7] = [
+    ("acme-author",
+        [("", UNKNOWN), ("rwd", "ok"), ("---", UNKNOWN), ("---", UNKNOWN), ("---", UNKNOWN)]),
+    ("acme-reader",
+        [("", UNKNOWN), ("r--", "ok"), ("---", UNKNOWN), ("---", UNKNOWN), ("---", UNKNOWN)]),
+    ("acme-collaborator",
+        [("", UNKNOWN), ("rwd", "ok"), ("---", UNKNOWN), ("---", UNKNOWN), ("---", UNKNOWN)]),
+    ("globex-author",
+        [("", UNKNOWN), ("---", UNKNOWN), ("rwd", "ok"), ("---", CANNOT_READ), ("---", UNKNOWN)]),
+    ("admin-reader",
+        [("", UNKNOWN), ("rwd", "ok"), ("rwd", "ok"), ("rwd", "ok"), ("rwd", "ok")]),
+    ("empty-org-author",
+        [("", UNKNOWN), ("---", UNKNOWN), ("---", UNKNOWN), ("---", UNKNOWN), ("rwd", "ok")]),
+    ("acme-key-wrong-org",
+        [("", UNKNOWN), ("---", UNKNOWN), ("---", CANNOT_READ), ("rwd", "ok"), ("---", UNKNOWN)]),
+];
+
+fn matrix_artifact(shape: Option<(&str, &str)>) -> Option<ArtifactMeta> {
+    shape.map(|(org, client_id)| artifact(EXISTING_FOREIGN, org, client_id))
+}
+
+/// Renders a decision as `ok` or `<status> <message>`.
+fn outcome(result: &Result<(), AppError>) -> String {
+    match result {
+        Ok(()) => "ok".to_owned(),
+        Err(error) => format!("{} {error}", error.http_status().as_u16()),
+    }
+}
+
+#[test]
+fn viewer_and_admin_decisions_match_the_frozen_matrix() {
+    for (&(label, email, org, is_admin), &(expected_label, admin_expected, row)) in
+        MATRIX_VIEWERS.iter().zip(&VIEWER_MATRIX)
+    {
+        assert_eq!(label, expected_label);
+        let viewer = Viewer {
+            email: email.map(EmailAddress::from),
+            org: org.map(OrgId::from),
+            is_admin,
+        };
+        assert_eq!(
+            outcome(&AccessPolicy::admin_access(&viewer)),
+            admin_expected,
+            "adminAccess: {label}"
+        );
+        for (&(artifact_label, shape), &(revealed, concealed)) in MATRIX_ARTIFACTS.iter().zip(&row)
+        {
+            let case = format!("{label} × {artifact_label}");
+            let meta = matrix_artifact(shape);
+            assert_eq!(
+                outcome(&AccessPolicy::artifact_access(
+                    &viewer,
+                    meta.as_ref(),
+                    Concealment::Reveal
+                )),
+                revealed,
+                "revealed: {case}"
+            );
+            assert_eq!(
+                outcome(&AccessPolicy::artifact_access(
+                    &viewer,
+                    meta.as_ref(),
+                    Concealment::Conceal
+                )),
+                concealed,
+                "concealed: {case}"
+            );
+            // The wrapper-producing gate agrees with the concealed decision, and every failure
+            // is the single concealed answer.
+            match AccessPolicy::authorize_viewer(&viewer, meta) {
+                Ok(_) => assert_eq!(concealed, "ok", "authorize: {case}"),
+                Err(error) => assert_eq!(error, AppError::ConcealedNotFound, "authorize: {case}"),
+            }
+        }
+    }
+}
+
+#[test]
+fn publisher_capabilities_and_concealed_reads_match_the_frozen_matrix() {
+    for (&(label, client_id, org, role), &(expected_label, row)) in
+        MATRIX_PUBLISHERS.iter().zip(&PUBLISHER_MATRIX)
+    {
+        assert_eq!(label, expected_label);
+        let auth = PublisherIdentity {
+            client_id: ClientId::from(client_id),
+            org: OrgId::from(org),
+            label: String::new(),
+            role: role.to_owned(),
+            scopes: None,
+        };
+        for (&(artifact_label, shape), &(flags, read)) in MATRIX_ARTIFACTS.iter().zip(&row) {
+            let case = format!("{label} × {artifact_label}");
+            let meta = matrix_artifact(shape);
+            let rendered_flags = meta.as_ref().map_or_else(String::new, |meta| {
+                [
+                    (AccessPolicy::publisher_can_read(&auth, meta), 'r'),
+                    (AccessPolicy::publisher_can_write(&auth, meta), 'w'),
+                    (AccessPolicy::publisher_can_delete(&auth, meta), 'd'),
+                ]
+                .into_iter()
+                .map(|(allowed, flag)| if allowed { flag } else { '-' })
+                .collect()
+            });
+            assert_eq!(rendered_flags, flags, "capabilities: {case}");
+            let rendered_read =
+                match AccessPolicy::authorize_publisher_read(&auth, meta, EXISTING_FOREIGN) {
+                    Ok(_) => "ok".to_owned(),
+                    Err(error) => error.to_string(),
+                };
+            assert_eq!(rendered_read, read, "concealed publisher read: {case}");
+        }
+    }
 }

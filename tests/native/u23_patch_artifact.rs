@@ -424,3 +424,86 @@ async fn patch_artifact_contract_is_atomic_utf8_safe_and_revision_guarded() {
     .await
     .expect("production-backed patch_artifact exercise");
 }
+
+/// The patch engine's output bytes and error strings, case by case. The patched bytes become
+/// the persisted body and the errors are returned to MCP clients verbatim.
+#[test]
+fn patch_engine_bytes_and_errors_match_frozen_vectors() {
+    // `Ok((content, bytes_before, bytes_after))` or `Err(message)`.
+    type Outcome = Result<(&'static str, usize, usize), &'static str>;
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let cases: [(&str, Value, Outcome); 9] = [
+        (
+            "before unique after",
+            json!([{ "find": "unique", "replace": "changed" }]),
+            Ok(("before changed after", 19, 20)),
+        ),
+        (
+            "A🎉B---C",
+            json!([
+                { "offset": 9, "length": 1, "replace": "see" },
+                { "offset": 5, "length": 1, "replace": "bee" }
+            ]),
+            Ok(("A🎉bee---see", 10, 14)),
+        ),
+        (
+            "alpha beta alpha",
+            json!([{ "find": "gamma", "replace": "changed" }]),
+            Err("edit 1 find matched 0 times; expected exactly once"),
+        ),
+        (
+            "aaa",
+            json!([{ "find": "aa", "replace": "x" }]),
+            Err("edit 1 find matched 2 times; expected exactly once"),
+        ),
+        (
+            "A🎉B",
+            json!([{ "offset": 2, "length": 1, "replace": "x" }]),
+            Err("edit 1 offset 2 is not a UTF-8 boundary"),
+        ),
+        (
+            "A🎉B",
+            json!([{ "offset": 1, "length": 1, "replace": "x" }]),
+            Err("edit 1 range end 2 is not a UTF-8 boundary"),
+        ),
+        (
+            "abcdef",
+            json!([
+                { "offset": 1, "length": 3, "replace": "x" },
+                { "offset": 2, "length": 1, "replace": "y" }
+            ]),
+            Err("edits 1 and 2 overlap in the original content"),
+        ),
+        (
+            "same",
+            json!([{ "find": "same", "replace": "same" }]),
+            Err("Patch did not change artifact content"),
+        ),
+        (
+            "ab",
+            json!([
+                { "offset": 1, "length": 0, "replace": "x" },
+                { "offset": 1, "length": 0, "replace": "y" }
+            ]),
+            Ok(("axyb", 2, 4)),
+        ),
+    ];
+    for (content, edits, expected) in cases {
+        let edits: artifact_mcp::mcp::protocol::OrderedJson =
+            serde_json::from_value(edits).expect("edits deserialize");
+        let actual = artifact_mcp::mcp::validation::apply_utf8_edits(content.as_bytes(), &edits)
+            .map(|patched| {
+                let patched_len = patched.len();
+                (
+                    String::from_utf8(patched).expect("patched content is UTF-8"),
+                    content.len(),
+                    patched_len,
+                )
+            })
+            .map_err(|error| error.to_string());
+        let expected = expected
+            .map(|(text, before, after)| (text.to_owned(), before, after))
+            .map_err(str::to_owned);
+        assert_eq!(actual, expected, "{content:?}");
+    }
+}

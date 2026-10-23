@@ -1,8 +1,8 @@
 //! U10 behaviour suite: reactions, view analytics, and notification read watermarks.
 //!
 //! These run entirely on the Rust adapters over a real migrated SQLite file (U03's pool, so
-//! `foreign_keys = ON` and the cascades are genuine). Cross-runtime agreement with `lib/` is
-//! proved separately in `u10_node_parity.rs`.
+//! `foreign_keys = ON` and the cascades are genuine). The two `frozen_node_vector` tests pin the
+//! persisted reaction and view rows with values captured from the retired Node runtime.
 
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
@@ -319,6 +319,55 @@ fn deleting_an_artifact_cascades_its_reactions() {
     );
 }
 
+/// The persisted `reactions` rows after a scripted mix of full and partial updates.
+#[test]
+fn reaction_writes_persist_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let fixture = Fixture::new("react-frozen");
+    let mut conn = fixture.conn();
+    insert_artifact(&conn, "alpha", "acme", "Alpha");
+    insert_artifact(&conn, "bravo", "acme", "Bravo");
+
+    let script = [
+        ("a@x.test", "alpha", Some(true), Some(1), (1, 1)),
+        ("a@x.test", "alpha", None, Some(-1), (1, -1)),
+        ("a@x.test", "alpha", Some(false), None, (0, -1)),
+        ("a@x.test", "alpha", None, Some(0), (0, 0)),
+        ("b@x.test", "alpha", Some(true), None, (1, 0)),
+        ("a@x.test", "bravo", Some(true), Some(-1), (1, -1)),
+    ];
+    for (viewer, artifact, favorite, vote, (stored_favorite, stored_vote)) in script {
+        let stored = reactions::set(
+            &mut conn,
+            &email(viewer),
+            &id(artifact),
+            ReactionUpdate { favorite, vote },
+        )
+        .expect("set reaction");
+        assert_eq!(
+            stored,
+            Reaction {
+                favorite: stored_favorite,
+                vote: stored_vote
+            },
+            "{viewer} on {artifact}"
+        );
+    }
+
+    assert_eq!(
+        column(
+            &conn,
+            "SELECT email || '|' || artifact_id || '|' || favorite || '|' || vote \
+             FROM reactions ORDER BY email, artifact_id"
+        ),
+        [
+            "a@x.test|alpha|0|0",
+            "a@x.test|bravo|1|-1",
+            "b@x.test|alpha|1|0"
+        ]
+    );
+}
+
 // ---------------------------------------------------------------------------------------------
 // View analytics
 // ---------------------------------------------------------------------------------------------
@@ -583,6 +632,43 @@ fn deleting_an_artifact_cascades_its_view_analytics() {
             "SELECT artifact_id FROM artifact_views ORDER BY artifact_id"
         ),
         ["keep"]
+    );
+}
+
+/// The persisted `artifact_views` rows after a scripted sequence of recorded views.
+///
+/// The last step names the right artifact with the wrong org. `ON CONFLICT(artifact_id, email)`
+/// matches the existing row, so it takes the UPDATE branch: the counter moves and `org` does not.
+#[test]
+fn view_writes_persist_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let fixture = Fixture::new("views-frozen");
+    let conn = fixture.conn();
+    insert_artifact(&conn, "alpha", "acme", "Alpha");
+    insert_artifact(&conn, "bravo", "acme", "Bravo");
+
+    for (artifact, tenant, viewer) in [
+        ("alpha", "acme", "a@x.test"),
+        ("alpha", "acme", "a@x.test"),
+        ("alpha", "acme", "b@x.test"),
+        ("bravo", "acme", "a@x.test"),
+        ("ghost", "acme", "a@x.test"),
+        ("alpha", "other", "a@x.test"),
+    ] {
+        views::record(&conn, &id(artifact), &org(tenant), &email(viewer));
+    }
+
+    assert_eq!(
+        column(
+            &conn,
+            "SELECT artifact_id || '|' || org || '|' || email || '|' || count \
+             FROM artifact_views ORDER BY artifact_id, email"
+        ),
+        [
+            "alpha|acme|a@x.test|3",
+            "alpha|acme|b@x.test|1",
+            "bravo|acme|a@x.test|1"
+        ]
     );
 }
 

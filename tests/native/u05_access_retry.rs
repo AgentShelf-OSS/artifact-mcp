@@ -1,7 +1,7 @@
 //! U05 — Cloudflare Access session retry (`src/security/access_retry.rs`).
 //!
-//! Mirrors `test/identity.test.js:136-217`, which is the Node suite that froze this behaviour.
-//! The Node-parity half is in `u05_node_parity.rs`.
+//! The cases mirror the retired Node runtime's identity suite, which froze this behaviour; every
+//! expected target below is a literal value, so no Node reference is needed.
 
 use artifact_mcp::config::AccessIdentityMode;
 use artifact_mcp::security::access_retry::{

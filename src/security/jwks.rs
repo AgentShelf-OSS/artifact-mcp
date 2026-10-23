@@ -588,130 +588,177 @@ impl JwksProvider for StaticJwks {
 
 #[cfg(test)]
 mod transport_tests {
+    //! Transport proof for [`HttpJwksSource`] against an in-process TLS fixture.
+    //!
+    //! The HTTPS server is `tokio-rustls` with the committed, test-only localhost chain in
+    //! `tests/fixtures/oauth-https/`; the client trusts only that fixture CA. A second, plain-HTTP
+    //! listener stands in for a downgrade target and counts every TCP connection it accepts, so
+    //! "never contacted" is checked at the socket level rather than per request. A fixture that
+    //! cannot start fails the test; nothing here skips.
+
     use super::*;
     use std::{
-        io::{BufRead, BufReader},
-        process::{Child, Command, Stdio},
+        convert::Infallible,
+        path::PathBuf,
+        sync::atomic::{AtomicUsize, Ordering},
     };
 
-    struct NodeFixture(Child);
+    use hyper::{
+        Request, Response, StatusCode, body::Incoming, header, server::conn::http1,
+        service::service_fn,
+    };
+    use hyper_util::rt::TokioIo;
+    use tokio::net::TcpListener;
+    use tokio_rustls::{
+        TlsAcceptor,
+        rustls::{
+            ServerConfig,
+            crypto::aws_lc_rs,
+            pki_types::{CertificateDer, PrivateKeyDer, pem::PemObject},
+        },
+    };
 
-    impl Drop for NodeFixture {
-        fn drop(&mut self) {
-            let _ = self.0.kill();
-            let _ = self.0.wait();
-        }
+    const JWKS_BODY: &str = r#"{"keys":[]}"#;
+
+    fn fixture(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/oauth-https")
+            .join(name)
     }
 
-    fn fixture() -> Option<(NodeFixture, u16, u16)> {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let cert = root.join("test/fixtures/oauth-https/localhost-cert.pem");
-        let key = root.join("test/fixtures/oauth-https/localhost-key.pem");
-        if !cert.is_file() || !key.is_file() {
-            if std::env::var_os("REQUIRE_NODE_REFERENCE").is_some_and(|v| v == "1") {
-                panic!("OAuth HTTPS fixture certificate files are missing");
+    fn tls_acceptor() -> TlsAcceptor {
+        let chain = CertificateDer::pem_file_iter(fixture("localhost-cert.pem"))
+            .expect("open fixture leaf certificate")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("parse fixture leaf certificate");
+        let key = PrivateKeyDer::from_pem_file(fixture("localhost-key.pem"))
+            .expect("parse fixture leaf key");
+        let config = ServerConfig::builder_with_provider(Arc::new(aws_lc_rs::default_provider()))
+            .with_safe_default_protocol_versions()
+            .expect("fixture TLS protocol versions")
+            .with_no_client_auth()
+            .with_single_cert(chain, key)
+            .expect("fixture TLS server certificate");
+        TlsAcceptor::from(Arc::new(config))
+    }
+
+    fn jwks_response() -> Response<String> {
+        Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(JWKS_BODY.to_owned())
+            .expect("fixture JWKS response")
+    }
+
+    async fn bind_loopback() -> (TcpListener, u16) {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind loopback fixture listener");
+        let port = listener
+            .local_addr()
+            .expect("fixture listener address")
+            .port();
+        (listener, port)
+    }
+
+    /// Plain-HTTP downgrade target. Counts accepted connections, then serves a valid JWKS so a
+    /// followed redirect would be observable as a successful fetch, not just as a hit.
+    async fn spawn_plain_target(connections: Arc<AtomicUsize>) -> u16 {
+        let (listener, port) = bind_loopback().await;
+        tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                connections.fetch_add(1, Ordering::SeqCst);
+                let service = service_fn(|_: Request<Incoming>| async {
+                    Ok::<_, Infallible>(jwks_response())
+                });
+                tokio::spawn(async move {
+                    let _ = http1::Builder::new()
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await;
+                });
             }
-            eprintln!("skipping JWKS HTTPS transport test: fixture certificate files missing");
-            return None;
-        }
-        let script = r#"
-const fs = require('fs'), http = require('http'), https = require('https');
-const cert = fs.readFileSync(process.argv[1]), key = fs.readFileSync(process.argv[2]);
-let targetHits = 0, redirectHits = 0;
-const body = JSON.stringify({keys: []});
-const target = http.createServer((req, res) => { targetHits++; res.writeHead(200, {'content-type':'application/json'}); res.end(body); });
-target.listen(0, '127.0.0.1', () => {
-  const targetPort = target.address().port;
-  const secure = https.createServer({cert, key}, (req, res) => {
-    if (req.url === '/redirect') { redirectHits++; res.writeHead(302, {location: `http://127.0.0.1:${targetPort}/target`}); return res.end(); }
-    if (req.url === '/stats') { res.writeHead(200, {'content-type':'application/json'}); return res.end(JSON.stringify({targetHits, redirectHits})); }
-    res.writeHead(200, {'content-type':'application/json'}); res.end(body);
-  });
-  const watchdog = setTimeout(() => process.exit(1), 30000);
-  secure.listen(0, '127.0.0.1', () => { clearTimeout(watchdog); process.stdout.write(JSON.stringify({https: secure.address().port, target: targetPort}) + '\n'); });
-});
-"#;
-        let child = match Command::new("node")
-            .arg("-e")
-            .arg(script)
-            .arg(&cert)
-            .arg(&key)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::inherit())
-            .spawn()
-        {
-            Ok(child) => child,
-            Err(error) => {
-                if std::env::var_os("REQUIRE_NODE_REFERENCE").is_some_and(|v| v == "1") {
-                    panic!("Node HTTPS fixture could not start: {error}");
-                }
-                eprintln!("skipping JWKS HTTPS transport test: Node unavailable ({error})");
-                return None;
+        });
+        port
+    }
+
+    /// HTTPS JWKS endpoint. `/redirect` answers `302` to `http://127.0.0.1:<target>/target`;
+    /// every other path serves the JWKS.
+    async fn spawn_https(target_port: u16, redirects: Arc<AtomicUsize>) -> u16 {
+        let acceptor = tls_acceptor();
+        let (listener, port) = bind_loopback().await;
+        tokio::spawn(async move {
+            while let Ok((stream, _)) = listener.accept().await {
+                let acceptor = acceptor.clone();
+                let redirects = Arc::clone(&redirects);
+                tokio::spawn(async move {
+                    let Ok(stream) = acceptor.accept(stream).await else {
+                        return;
+                    };
+                    let service = service_fn(move |request: Request<Incoming>| {
+                        let redirects = Arc::clone(&redirects);
+                        async move {
+                            if request.uri().path() != "/redirect" {
+                                return Ok::<_, Infallible>(jwks_response());
+                            }
+                            redirects.fetch_add(1, Ordering::SeqCst);
+                            Ok(Response::builder()
+                                .status(StatusCode::FOUND)
+                                .header(
+                                    header::LOCATION,
+                                    format!("http://127.0.0.1:{target_port}/target"),
+                                )
+                                .body(String::new())
+                                .expect("fixture redirect response"))
+                        }
+                    });
+                    let _ = http1::Builder::new()
+                        .serve_connection(TokioIo::new(stream), service)
+                        .await;
+                });
             }
-        };
-        let mut fixture = NodeFixture(child);
-        let stdout = fixture.0.stdout.take().expect("Node fixture stdout");
-        let mut line = String::new();
-        BufReader::new(stdout)
-            .read_line(&mut line)
-            .expect("read Node HTTPS fixture startup");
-        let ports: serde_json::Value =
-            serde_json::from_str(&line).expect("parse Node HTTPS fixture startup JSON");
-        let https_port = ports
-            .get("https")
-            .and_then(serde_json::Value::as_u64)
-            .and_then(|port| u16::try_from(port).ok())
-            .expect("Node HTTPS fixture HTTPS port");
-        let target_port = ports
-            .get("target")
-            .and_then(serde_json::Value::as_u64)
-            .and_then(|port| u16::try_from(port).ok())
-            .expect("Node HTTPS fixture target port");
-        Some((fixture, https_port, target_port))
+        });
+        port
     }
 
     #[tokio::test]
     async fn production_jwks_client_fetches_https_and_rejects_downgrade_redirect() {
-        let Some((fixture, https_port, target_port)) = fixture() else {
-            return;
-        };
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-        let cert = reqwest::Certificate::from_pem(
-            &std::fs::read(root.join("test/fixtures/oauth-https/ca-cert.pem"))
-                .expect("fixture certificate"),
+        let target_connections = Arc::new(AtomicUsize::new(0));
+        let redirects = Arc::new(AtomicUsize::new(0));
+        let target_port = spawn_plain_target(Arc::clone(&target_connections)).await;
+        let https_port = spawn_https(target_port, Arc::clone(&redirects)).await;
+
+        let ca = reqwest::Certificate::from_pem(
+            &std::fs::read(fixture("ca-cert.pem")).expect("read fixture CA certificate"),
         )
-        .expect("parse fixture certificate");
+        .expect("parse fixture CA certificate");
         let client = HttpJwksSource::client_builder()
-            .add_root_certificate(cert)
+            .add_root_certificate(ca)
             .build()
             .expect("test HTTPS client");
-        let source = HttpJwksSource {
+
+        let direct = HttpJwksSource {
             client: client.clone(),
             url: format!("https://localhost:{https_port}/jwks"),
         };
-        source.fetch().await.expect("direct HTTPS JWKS fetch");
+        direct.fetch().await.expect("direct HTTPS JWKS fetch");
 
         let redirect = HttpJwksSource {
-            client: client.clone(),
+            client,
             url: format!("https://localhost:{https_port}/redirect"),
         };
         assert_eq!(
             redirect.fetch().await,
             Err(AppError::Unavailable(JWKS_UNAVAILABLE_MESSAGE.to_owned()))
         );
-        let stats: serde_json::Value = client
-            .get(format!("https://localhost:{https_port}/stats"))
-            .send()
-            .await
-            .expect("HTTPS stats request")
-            .json()
-            .await
-            .expect("stats JSON");
-        assert_eq!(stats["redirectHits"], 1);
         assert_eq!(
-            stats["targetHits"], 0,
-            "redirect target {target_port} was contacted"
+            redirects.load(Ordering::SeqCst),
+            1,
+            "the HTTPS endpoint must have served the downgrade redirect"
         );
-        drop(fixture);
+        assert_eq!(
+            target_connections.load(Ordering::SeqCst),
+            0,
+            "plain-HTTP redirect target {target_port} was contacted"
+        );
     }
 }

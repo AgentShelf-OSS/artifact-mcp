@@ -1,9 +1,7 @@
-//! Route-level and cross-runtime parity proofs for U17.
+//! Route-level proofs for U17, with frozen route-shape vectors from the retired Node runtime.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
-    path::{Path as FsPath, PathBuf},
-    process::Command,
     sync::{Arc, Mutex},
 };
 
@@ -32,7 +30,6 @@ use tower::ServiceExt;
 
 const ID: &str = "abc123def456";
 const DIGEST: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
 
 #[derive(Default)]
 struct FakeState {
@@ -1780,97 +1777,6 @@ async fn gallery_preserves_admin_registry_union_order_and_unsigned_cache_policy(
     assert_eq!(unsigned.calls(), ["viewer.resolve", "pages.not_signed_in"]);
 }
 
-const NODE_DRIVER: &str = r#"
-import(process.argv[1]).then(async ({ createApp }) => {
-  const artifact = { id: 'abc123def456', org: 'acme', title: 'Raw Case', client_id: 'publisher', is_bundle: 0, entry: 'index.html', revision: 2, body_sha256: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' };
-  const deps = {
-    checkPublisherKey: () => ({ ok: false }), handleMcp: async () => null,
-    resolveViewer: async () => ({ email: 'member@acme.test', org: 'acme', isAdmin: false }),
-    artifacts: {
-      isReserved: () => false, getArtifactMeta: () => artifact,
-      readArtifact: () => ({ html: '<h1>Artifact</h1>' }),
-      readBundleFile: () => null, readHistoryArtifact: () => null, readHistoryBundleFile: () => null,
-      listOrgArtifacts: () => [], listAllGroupedByOrg: () => new Map(), listOrgIds: () => [artifact.id]
-    },
-    shares: { resolve: () => ({ artifact_id: artifact.id, org: artifact.org }) },
-    keys: { list: () => [] }, orgs: { names: () => [], colorMap: () => ({}) },
-    reactions: { get: () => ({ favorite: 0, vote: 0 }), forViewer: () => new Map(), sentiment: () => new Map() },
-    views: { record() {}, countsFor: () => null, countsForOrg: () => new Map(), viewersFor: () => [], topForOrg: () => [] },
-    feedback: { listForArtifact: () => [] }, notifications: { recentForViewer: () => [], unreadCount: () => 0, markSeen() {} },
-    thumbnails: { readThumbnail: async () => null, placeholder: () => Buffer.from('placeholder') },
-    pages: { gallery: () => 'gallery', shell: () => 'shell', notFound: () => 'not found', notSignedIn: () => 'not signed in', settings: () => 'settings' },
-    logger: { error() {}, info() {} }
-  };
-  const app = createApp(deps);
-  async function invoke(method, routePath, params, query = {}) {
-    const route = app._router.stack.find((layer) => layer.route?.path === routePath && layer.route.methods[method]);
-    const result = { status: 200, headers: {}, body: null };
-    const res = {
-      status(code){ result.status=code; return this; },
-      set(name,value){ if(typeof name === 'object') Object.assign(result.headers,name); else result.headers[String(name).toLowerCase()]=value; return this; },
-      send(value){ result.body=Buffer.isBuffer(value)?value.toString('utf8'):String(value); return this; },
-      json(value){ result.headers['content-type']='application/json'; result.body=JSON.stringify(value); return this; },
-      redirect(code,location){ result.status=code; result.headers.location=location; return this; }, end(){ return this; }
-    };
-    await route.route.stack.at(-1).handle({ headers:{}, params, query }, res);
-    return { status: result.status, location: result.headers.location || null, contentType: result.headers['content-type'] || result.headers['Content-Type'] || null, cache: result.headers['cache-control'] || result.headers['Cache-Control'] || null, csp: result.headers['content-security-policy'] || result.headers['Content-Security-Policy'] || null, body: result.body };
-  }
-  const output = [];
-  output.push(await invoke('get','/raw/:id',{id:artifact.id},{}));
-  output.push(await invoke('get','/raw/:id',{id:artifact.id},{download:''}));
-  output.push(await invoke('get','/s/:token',{token:'token'},{}));
-  output.push(await invoke('post','/notifications/seen',{},{}));
-  process.stdout.write(JSON.stringify(output));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn node_reference_available(root: &FsPath) -> bool {
-    let required = std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1");
-    let reason = if !root.join("lib/app.js").is_file() {
-        Some("lib/app.js is missing")
-    } else if !root.join("node_modules/express").is_dir() {
-        Some("node_modules/express is missing")
-    } else {
-        match Command::new("node").arg("--version").output() {
-            Ok(output) if output.status.success() => None,
-            _ => Some("node is not on PATH"),
-        }
-    };
-    match reason {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !required,
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node reference is unavailable ({reason}); the U17 route parity proof did not run"
-            );
-            eprintln!("skipping U17 Node parity proof: {reason}");
-            false
-        }
-    }
-}
-
-fn node_route_snapshots(root: &FsPath) -> Value {
-    let module = format!("file://{}", root.join("lib/app.js").display());
-    let output = Command::new("node")
-        .current_dir(root)
-        .arg("-e")
-        .arg(NODE_DRIVER)
-        .arg(module)
-        .output()
-        .expect("run Node U17 route oracle");
-    assert!(
-        output.status.success(),
-        "Node U17 route oracle failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("Node route snapshots")
-}
-
 async fn rust_route_snapshot(fake: &Fake, method: Method, uri: &str) -> Value {
     let response = invoke(fake, method, uri).await;
     let status = response.status().as_u16();
@@ -1887,12 +1793,7 @@ async fn rust_route_snapshot(fake: &Fake, method: Method, uri: &str) -> Value {
 }
 
 #[tokio::test]
-async fn rust_route_shapes_match_the_real_node_app_oracle() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
-    let node = node_route_snapshots(&root);
+async fn route_shapes_match_frozen_vectors() {
     let fake = Fake::standard();
     let rust = Value::Array(vec![
         rust_route_snapshot(&fake, Method::GET, &format!("/raw/{ID}")).await,
@@ -1901,9 +1802,34 @@ async fn rust_route_shapes_match_the_real_node_app_oracle() {
         rust_route_snapshot(&fake, Method::POST, "/notifications/seen").await,
     ]);
 
-    // Express adds transport-level details (ETag/content length) outside these route handlers;
-    // the route-owned status, representation headers and bytes must be identical.
-    assert_eq!(rust, node);
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0. The CSP equals
+    // `DOCUMENT_SANDBOX`, whose literal value `u14_response.rs` pins.
+    let raw = |cache: &str| {
+        json!({
+            "status": 200,
+            "location": null,
+            "contentType": "text/html; charset=utf-8",
+            "cache": cache,
+            "csp": DOCUMENT_SANDBOX,
+            "body": "<h1>Artifact</h1>",
+        })
+    };
+    let expected = json!([
+        raw("private, max-age=60"),
+        raw("private, max-age=60"),
+        raw("no-store"),
+        {
+            "status": 200,
+            "location": null,
+            "contentType": "application/json",
+            "cache": null,
+            "csp": null,
+            "body": "{\"ok\":true}",
+        },
+    ]);
+    // Transport-level details (ETag/content length) sit outside these route handlers; the
+    // route-owned status, representation headers and bytes are what is pinned.
+    assert_eq!(rust, expected);
 }
 
 #[tokio::test]

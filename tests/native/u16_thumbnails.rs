@@ -17,7 +17,7 @@ use artifact_mcp::http::ingress::IngressState;
 use artifact_mcp::integrations::preview::PreviewRenderer;
 use artifact_mcp::integrations::thumbnails::{
     DEFAULT_MAX_PNG_BYTES, PreviewArtifactIndex, PreviewArtifactRef, PreviewHtml,
-    PreviewIntegration, ThumbnailQueue, ThumbnailStore, valid_png,
+    PreviewIntegration, ThumbnailQueue, ThumbnailStore, thumbnail_placeholder, valid_png,
 };
 use artifact_mcp::model::{ArtifactId, ArtifactMeta, ClientId, OrgId, Timestamp};
 use artifact_mcp::ports::PreviewService;
@@ -846,4 +846,98 @@ fn png_validation_bounds() {
     assert!(!valid_png(b"\x89PNG", DEFAULT_MAX_PNG_BYTES));
     assert!(!valid_png(&png_of(64), 63));
     assert!(valid_png(&png_of(64), 64));
+}
+
+/// The id and digest guards that keep caller strings out of the preview path, as
+/// `validArtifactId` / `validDigest` decided them.
+#[test]
+fn path_guards_match_the_frozen_node_verdicts() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (id, valid) in [
+        (ID, true),
+        ("abcdef", true),
+        ("abcde", false),
+        ("aaaaaaaaaaaaaaaaaaaaaaaa", true),
+        ("aaaaaaaaaaaaaaaaaaaaaaaaa", false),
+        ("", false),
+        ("ABC123DEF456", false),
+        ("abc-123-def", false),
+        ("../../etc/passwd", false),
+        ("abc123/def456", false),
+        ("abc 123 def", false),
+        (".hidden123", false),
+        ("thumbnails", true),
+        ("notifications", true),
+        ("abc123def456\n", false),
+    ] {
+        assert_eq!(SafeArtifactId::parse(id).is_some(), valid, "id {id:?}");
+    }
+    let trailing_newline = format!("{DIGEST}\n");
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (digest, valid) in [
+        (DIGEST, true),
+        (OTHER_DIGEST, true),
+        ("", false),
+        (
+            "CAFEBABE00112233445566778899AABBCCDDEEFF00112233445566778899AABB",
+            false,
+        ),
+        (&DIGEST[..63], false),
+        (
+            "gggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg",
+            false,
+        ),
+        ("../../../etc/passwd", false),
+        ("0", false),
+        (trailing_newline.as_str(), false),
+    ] {
+        assert_eq!(
+            BodyDigest::parse(digest).is_some(),
+            valid,
+            "digest {digest:?}"
+        );
+    }
+}
+
+/// The placeholder SVG served while no thumbnail exists, and the org hue (32-bit FNV-1a over
+/// UTF-16 code units) that colours it.
+#[test]
+fn the_placeholder_matches_the_frozen_node_bytes() {
+    let svg = |org: &str, accent: Option<&str>| {
+        let mut meta = single(ID, DIGEST);
+        meta.org = OrgId(org.to_owned());
+        String::from_utf8(thumbnail_placeholder(&meta, accent)).expect("utf-8 svg")
+    };
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    assert_eq!(
+        svg("acme", None),
+        concat!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="750" viewBox="0 0 1200 750" role="img" aria-label="Preview temporarily unavailable">"#,
+            "\n",
+            r##"<rect width="1200" height="750" fill="#f4f1ea"/><rect x="56" y="56" width="1088" height="638" rx="18" fill="#fff" stroke="#d8d2c5" stroke-width="3"/>"##,
+            "\n",
+            r##"<rect x="96" y="96" width="152" height="42" rx="7" fill="hsl(55 68% 44%)"/><text x="172" y="124" text-anchor="middle" font-family="ui-monospace,monospace" font-size="20" font-weight="700" fill="#fff">HTML</text>"##,
+            "\n",
+            r##"<path d="M96 194h620M96 242h820M96 290h710" stroke="#d8d2c5" stroke-width="22" stroke-linecap="round"/>"##,
+            "\n",
+            r##"<circle cx="600" cy="474" r="62" fill="hsl(55 68% 44%)" opacity=".12"/><path d="M600 442v64M568 474h64" stroke="hsl(55 68% 44%)" stroke-width="10" stroke-linecap="round"/>"##,
+            "\n",
+            r##"<text x="600" y="586" text-anchor="middle" font-family="system-ui,sans-serif" font-size="27" fill="#596273">Preview temporarily unavailable</text></svg>"##,
+        )
+    );
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (org, accent, fill) in [
+        ("acme", Some("#0a0"), "#00aa00"),
+        ("acme", Some("  #ABCDEF  "), "#ABCDEF"),
+        ("acme", Some("red"), "hsl(55 68% 44%)"),
+        ("", None, "hsl(61 68% 44%)"),
+        ("globex-int'l", None, "hsl(209 68% 44%)"),
+        ("ünïcødé-🎉-Ω", None, "hsl(283 68% 44%)"),
+        ("\u{1D11E}clef", None, "hsl(295 68% 44%)"),
+    ] {
+        assert!(
+            svg(org, accent).contains(&format!(r#"rx="7" fill="{fill}"/>"#)),
+            "org {org:?} accent {accent:?} should use {fill}"
+        );
+    }
 }

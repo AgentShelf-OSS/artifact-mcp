@@ -371,9 +371,10 @@ impl IsoShape {
     /// V8's field validation plus the epoch arithmetic `Date` performs, or `None` for the values
     /// `new Date(…)` reports as `Invalid Date`.
     fn to_unix_millis(self) -> Option<i64> {
-        // Empirically pinned against V8 (see `u11_node_parity`): month 1-12, day 1-31 (rolling
-        // over into the following month), hour <= 24 with 24 permitted only as exact midnight,
-        // minute/second <= 59, offset |hh| <= 23 and |mm| <= 59.
+        // Empirically pinned against V8 and frozen in
+        // `u11_shares::expiry_matrix_matches_the_frozen_node_vector`: month 1-12, day 1-31
+        // (rolling over into the following month), hour <= 24 with 24 permitted only as exact
+        // midnight, minute/second <= 59, offset |hh| <= 23 and |mm| <= 59.
         if !(1..=12).contains(&self.month) || !(1..=31).contains(&self.day) {
             return None;
         }

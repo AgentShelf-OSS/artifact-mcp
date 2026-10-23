@@ -1,27 +1,16 @@
-//! U04 cross-runtime proof: the webhook AEAD must be byte-compatible with `lib/crypto.js`.
+//! U04 — the webhook AEAD (`src/security/crypto.rs`) and its at-rest record format.
 //!
-//! Production rows are already encrypted by the Node reference and `WEBHOOK_ENC_KEY` is currently
-//! unset in production, so both the ciphertext format and the plaintext fallback are load-bearing.
-//! A Rust→Rust round trip proves nothing about either, so every parity assertion here drives the
-//! real `lib/crypto.js` through `node -e`, in **both** directions:
+//! Production rows were encrypted by the retired Node runtime, and `WEBHOOK_ENC_KEY` is unset in
+//! production, so both the ciphertext format and the plaintext fallback are load-bearing. A
+//! Rust→Rust round trip proves nothing about the format, so the format is pinned by frozen
+//! vectors captured from the retired Node runtime:
 //!
-//! * **Node → Rust** — Node encrypts, Rust must recover the exact original UTF-8 string.
-//! * **Rust → Node** — Rust encrypts (including a record produced by U03's real database
-//!   conversion path), Node's `decrypt()` must recover the exact original.
-//!
-//! # Skip visibility
-//!
-//! When `node` or `lib/crypto.js` is unavailable these tests **skip** so `cargo test` still works
-//! in a Rust-only environment. That is the hazard recorded in the U01 contract: a green run does
-//! not by itself prove the parity check executed. Set `REQUIRE_NODE_REFERENCE=1` to convert every
-//! skip into a hard failure, which is how CI must run this suite:
-//!
-//! ```text
-//! REQUIRE_NODE_REFERENCE=1 cargo test
-//! ```
+//! * **Node → Rust** — records Node encrypted must decrypt to the exact original UTF-8 string.
+//! * **Rust → Node** — with a pinned nonce, Rust must emit the exact record Node's `decrypt()`
+//!   accepted.
+//! * **Key parsing** — every key shape Node accepted, treated as unset, or rejected is classified
+//!   the same way, with the same verbatim messages.
 
-use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::Arc;
 
 use artifact_mcp::config::{ScriptedRandom, Secret};
@@ -37,27 +26,8 @@ use artifact_mcp::security::crypto::{
 };
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD as BASE64;
-use serde_json::{Value, json};
 
 use crate::u03_support::TempDataDir;
-
-/// Setting this to `1` turns "Node is unavailable" from a skip into a failure.
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
-
-/// The URL shapes the parity proof must cover: ASCII, non-ASCII/emoji, empty, long, and a
-/// realistic Discord webhook URL.
-fn samples() -> Vec<String> {
-    vec![
-        String::new(),
-        "https://discord.com/api/webhooks/123456789012345678/aB3-_xYz0TokenValue".to_owned(),
-        "https://discordapp.com/api/webhooks/1/ünïcødé-🎉-トークン-Ω≈ç√".to_owned(),
-        "plain-ascii-no-scheme".to_owned(),
-        format!(
-            "https://discord.com/api/webhooks/1/{}",
-            "long".repeat(512) // 2 KiB of token
-        ),
-    ]
-}
 
 /// A canonical 32-byte key: standard Base64 of the bytes `0..32`.
 fn parity_key() -> String {
@@ -68,182 +38,41 @@ fn parity_key() -> String {
     )
 }
 
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn require_node_reference() -> bool {
-    std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1")
-}
-
-/// Node reference availability.
-///
-/// Returns `false` (skip) only when `REQUIRE_NODE_REFERENCE=1` is not set; otherwise it fails the
-/// test, so a CI job cannot silently green-pass without ever running the byte-parity proof.
-fn node_reference_available(root: &Path) -> bool {
-    let unavailable = if root.join("lib/crypto.js").is_file() {
-        match Command::new("node").arg("--version").output() {
-            Ok(output) if output.status.success() => None,
-            _ => Some("node is not on PATH"),
-        }
-    } else {
-        Some("lib/crypto.js is missing")
-    };
-
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !require_node_reference(),
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node reference is unavailable ({reason}); \
-                 the Node/Rust byte-parity proof did not run"
-            );
-            eprintln!("skipping U04 Node byte-parity proof: {reason}");
-            eprintln!("set {REQUIRE_NODE_REFERENCE}=1 to make this a failure instead");
-            false
-        }
-    }
-}
-
-/// One `node -e` invocation that exercises every `lib/crypto.js` entry point this unit ports.
-///
-/// `process.argv[1]` is the module URL and `process.argv[2]` the JSON request, matching the way
-/// `u03_cross_runtime.rs` drives the reference.
-const NODE_DRIVER: &str = r#"
-import(process.argv[1]).then((crypto) => {
-  const input = JSON.parse(process.argv[2]);
-  const decryptAll = (records) => records.map((record) => {
-    try { return { ok: true, value: crypto.decrypt(record, input.key) }; }
-    catch (error) { return { ok: false, error: String(error && error.message) }; }
-  });
-  const nodeRecords = input.samples.map((sample) => crypto.encrypt(sample, input.key));
-  const out = {
-    nodeRecords,
-    nodeSelfCheck: nodeRecords.map((record) => crypto.decrypt(record, input.key)),
-    nodeDecrypts: decryptAll(input.rustRecords),
-    nodeDecryptsTampered: decryptAll(input.tamperedRecords),
-    keyResults: input.keyCandidates.map((candidate) => {
-      try { return { accepted: Boolean(crypto.parseEncryptionKey(candidate)), error: null }; }
-      catch (error) { return { accepted: false, error: String(error && error.message) }; }
-    }),
-    missingKeyError: null,
-    invalidKeyError: null,
-    warning: null
-  };
-  try { crypto.decrypt({}, ""); }
-  catch (error) { out.missingKeyError = String(error && error.message); }
-  try { crypto.encrypt("x", "not-a-key"); }
-  catch (error) { out.invalidKeyError = String(error && error.message); }
-  const warn = console.warn;
-  console.warn = (message) => { out.warning = String(message); };
-  crypto.warnIfWebhookEncryptionDisabled("");
-  console.warn = warn;
-  process.stdout.write(JSON.stringify(out));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
-
-fn run_node(root: &Path, request: &Value) -> Value {
-    let module = format!("file://{}", root.join("lib/crypto.js").display());
-    let output = Command::new("node")
-        .current_dir(root)
-        .arg("-e")
-        .arg(NODE_DRIVER)
-        .arg(&module)
-        .arg(request.to_string())
-        .env_remove("WEBHOOK_ENC_KEY")
-        .output()
-        .expect("run the node crypto reference");
-    assert!(
-        output.status.success(),
-        "node reference failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("node reference emitted JSON")
-}
-
-fn request(
-    key: &str,
-    samples: &[String],
-    rust: &[EncryptedUrl],
-    tampered: &[EncryptedUrl],
-) -> Value {
-    json!({
-        "key": key,
-        "samples": samples,
-        "rustRecords": rust.iter().map(record_json).collect::<Vec<Value>>(),
-        "tamperedRecords": tampered.iter().map(record_json).collect::<Vec<Value>>(),
-        "keyCandidates": Vec::<String>::new(),
-    })
-}
-
-fn record_json(record: &EncryptedUrl) -> Value {
-    json!({
-        "ciphertext": record.ciphertext,
-        "nonce": record.nonce,
-        "tag": record.tag,
-    })
-}
-
-fn record_from_json(value: &Value) -> EncryptedUrl {
-    let field = |name: &str| {
-        value
-            .get(name)
-            .and_then(Value::as_str)
-            .unwrap_or_else(|| panic!("node record is missing {name}: {value}"))
-            .to_owned()
-    };
-    EncryptedUrl {
-        ciphertext: field("ciphertext"),
-        nonce: field("nonce"),
-        tag: field("tag"),
-    }
-}
-
-fn array<'a>(response: &'a Value, name: &str) -> &'a Vec<Value> {
-    response
-        .get(name)
-        .and_then(Value::as_array)
-        .unwrap_or_else(|| panic!("node response is missing the {name} array"))
-}
-
 fn cipher() -> WebhookCipher {
     WebhookCipher::new(&Secret::new(parity_key())).expect("parity key is valid")
 }
 
 // ---------------------------------------------------------------------------
-// Direction 1: Node encrypts, Rust decrypts
+// Direction 1: Node encrypted, Rust decrypts
 // ---------------------------------------------------------------------------
 
 #[test]
-fn rust_decrypts_records_written_by_the_node_reference() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
-
-    let samples = samples();
-    let key = parity_key();
-    let response = run_node(&root, &request(&key, &samples, &[], &[]));
-
-    // The reference must agree with itself first; otherwise the fixture, not the port, is wrong.
-    let self_check: Vec<String> = array(&response, "nodeSelfCheck")
-        .iter()
-        .map(|value| {
-            value
-                .as_str()
-                .expect("node self check is a string")
-                .to_owned()
-        })
-        .collect();
-    assert_eq!(self_check, samples, "the node reference is inconsistent");
-
-    let records = array(&response, "nodeRecords");
-    assert_eq!(records.len(), samples.len());
+fn rust_decrypts_records_written_by_the_retired_node_runtime() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // `(plaintext, ciphertext, nonce, tag)` under `parity_key()`.
+    let records = [
+        ("", "", "25iAWWtqI4oS7Eu4", "JTf9m17ORCSy9QDeuB0HOg=="),
+        (
+            "https://discord.com/api/webhooks/123456789012345678/aB3-_xYz0TokenValue",
+            "Vm3f0ZJ6JWHo9edqhWQ9h0Ips0m2gqpvnio+i6WmXy3RomWeAj2V9cQoGXLqbf+/fe572y2655ioQsoHXVlqvJ6QxbA9y+Y=",
+            "QmdiyRudhdZvCzn+",
+            "BJqujEGAzAAEP/uYXAvMAw==",
+        ),
+        (
+            "https://discordapp.com/api/webhooks/1/ünïcødé-🎉-トークン-Ω≈ç√",
+            "T/Gc6vS71zBRrYu6zgKyR3WKLy8gpoqcZ9piRDEOGApVfyTd2gkVHF1s9T2eMooSM5YEm6TRk9mfZUFVY6Qn6XuugrI54HYbtjEMWaUt",
+            "SCLTH1xpAhuMkUc/",
+            "T8G+0JNzBt3N4cj+l3HPlg==",
+        ),
+    ];
 
     let cipher = cipher();
-    for (record, expected) in records.iter().zip(samples.iter()) {
-        let encrypted = record_from_json(record);
+    for (expected, ciphertext, nonce, tag) in records {
+        let encrypted = EncryptedUrl {
+            ciphertext: ciphertext.to_owned(),
+            nonce: nonce.to_owned(),
+            tag: tag.to_owned(),
+        };
 
         // The at-rest shape itself is part of the contract.
         assert_eq!(
@@ -268,63 +97,47 @@ fn rust_decrypts_records_written_by_the_node_reference() {
         let decrypted = cipher
             .decrypt(&encrypted)
             .expect("rust must decrypt a node record");
-        assert_eq!(&decrypted, expected, "node → rust plaintext diverged");
+        assert_eq!(decrypted, expected, "node → rust plaintext diverged");
     }
 }
 
 // ---------------------------------------------------------------------------
-// Direction 2: Rust encrypts, Node decrypts
+// Direction 2: Rust encrypts a record Node decrypted
 // ---------------------------------------------------------------------------
 
 #[test]
-fn the_node_reference_decrypts_records_written_by_rust() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
+fn a_pinned_nonce_produces_the_record_the_retired_node_runtime_decrypted() {
+    // Guards the format against an accidental change of AAD, tag length, or field encoding: with
+    // a fixed key and a fixed nonce the three columns are fully determined.
+    let cipher = WebhookCipher::with_random(
+        &Secret::new(parity_key()),
+        Arc::new(ScriptedRandom::new(vec![0xAB])),
+    )
+    .expect("valid key");
+    let record = cipher.encrypt("artifact-mcp").expect("encrypt");
 
-    let key = parity_key();
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // Node's `decrypt()` returned "artifact-mcp" for exactly this record.
+    assert_eq!(
+        record,
+        EncryptedUrl {
+            ciphertext: "rarAIMJ5co8PMiVb".to_owned(),
+            nonce: "q6urq6urq6urq6ur".to_owned(),
+            tag: "WFTM+SaEQLncUUlYmCp88w==".to_owned(),
+        }
+    );
+    assert_eq!(record.nonce, BASE64.encode([0xAB_u8; NONCE_BYTES]));
+    assert_eq!(cipher.decrypt(&record).expect("decrypt"), "artifact-mcp");
+}
+
+#[test]
+fn a_converted_legacy_row_decrypts_to_the_original_url() {
+    // A row produced by U03's real bootstrap conversion, driven by this unit's cipher.
     let cipher = cipher();
-    let mut samples = samples();
-    let mut records: Vec<EncryptedUrl> = samples
-        .iter()
-        .map(|sample| cipher.encrypt(sample).expect("rust encrypt"))
-        .collect();
-
-    // The strongest case: a row produced by U03's real bootstrap conversion, driven by this
-    // unit's cipher, must be readable by the Node reference.
-    let (converted_url, converted_record) = convert_one_legacy_row(&cipher);
-    samples.push(converted_url);
-    records.push(converted_record);
-
-    // Tampering with any of the three columns must fail authentication in Node too.
-    let tampered = tampered_variants(&records[1]);
-
-    let response = run_node(&root, &request(&key, &[], &records, &tampered));
-
-    let decrypts = array(&response, "nodeDecrypts");
-    assert_eq!(decrypts.len(), samples.len());
-    for (result, expected) in decrypts.iter().zip(samples.iter()) {
-        assert_eq!(
-            result.get("ok").and_then(Value::as_bool),
-            Some(true),
-            "node failed to decrypt a rust record: {result}"
-        );
-        assert_eq!(
-            result.get("value").and_then(Value::as_str),
-            Some(expected.as_str()),
-            "rust → node plaintext diverged"
-        );
-    }
-
-    let rejected = array(&response, "nodeDecryptsTampered");
-    assert_eq!(rejected.len(), tampered.len());
-    for result in rejected {
-        assert_eq!(
-            result.get("ok").and_then(Value::as_bool),
-            Some(false),
-            "node accepted a tampered rust record: {result}"
-        );
+    let (url, record) = convert_one_legacy_row(&cipher);
+    assert_eq!(cipher.decrypt(&record).expect("decrypt"), url);
+    for tampered in tampered_variants(&record) {
+        assert_eq!(cipher.decrypt(&tampered), Err(AppError::Internal));
     }
 }
 
@@ -401,97 +214,61 @@ fn tampered_variants(record: &EncryptedUrl) -> Vec<EncryptedUrl> {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn key_parsing_and_error_strings_match_the_node_reference() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
+fn key_parsing_and_error_strings_match_the_retired_node_runtime() {
+    #[derive(Debug, PartialEq, Eq)]
+    enum Verdict {
+        Accepted,
+        Unset,
+        Rejected,
     }
 
     let valid = parity_key();
-    let nel_wrapped = format!("\u{85}{valid}\u{85}");
-    let bom_wrapped = format!("\u{feff}{valid}\u{feff}");
-    let candidates: Vec<String> = vec![
-        valid.clone(),
-        format!("  {valid}  "),                                   // trimmed
-        nel_wrapped,                                              // JS preserves NEL
-        bom_wrapped,                                              // JS trims BOM
-        BASE64.encode([0_u8; KEY_BYTES]),                         // all-zero but canonical
-        String::new(),                                            // unset → plaintext fallback
-        "   ".to_owned(),                                         // blank → plaintext fallback
-        BASE64.encode([0_u8; 31]),                                // 31 bytes
-        BASE64.encode([0_u8; 33]),                                // 33 bytes
-        valid.replace('=', ""),                                   // unpadded
-        format!("{valid}="),                                      // over-padded
-        "AAAA".to_owned(),                                        // canonical, wrong length
-        "not base64!!".to_owned(),                                // invalid characters
-        "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8".to_owned(), // 32 bytes, unpadded
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let cases: Vec<(String, Verdict)> = vec![
+        (valid.clone(), Verdict::Accepted),
+        (format!("  {valid}  "), Verdict::Accepted), // trimmed
+        (format!("\u{85}{valid}\u{85}"), Verdict::Rejected), // JS preserves NEL
+        (format!("\u{feff}{valid}\u{feff}"), Verdict::Accepted), // JS trims BOM
+        (BASE64.encode([0_u8; KEY_BYTES]), Verdict::Accepted), // all-zero but canonical
+        (String::new(), Verdict::Unset),             // unset → plaintext fallback
+        ("   ".to_owned(), Verdict::Unset),          // blank → plaintext fallback
+        (BASE64.encode([0_u8; 31]), Verdict::Rejected), // 31 bytes
+        (BASE64.encode([0_u8; 33]), Verdict::Rejected), // 33 bytes
+        (valid.replace('=', ""), Verdict::Rejected), // unpadded
+        (format!("{valid}="), Verdict::Rejected),    // over-padded
+        ("AAAA".to_owned(), Verdict::Rejected),      // canonical, wrong length
+        ("not base64!!".to_owned(), Verdict::Rejected), // invalid characters
+        (
+            "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8".to_owned(), // 32 bytes, unpadded
+            Verdict::Rejected,
+        ),
     ];
 
-    let mut payload = request(&valid, &[], &[], &[]);
-    payload["keyCandidates"] = json!(candidates);
-    let response = run_node(&root, &payload);
-
-    // Both runtimes must classify every candidate identically.
-    let results = array(&response, "keyResults");
-    assert_eq!(results.len(), candidates.len());
-    assert_eq!(
-        results[2].get("accepted").and_then(Value::as_bool),
-        Some(false),
-        "the real Node parser must preserve U+0085 NEL and reject the wrapped key"
-    );
-    assert_eq!(
-        results[3].get("accepted").and_then(Value::as_bool),
-        Some(true),
-        "the real Node parser must trim U+FEFF BOM and accept the wrapped key"
-    );
-    for (result, candidate) in results.iter().zip(candidates.iter()) {
-        let node_accepted = result
-            .get("accepted")
-            .and_then(Value::as_bool)
-            .expect("node key result");
-        let node_error = result.get("error").and_then(Value::as_str);
-        match parse_encryption_key(Some(candidate)) {
-            Ok(Some(_)) => assert!(
-                node_accepted,
-                "rust accepted a key node rejected: {candidate:?} ({node_error:?})"
-            ),
-            Ok(None) => {
-                assert!(
-                    !node_accepted,
-                    "rust treated {candidate:?} as unset, node did not"
-                );
-                assert_eq!(
-                    node_error, None,
-                    "node threw for a blank key: {candidate:?}"
-                );
-            }
+    for (candidate, expected) in cases {
+        let verdict = match parse_encryption_key(Some(&candidate)) {
+            Ok(Some(_)) => Verdict::Accepted,
+            Ok(None) => Verdict::Unset,
             Err(error) => {
-                assert!(
-                    !node_accepted,
-                    "rust rejected a key node accepted: {candidate:?}"
-                );
-                assert_eq!(
-                    node_error,
-                    Some(INVALID_KEY_MESSAGE),
-                    "node's rejection message diverged for {candidate:?}"
-                );
                 assert_eq!(error, AppError::Validation(INVALID_KEY_MESSAGE.to_owned()));
+                Verdict::Rejected
             }
-        }
+        };
+        assert_eq!(verdict, expected, "{candidate:?}");
     }
 
-    // The three verbatim Node strings this unit reproduces.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
-        response.get("invalidKeyError").and_then(Value::as_str),
-        Some(INVALID_KEY_MESSAGE)
+        INVALID_KEY_MESSAGE,
+        "WEBHOOK_ENC_KEY must be a 32-byte base64 value."
     );
     assert_eq!(
-        response.get("missingKeyError").and_then(Value::as_str),
-        Some(MISSING_KEY_MESSAGE)
+        MISSING_KEY_MESSAGE,
+        "WEBHOOK_ENC_KEY is required to decrypt webhook URLs."
     );
     assert_eq!(
-        response.get("warning").and_then(Value::as_str),
-        Some(PLAINTEXT_FALLBACK_WARNING)
+        PLAINTEXT_FALLBACK_WARNING,
+        "[artifact-mcp] WARNING: WEBHOOK_ENC_KEY is unset — Discord webhook URLs will be stored \
+         in PLAINTEXT. Set a 32-byte base64 key to encrypt webhook credentials at rest."
     );
 }
 
@@ -601,26 +378,6 @@ fn no_key_or_url_reaches_debug_display_or_an_error_message() {
 
     // The masked column keeps only the last four characters of the token.
     assert_eq!(stored.url, "https://discord.com/…oken");
-}
-
-#[test]
-fn a_pinned_nonce_pins_the_whole_record() {
-    // Guards the format against an accidental change of AAD, tag length, or field encoding: with
-    // a fixed key and a fixed nonce the three columns are fully determined.
-    let cipher = WebhookCipher::with_random(
-        &Secret::new(parity_key()),
-        Arc::new(ScriptedRandom::new(vec![0xAB])),
-    )
-    .expect("valid key");
-    let record = cipher.encrypt("artifact-mcp").expect("encrypt");
-
-    assert_eq!(record.nonce, BASE64.encode([0xAB_u8; NONCE_BYTES]));
-    assert_eq!(
-        BASE64.decode(&record.ciphertext).expect("ciphertext").len(),
-        "artifact-mcp".len()
-    );
-    assert_eq!(BASE64.decode(&record.tag).expect("tag").len(), TAG_BYTES);
-    assert_eq!(cipher.decrypt(&record).expect("decrypt"), "artifact-mcp");
 }
 
 #[test]

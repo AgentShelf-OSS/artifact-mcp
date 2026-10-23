@@ -1,8 +1,9 @@
 //! U05 — publisher bearer-key authentication (`src/security/auth.rs`).
 //!
 //! Covers credential extraction and precedence, the hash input, the derived admin flag, the
-//! invariant-1 org pinning matrix, and secret containment. The Node-parity half of the hash and
-//! extraction rules lives in `u05_node_parity.rs`.
+//! invariant-1 org pinning matrix, and secret containment. Stored key hashes are pinned by a
+//! frozen vector captured from the retired Node runtime, because rows that runtime wrote must
+//! still authenticate.
 
 use std::sync::Arc;
 
@@ -111,6 +112,33 @@ fn sha256_hex_is_lowercase_hex_of_the_utf8_bytes() {
     assert_ne!(sha256_hex("secret"), sha256_hex("Secret"));
     assert_eq!(KeyHash::of("abc").expose(), sha256_hex("abc"));
     assert_eq!(BearerKey::new("abc").hash().expose(), sha256_hex("abc"));
+}
+
+#[test]
+fn stored_key_hashes_match_the_retired_node_runtime() {
+    // `api_keys.key_hash` rows written by Node's `sha256Hex` must still match the request path.
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (secret, expected) in [
+        (
+            "s3cret-value",
+            "bf496b76b91b82820ee599d4f83ba3d87b0c9365666694241916c40843d2a524",
+        ),
+        (
+            "ünïcødé-🎉-トークン-Ω≈ç√",
+            "d5bdbb48c3217a4e8ecc6f4a196f8fa19502a3fdb3fc7d2f0424e3895c52a8a9",
+        ),
+        (
+            "a key with spaces",
+            "4c7c4ce4c1d202513b89461164edc15f31680c95ee7375fb569da0891b0fedf6",
+        ),
+    ] {
+        assert_eq!(sha256_hex(secret), expected, "{secret:?}");
+        assert_eq!(
+            BearerKey::new(secret).hash().expose(),
+            expected,
+            "{secret:?}"
+        );
+    }
 }
 
 // ---------------------------------------------------------------------------
