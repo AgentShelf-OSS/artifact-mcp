@@ -219,6 +219,8 @@ To add inline PNG previews for single-file publish/update/restore notifications,
 
 ```dotenv
 PREVIEW_RENDERER_URL=http://artifact-preview:3000
+# Optional: a shared token that the renderer then requires (generate with `openssl rand -hex 32`).
+# PREVIEW_RENDERER_TOKEN=REPLACE_WITH_64_HEX_CHARACTERS
 ```
 
 Then enable the renderer profile:
@@ -228,7 +230,8 @@ docker compose --profile preview up -d --build
 ```
 
 The renderer processes untrusted HTML. It must remain on the shipped internal-only network with no
-published port, tunnel route, host/app-data mounts, or secrets. One validated PNG per current
+published port, tunnel route, host/app-data mounts, or secrets other than the optional shared
+renderer token. One validated PNG per current
 single-file content digest is stored in `DATA_DIR/previews` and reused by the authenticated gallery
 and Discord; existing artifacts backfill serially after startup. Bundles always use a distinct
 first-party placeholder. Removing `PREVIEW_RENDERER_URL` stops new rendering without breaking the

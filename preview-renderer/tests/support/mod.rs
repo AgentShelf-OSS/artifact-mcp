@@ -54,25 +54,42 @@ impl Service {
                 .env("CHROME_HEADLESS_SHELL", chrome)
                 .env("TMPDIR", &tmpdir)
                 .stdin(Stdio::null())
-                .stdout(Stdio::null())
+                .stdout(Stdio::piped())
                 .stderr(Stdio::inherit());
             for (name, value) in extra_env {
                 command.env(name, value);
             }
             let mut child = command.spawn().expect("start artifact-preview");
             let authority = format!("127.0.0.1:{port}");
+            // Readiness must come from THIS child. Another test's service can bind the same probed
+            // port first, so a successful connect alone may reach someone else's server. The
+            // service prints this line only after its own bind succeeded.
+            let ready_line = format!("[artifact-preview] listening on 0.0.0.0:{port}");
+            let (ready_tx, ready_rx) = std::sync::mpsc::channel();
+            let stdout = child.stdout.take().expect("piped stdout");
+            std::thread::spawn(move || {
+                use std::io::BufRead;
+                for line in std::io::BufReader::new(stdout)
+                    .lines()
+                    .map_while(Result::ok)
+                {
+                    if line == ready_line {
+                        let _ = ready_tx.send(());
+                    }
+                }
+            });
             let deadline = Instant::now() + Duration::from_secs(10);
             while Instant::now() < deadline {
-                if child.try_wait().unwrap().is_some() {
-                    break; // the port was taken between probe and bind; try another
-                }
-                if std::net::TcpStream::connect(&authority).is_ok() {
+                if ready_rx.try_recv().is_ok() {
                     return Self {
                         child,
                         authority,
                         tmpdir,
                         chrome: chrome.to_owned(),
                     };
+                }
+                if child.try_wait().unwrap().is_some() {
+                    break; // the port was taken between probe and bind; try another
                 }
                 std::thread::sleep(Duration::from_millis(20));
             }

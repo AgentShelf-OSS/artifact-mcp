@@ -9,9 +9,12 @@
 //! the directory. `Drop` repeats the kill and the removal on a best-effort basis in case
 //! `shutdown` never ran (a panic, or a cancelled task).
 //!
-//! The browser runs without Chromium's own sandbox (`--no-sandbox`), as it did under Playwright
-//! (`chromiumSandbox: false`): that sandbox needs user namespaces or a setuid helper, which the
-//! hardened container and systemd unit remove. The container or unit is the isolation boundary.
+//! By default the browser runs without Chromium's own sandbox (`--no-sandbox`), as it did under
+//! Playwright (`chromiumSandbox: false`): that sandbox needs unprivileged user namespaces (or a
+//! setuid helper, which `chrome-headless-shell` does not ship), and the hardened container removes
+//! them. The container or unit is then the isolation boundary. [`LaunchOptions::sandbox`] keeps
+//! the sandbox where user namespaces are available: the only change is that `--no-sandbox` is not
+//! passed. Chromium refuses its sandbox when it runs as root.
 //!
 //! [`LaunchOptions`] chooses the network policy. The preview renderer always uses
 //! [`Network::LockedDown`]; browser tests may choose [`Network::LoopbackOnly`] to reach a server
@@ -69,10 +72,15 @@ pub struct LaunchOptions {
     pub extra_args: Vec<OsString>,
     /// Pass the browser's stderr through instead of discarding it, for debugging.
     pub inherit_stderr: bool,
+    /// Keep Chromium's own sandbox: omit `--no-sandbox` and change nothing else. Off by default.
+    /// Renderer processes then run under seccomp-bpf in their own user, PID and network
+    /// namespaces, so the host must allow unprivileged user namespaces.
+    pub sandbox: bool,
 }
 
 impl LaunchOptions {
-    /// Locked-down defaults: [`Network::LockedDown`], no extra switches, stderr discarded.
+    /// Locked-down defaults: [`Network::LockedDown`], no extra switches, stderr discarded, and
+    /// Chromium's sandbox off (`--no-sandbox`).
     pub fn new(temp_dir_prefix: &'static str, log_label: &'static str) -> Self {
         Self {
             network: Network::LockedDown,
@@ -81,6 +89,7 @@ impl LaunchOptions {
             max_message_bytes: DEFAULT_MAX_MESSAGE_BYTES,
             extra_args: Vec::new(),
             inherit_stderr: false,
+            sandbox: false,
         }
     }
 }
@@ -168,9 +177,16 @@ pub const LOOPBACK_ONLY_SWITCHES: &[&str] = &[
     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 ];
 
+/// The switch that turns Chromium's own sandbox off. [`LaunchOptions::sandbox`] drops it.
+pub const NO_SANDBOX_SWITCH: &str = "--no-sandbox";
+
 /// The launch arguments for one browser with its profile in `profile_dir`.
 pub fn launch_args(profile_dir: &Path, options: &LaunchOptions) -> Vec<OsString> {
-    let mut args: Vec<OsString> = PLAYWRIGHT_SWITCHES.iter().map(OsString::from).collect();
+    let mut args: Vec<OsString> = PLAYWRIGHT_SWITCHES
+        .iter()
+        .filter(|switch| !(options.sandbox && **switch == NO_SANDBOX_SWITCH))
+        .map(OsString::from)
+        .collect();
     let network: &[&str] = match options.network {
         Network::LockedDown => LOCKDOWN_SWITCHES,
         Network::LoopbackOnly => LOOPBACK_ONLY_SWITCHES,
@@ -491,6 +507,33 @@ mod tests {
                 .any(|arg| arg.to_string_lossy().starts_with("--proxy-server"))
         );
         assert_eq!(open.len(), PLAYWRIGHT_SWITCHES.len() + 1);
+    }
+
+    #[test]
+    fn the_sandbox_option_drops_only_no_sandbox() {
+        for network in [
+            Network::LockedDown,
+            Network::LoopbackOnly,
+            Network::Unrestricted,
+        ] {
+            let off = launch_args(Path::new("/tmp/p"), &options(network));
+            let on = launch_args(
+                Path::new("/tmp/p"),
+                &LaunchOptions {
+                    sandbox: true,
+                    ..options(network)
+                },
+            );
+            assert!(has(&off, NO_SANDBOX_SWITCH));
+            assert!(!has(&on, NO_SANDBOX_SWITCH));
+            let expected: Vec<OsString> = off
+                .iter()
+                .filter(|arg| *arg != NO_SANDBOX_SWITCH)
+                .cloned()
+                .collect();
+            assert_eq!(on, expected);
+            assert_eq!(on.len() + 1, off.len());
+        }
     }
 
     #[test]

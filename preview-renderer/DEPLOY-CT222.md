@@ -1,12 +1,19 @@
 # Runbook: move CT222 from the Node renderer to the Rust renderer
 
-This is a plan. Nobody has run it yet. Do the steps in order and stop at the first failed check.
+Do the steps in order and stop at the first failed check.
+
+**Run log.** Steps 1–6 ran on 2026-10-23 with a local build of `a34964b` (sha256 `47af6293…`); CT222
+has served previews from the Rust renderer since 16:17 UTC that day. The same day CT222 got
+`features: nesting=1` (for the Chrome sandbox), 768 MB of memory, and `MemoryMax=640M` in the
+drop-in. Step 8 waits for a one-week soak (`ct222_soak_check.py` in the operator's migration folder).
+From v1.28.0, install the attested release binary as described in step 1 instead of a local build.
 
 ## Current state (read on 2026-10-22)
 
 | Item | Value |
 |---|---|
 | Container | CT222 `artifact-preview`, Ubuntu 24.04.5, unprivileged LXC, 2 cores, 1024 MB RAM, no swap |
+| Features | `nesting=1`. The service user can create user namespaces, and `chrome-headless-shell` starts without `--no-sandbox` there (checked after the feature was set). See [Chrome sandbox](#chrome-sandbox). |
 | Address | `192.168.0.222:3000`. nftables accepts port 3000 only from CT220 (`192.168.0.220`) and drops all output except loopback and established connections. **CT222 cannot download anything.** |
 | Unit | `/etc/systemd/system/artifact-preview.service`, `User=artifact-preview` (uid 999), `ExecStart=/usr/bin/node /opt/artifact-preview/server.js` |
 | Unit environment | `NODE_ENV=production`, `PORT=3000`, `HOME=/var/lib/artifact-preview`, `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` |
@@ -30,23 +37,27 @@ They must match `CHROME_VERSION` and `CHROME_SHA256` in `preview-renderer/Docker
 
 ## 1. Prepare the files on pve1
 
-Run these steps on pve1, which has network access, in an empty working directory.
+Run these steps on pve1, which has network access, in an empty working directory. Set `TAG` to the
+release that you install.
 
-1. Build the static binary from the release commit:
-
-   ```sh
-   cargo build --release --locked --target x86_64-unknown-linux-musl \
-     --manifest-path <repo>/preview-renderer/Cargo.toml
-   cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/release/artifact-preview" .
-   ```
-
-   Or copy it out of the release image:
+1. Download the attested renderer binary and the release checksums, and verify both. The flags
+   are the ones the server release check uses: the attestation must come from the release
+   workflow, for this tag and its commit.
 
    ```sh
-   docker create --name ap-extract <image>
-   docker cp ap-extract:/usr/local/bin/artifact-preview .
-   docker rm ap-extract
+   TAG=vX.Y.Z
+   REPO=AgentShelf-OSS/artifact-mcp
+   COMMIT="$(gh api "repos/$REPO/commits/$TAG" --jq .sha)"
+   gh release download "$TAG" --repo "$REPO" -p artifact-preview -p SHA256SUMS
+   sha256sum --check --strict --ignore-missing SHA256SUMS          # artifact-preview: OK
+   gh attestation verify artifact-preview --repo "$REPO" \
+     --cert-identity "https://github.com/$REPO/.github/workflows/release-provenance.yml@refs/tags/$TAG" \
+     --cert-oidc-issuer https://token.actions.githubusercontent.com \
+     --source-ref "refs/tags/$TAG" --source-digest "$COMMIT"
    ```
+
+   Stop if a command fails. `sha256sum` fails with `no file was verified` when `SHA256SUMS` has
+   no `artifact-preview` line. Releases before v1.28.0 have no `artifact-preview` asset.
 
 2. Run `file artifact-preview`. It must say `static-pie linked` or `statically linked`. Record
    `sha256sum artifact-preview`.
@@ -58,6 +69,24 @@ Run these steps on pve1, which has network access, in an empty working directory
    ```
 
    Stop if the check does not print `OK`.
+
+Fallback, only for a release without the `artifact-preview` asset or for a test build: build the
+static binary from the release commit. Such a binary has no attestation, so record its digest
+with the change.
+
+```sh
+cargo build --release --locked --target x86_64-unknown-linux-musl \
+  --manifest-path <repo>/preview-renderer/Cargo.toml
+cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/release/artifact-preview" .
+```
+
+Or copy it out of the release image:
+
+```sh
+docker create --name ap-extract <image>
+docker cp ap-extract:/usr/local/bin/artifact-preview .
+docker rm ap-extract
+```
 
 ## 2. Copy the files into CT222
 
@@ -149,11 +178,13 @@ Do not add these:
 
 * `MemoryDenyWriteExecute=yes`: V8's JIT needs writable and executable memory.
 * `PrivateNetwork=yes`: the service must accept connections from CT220.
+* `RestrictNamespaces=` (any value): it blocks the user, PID and network namespaces that
+  Chromium's sandbox needs (`CHROME_SANDBOX=1`, see [Chrome sandbox](#chrome-sandbox)).
 
-These should work, but none was tested in an unprivileged LXC: `RestrictNamespaces=yes`,
-`SystemCallArchitectures=native`, `ProtectClock=yes`, `ProtectHostname=yes`,
-`RestrictRealtime=yes`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`. Add them
-one at a time, and run step 6 after each.
+These should work, but none was tested in an unprivileged LXC: `SystemCallArchitectures=native`,
+`ProtectClock=yes`, `ProtectHostname=yes`, `RestrictRealtime=yes`,
+`RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`. Add them one at a time, and run
+step 6 after each.
 
 Then:
 
@@ -184,6 +215,10 @@ curl -s -o /tmp/ct222.png -w '%{http_code} %{content_type}\n' \
   -H 'content-type: application/json' -d '{"html":"<h1>ct222</h1>"}' \
   http://192.168.0.222:3000/render                       # 200 image/png
 ```
+
+When the renderer has the shared token ([Shared token](#shared-token)), this `curl` gets `401`,
+and the `smoke` commands above need `RENDER_TOKEN_FILE=/etc/artifact-preview/render-token` in
+front of them. Use the `regenerate_artifact_preview` check from CT220 instead.
 
 After a few renders, back in CT222:
 
@@ -276,6 +311,128 @@ Wait until the Rust renderer has run without a rollback for at least a week. The
 3. Repeat step 6. `command -v node` must print nothing.
 4. Update `homelab-automation`: `docs/inventory/live-topology.md` says "Native Playwright", and
    `docs/ops/native-edge-services-migration-2026-08-01.md` lists Node and Playwright Chromium.
+
+## Chrome sandbox
+
+`CHROME_SANDBOX=1` keeps Chromium's own sandbox: the renderer starts the browser without
+`--no-sandbox`, and every other flag stays the same. Each Chromium renderer process then runs in
+new user, PID and network namespaces under a seccomp-bpf filter, inside the unit's hardening.
+CT222 needs `features: nesting=1` for this (it has it). Turn the sandbox on after step 6 passes.
+
+1. In CT222, check that the service user can create the namespaces. This must print `ok`:
+
+   ```sh
+   runuser -u artifact-preview -- unshare --user --map-root-user --pid --net --fork true && echo ok
+   ```
+
+2. Run step 4 again with `CHROME_SANDBOX=1` added to the `env -i` line. `smoke` must pass.
+3. Add one line to the `[Service]` section of the drop-in (or of the unit, after step 8):
+
+   ```ini
+   Environment=CHROME_SANDBOX=1
+   ```
+
+   Do not add `RestrictNamespaces=`. Then run `systemctl daemon-reload`,
+   `systemctl restart artifact-preview`, and step 6.
+4. Check that the sandbox is active. While a slow page renders, every renderer process must show
+   `Seccomp: 2` and more `Seccomp_filters` than the service's main process. `LockPersonality` and
+   `RestrictSUIDSGID` already give the whole service a seccomp filter, so `Seccomp: 2` alone
+   proves nothing here; compare the counts.
+
+   ```sh
+   main=$(systemctl show -p MainPID --value artifact-preview)
+   curl -s -o /dev/null -w '%{http_code}\n' -H 'content-type: application/json' \
+     -d '{"html":"<script>const t = Date.now() + 2000; while (Date.now() < t) {}</script>"}' \
+     http://127.0.0.1:3000/render &
+   sleep 1
+   grep -H '^Seccomp' /proc/"$main"/status
+   for pid in $(pgrep -u artifact-preview -f -- --type=renderer); do grep -H '^Seccomp' /proc/"$pid"/status; done
+   wait                                                     # 200
+   ```
+
+   When the shared token is on (see [Shared token](#shared-token)), add
+   `-H "authorization: Bearer $(cat /etc/artifact-preview/render-token)"` to the `curl` line.
+5. After a few renders, compare `systemctl show artifact-preview -p MemoryPeak` with the value
+   before the change. It must stay below `MemoryMax=768M`.
+
+If every render fails after the change, the journal shows
+`render failed: browser closed the devtools pipe`: Chromium could not start its sandbox. Roll
+back: remove the `Environment=CHROME_SANDBOX=1` line, then run `systemctl daemon-reload` and
+`systemctl restart artifact-preview`, and repeat step 6.
+
+## Shared token
+
+The server on CT220 and the renderer on CT222 can share a bearer token. It is defence in depth:
+nftables, which accepts port 3000 only from CT220, stays the main control. With the token, a
+process that reaches port 3000 in another way still cannot render.
+
+| Side | Setting | Value comes from |
+|---|---|---|
+| CT220, `artifact-mcp` | `PREVIEW_RENDERER_TOKEN` | Infisical secret `/ARTIFACT_PREVIEW_RENDERER_TOKEN`, bound by the launcher at each start |
+| CT222, `artifact-preview` | `RENDER_TOKEN_FILE` | the same value in the root-only file `/etc/artifact-preview/render-token`, given to the unit with `LoadCredential=` |
+
+The token is 32 to 4096 printable ASCII characters without spaces; use 64 hexadecimal
+characters. The file holds the token and at most one trailing newline. Both services check the
+value at startup, refuse an invalid one, and never log it.
+
+The token needs artifact-mcp 1.28.0 or later on CT220 and the `artifact-preview` binary from the
+same release on CT222 (steps 1 to 6). CT222 has no network, so it cannot fetch the secret itself.
+A renderer without a token ignores the `authorization` header (the Node renderer did too), so set
+CT220 first and CT222 second. Then no render fails during the rollout.
+
+1. On pve1, create the token with `openssl rand -hex 32` and store it in Infisical as
+   `/ARTIFACT_PREVIEW_RENDERER_TOKEN` with `homelab-secrets add` and the operator profile, which
+   reads the value from a private prompt. Do not put the value on a command line or in chat.
+   Give the CT220 reader identity read access to it.
+2. CT220: add the binding `/ARTIFACT_PREVIEW_RENDERER_TOKEN` → `PREVIEW_RENDERER_TOKEN` to the
+   launcher, next to the one for `/ARTIFACT_AUDIT_LEDGER_HMAC_KEY`, and restart `artifact-mcp`.
+   The server now sends the header, and the renderer ignores it. Check that
+   `regenerate_artifact_preview` still gives a thumbnail.
+3. CT222: write the file. On pve1, the value goes through a pipe into the container; it is not
+   printed or stored on pve1 (`printf` is a shell built-in, so the value is not in any process's
+   arguments):
+
+   ```sh
+   homelab-secrets --config <reader profile> run \
+     --secret /ARTIFACT_PREVIEW_RENDERER_TOKEN=PREVIEW_RENDERER_TOKEN -- \
+     sh -c 'printf "%s\n" "$PREVIEW_RENDERER_TOKEN" | pct exec 222 -- sh -c \
+       "umask 077 && mkdir -p /etc/artifact-preview && cat > /etc/artifact-preview/render-token"'
+   pct exec 222 -- stat -c '%U:%G %a %s' /etc/artifact-preview/render-token   # root:root 600 65
+   ```
+
+4. CT222: add two lines to the `[Service]` section of the drop-in (or of the unit, after step 8).
+   `LoadCredential=` lets systemd read the root-only file and give the service a private copy;
+   `%d` is that credentials directory.
+
+   ```ini
+   LoadCredential=render-token:/etc/artifact-preview/render-token
+   Environment=RENDER_TOKEN_FILE=%d/render-token
+   ```
+
+   Then:
+
+   ```sh
+   systemctl daemon-reload
+   systemctl restart artifact-preview
+   systemctl is-active artifact-preview                                        # active
+   RENDER_TOKEN_FILE=/etc/artifact-preview/render-token \
+     PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke   # passed
+   PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke     # fails: HTTP 401
+   curl -fsS http://127.0.0.1:3000/health                                     # {"status":"ok"}
+   ```
+
+   `LoadCredential=` has not been tested in this unprivileged container. If the restart fails
+   with a credentials error, use a file that the service user can read instead
+   (`chown root:artifact-preview` and `chmod 0640`), and set
+   `Environment=RENDER_TOKEN_FILE=/etc/artifact-preview/render-token` without `LoadCredential=`.
+5. From CT220, run `regenerate_artifact_preview` once more. The journal on CT222 must not show
+   `rejected a render request without a valid token`.
+
+Roll back in the reverse order: remove the two lines on CT222, run `systemctl daemon-reload` and
+`systemctl restart artifact-preview` (the renderer is open again), and then remove the binding on
+CT220 if needed. To rotate the token, store the new value, then repeat steps 3 and 4 and restart
+`artifact-mcp` on CT220 right away. Renders between the two restarts fail and keep their
+placeholders; the restart of `artifact-mcp` backfills missing previews.
 
 ## Later browser upgrades
 

@@ -9,6 +9,8 @@
 //! The contract exercised:
 //!
 //! * `POST /render`, `content-type: application/json`, body `{"html":…,"width":…,"height":…}`;
+//! * `authorization: Bearer <PREVIEW_RENDERER_TOKEN>` when a token is configured, and no
+//!   `authorization` header otherwise;
 //! * success is `200` + `content-type: image/png` + a PNG within the byte cap;
 //! * everything else — `503 renderer busy`, `500 render failed`, a redirect, a mislabelled body,
 //!   a lying `content-length`, an unbounded stream, silence — yields `None`, never an error.
@@ -16,7 +18,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use artifact_mcp::config::PreviewConfig;
+use artifact_mcp::config::{PreviewConfig, Secret};
 use artifact_mcp::integrations::preview::PreviewRenderer;
 use artifact_mcp::integrations::thumbnails::PNG_SIGNATURE;
 
@@ -65,6 +67,63 @@ async fn posts_the_sidecar_contract_and_returns_the_png() {
     );
     assert_eq!(request.html, "<h1>hello</h1>");
     assert_eq!((request.width, request.height), (800, 400));
+}
+
+#[tokio::test]
+async fn sends_the_shared_token_only_when_configured() {
+    const TOKEN: &str = "shared-renderer-token_0123456789.ABCDEF~";
+    let stub = StubRenderer::rendering(sample_png());
+
+    // No token configured: no `authorization` header at all.
+    let open = renderer(stub.config());
+    assert!(open.render_preview("<p>open</p>").await.is_some());
+
+    // A configured token goes out as exactly `Bearer <token>`, on every request.
+    let guarded = renderer(PreviewConfig {
+        renderer_token: Some(Secret::new(TOKEN)),
+        ..stub.config()
+    });
+    assert!(guarded.render_preview("<p>one</p>").await.is_some());
+    assert!(
+        guarded
+            .render_revision_preview(ID, DIGEST, "<p>two</p>")
+            .await
+            .is_some()
+    );
+
+    let requests = stub.requests();
+    assert_eq!(requests.len(), 3);
+    assert_eq!(requests[0].html, "<p>open</p>");
+    assert_eq!(requests[0].authorization, None);
+    for request in &requests[1..] {
+        assert_eq!(
+            request.authorization.as_deref(),
+            Some(format!("Bearer {TOKEN}").as_str()),
+            "{}",
+            request.html
+        );
+    }
+}
+
+#[tokio::test]
+async fn a_renderer_that_refuses_the_token_yields_none() {
+    let stub = StubRenderer::start(StubReply::Status {
+        status: 401,
+        content_type: "application/json; charset=utf-8".to_owned(),
+        body: br#"{"error":"unauthorized"}"#.to_vec(),
+    });
+    let renderer = renderer(PreviewConfig {
+        renderer_token: Some(Secret::new("a-token-the-renderer-does-not-accept-0123")),
+        ..stub.config()
+    });
+    assert_eq!(renderer.render_preview("<p>x</p>").await, None);
+    assert_eq!(
+        renderer
+            .render_revision_preview(ID, DIGEST, "<p>x</p>")
+            .await,
+        None
+    );
+    assert!(renderer.cache_keys().is_empty(), "a refusal is not cached");
 }
 
 #[tokio::test]

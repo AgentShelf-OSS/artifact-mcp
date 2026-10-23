@@ -65,6 +65,14 @@ jobs:
           echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
           unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
           echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
+      - name: Allow the unprivileged user namespaces that the CHROME_SANDBOX tests need
+        # Ubuntu 24.04 restricts them through AppArmor. Without them the sandbox tests fail (CI=1).
+        run: |
+          set -euo pipefail
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+          unshare --user --map-root-user --pid --net --fork true
       - run: cargo fmt --manifest-path preview-renderer/Cargo.toml --check
       - run: cargo clippy --manifest-path preview-renderer/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path preview-renderer/Cargo.toml --locked

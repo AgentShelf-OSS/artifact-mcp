@@ -17,7 +17,9 @@ use tokio::sync::Semaphore;
 
 use crate::browser::Hardening;
 use crate::render::Renderer;
-use common::{Canary, canary_hosts, chrome, process_tree, running_processes};
+use common::{
+    Canary, canary_hosts, chrome, chrome_sandbox_supported, process_tree, running_processes,
+};
 
 /// Time each vector page stays loaded before the screenshot.
 const SETTLE: Duration = Duration::from_millis(1000);
@@ -174,7 +176,24 @@ async fn vectors_reach_the_canary_without_defences() {
 #[tokio::test]
 async fn every_browser_process_is_in_the_group_and_none_survives() {
     let Some(chrome) = chrome() else { return };
-    let renderer = Renderer::new(chrome, Duration::from_secs(15));
+    assert_group_holds_every_process(Renderer::new(chrome, Duration::from_secs(15))).await;
+}
+
+/// With `CHROME_SANDBOX=1` the renderers run in their own namespaces, but they must still stay in
+/// the browser's process group, and the group kill must still leave nothing behind.
+#[tokio::test]
+async fn sandboxed_browser_processes_are_in_the_group_and_none_survives() {
+    let Some(chrome) = chrome() else { return };
+    if !chrome_sandbox_supported() {
+        return;
+    }
+    assert_group_holds_every_process(
+        Renderer::new(chrome, Duration::from_secs(15)).with_chrome_sandbox(true),
+    )
+    .await;
+}
+
+async fn assert_group_holds_every_process(renderer: Renderer) {
     let page = format!(
         "<p>group</p><iframe srcdoc='<p>child</p>'></iframe><img src='data:image/png;base64,{}'>",
         common::RED_PNG_BASE64

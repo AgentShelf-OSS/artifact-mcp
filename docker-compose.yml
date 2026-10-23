@@ -14,6 +14,8 @@ services:
       - DATA_DIR=/data
       # Set PUBLIC_BASE_URL in .env to your public hostname (used to build artifact/share links).
       - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:3480}
+      # Optional shared renderer token; artifact-preview gets the same value as RENDER_TOKEN.
+      - PREVIEW_RENDERER_TOKEN=${PREVIEW_RENDERER_TOKEN:-}
     volumes:
       - ./data:/data
     healthcheck:
@@ -40,6 +42,9 @@ services:
       - PORT=3000
       - RENDER_TIMEOUT_MS=7000
       - CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell
+      # The server's PREVIEW_RENDERER_TOKEN from .env. Empty (the default) leaves /render open.
+      - RENDER_TOKEN=${PREVIEW_RENDERER_TOKEN:-}
+      # CHROME_SANDBOX stays unset (off): the container boundary above is the isolation layer.
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777

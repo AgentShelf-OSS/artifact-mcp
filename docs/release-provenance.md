@@ -10,8 +10,10 @@ approve or perform a deployment.
 2. A successful `CI` push run must already exist for the exact tagged commit.
 3. The workflow builds one candidate image, boots every frozen historical fixture with that exact
    digest, generates source and image SBOMs, and rejects high or critical vulnerability findings.
-4. GitHub's OIDC-backed attestation service records provenance for the native binary and OCI
-   digest. No repository signing key is required.
+   From the same checkout it builds the preview renderer, `artifact-preview`, as a static musl
+   binary and refuses it unless `file` reports `static-pie linked` or `statically linked`.
+4. GitHub's OIDC-backed attestation service records provenance for the native server binary, the
+   preview renderer binary, and the OCI digest. No repository signing key is required.
 5. The workflow assigns the stable image tag to the verified digest without rebuilding it, writes
    the release manifest and checksums, attaches every asset to a draft GitHub Release, and then
    publishes the complete draft.
@@ -45,6 +47,9 @@ workflow uploads every asset to a draft before publishing and locking it.
 Each GitHub Release contains:
 
 - `artifact-mcp`, copied from the tested final image;
+- `artifact-preview`, the static preview renderer binary (`preview-renderer/`), built from the
+  tagged source with
+  `cargo build --release --locked --target x86_64-unknown-linux-musl --manifest-path preview-renderer/Cargo.toml`;
 - `source.spdx.json`, the SPDX 2.3 inventory for the tagged source tree;
 - `image.spdx.json`, the SPDX 2.3 inventory for the exact candidate digest;
 - `historical-fixture-preflight.json`, the exact-image compatibility report;
@@ -53,6 +58,11 @@ Each GitHub Release contains:
   report, and GitHub attestations; and
 - `SHA256SUMS`, which covers every downloadable evidence file.
 
+`release-manifest.json` does not name `artifact-preview`, and its format did not change when the
+renderer was added. The renderer binary is bound by its `SHA256SUMS` entry and by its own build
+provenance attestation. The image SBOM and the vulnerability scan cover the server image, not the
+renderer binary. The renderer's dependencies are locked in `preview-renderer/Cargo.lock`.
+
 Verify downloaded assets before using them. Run `cargo xtask` from a checkout of the release tag;
 the manifest path can be absolute or relative to the current directory:
 
@@ -60,10 +70,29 @@ the manifest path can be absolute or relative to the current directory:
 (cd <download-dir> && sha256sum --check SHA256SUMS)
 cargo --locked xtask release verify-manifest <download-dir>/release-manifest.json
 gh attestation verify <download-dir>/artifact-mcp --repo AgentShelf-OSS/artifact-mcp
+gh attestation verify <download-dir>/artifact-preview --repo AgentShelf-OSS/artifact-mcp
 gh attestation verify \
   oci://ghcr.io/agentshelf-oss/artifact-mcp@sha256:<digest> \
   --repo AgentShelf-OSS/artifact-mcp
 ```
+
+To install only the renderer, download it with `SHA256SUMS` and check both. Pinning the signing
+workflow, the tag and its commit is stricter than `--repo` alone. `sha256sum` fails with
+`no file was verified` when `SHA256SUMS` has no `artifact-preview` line.
+
+```sh
+TAG=vX.Y.Z
+REPO=AgentShelf-OSS/artifact-mcp
+COMMIT="$(gh api "repos/$REPO/commits/$TAG" --jq .sha)"
+gh release download "$TAG" --repo "$REPO" -p artifact-preview -p SHA256SUMS
+sha256sum --check --strict --ignore-missing SHA256SUMS
+gh attestation verify artifact-preview --repo "$REPO" \
+  --cert-identity "https://github.com/$REPO/.github/workflows/release-provenance.yml@refs/tags/$TAG" \
+  --cert-oidc-issuer https://token.actions.githubusercontent.com \
+  --source-ref "refs/tags/$TAG" --source-digest "$COMMIT"
+```
+
+`preview-renderer/DEPLOY-CT222.md` uses these commands for a native renderer host.
 
 `verify-manifest` exits 0 and prints `verified <tag> (<digest>)` when the manifest and every file
 it names are consistent. It exits 1 and prints `release manifest verification failed: <reason>`

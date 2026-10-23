@@ -12,7 +12,7 @@ use hyper::{HeaderMap, Method, Request, StatusCode};
 use hyper_util::rt::TokioIo;
 use tokio::net::TcpStream;
 
-use crate::config::{DEFAULT_HEIGHT, DEFAULT_WIDTH, DEVICE_SCALE_FACTOR};
+use crate::config::{DEFAULT_HEIGHT, DEFAULT_WIDTH, DEVICE_SCALE_FACTOR, RenderToken};
 use crate::image_info::{PNG_SIGNATURE, png_dimensions};
 
 /// The page `smoke.js` rendered.
@@ -34,14 +34,30 @@ pub async fn send(
     body: Option<(&'static str, Bytes)>,
     timeout: Duration,
 ) -> Result<HttpResponse, String> {
-    tokio::time::timeout(timeout, send_inner(authority, method, path, body))
-        .await
-        .map_err(|_| {
-            format!(
-                "no response from {authority} within {} ms",
-                timeout.as_millis()
-            )
-        })?
+    send_with_authorization(authority, method, path, body, None, timeout).await
+}
+
+/// [`send`] with an `authorization` header, for example [`RenderToken::header_value`]. The value
+/// is marked sensitive and never appears in an error.
+pub async fn send_with_authorization(
+    authority: &str,
+    method: Method,
+    path: &str,
+    body: Option<(&'static str, Bytes)>,
+    authorization: Option<&str>,
+    timeout: Duration,
+) -> Result<HttpResponse, String> {
+    tokio::time::timeout(
+        timeout,
+        send_inner(authority, method, path, body, authorization),
+    )
+    .await
+    .map_err(|_| {
+        format!(
+            "no response from {authority} within {} ms",
+            timeout.as_millis()
+        )
+    })?
 }
 
 async fn send_inner(
@@ -49,7 +65,16 @@ async fn send_inner(
     method: Method,
     path: &str,
     body: Option<(&'static str, Bytes)>,
+    authorization: Option<&str>,
 ) -> Result<HttpResponse, String> {
+    let authorization = authorization
+        .map(|value| {
+            let mut value = HeaderValue::from_str(value)
+                .map_err(|_| "the authorization value is not a valid header value".to_owned())?;
+            value.set_sensitive(true);
+            Ok::<_, String>(value)
+        })
+        .transpose()?;
     let stream = TcpStream::connect(authority)
         .await
         .map_err(|error| format!("connect {authority}: {error}"))?;
@@ -61,6 +86,9 @@ async fn send_inner(
         .method(method)
         .uri(path)
         .header(hyper::header::HOST, authority);
+    if let Some(value) = authorization {
+        builder = builder.header(hyper::header::AUTHORIZATION, value);
+    }
     let payload = match body {
         Some((content_type, bytes)) => {
             builder = builder.header(
@@ -123,17 +151,20 @@ pub async fn healthcheck(port: u16) -> bool {
 }
 
 /// The `smoke.js` check: render a small page and verify that a PNG of the expected size comes
-/// back. Returns the PNG size in bytes.
-pub async fn smoke(base_url: &str) -> Result<usize, String> {
+/// back. Sends `token` as `authorization: Bearer <token>` when it is set. Returns the PNG size in
+/// bytes.
+pub async fn smoke(base_url: &str, token: Option<&RenderToken>) -> Result<usize, String> {
     let authority = authority_of(base_url)?;
     let body =
         serde_json::json!({"html": SMOKE_HTML, "width": DEFAULT_WIDTH, "height": DEFAULT_HEIGHT});
     let body = Bytes::from(serde_json::to_vec(&body).expect("a JSON value always serializes"));
-    let response = send(
+    let authorization = token.map(RenderToken::header_value);
+    let response = send_with_authorization(
         &authority,
         Method::POST,
         "/render",
         Some(("application/json", body)),
+        authorization.as_deref(),
         Duration::from_secs(10),
     )
     .await?;

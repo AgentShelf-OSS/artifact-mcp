@@ -6,6 +6,7 @@
 //! |---|---|
 //! | `GET /health` | `200 {"status":"ok"}` |
 //! | `POST /render` `{html, width, height}` | `200 image/png` |
+//! | `POST /render` without `authorization: Bearer <RENDER_TOKEN>`, when a token is set | `401 {"error":"unauthorized"}` |
 //! | a second `POST /render` while one is in flight | `503 {"error":"renderer busy"}` |
 //! | body above `MAX_BODY_BYTES` | `413 {"error":"request too large"}` |
 //! | body that is not JSON | `400 {"error":"invalid JSON"}` |
@@ -16,6 +17,11 @@
 //! Every response carries `cache-control: no-store` and `x-content-type-options: nosniff`. A
 //! request whose body does not arrive within `RENDER_TIMEOUT_MS + 2000` ms gets `408`, as Node's
 //! `server.requestTimeout` did; headers must arrive within `RENDER_TIMEOUT_MS + 3000` ms.
+//!
+//! The token check is the only addition to the Node contract, and it applies only when
+//! `RENDER_TOKEN` or `RENDER_TOKEN_FILE` is set. It runs before the busy check and before the body
+//! is read, so a client without the token cannot occupy the render slot or learn whether a render
+//! is running. `/health` stays open.
 
 use std::convert::Infallible;
 use std::io;
@@ -47,6 +53,8 @@ struct State {
     request_timeout: Duration,
     /// One render at a time; a second request gets 503 rather than a queue slot.
     busy: AtomicBool,
+    /// The exact `authorization` value `POST /render` requires (`Bearer <token>`), or `None`.
+    authorization: Option<Vec<u8>>,
 }
 
 /// Releases the single render slot when dropped, including when the request is abandoned.
@@ -83,10 +91,15 @@ impl Server {
     pub async fn bind_to(address: SocketAddr, config: &Config) -> io::Result<Self> {
         let listener = TcpListener::bind(address).await?;
         let state = Arc::new(State {
-            renderer: Renderer::new(config.chrome.clone(), config.render_timeout),
+            renderer: Renderer::new(config.chrome.clone(), config.render_timeout)
+                .with_chrome_sandbox(config.chrome_sandbox),
             max_body_bytes: config.max_body_bytes,
             request_timeout: config.request_timeout(),
             busy: AtomicBool::new(false),
+            authorization: config
+                .render_token
+                .as_ref()
+                .map(|token| token.header_value().into_bytes()),
         });
         Ok(Self {
             listener,
@@ -138,6 +151,13 @@ async fn handle(
     }
     if request.method() != Method::POST || target != "/render" {
         return Ok(error(StatusCode::NOT_FOUND, "not found"));
+    }
+    if let Some(expected) = &state.authorization
+        && !authorized(&request, expected)
+    {
+        // Never log the header: a wrong value may be a near miss of the real token.
+        eprintln!("[artifact-preview] rejected a render request without a valid token");
+        return Ok(unauthorized());
     }
     let Some(slot) = BusySlot::acquire(&state) else {
         return Ok(error(StatusCode::SERVICE_UNAVAILABLE, "renderer busy"));
@@ -215,6 +235,36 @@ async fn render_route(
     }
 }
 
+/// True when the request's `authorization` header is exactly `expected` (`Bearer <token>`; the
+/// scheme is matched case-sensitively). The comparison takes the same time wherever the first
+/// difference is.
+fn authorized(request: &Request<Incoming>, expected: &[u8]) -> bool {
+    request
+        .headers()
+        .get(hyper::header::AUTHORIZATION)
+        .is_some_and(|value| constant_time_eq(value.as_bytes(), expected))
+}
+
+/// Compares every byte up to the longer length, so the time depends only on the lengths.
+fn constant_time_eq(left: &[u8], right: &[u8]) -> bool {
+    let mut difference = left.len() ^ right.len();
+    for index in 0..left.len().max(right.len()) {
+        let a = left.get(index).copied().unwrap_or(0);
+        let b = right.get(index).copied().unwrap_or(0);
+        difference |= usize::from(a ^ b);
+    }
+    std::hint::black_box(difference) == 0
+}
+
+fn unauthorized() -> Response<Full<Bytes>> {
+    let mut response = error(StatusCode::UNAUTHORIZED, "unauthorized");
+    response.headers_mut().insert(
+        hyper::header::WWW_AUTHENTICATE,
+        HeaderValue::from_static("Bearer"),
+    );
+    response
+}
+
 enum BodyError {
     TooLarge,
     Broken,
@@ -271,4 +321,33 @@ fn respond(
         HeaderValue::from_static("nosniff"),
     );
     response
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn constant_time_eq_matches_only_identical_bytes() {
+        assert!(constant_time_eq(b"Bearer abc", b"Bearer abc"));
+        assert!(constant_time_eq(b"", b""));
+        assert!(!constant_time_eq(b"Bearer abc", b"Bearer abd"));
+        assert!(!constant_time_eq(b"Bearer abc", b"bearer abc"));
+        assert!(!constant_time_eq(b"Bearer abc", b"Bearer abc "));
+        assert!(!constant_time_eq(b"Bearer abc", b"Bearer ab"));
+        assert!(!constant_time_eq(b"Bearer abc", b""));
+        // A shorter value padded with NUL bytes must not match.
+        assert!(!constant_time_eq(b"Bearer ab", b"Bearer ab\0"));
+    }
+
+    #[test]
+    fn unauthorized_keeps_the_common_headers() {
+        let response = unauthorized();
+        assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+        let headers = response.headers();
+        assert_eq!(headers["cache-control"], "no-store");
+        assert_eq!(headers["x-content-type-options"], "nosniff");
+        assert_eq!(headers["www-authenticate"], "Bearer");
+        assert_eq!(headers["content-type"], JSON);
+    }
 }

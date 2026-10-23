@@ -29,6 +29,95 @@ pub fn chrome() -> Option<PathBuf> {
     }
 }
 
+/// Whether Chromium's own sandbox (`CHROME_SANDBOX=1`) can run here. It needs unprivileged user
+/// namespaces, and Chromium refuses it for root. Returns `false` (after printing why) when the
+/// sandbox tests are skipped; with `CI` set it fails instead, so a CI job cannot pass by
+/// skipping them.
+pub fn chrome_sandbox_supported() -> bool {
+    let Some(reason) = chrome_sandbox_blocker() else {
+        return true;
+    };
+    assert!(
+        std::env::var_os("CI").is_none(),
+        "CHROME_SANDBOX tests cannot run in this environment: {reason}"
+    );
+    eprintln!("skipping CHROME_SANDBOX test: {reason}");
+    false
+}
+
+fn chrome_sandbox_blocker() -> Option<String> {
+    if effective_uid() == Some(0) {
+        return Some(
+            "the tests run as root, and Chromium refuses its sandbox for root \
+             (crbug.com/638180). Run them as an unprivileged user, for example under \
+             `unshare --user --map-user=1000 --map-group=1000`"
+                .into(),
+        );
+    }
+    // Chromium's namespace sandbox puts each renderer in new user, PID and network namespaces.
+    // `unshare` asks the kernel for the same thing.
+    let probe = [
+        "--user",
+        "--map-root-user",
+        "--pid",
+        "--net",
+        "--fork",
+        "true",
+    ];
+    let advice = "Chromium's sandbox needs unprivileged user namespaces. On Ubuntu 24.04 set \
+                  kernel.apparmor_restrict_unprivileged_userns=0; in a Proxmox LXC set \
+                  `features: nesting=1`; Docker's default seccomp profile blocks them";
+    match std::process::Command::new("unshare").args(probe).output() {
+        Ok(output) if output.status.success() => None,
+        Ok(output) => Some(format!(
+            "this environment cannot create user namespaces: `unshare {}` failed ({}: {}). {advice}",
+            probe.join(" "),
+            output.status,
+            String::from_utf8_lossy(&output.stderr).trim()
+        )),
+        Err(error) => Some(format!(
+            "cannot check for user namespaces: running `unshare` failed: {error}. {advice}"
+        )),
+    }
+}
+
+/// The effective user id of this process, from `/proc/self/status`.
+pub fn effective_uid() -> Option<u32> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    status
+        .lines()
+        .find_map(|line| line.strip_prefix("Uid:"))?
+        .split_ascii_whitespace()
+        .nth(1)?
+        .parse()
+        .ok()
+}
+
+/// The seccomp state of a process: `Seccomp` (0 off, 1 strict, 2 filter) and `Seccomp_filters`
+/// (the number of attached filters; Linux 5.9 and later) from `/proc/<pid>/status`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SeccompState {
+    pub mode: u32,
+    pub filters: Option<u32>,
+}
+
+/// `None` when the process is gone or its status has no `Seccomp` line.
+pub fn seccomp_state(pid: u32) -> Option<SeccompState> {
+    let status = std::fs::read_to_string(format!("/proc/{pid}/status")).ok()?;
+    let field = |name: &str| -> Option<u32> {
+        status
+            .lines()
+            .find_map(|line| line.strip_prefix(name))?
+            .trim()
+            .parse()
+            .ok()
+    };
+    Some(SeccompState {
+        mode: field("Seccomp:")?,
+        filters: field("Seccomp_filters:"),
+    })
+}
+
 #[derive(Debug, Clone)]
 pub struct ProcessInfo {
     pub pid: u32,

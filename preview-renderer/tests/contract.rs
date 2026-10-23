@@ -7,13 +7,16 @@ mod support;
 use std::io::{Read, Write};
 use std::time::Duration;
 
-use artifact_preview::client::{HttpResponse, send};
+use artifact_preview::client::{HttpResponse, send, send_with_authorization};
 use artifact_preview::image_info::png_dimensions;
 use hyper::body::Bytes;
 use hyper::{Method, StatusCode};
-use support::{Service, chrome};
+use support::{Service, chrome, scratch_dir};
 
 const TIMEOUT: Duration = Duration::from_secs(20);
+
+/// A valid shared token (32 to 4096 printable ASCII characters).
+const TOKEN: &str = "k3y_0123456789-abcdefghij.ABCDEFGHIJ~xyz";
 
 async fn post(service: &Service, body: impl Into<Bytes>) -> HttpResponse {
     send(
@@ -340,6 +343,239 @@ async fn smoke_and_healthcheck_commands_work() {
         .status()
         .unwrap();
     assert_eq!(usage.code(), Some(2));
+}
+
+async fn post_with(service: &Service, authorization: Option<&str>, html: &str) -> HttpResponse {
+    let body = Bytes::from(serde_json::to_vec(&serde_json::json!({"html": html})).unwrap());
+    send_with_authorization(
+        &service.authority,
+        Method::POST,
+        "/render",
+        Some(("application/json", body)),
+        authorization,
+        TIMEOUT,
+    )
+    .await
+    .unwrap()
+}
+
+fn assert_unauthorized(response: &HttpResponse, case: &str) {
+    assert_eq!(response.status, StatusCode::UNAUTHORIZED, "{case}");
+    assert_json(
+        response,
+        StatusCode::UNAUTHORIZED,
+        r#"{"error":"unauthorized"}"#,
+    );
+    assert_eq!(header(response, "www-authenticate"), "Bearer", "{case}");
+}
+
+/// Without a configured token the contract is unchanged: no header is needed, and an
+/// `authorization` header is ignored, as the Node renderer ignored it. The server can therefore
+/// start sending its token before the renderer requires one.
+#[tokio::test]
+async fn without_a_token_render_needs_no_authorization() {
+    let Some(chrome) = chrome() else { return };
+    let service = Service::start(&chrome, "no-token", &[("RENDER_TOKEN", "")]);
+    let bearer = format!("Bearer {TOKEN}");
+    for authorization in [None, Some(bearer.as_str()), Some("Bearer whatever")] {
+        let response = post_with(&service, authorization, "<p>open</p>").await;
+        assert_eq!(response.status, StatusCode::OK, "{authorization:?}");
+        assert_eq!(header(&response, "content-type"), "image/png");
+    }
+}
+
+#[tokio::test]
+async fn a_configured_token_guards_render_but_not_health() {
+    let Some(chrome) = chrome() else { return };
+    let service = Service::start(&chrome, "token", &[("RENDER_TOKEN", TOKEN)]);
+    let wrong_last = format!("Bearer {}X", &TOKEN[..TOKEN.len() - 1]);
+    let lower_scheme = format!("bearer {TOKEN}");
+    let upper_scheme = format!("BEARER {TOKEN}");
+    let two_spaces = format!("Bearer  {TOKEN}");
+    let bare = TOKEN.to_owned();
+    let prefix = format!("Bearer {}", &TOKEN[..TOKEN.len() - 1]);
+    let longer = format!("Bearer {TOKEN}x");
+    let basic = "Basic dXNlcjpwYXNz".to_owned();
+    let cases = [
+        ("missing", None),
+        (
+            "wrong token",
+            Some("Bearer not-the-token-0123456789-abcdefghij"),
+        ),
+        ("wrong last byte", Some(wrong_last.as_str())),
+        ("lower-case scheme", Some(lower_scheme.as_str())),
+        ("upper-case scheme", Some(upper_scheme.as_str())),
+        ("two spaces", Some(two_spaces.as_str())),
+        ("no scheme", Some(bare.as_str())),
+        ("prefix of the token", Some(prefix.as_str())),
+        ("longer than the token", Some(longer.as_str())),
+        ("basic scheme", Some(basic.as_str())),
+        ("empty", Some("")),
+    ];
+    for (case, authorization) in cases {
+        assert_unauthorized(&post_with(&service, authorization, "<p>x</p>").await, case);
+    }
+
+    let correct = format!("Bearer {TOKEN}");
+    let response = post_with(&service, Some(&correct), "<p>authorized</p>").await;
+    assert_eq!(response.status, StatusCode::OK);
+    assert_eq!(header(&response, "content-type"), "image/png");
+    assert_common_headers(&response);
+
+    // Health and routing stay as they were.
+    let health = send(&service.authority, Method::GET, "/health", None, TIMEOUT)
+        .await
+        .unwrap();
+    assert_json(&health, StatusCode::OK, r#"{"status":"ok"}"#);
+    let unknown = send(&service.authority, Method::GET, "/render", None, TIMEOUT)
+        .await
+        .unwrap();
+    assert_json(&unknown, StatusCode::NOT_FOUND, r#"{"error":"not found"}"#);
+
+    // The token check comes before the busy check: without the token a client gets 401 while a
+    // render runs, not 503, so it cannot learn whether the renderer is busy.
+    let authority = service.authority.clone();
+    let slow = tokio::spawn(async move {
+        let body = Bytes::from(
+            serde_json::to_vec(&serde_json::json!({"html": "<script>const t = Date.now(); while (Date.now() - t < 2000) {}</script>"}))
+                .unwrap(),
+        );
+        send_with_authorization(
+            &authority,
+            Method::POST,
+            "/render",
+            Some(("application/json", body)),
+            Some(&format!("Bearer {TOKEN}")),
+            TIMEOUT,
+        )
+        .await
+        .unwrap()
+    });
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_unauthorized(&post_with(&service, None, "<p>x</p>").await, "while busy");
+    assert_json(
+        &post_with(&service, Some(&correct), "<p>x</p>").await,
+        StatusCode::SERVICE_UNAVAILABLE,
+        r#"{"error":"renderer busy"}"#,
+    );
+    assert_eq!(slow.await.unwrap().status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn smoke_sends_the_token_from_the_same_settings() {
+    let Some(chrome) = chrome() else { return };
+    let dir = scratch_dir("token-file");
+    let token_file = dir.join("render-token");
+    std::fs::write(&token_file, format!("{TOKEN}\n")).unwrap();
+    let token_file = token_file.to_str().unwrap();
+    let binary = env!("CARGO_BIN_EXE_artifact-preview");
+    for (label, service_env) in [
+        ("value", ("RENDER_TOKEN", TOKEN)),
+        ("file", ("RENDER_TOKEN_FILE", token_file)),
+    ] {
+        let service = Service::start(&chrome, &format!("smoke-{label}"), &[service_env]);
+        let url = format!("http://{}", service.authority);
+        let smoke = |env: &[(&str, &str)]| {
+            let mut command = std::process::Command::new(binary);
+            command
+                .arg("smoke")
+                .env_clear()
+                .env("PREVIEW_RENDERER_URL", &url);
+            for (name, value) in env {
+                command.env(name, value);
+            }
+            command.output().unwrap()
+        };
+        for client_env in [("RENDER_TOKEN", TOKEN), ("RENDER_TOKEN_FILE", token_file)] {
+            let passed = smoke(&[client_env]);
+            assert!(
+                passed.status.success(),
+                "{label} service, {client_env:?}: {}",
+                String::from_utf8_lossy(&passed.stderr)
+            );
+            assert!(
+                String::from_utf8_lossy(&passed.stdout)
+                    .starts_with("preview renderer smoke test passed (")
+            );
+        }
+        let refused = smoke(&[]);
+        assert!(
+            !refused.status.success(),
+            "{label}: smoke without the token"
+        );
+        let stderr = String::from_utf8_lossy(&refused.stderr);
+        assert!(stderr.contains("renderer returned HTTP 401"), "{stderr}");
+    }
+    // A bad client setting stops `smoke` before it sends anything, without echoing the value.
+    let output = std::process::Command::new(binary)
+        .arg("smoke")
+        .env_clear()
+        .env("PREVIEW_RENDERER_URL", "http://127.0.0.1:1")
+        .env("RENDER_TOKEN", "short-secret-value")
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("RENDER_TOKEN: the token must be"),
+        "{stderr}"
+    );
+    assert!(!stderr.contains("short-secret-value"), "{stderr}");
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+/// Token mistakes stop the service at startup, and the message never contains a token.
+#[test]
+fn invalid_token_settings_stop_the_service_without_echoing_the_token() {
+    let dir = scratch_dir("token-startup");
+    let file = dir.join("render-token");
+    std::fs::write(&file, format!("{TOKEN}\n")).unwrap();
+    let doubled = dir.join("render-token-doubled");
+    std::fs::write(&doubled, format!("{TOKEN}\n\n")).unwrap();
+    let short = "s3cret-but-too-short";
+    let file = file.to_str().unwrap();
+    let doubled = doubled.to_str().unwrap();
+    /// `(case, environment, expected message)`.
+    type Case<'a> = (&'a str, &'a [(&'a str, &'a str)], &'a str);
+    let cases: [Case; 4] = [
+        (
+            "both",
+            &[("RENDER_TOKEN", TOKEN), ("RENDER_TOKEN_FILE", file)],
+            "set RENDER_TOKEN or RENDER_TOKEN_FILE, not both",
+        ),
+        (
+            "too short",
+            &[("RENDER_TOKEN", short)],
+            "RENDER_TOKEN: the token must be 32 to 4096 printable ASCII characters",
+        ),
+        (
+            "two trailing newlines",
+            &[("RENDER_TOKEN_FILE", doubled)],
+            "RENDER_TOKEN_FILE: the token must be 32 to 4096 printable ASCII characters",
+        ),
+        (
+            "missing file",
+            &[("RENDER_TOKEN_FILE", "/nonexistent/render-token")],
+            "RENDER_TOKEN_FILE (/nonexistent/render-token) cannot be read",
+        ),
+    ];
+    for (case, env, message) in cases {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_artifact-preview"));
+        command
+            .env_clear()
+            .env("PORT", "1")
+            .env("CHROME_HEADLESS_SHELL", "/bin/sh");
+        for (name, value) in env {
+            command.env(name, value);
+        }
+        let output = command.output().unwrap();
+        assert!(!output.status.success(), "{case}");
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        assert!(stderr.contains(message), "{case}: {stderr}");
+        assert!(!stderr.contains(TOKEN), "{case}: {stderr}");
+        assert!(!stderr.contains(short), "{case}: {stderr}");
+    }
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

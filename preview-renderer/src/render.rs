@@ -144,9 +144,12 @@ pub struct Renderer {
     /// Extra time to keep the loaded page alive before the screenshot. Always zero in production;
     /// tests raise it so slow network attempts get the chance to reach a canary.
     settle: Duration,
+    /// `CHROME_SANDBOX`: launch without `--no-sandbox`.
+    chrome_sandbox: bool,
 }
 
 impl Renderer {
+    /// A renderer with Chromium's own sandbox off, as before `CHROME_SANDBOX` existed.
     pub fn new(executable: PathBuf, timeout: Duration) -> Self {
         Self {
             executable,
@@ -154,7 +157,15 @@ impl Renderer {
             hardening: Hardening::FULL,
             max_message_bytes: DEFAULT_MAX_MESSAGE_BYTES,
             settle: Duration::ZERO,
+            chrome_sandbox: false,
         }
+    }
+
+    /// Keep Chromium's own sandbox (`CHROME_SANDBOX`): every launch leaves out `--no-sandbox`.
+    #[must_use]
+    pub fn with_chrome_sandbox(mut self, enabled: bool) -> Self {
+        self.chrome_sandbox = enabled;
+        self
     }
 
     #[cfg(test)]
@@ -194,7 +205,9 @@ impl Renderer {
         let started = tokio::time::Instant::now();
         let (browser, mut pipe) = Browser::launch(
             &self.executable,
-            &self.hardening.launch_options(self.max_message_bytes),
+            &self
+                .hardening
+                .launch_options(self.max_message_bytes, self.chrome_sandbox),
         )
         .map_err(RenderError::Launch)?;
         let remaining = self.timeout.saturating_sub(started.elapsed());

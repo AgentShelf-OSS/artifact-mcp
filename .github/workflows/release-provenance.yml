@@ -183,6 +183,21 @@ jobs:
           container="$(docker create "$IMAGE@$DIGEST")"
           docker cp "$container:/artifact-mcp" release/artifact-mcp
           docker rm "$container" >/dev/null
+      - name: Build the static preview renderer binary
+        run: |
+          set -euo pipefail
+          # Its own workspace and lockfile; preview-renderer/rust-toolchain.toml pins the same
+          # toolchain and musl target as the root. The target directory stays outside the checkout.
+          cargo build --release --locked --target x86_64-unknown-linux-musl \
+            --manifest-path preview-renderer/Cargo.toml \
+            --target-dir "$RUNNER_TEMP/artifact-preview-target"
+          renderer="$RUNNER_TEMP/artifact-preview-target/x86_64-unknown-linux-musl/release/artifact-preview"
+          description="$(file --brief "$renderer")"
+          echo "$description"
+          grep -Eq 'static-pie linked|statically linked' <<<"$description" || {
+            echo "artifact-preview is not statically linked" >&2; exit 1;
+          }
+          cp "$renderer" release/artifact-preview
       - name: Generate SPDX image SBOM for exact candidate digest
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
@@ -200,13 +215,18 @@ jobs:
       - name: Write candidate checksums
         run: |
           cd release
-          sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json > SHA256SUMS
+          sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json historical-fixture-preflight.json > SHA256SUMS
           sha256sum --check SHA256SUMS
       - id: attest_binary
         name: Attest the released native binary
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-path: release/artifact-mcp
+      - id: attest_renderer
+        name: Attest the released preview renderer binary
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: release/artifact-preview
       - id: attest_image
         name: Attest the released OCI image digest
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -269,6 +289,7 @@ jobs:
             echo "Candidate tag does not resolve to the attested digest" >&2; exit 1;
           }
           gh attestation verify release/artifact-mcp --repo "$GITHUB_REPOSITORY"
+          gh attestation verify release/artifact-preview --repo "$GITHUB_REPOSITORY"
           gh attestation verify "oci://$IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
           if docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
             existing="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
@@ -315,7 +336,7 @@ jobs:
             --binary-attestation '${{ needs.candidate.outputs.binary_attestation }}' \
             --image-attestation '${{ needs.candidate.outputs.image_attestation }}'
           cargo --locked xtask release verify-manifest release-manifest.json
-          sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
+          sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
           sha256sum --check SHA256SUMS
       - id: release_state
         name: Check existing release state
@@ -323,8 +344,8 @@ jobs:
           set -euo pipefail
           if release_json="$(gh release view "$TAG" --json isDraft,assets 2>/dev/null)"; then
             if [[ "$(jq -r '.isDraft' <<<"$release_json")" == "false" ]]; then
-              for asset in artifact-mcp SHA256SUMS release-manifest.json source.spdx.json \
-                image.spdx.json historical-fixture-preflight.json migration-notes.md; do
+              for asset in artifact-mcp artifact-preview SHA256SUMS release-manifest.json \
+                source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md; do
                 jq -e --arg asset "$asset" '.assets | map(.name) | index($asset) != null' \
                   <<<"$release_json" >/dev/null || {
                     echo "Published release $TAG is missing $asset" >&2; exit 1;
@@ -347,6 +368,7 @@ jobs:
           fail_on_unmatched_files: true
           files: |
             release/artifact-mcp
+            release/artifact-preview
             release/SHA256SUMS
             release/release-manifest.json
             release/source.spdx.json

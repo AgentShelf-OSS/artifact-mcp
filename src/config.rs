@@ -18,6 +18,7 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
+    io::Read as _,
     path::{Path, PathBuf},
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
@@ -232,6 +233,11 @@ pub const DEFAULT_PREVIEW_VIEWPORT_WIDTH: u64 = 1200;
 pub const DEFAULT_PREVIEW_VIEWPORT_HEIGHT: u64 = 630;
 /// `const DEFAULT_CACHE_ENTRIES = 32` — [lib/preview.js:8]
 pub const DEFAULT_PREVIEW_CACHE_ENTRIES: u64 = 32;
+/// Shortest accepted `PREVIEW_RENDERER_TOKEN`, in bytes. The renderer's `RENDER_TOKEN` uses the
+/// same rule (`preview-renderer/src/config.rs`).
+pub const MIN_PREVIEW_RENDERER_TOKEN_BYTES: usize = 32;
+/// Longest accepted `PREVIEW_RENDERER_TOKEN`, in bytes.
+pub const MAX_PREVIEW_RENDERER_TOKEN_BYTES: usize = 4096;
 /// `export const DEFAULT_MAX_PNG_BYTES = 7_500_000` — [lib/thumbnails.js:17]
 pub const DEFAULT_PREVIEW_MAX_PNG_BYTES: u64 = 7_500_000;
 
@@ -829,6 +835,10 @@ pub struct PreviewConfig {
     pub cache_entries: u64,
     /// `PREVIEW_MAX_PNG_BYTES`
     pub max_png_bytes: u64,
+    /// `PREVIEW_RENDERER_TOKEN` or `PREVIEW_RENDERER_TOKEN_FILE`: the shared bearer token sent as
+    /// `authorization: Bearer <token>` with every render request. `None` sends no header. The
+    /// value is redacted from `Debug` and never logged.
+    pub renderer_token: Option<Secret>,
 }
 
 impl Default for PreviewConfig {
@@ -840,6 +850,7 @@ impl Default for PreviewConfig {
             viewport_height: DEFAULT_PREVIEW_VIEWPORT_HEIGHT,
             cache_entries: DEFAULT_PREVIEW_CACHE_ENTRIES,
             max_png_bytes: DEFAULT_PREVIEW_MAX_PNG_BYTES,
+            renderer_token: None,
         }
     }
 }
@@ -872,8 +883,60 @@ impl PreviewConfig {
                 "PREVIEW_MAX_PNG_BYTES",
                 DEFAULT_PREVIEW_MAX_PNG_BYTES,
             )?,
+            renderer_token: parse_preview_renderer_token(env)?,
         })
     }
+}
+
+/// `PREVIEW_RENDERER_TOKEN` or `PREVIEW_RENDERER_TOKEN_FILE`, with the renderer's `RENDER_TOKEN`
+/// rules: setting both is an error; the file is read once, here, and one trailing newline
+/// (`\n` or `\r\n`) is removed; the token must be 32 to 4096 printable ASCII characters without
+/// spaces. Values are never trimmed otherwise, so both sides compare the same bytes. No error
+/// message contains the token.
+fn parse_preview_renderer_token(env: &dyn EnvSource) -> Result<Option<Secret>, AppError> {
+    const VALUE: &str = "PREVIEW_RENDERER_TOKEN";
+    const FILE: &str = "PREVIEW_RENDERER_TOKEN_FILE";
+    let (source, bytes) = match (present(env, VALUE), present(env, FILE)) {
+        (None, None) => return Ok(None),
+        (Some(_), Some(_)) => {
+            return Err(AppError::Validation(format!(
+                "Set {VALUE} or {FILE}, not both."
+            )));
+        }
+        (Some(value), None) => (VALUE, value.into_bytes()),
+        (None, Some(path)) => (FILE, read_preview_renderer_token_file(FILE, &path)?),
+    };
+    if !(MIN_PREVIEW_RENDERER_TOKEN_BYTES..=MAX_PREVIEW_RENDERER_TOKEN_BYTES).contains(&bytes.len())
+        || !bytes.iter().all(u8::is_ascii_graphic)
+    {
+        return Err(AppError::Validation(format!(
+            "{source} must hold {MIN_PREVIEW_RENDERER_TOKEN_BYTES} to \
+             {MAX_PREVIEW_RENDERER_TOKEN_BYTES} printable ASCII characters without spaces."
+        )));
+    }
+    String::from_utf8(bytes)
+        .map(|token| Some(Secret::new(token)))
+        .map_err(|_| AppError::Validation(format!("{source} must be ASCII.")))
+}
+
+/// The file's bytes without one trailing newline. Reads at most a few bytes more than the longest
+/// token, so a wrong path cannot make startup read a huge file.
+fn read_preview_renderer_token_file(key: &str, path: &str) -> Result<Vec<u8>, AppError> {
+    let cannot_read = |error: std::io::Error| {
+        AppError::Validation(format!("{key} ({path}) cannot be read: {error}"))
+    };
+    let mut bytes = Vec::new();
+    std::fs::File::open(path)
+        .map_err(cannot_read)?
+        .take(MAX_PREVIEW_RENDERER_TOKEN_BYTES as u64 + 3)
+        .read_to_end(&mut bytes)
+        .map_err(cannot_read)?;
+    if bytes.ends_with(b"\r\n") {
+        bytes.truncate(bytes.len() - 2);
+    } else if bytes.ends_with(b"\n") {
+        bytes.truncate(bytes.len() - 1);
+    }
+    Ok(bytes)
 }
 
 /// Port of `rendererEndpoint(value)` — [lib/preview.js:25-36]

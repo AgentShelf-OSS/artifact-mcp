@@ -16,9 +16,9 @@ use artifact_mcp::{
         DEFAULT_KEY_JSON_LIMIT, DEFAULT_LISTEN_HOST, DEFAULT_MCP_JSON_FALLBACK_LIMIT, DEFAULT_PORT,
         DEFAULT_PUBLIC_BASE_URL, DEFAULT_REACTION_JSON_LIMIT, FEEDBACK_ID_ALPHABET,
         FEEDBACK_ID_LENGTH, FixedClock, IdSource, MapEnv, NanoIdSource, OsRandom, RandomSource,
-        SHARE_TOKEN_ALPHABET, SHARE_TOKEN_LENGTH, ScriptedRandom, SeededRandom, SequentialIdSource,
-        WEBHOOK_ID_ALPHABET, WEBHOOK_ID_LENGTH, generate_id, is_valid_artifact_id,
-        mcp_json_limit_for,
+        SHARE_TOKEN_ALPHABET, SHARE_TOKEN_LENGTH, ScriptedRandom, Secret, SeededRandom,
+        SequentialIdSource, WEBHOOK_ID_ALPHABET, WEBHOOK_ID_LENGTH, generate_id,
+        is_valid_artifact_id, mcp_json_limit_for,
     },
     error::AppError,
 };
@@ -114,6 +114,7 @@ fn empty_environment_reproduces_every_node_default() {
     assert_eq!(config.preview.viewport_height, 630);
     assert_eq!(config.preview.cache_entries, 32);
     assert_eq!(config.preview.max_png_bytes, 7_500_000);
+    assert_eq!(config.preview.renderer_token, None);
 
     // lib/crypto.js:9, lib/db.js:30
     assert!(config.webhook_enc_key.is_none());
@@ -466,12 +467,155 @@ fn secrets_are_redacted_in_debug_output() {
         ("WEBHOOK_ENC_KEY", VALID_WEBHOOK_KEY),
         ("DISCORD_BOT_TOKEN", "navi.local.secret"),
         ("ARTIFACT_API_KEYS", "agent:acme:hunter2-super-secret"),
+        ("PREVIEW_RENDERER_TOKEN", RENDERER_TOKEN),
     ]);
     let rendered = format!("{config:?}");
     assert!(!rendered.contains(VALID_WEBHOOK_KEY), "{rendered}");
     assert!(!rendered.contains("navi.local.secret"), "{rendered}");
     assert!(!rendered.contains("hunter2-super-secret"), "{rendered}");
+    assert!(!rendered.contains(RENDERER_TOKEN), "{rendered}");
     assert!(rendered.contains("Secret(<redacted>)"), "{rendered}");
+    let preview = format!("{:?}", config.preview);
+    assert!(!preview.contains(RENDERER_TOKEN), "{preview}");
+    assert!(
+        preview.contains("renderer_token: Some(Secret(<redacted>))"),
+        "{preview}"
+    );
+}
+
+/// A valid shared renderer token: 32 to 4096 printable ASCII characters without spaces.
+const RENDERER_TOKEN: &str = "renderer.token_0123456789-ABCDEFGHIJ~/+=";
+
+/// A token file under the temporary directory, unique to this process and `name`.
+fn renderer_token_file(name: &str, contents: &[u8]) -> PathBuf {
+    let path = std::env::temp_dir().join(format!(
+        "artifact-mcp-u02-renderer-token-{}-{name}",
+        std::process::id()
+    ));
+    std::fs::write(&path, contents).expect("write token file");
+    path
+}
+
+#[test]
+fn preview_renderer_token_is_optional_and_validated() {
+    let token = |value: &str| {
+        parse(&[("PREVIEW_RENDERER_TOKEN", value)]).map(|config| {
+            config
+                .preview
+                .renderer_token
+                .map(|secret| secret.expose().to_owned())
+        })
+    };
+    assert_eq!(
+        token(RENDERER_TOKEN).unwrap().as_deref(),
+        Some(RENDERER_TOKEN)
+    );
+    // Empty or whitespace-only counts as unset, like every other variable.
+    assert_eq!(token("").unwrap(), None);
+    assert_eq!(token("   ").unwrap(), None);
+    let shortest = "x".repeat(32);
+    let longest = "~".repeat(4096);
+    assert_eq!(
+        token(&shortest).unwrap().as_deref(),
+        Some(shortest.as_str())
+    );
+    assert_eq!(token(&longest).unwrap().as_deref(), Some(longest.as_str()));
+
+    let too_short = "x".repeat(31);
+    let too_long = "x".repeat(4097);
+    let with_space = format!("{} {}", &RENDERER_TOKEN[..16], &RENDERER_TOKEN[16..]);
+    let padded = format!(" {RENDERER_TOKEN}");
+    let with_newline = format!("{RENDERER_TOKEN}\n");
+    let non_ascii = format!("{RENDERER_TOKEN}é");
+    for bad in [
+        &too_short,
+        &too_long,
+        &with_space,
+        &padded,
+        &with_newline,
+        &non_ascii,
+    ] {
+        let error = token(bad).expect_err("an invalid token must fail");
+        assert_eq!(
+            error,
+            AppError::Validation(
+                "PREVIEW_RENDERER_TOKEN must hold 32 to 4096 printable ASCII characters without \
+                 spaces."
+                    .to_owned()
+            )
+        );
+        assert!(
+            !format!("{error:?}").contains(&bad[..12]),
+            "no echo of {bad:?}"
+        );
+    }
+}
+
+#[test]
+fn preview_renderer_token_and_its_file_are_mutually_exclusive() {
+    let path = renderer_token_file("both", RENDERER_TOKEN.as_bytes());
+    let error = parse(&[
+        ("PREVIEW_RENDERER_TOKEN", RENDERER_TOKEN),
+        ("PREVIEW_RENDERER_TOKEN_FILE", path.to_str().unwrap()),
+    ])
+    .expect_err("both set must fail");
+    assert_eq!(
+        error,
+        AppError::Validation(
+            "Set PREVIEW_RENDERER_TOKEN or PREVIEW_RENDERER_TOKEN_FILE, not both.".to_owned()
+        )
+    );
+    std::fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn preview_renderer_token_file_is_read_once_with_one_trailing_newline_removed() {
+    for (name, contents) in [
+        ("plain", RENDERER_TOKEN.to_owned()),
+        ("lf", format!("{RENDERER_TOKEN}\n")),
+        ("crlf", format!("{RENDERER_TOKEN}\r\n")),
+    ] {
+        let path = renderer_token_file(name, contents.as_bytes());
+        let config = parse_ok(&[("PREVIEW_RENDERER_TOKEN_FILE", path.to_str().unwrap())]);
+        assert_eq!(
+            config.preview.renderer_token.as_ref().map(Secret::expose),
+            Some(RENDERER_TOKEN),
+            "{name}"
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+    for (name, contents) in [
+        ("two-newlines", format!("{RENDERER_TOKEN}\n\n")),
+        ("trailing-space", format!("{RENDERER_TOKEN} ")),
+        ("huge", "x".repeat(1 << 20)),
+        ("empty", String::new()),
+    ] {
+        let path = renderer_token_file(name, contents.as_bytes());
+        let error = parse(&[("PREVIEW_RENDERER_TOKEN_FILE", path.to_str().unwrap())])
+            .expect_err("an invalid token file must fail");
+        assert_eq!(
+            error,
+            AppError::Validation(
+                "PREVIEW_RENDERER_TOKEN_FILE must hold 32 to 4096 printable ASCII characters \
+                 without spaces."
+                    .to_owned()
+            ),
+            "{name}"
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+    let AppError::Validation(message) =
+        parse(&[("PREVIEW_RENDERER_TOKEN_FILE", "/nonexistent/renderer-token")])
+            .expect_err("a missing file must fail")
+    else {
+        panic!("expected a validation error");
+    };
+    assert!(
+        message.starts_with(
+            "PREVIEW_RENDERER_TOKEN_FILE (/nonexistent/renderer-token) cannot be read"
+        ),
+        "{message}"
+    );
 }
 
 #[test]
