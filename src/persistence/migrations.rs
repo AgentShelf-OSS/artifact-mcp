@@ -3,9 +3,10 @@
 //! The Node reference `lib/migrations.js` is the behavioural oracle for this module. Every
 //! statement below is a verbatim copy of the SQL it executes so that `sqlite_master.sql` text,
 //! column order, index names, check constraints, and composite foreign keys are identical
-//! between a Node-created and a Rust-created database. Do not "tidy" the SQL: the cross-runtime
-//! schema comparison in `tests/native/u03_cross_runtime.rs` compares normalised statement text,
-//! and a reformatted statement is a real divergence in a shared production database.
+//! between a Node-created and a Rust-created database. Do not "tidy" the SQL: the schema
+//! comparison in `tests/native/u03_migrations.rs` checks normalised statement text against a
+//! database the Node runtime wrote, and a reformatted statement is a real divergence in a shared
+//! production database.
 //!
 //! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run
 //! them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no
@@ -306,6 +307,34 @@ pub fn apply(
     conn: &mut Connection,
     ctx: &MigrationContext,
 ) -> rusqlite::Result<Vec<AppliedMigration>> {
+    migrate_through(conn, ctx, LATEST_SCHEMA_VERSION)
+}
+
+/// Applies the ledger exactly like [`apply`], but stops after `target_version`.
+///
+/// Production startup always calls [`apply`], which is this function with
+/// [`LATEST_SCHEMA_VERSION`]. The bound exists so release tooling (`cargo xtask
+/// historical-fixture`) can build a database as it stood at an earlier schema boundary. It runs
+/// the real migration functions and records the real ledger rows; it never makes an old database
+/// by deleting rows from a newer one. A `target_version` of `0` creates only `schema_migrations`.
+///
+/// # Errors
+///
+/// Returns an `SQLITE_RANGE` failure, before it touches the database, when `target_version` is
+/// negative or newer than [`LATEST_SCHEMA_VERSION`]. Other errors come from SQLite.
+pub fn migrate_through(
+    conn: &mut Connection,
+    ctx: &MigrationContext,
+    target_version: i64,
+) -> rusqlite::Result<Vec<AppliedMigration>> {
+    if !(0..=LATEST_SCHEMA_VERSION).contains(&target_version) {
+        return Err(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_RANGE),
+            Some(format!(
+                "unsupported schema version {target_version}; expected 0..={LATEST_SCHEMA_VERSION}"
+            )),
+        ));
+    }
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
       version    INTEGER PRIMARY KEY,
@@ -318,6 +347,9 @@ pub fn apply(
     let mut newly_applied = Vec::new();
 
     for migration in MIGRATIONS {
+        if migration.version > target_version {
+            break;
+        }
         if applied.contains(&migration.version) {
             continue;
         }
@@ -1924,6 +1956,72 @@ mod tests {
             MIGRATIONS.last().map(|migration| migration.version),
             Some(LATEST_SCHEMA_VERSION)
         );
+    }
+
+    fn schema_text(conn: &Connection) -> Vec<(String, String, Option<String>)> {
+        let mut stmt = conn
+            .prepare("SELECT type, name, sql FROM sqlite_master ORDER BY rowid")
+            .expect("prepare sqlite_master");
+        stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .expect("query sqlite_master")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("read sqlite_master")
+    }
+
+    #[test]
+    fn migrate_through_stops_at_the_boundary_and_apply_resumes_from_it() {
+        let ctx = MigrationContext::empty();
+        for boundary in [
+            0,
+            1,
+            7,
+            24,
+            LATEST_SCHEMA_VERSION - 1,
+            LATEST_SCHEMA_VERSION,
+        ] {
+            let mut conn = Connection::open_in_memory().expect("open in-memory database");
+            let applied = migrate_through(&mut conn, &ctx, boundary).expect("migrate through");
+            assert_eq!(
+                applied.iter().map(|m| m.version).collect::<Vec<_>>(),
+                (1..=boundary).collect::<Vec<_>>()
+            );
+            assert_eq!(current_version(&conn).expect("version"), boundary);
+            assert!(table_exists(&conn, "schema_migrations").expect("ledger table"));
+            assert!(
+                migrate_through(&mut conn, &ctx, boundary)
+                    .expect("reapply boundary")
+                    .is_empty()
+            );
+
+            // The normal startup path continues from the boundary to the same schema that a
+            // fresh database reaches.
+            let resumed = apply(&mut conn, &ctx).expect("apply after boundary");
+            assert_eq!(
+                resumed.iter().map(|m| m.version).collect::<Vec<_>>(),
+                ((boundary + 1)..=LATEST_SCHEMA_VERSION).collect::<Vec<_>>()
+            );
+            let mut fresh = Connection::open_in_memory().expect("open fresh database");
+            apply(&mut fresh, &ctx).expect("fresh apply");
+            assert_eq!(
+                schema_text(&conn),
+                schema_text(&fresh),
+                "boundary {boundary}"
+            );
+        }
+    }
+
+    #[test]
+    fn migrate_through_rejects_unknown_versions_without_touching_the_database() {
+        let ctx = MigrationContext::empty();
+        for version in [-1, LATEST_SCHEMA_VERSION + 1] {
+            let mut conn = Connection::open_in_memory().expect("open in-memory database");
+            let error = migrate_through(&mut conn, &ctx, version).expect_err("out of range");
+            assert_eq!(
+                error.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::ParameterOutOfRange)
+            );
+            assert!(schema_text(&conn).is_empty(), "version {version}");
+        }
     }
 
     #[test]

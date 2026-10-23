@@ -8,7 +8,7 @@ Describe what changed and the reason for it.
 
 ## How verified
 
-- [ ] `npm test` is green
+- [ ] `cargo test --workspace --all-targets --locked` and the `browser-tests` suite are green
 - [ ] Added/updated tests for the change
 - [ ] All commits are signed off (`git commit -s`) per the [DCO](../DCO)
 - [ ] Manual steps (list them):

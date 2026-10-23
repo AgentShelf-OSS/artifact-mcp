@@ -5,7 +5,7 @@
 //! 1. **Byte-identical embeds.** Discord renders what it is sent, so the JSON must match
 //!    `JSON.stringify(buildEmbed(event, payload))` exactly — including key order, which is why the
 //!    payload is a `serde` struct tree (declaration order) and not a `serde_json::Map`
-//!    (alphabetical). `tests/native/u12_node_parity.rs` compares against the real `lib/notify.js`.
+//!    (alphabetical). `tests/native/u12_notify.rs` pins the bytes the retired Node runtime sent.
 //! 2. **The SSRF guard.** Delivery targets are restricted to `https://discord.com/api/webhooks/`
 //!    and `https://discordapp.com/api/webhooks/` by
 //!    [`is_discord_webhook_url`](crate::persistence::webhooks::is_discord_webhook_url), redirects

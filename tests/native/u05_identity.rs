@@ -2,8 +2,9 @@
 //!
 //! Every token here is really signed with the fixture keys in `u05_support.rs`, and every clock
 //! comparison runs against a [`FixedClock`], so the 60-second leeway boundaries are asserted at
-//! the exact second rather than approximately. `u05_node_parity.rs` proves the same boundaries
-//! against the real `jose` implementation Node uses.
+//! the exact second rather than approximately. The verdicts, header-trust resolutions, and
+//! signed-email trim outcomes that the retired Node runtime (`jose@5.10.0`) produced are pinned
+//! below as frozen vectors.
 
 use std::sync::Arc;
 
@@ -806,6 +807,345 @@ async fn every_rejection_reaches_the_route_layer_as_an_anonymous_viewer() {
                 .expect("resolution never errors"),
             Default::default(),
             "{candidate:?} must resolve anonymous"
+        );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Frozen vectors from the retired Node runtime
+// ---------------------------------------------------------------------------
+
+/// `jose.jwtVerify` verdicts for [`jose_matrix`], in order: `ok`, `expired`
+/// (`ERR_JWT_EXPIRED`), `not-yet-valid` (`ERR_JWT_CLAIM_VALIDATION_FAILED` on `nbf`), or
+/// `rejected` (any other failure).
+///
+/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+const JOSE_VERDICTS: &[(&str, &str)] = &[
+    ("valid", "ok"),
+    ("nbf-600", "ok"),
+    ("exp-600", "expired"),
+    ("nbf-61", "ok"),
+    ("exp-61", "expired"),
+    ("nbf-60", "ok"),
+    ("exp-60", "expired"),
+    ("nbf-59", "ok"),
+    ("exp-59", "ok"),
+    ("nbf-1", "ok"),
+    ("exp-1", "ok"),
+    ("nbf+0", "ok"),
+    ("exp+0", "ok"),
+    ("nbf+1", "ok"),
+    ("exp+1", "ok"),
+    ("nbf+59", "ok"),
+    ("exp+59", "ok"),
+    ("nbf+60", "ok"),
+    ("exp+60", "ok"),
+    ("nbf+61", "not-yet-valid"),
+    ("exp+61", "ok"),
+    ("nbf+600", "not-yet-valid"),
+    ("exp+600", "ok"),
+    ("nbf@5-1", "ok"),
+    ("exp@5-1", "ok"),
+    ("nbf@5+0", "ok"),
+    ("exp@5+0", "expired"),
+    ("nbf@5+1", "not-yet-valid"),
+    ("exp@5+1", "expired"),
+    ("nbf@300-1", "ok"),
+    ("exp@300-1", "ok"),
+    ("nbf@300+0", "ok"),
+    ("exp@300+0", "expired"),
+    ("nbf@300+1", "not-yet-valid"),
+    ("exp@300+1", "expired"),
+    ("no-temporal-claims", "ok"),
+    ("wrong-issuer", "rejected"),
+    ("missing-issuer", "rejected"),
+    ("wrong-audience", "rejected"),
+    ("missing-audience", "rejected"),
+    ("audience-array", "ok"),
+    ("audience-array-miss", "rejected"),
+    ("unknown-kid", "rejected"),
+    ("alg-none", "rejected"),
+    ("alg-hs256", "rejected"),
+    ("string-exp", "rejected"),
+    ("uppercase-email", "ok"),
+    ("malformed", "rejected"),
+    ("two-segments", "rejected"),
+];
+
+/// The claim-validation matrix behind [`JOSE_VERDICTS`]: `(label, token, clock tolerance)`.
+fn jose_matrix() -> Vec<(String, String, u64)> {
+    let mut cases: Vec<(String, String, u64)> = Vec::new();
+    let mut push = |label: String, candidate: String, tolerance: u64| {
+        cases.push((label, candidate, tolerance));
+    };
+
+    push("valid".to_owned(), token(KID_CURRENT, json!({})), 60);
+    for offset in [-600_i64, -61, -60, -59, -1, 0, 1, 59, 60, 61, 600] {
+        push(
+            format!("nbf{offset:+}"),
+            token(
+                KID_CURRENT,
+                json!({ "nbf": NOW_SECONDS + offset, "exp": NOW_SECONDS + 100_000 }),
+            ),
+            60,
+        );
+        push(
+            format!("exp{offset:+}"),
+            token(
+                KID_CURRENT,
+                json!({ "nbf": NOW_SECONDS - 100_000, "exp": NOW_SECONDS + offset }),
+            ),
+            60,
+        );
+    }
+    for tolerance in [5_u64, 300] {
+        for offset in [-1_i64, 0, 1] {
+            let boundary = i64::try_from(tolerance).expect("small tolerance") + offset;
+            push(
+                format!("nbf@{tolerance}{offset:+}"),
+                token(
+                    KID_CURRENT,
+                    json!({ "nbf": NOW_SECONDS + boundary, "exp": NOW_SECONDS + 100_000 }),
+                ),
+                tolerance,
+            );
+            push(
+                format!("exp@{tolerance}{offset:+}"),
+                token(
+                    KID_CURRENT,
+                    json!({ "nbf": NOW_SECONDS - 100_000, "exp": NOW_SECONDS - boundary }),
+                ),
+                tolerance,
+            );
+        }
+    }
+
+    let claim = |name: &str, patch: Value| (name.to_owned(), token(KID_CURRENT, patch), 60);
+    let attacker = json!({
+        "iss": format!("https://{TEAM_DOMAIN}"),
+        "aud": AUDIENCE,
+        "email": "attacker@evil.test",
+        "exp": NOW_SECONDS + 3600
+    });
+    for (label, candidate, tolerance) in [
+        claim(
+            "no-temporal-claims",
+            json!({ "nbf": null, "exp": null, "iat": null }),
+        ),
+        claim("wrong-issuer", json!({ "iss": "https://evil.test" })),
+        claim("missing-issuer", json!({ "iss": null })),
+        claim("wrong-audience", json!({ "aud": "other" })),
+        claim("missing-audience", json!({ "aud": null })),
+        claim("audience-array", json!({ "aud": ["other", AUDIENCE] })),
+        claim("audience-array-miss", json!({ "aud": ["other"] })),
+        ("unknown-kid".to_owned(), token(KID_ROTATED, json!({})), 60),
+        (
+            "alg-none".to_owned(),
+            with_signature(json!({ "alg": "none", "typ": "JWT" }), attacker.clone(), ""),
+            60,
+        ),
+        (
+            "alg-hs256".to_owned(),
+            with_signature(
+                json!({ "alg": "HS256", "kid": KID_CURRENT, "typ": "JWT" }),
+                attacker,
+                "AAAA",
+            ),
+            60,
+        ),
+        claim("string-exp", json!({ "exp": "later" })),
+        claim("uppercase-email", json!({ "email": " Member@ACME.test " })),
+        ("malformed".to_owned(), "not-a-jwt".to_owned(), 60),
+        ("two-segments".to_owned(), "a.b".to_owned(), 60),
+    ] {
+        push(label, candidate, tolerance);
+    }
+    cases
+}
+
+#[tokio::test]
+async fn jose_claim_verdicts_match_the_retired_node_runtime() {
+    let matrix = jose_matrix();
+    assert_eq!(matrix.len(), JOSE_VERDICTS.len());
+    for ((label, candidate, tolerance), (expected_label, expected)) in
+        matrix.iter().zip(JOSE_VERDICTS)
+    {
+        assert_eq!(label, expected_label, "matrix order drifted");
+        let tolerance = tolerance.to_string();
+        let resolver = resolver(jwt_config(&[("ACCESS_CLOCK_TOLERANCE_S", &tolerance)]));
+        let verdict = match verify(&resolver, candidate).await {
+            Ok(email) => {
+                // Node reports the raw claim; `lib/identity.js` trims and lowercases it next.
+                assert_eq!(email, "member@acme.test", "{label}");
+                "ok"
+            }
+            Err(TokenRejection::Expired) => "expired",
+            Err(TokenRejection::NotYetValid) => "not-yet-valid",
+            Err(_) => "rejected",
+        };
+        assert_eq!(verdict, *expected, "{label}");
+    }
+}
+
+#[tokio::test]
+async fn header_trust_resolution_matches_the_retired_node_runtime() {
+    let resolver = resolver_with(
+        config(&[
+            ("TRUST_ACCESS_HEADERS", "1"),
+            ("LISTEN_HOST", "127.0.0.1"),
+            (
+                "ORG_EMAIL_DOMAINS",
+                "Configured.Test:from-env,registered.test:env-loses,dup.test:first,dup.test:last, spaced.test : spaced-org ,broken,:noorg,nodomain:",
+            ),
+            ("ADMIN_EMAILS", " Boss@Acme.Test , second@ops.test "),
+            ("ADMIN_EMAIL_DOMAINS", "Ops.Test"),
+        ]),
+        &[KID_CURRENT],
+        Arc::new(
+            FakeDirectory::default()
+                .with_email("contractor@shared.test", "acme")
+                .with_domain("acme.test", "acme")
+                .with_domain("registered.test", "from-registry"),
+        ),
+    );
+
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // `(email header, viewer email, viewer org, is_admin)`.
+    let cases: [(&str, Option<&str>, Option<&str>, bool); 17] = [
+        (
+            "member@acme.test",
+            Some("member@acme.test"),
+            Some("acme"),
+            false,
+        ),
+        (
+            "MEMBER@ACME.TEST",
+            Some("member@acme.test"),
+            Some("acme"),
+            false,
+        ),
+        (
+            "  member@acme.test  ",
+            Some("member@acme.test"),
+            Some("acme"),
+            false,
+        ),
+        (
+            "boss@acme.test",
+            Some("boss@acme.test"),
+            Some("admin"),
+            true,
+        ),
+        (
+            "BOSS@acme.test",
+            Some("boss@acme.test"),
+            Some("admin"),
+            true,
+        ),
+        (
+            "anyone@ops.test",
+            Some("anyone@ops.test"),
+            Some("admin"),
+            true,
+        ),
+        (
+            "contractor@shared.test",
+            Some("contractor@shared.test"),
+            Some("acme"),
+            false,
+        ),
+        (
+            "CONTRACTOR@Shared.Test",
+            Some("contractor@shared.test"),
+            Some("acme"),
+            false,
+        ),
+        (
+            "user@registered.test",
+            Some("user@registered.test"),
+            Some("from-registry"),
+            false,
+        ),
+        (
+            "user@configured.test",
+            Some("user@configured.test"),
+            Some("from-env"),
+            false,
+        ),
+        ("user@dup.test", Some("user@dup.test"), Some("last"), false),
+        (
+            "user@spaced.test",
+            Some("user@spaced.test"),
+            Some("spaced-org"),
+            false,
+        ),
+        (
+            "user@unmapped.test",
+            Some("user@unmapped.test"),
+            Some("unmapped.test"),
+            false,
+        ),
+        (
+            "odd@name@acme.test",
+            Some("odd@name@acme.test"),
+            Some("acme"),
+            false,
+        ),
+        ("nodomain", Some("nodomain"), Some(""), false),
+        ("", None, None, false),
+        ("   ", None, None, false),
+    ];
+    for (header, email, org, is_admin) in cases {
+        let viewer = resolver
+            .resolve(&headers(&[(ACCESS_EMAIL_HEADER, header)]))
+            .await
+            .expect("resolution never errors");
+        assert_eq!(
+            (
+                viewer.email.as_ref().map(|value| value.0.as_str()),
+                viewer.org.as_ref().map(|value| value.0.as_str()),
+                viewer.is_admin,
+            ),
+            (email, org, is_admin),
+            "{header:?}"
+        );
+    }
+}
+
+#[tokio::test]
+async fn signed_admin_email_trim_matches_the_retired_node_runtime() {
+    // JavaScript's `trim` strips U+FEFF and keeps U+0085; Rust's `trim` does the opposite.
+    let resolver = resolver(jwt_config(&[("ADMIN_EMAILS", "boss@acme.test")]));
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    for (claim, email, org, is_admin) in [
+        (
+            "\u{85}boss@acme.test\u{85}",
+            "\u{85}boss@acme.test\u{85}",
+            "acme.test\u{85}",
+            false,
+        ),
+        (
+            "\u{feff}boss@acme.test\u{feff}",
+            "boss@acme.test",
+            "admin",
+            true,
+        ),
+    ] {
+        let viewer = resolver
+            .resolve(&headers(&[(
+                ACCESS_JWT_HEADER,
+                &token(KID_CURRENT, json!({ "email": claim })),
+            )]))
+            .await
+            .expect("resolution never errors");
+        assert_eq!(
+            (
+                viewer.email.as_ref().map(|value| value.0.as_str()),
+                viewer.org.as_ref().map(|value| value.0.as_str()),
+                viewer.is_admin,
+            ),
+            (Some(email), Some(org), is_admin),
+            "{claim:?}"
         );
     }
 }

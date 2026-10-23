@@ -1,0 +1,28 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Neil Blackman
+#
+# The DevTools transport and browser launcher shared by the preview renderer (`..`) and the
+# browser test harness (`../../browser-tests`). It is a member of the `preview-renderer` workspace,
+# so the renderer's `./preview-renderer` Docker build context contains it.
+[package]
+name = "artifact-cdp"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Chrome DevTools pipe transport and chrome-headless-shell process-group launcher"
+
+[lib]
+name = "artifact_cdp"
+path = "src/lib.rs"
+
+[dependencies]
+libc = "0.2"
+serde_json = { version = "1", features = ["float_roundtrip"] }
+tokio = { version = "1", features = ["io-util", "net", "process", "rt", "time"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }
+
+[lints.rust]
+unsafe_code = "deny"

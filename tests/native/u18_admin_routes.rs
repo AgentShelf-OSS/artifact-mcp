@@ -1,7 +1,6 @@
 use std::{
     collections::BTreeMap,
-    path::{Path, PathBuf},
-    process::Command,
+    path::PathBuf,
     sync::{
         Arc, Mutex,
         atomic::{AtomicU64, Ordering},
@@ -2028,251 +2027,62 @@ async fn webhook_events_reject_non_arrays_and_unknown_names_with_node_messages()
     }
 }
 
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
-
-const NODE_ROUTE_DRIVER: &str = r#"
-import(process.argv[1]).then(async ({ createApp }) => {
-  const input = JSON.parse(process.argv[2]);
-  const webhook = {
-    id: "wh0000000002",
-    org: "acme",
-    url: "https://discord.com/api/webhooks/1/secret-token",
-    label: "Ops",
-    events: ["published"]
-  };
-  const publicWebhook = (events = webhook.events) => ({
-    id: webhook.id,
-    label: webhook.label,
-    events,
-    url: "https://discord.com…wxyz",
-    last_ok_at: null,
-    last_error: null
-  });
-  const app = createApp({
-    checkPublisherKey: () => ({ ok: false }),
-    handleMcp: async () => null,
-    resolveViewer: async () => ({ email: "admin@example.test", org: "admin", isAdmin: true }),
-    artifacts: {},
-    keys: {
-      list: () => [],
-      create: (request) => ({ ...request, role: request.role || "author", secret: "one-time-secret" }),
-      update: (id, request) => ({ clientId: id, org: "acme", ...request }),
-      revoke: (id) => id === "publisher-2"
-    },
-    orgs: {
-      list: () => [],
-      names: () => [],
-      has: (name) => name === "acme",
-      create: ({ name, label, domain }) => ({
-        name,
-        label,
-        domains: domain ? [domain] : [],
-        emails: [],
-        categories: [],
-        keyCount: 0
-      }),
-      remove: () => true,
-      addDomain: (org, domain) => ({ org, domain: String(domain).toLowerCase() }),
-      removeDomain: () => true,
-      addEmailMember: (org, email) => ({ org, email: String(email).trim().toLowerCase() }),
-      removeEmailMember: () => true,
-      addCategory: (org, name) => ({ org, name }),
-      removeCategory: () => true,
-      setColor: (name, color) => ({ name, color }),
-      colorMap: () => ({})
-    },
-    webhooks: {
-      listForOrg: () => [],
-      create: ({ events }) => publicWebhook(events ?? ["published", "updated", "restored", "deleted", "feedback", "resolved"]),
-      remove: () => true,
-      setEvents: (_org, _id, events) => publicWebhook(events ?? []),
-      get: () => webhook
-    },
-    notify: { emit() {}, test: async () => ({ ok: true }) },
-    reactions: {},
-    feedback: {},
-    pages: {
-      settings: () => "<main>settings fixture</main>",
-      notFound: () => "not found",
-      notSignedIn: () => "not signed in"
-    },
-    logger: { info() {}, error() {} }
-  });
-
-  async function invoke(candidate) {
-    const layer = app._router.stack.find((entry) =>
-      entry.route?.path === candidate.route && entry.route.methods[candidate.method]
-    );
-    if (!layer) throw new Error(`missing route ${candidate.method} ${candidate.route}`);
-    const handler = layer.route.stack.at(-1).handle;
-    const result = { status: 200, body: null };
-    const response = {
-      status(code) { result.status = code; return this; },
-      set() { return this; },
-      send(value) { result.body = value; return this; },
-      json(value) { result.body = value; return this; },
-      end() { return this; }
-    };
-    await handler({ headers: {}, params: candidate.params, query: {}, body: candidate.body }, response);
-    if (candidate.route === "/settings/keys" && result.body?.created_at) {
-      result.body.created_at = "<iso-timestamp>";
-    }
-    return result;
-  }
-
-  const results = [];
-  for (const candidate of input) results.push(await invoke(candidate));
-  process.stdout.write(JSON.stringify(results));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn require_node_reference() -> bool {
-    std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1")
-}
-
-fn node_reference_available(root: &Path) -> bool {
-    let unavailable = if !root.join("lib/app.js").is_file() {
-        Some("lib/app.js is missing")
-    } else if !root.join("node_modules/express/package.json").is_file() {
-        Some("Node dependencies are missing")
-    } else {
-        match Command::new("node").arg("--version").output() {
-            Ok(output) if output.status.success() => None,
-            _ => Some("node is not on PATH"),
-        }
-    };
-
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !require_node_reference(),
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node app reference is unavailable ({reason})"
-            );
-            eprintln!("skipping U18 Node route parity proof: {reason}");
-            false
-        }
-    }
-}
-
-fn parity_cases() -> Value {
+/// Admin route requests replayed against the Rust router. `route` names the Express route the
+/// retired Node runtime registered for the same request.
+fn admin_route_cases() -> Value {
     json!([
-        { "method": "get", "route": "/settings", "uri": "/settings", "params": {} },
-        {
-            "method": "post", "route": "/settings/keys", "uri": "/settings/keys",
-            "params": {}, "body": { "clientId": "publisher-2", "org": "acme", "label": "Agent" }
-        },
-        {
-            "method": "post", "route": "/settings/keys/:id/revoke",
-            "uri": "/settings/keys/publisher-2/revoke", "params": { "id": "publisher-2" }
-        },
-        {
-            "method": "patch", "route": "/settings/keys/:id",
-            "uri": "/settings/keys/publisher-2", "params": { "id": "publisher-2" },
-            "body": { "label": "Alex", "role": "collaborator", "ownerEmail": "alex@acme.test" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs", "uri": "/settings/orgs", "params": {},
-            "body": { "name": "newco", "label": "New Co", "domain": "newco.test" }
-        },
-        {
-            "method": "delete", "route": "/settings/orgs/:name", "uri": "/settings/orgs/acme",
-            "params": { "name": "acme" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/domains",
-            "uri": "/settings/orgs/acme/domains", "params": { "name": "acme" },
-            "body": { "domain": "DOCS.ACME.TEST" }
-        },
-        {
-            "method": "delete", "route": "/settings/orgs/:name/domains/:domain",
-            "uri": "/settings/orgs/acme/domains/docs.acme.test",
-            "params": { "name": "acme", "domain": "docs.acme.test" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/emails",
-            "uri": "/settings/orgs/acme/emails", "params": { "name": "acme" },
-            "body": { "email": " Person@Example.com " }
-        },
-        {
-            "method": "delete", "route": "/settings/orgs/:name/emails/:email",
-            "uri": "/settings/orgs/acme/emails/person%40example.com",
-            "params": { "name": "acme", "email": "person@example.com" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/categories",
-            "uri": "/settings/orgs/acme/categories", "params": { "name": "acme" },
-            "body": { "name": "Reports" }
-        },
-        {
-            "method": "delete", "route": "/settings/orgs/:name/categories",
-            "uri": "/settings/orgs/acme/categories", "params": { "name": "acme" },
-            "body": { "name": "Reports" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/color",
-            "uri": "/settings/orgs/acme/color", "params": { "name": "acme" },
-            "body": { "color": "#356B9F" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/webhooks",
-            "uri": "/settings/orgs/acme/webhooks", "params": { "name": "acme" },
-            "body": {
-                "url": "https://discord.com/api/webhooks/1/secret-token",
-                "label": "Ops", "events": ["published"]
-            }
-        },
-        {
-            "method": "patch", "route": "/settings/orgs/:name/webhooks/:id",
-            "uri": "/settings/orgs/acme/webhooks/wh0000000002",
-            "params": { "name": "acme", "id": "wh0000000002" },
-            "body": { "events": ["feedback", "resolved"] }
-        },
-        {
-            "method": "delete", "route": "/settings/orgs/:name/webhooks/:id",
-            "uri": "/settings/orgs/acme/webhooks/wh0000000002",
-            "params": { "name": "acme", "id": "wh0000000002" }
-        },
-        {
-            "method": "post", "route": "/settings/orgs/:name/webhooks/:id/test",
-            "uri": "/settings/orgs/acme/webhooks/wh0000000002/test",
-            "params": { "name": "acme", "id": "wh0000000002" }
-        }
+        {"method": "get", "route": "/settings", "uri": "/settings"},
+        {"method": "post", "route": "/settings/keys", "uri": "/settings/keys", "body": {"clientId": "publisher-2", "org": "acme", "label": "Agent"}},
+        {"method": "post", "route": "/settings/keys/:id/revoke", "uri": "/settings/keys/publisher-2/revoke"},
+        {"method": "patch", "route": "/settings/keys/:id", "uri": "/settings/keys/publisher-2", "body": {"label": "Alex", "role": "collaborator", "ownerEmail": "alex@acme.test"}},
+        {"method": "post", "route": "/settings/orgs", "uri": "/settings/orgs", "body": {"name": "newco", "label": "New Co", "domain": "newco.test"}},
+        {"method": "delete", "route": "/settings/orgs/:name", "uri": "/settings/orgs/acme"},
+        {"method": "post", "route": "/settings/orgs/:name/domains", "uri": "/settings/orgs/acme/domains", "body": {"domain": "DOCS.ACME.TEST"}},
+        {"method": "delete", "route": "/settings/orgs/:name/domains/:domain", "uri": "/settings/orgs/acme/domains/docs.acme.test"},
+        {"method": "post", "route": "/settings/orgs/:name/emails", "uri": "/settings/orgs/acme/emails", "body": {"email": " Person@Example.com "}},
+        {"method": "delete", "route": "/settings/orgs/:name/emails/:email", "uri": "/settings/orgs/acme/emails/person%40example.com"},
+        {"method": "post", "route": "/settings/orgs/:name/categories", "uri": "/settings/orgs/acme/categories", "body": {"name": "Reports"}},
+        {"method": "delete", "route": "/settings/orgs/:name/categories", "uri": "/settings/orgs/acme/categories", "body": {"name": "Reports"}},
+        {"method": "post", "route": "/settings/orgs/:name/color", "uri": "/settings/orgs/acme/color", "body": {"color": "#356B9F"}},
+        {"method": "post", "route": "/settings/orgs/:name/webhooks", "uri": "/settings/orgs/acme/webhooks", "body": {"url": "https://discord.com/api/webhooks/1/secret-token", "label": "Ops", "events": ["published"]}},
+        {"method": "patch", "route": "/settings/orgs/:name/webhooks/:id", "uri": "/settings/orgs/acme/webhooks/wh0000000002", "body": {"events": ["feedback", "resolved"]}},
+        {"method": "delete", "route": "/settings/orgs/:name/webhooks/:id", "uri": "/settings/orgs/acme/webhooks/wh0000000002"},
+        {"method": "post", "route": "/settings/orgs/:name/webhooks/:id/test", "uri": "/settings/orgs/acme/webhooks/wh0000000002/test"},
     ])
 }
 
-fn run_node_app(root: &Path, cases: &Value) -> Value {
-    let module = format!("file://{}", root.join("lib/app.js").display());
-    let output = Command::new("node")
-        .current_dir(root)
-        .arg("-e")
-        .arg(NODE_ROUTE_DRIVER)
-        .arg(module)
-        .arg(cases.to_string())
-        .output()
-        .expect("run the Node app reference");
-    assert!(
-        output.status.success(),
-        "Node app reference failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("Node app reference emitted JSON")
+/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+fn frozen_admin_route_results() -> Value {
+    json!([
+        {"status": 200, "body": "<main>settings fixture</main>"},
+        {"status": 200, "body": {"clientId": "publisher-2", "org": "acme", "label": "Agent", "role": "author", "secret": "one-time-secret", "created_at": "<iso-timestamp>"}},
+        {"status": 200, "body": {"id": "publisher-2", "revoked": true}},
+        {"status": 200, "body": {"clientId": "publisher-2", "org": "acme", "label": "Alex", "role": "collaborator", "ownerEmail": "alex@acme.test"}},
+        {"status": 200, "body": {"name": "newco", "label": "New Co", "domains": ["newco.test"], "emails": [], "categories": [], "keyCount": 0}},
+        {"status": 200, "body": {"name": "acme", "removed": true}},
+        {"status": 200, "body": {"org": "acme", "domain": "docs.acme.test"}},
+        {"status": 200, "body": {"org": "acme", "domain": "docs.acme.test", "removed": true}},
+        {"status": 200, "body": {"org": "acme", "email": "person@example.com"}},
+        {"status": 200, "body": {"org": "acme", "email": "person@example.com", "removed": true}},
+        {"status": 200, "body": {"org": "acme", "name": "Reports"}},
+        {"status": 200, "body": {"org": "acme", "name": "Reports", "removed": true}},
+        {"status": 200, "body": {"name": "acme", "color": "#356B9F"}},
+        {"status": 200, "body": {"id": "wh0000000002", "label": "Ops", "events": ["published"], "url": "https://discord.com…wxyz", "last_ok_at": null, "last_error": null}},
+        {"status": 200, "body": {"id": "wh0000000002", "label": "Ops", "events": ["feedback", "resolved"], "url": "https://discord.com…wxyz", "last_ok_at": null, "last_error": null}},
+        {"status": 200, "body": {"org": "acme", "id": "wh0000000002", "removed": true}},
+        {"status": 200, "body": {"ok": true}},
+    ])
 }
 
 async fn run_rust_app(harness: &Arc<Harness>, cases: &Value) -> Value {
     let app = artifact_mcp::build_router(harness.deps());
     let mut results = Vec::new();
-    for candidate in cases.as_array().expect("parity cases are an array") {
+    for candidate in cases.as_array().expect("admin route cases are an array") {
         let method = candidate["method"]
             .as_str()
-            .expect("parity method")
+            .expect("route method")
             .to_ascii_uppercase();
-        let uri = candidate["uri"].as_str().expect("parity URI");
+        let uri = candidate["uri"].as_str().expect("route URI");
         let method = method.parse::<axum::http::Method>().expect("HTTP method");
         let mut request = Request::builder().method(method).uri(uri);
         let body = candidate.get("body").filter(|body| !body.is_null());
@@ -2284,7 +2094,7 @@ async fn run_rust_app(harness: &Arc<Harness>, cases: &Value) -> Value {
             .oneshot(
                 request
                     .body(body.map_or_else(Body::empty, |body| Body::from(body.to_string())))
-                    .expect("valid parity request"),
+                    .expect("valid route request"),
             )
             .await
             .expect("Rust route response");
@@ -2296,11 +2106,11 @@ async fn run_rust_app(harness: &Arc<Harness>, cases: &Value) -> Value {
             .is_some_and(|value| value.starts_with("application/json"));
         let bytes = to_bytes(response.into_body(), 128 * 1024)
             .await
-            .expect("Rust parity response body");
+            .expect("route response body");
         let mut body = if is_json {
-            serde_json::from_slice(&bytes).expect("Rust parity JSON")
+            serde_json::from_slice(&bytes).expect("route JSON")
         } else {
-            Value::String(String::from_utf8(bytes.to_vec()).expect("Rust parity text"))
+            Value::String(String::from_utf8(bytes.to_vec()).expect("route text"))
         };
         if candidate["route"] == "/settings/keys" {
             body["created_at"] = Value::String("<iso-timestamp>".to_owned());
@@ -2311,12 +2121,7 @@ async fn run_rust_app(harness: &Arc<Harness>, cases: &Value) -> Value {
 }
 
 #[tokio::test]
-async fn node_app_route_handlers_match_the_rust_admin_contract() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
-
+async fn admin_route_handlers_match_the_frozen_admin_contract() {
     let harness = Harness::admin();
     harness
         .organizations
@@ -2336,10 +2141,8 @@ async fn node_app_route_handlers_match_the_rust_admin_contract() {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .insert(delivery.id.clone(), delivery);
 
-    let cases = parity_cases();
-    let node = run_node_app(&root, &cases);
-    let rust = run_rust_app(&harness, &cases).await;
-    assert_eq!(rust, node, "Rust U18 routes diverged from lib/app.js");
+    let rust = run_rust_app(&harness, &admin_route_cases()).await;
+    assert_eq!(rust, frozen_admin_route_results());
 }
 
 fn audit_route_config(label: &str) -> (AppConfig, PathBuf) {

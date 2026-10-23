@@ -404,13 +404,10 @@ fn loopback_http_switch_is_ignored_when_oauth_is_disabled() {
     assert!(!config.oauth.allow_loopback_http);
 }
 
+/// The HTTPS-only OAuth URL policy for both URL settings. The expected verdicts are the ones the
+/// retired Node runtime's `oauthConfigFromEnv` reached for the same matrix.
 #[test]
-fn oauth_url_policy_matches_node_for_both_settings() {
-    use crate::u05_support::{node_reference_available, run_node};
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
-    if !node_reference_available(root, &["lib/oauth.js"]) {
-        return;
-    }
+fn oauth_url_policy_for_both_settings() {
     let mut cases = Vec::new();
     for setting in ["MCP_OAUTH_ISSUER", "MCP_OAUTH_JWKS_URL"] {
         for (url, loopback_http) in [
@@ -451,53 +448,29 @@ fn oauth_url_policy_matches_node_for_both_settings() {
     for (opt_in, expected) in [("", true), (" ", true), ("yes", false), (" 1 ", false)] {
         cases.push(json!({"setting": "MCP_OAUTH_ISSUER", "url": ISSUER, "optIn": opt_in, "expected": expected}));
     }
-    let rust: Vec<bool> = cases
-        .iter()
-        .map(|case| {
-            let mut env = MapEnv::empty()
-                .with("MCP_OAUTH_ISSUER", ISSUER)
-                .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
-                .with("MCP_OAUTH_JWKS_URL", "https://auth.example.test/jwks")
-                .with(
-                    case["setting"].as_str().expect("setting"),
-                    case["url"].as_str().expect("url"),
-                );
-            if let Some(opt_in) = case["optIn"].as_str() {
-                env = env.with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", opt_in);
-            }
-            let result = AppConfig::from_source(&env);
-            if let Err(error) = &result {
-                let message = error.to_string();
-                assert!(message.contains("MCP_OAUTH_"));
-                assert!(!message.contains("synthetic-password"));
-                assert!(!message.contains("synthetic-query-secret"));
-            }
-            assert_eq!(
-                result.is_ok(),
-                case["expected"].as_bool().expect("expected"),
-                "{case}"
+    for case in &cases {
+        let mut env = MapEnv::empty()
+            .with("MCP_OAUTH_ISSUER", ISSUER)
+            .with("MCP_OAUTH_AUDIENCE", AUDIENCE)
+            .with("MCP_OAUTH_JWKS_URL", "https://auth.example.test/jwks")
+            .with(
+                case["setting"].as_str().expect("setting"),
+                case["url"].as_str().expect("url"),
             );
-            result.is_ok()
-        })
-        .collect();
-    let node = run_node(
-        root,
-        r#"
-        const { oauthConfigFromEnv } = await import('./lib/oauth.js');
-        const cases = JSON.parse(process.argv[1]);
-        console.log(JSON.stringify(cases.map(row => {
-            const env = {
-                MCP_OAUTH_ISSUER: 'https://auth.example.test',
-                MCP_OAUTH_AUDIENCE: 'https://artifacts.example.test/mcp',
-                MCP_OAUTH_JWKS_URL: 'https://auth.example.test/jwks',
-                [row.setting]: row.url
-            };
-            if (row.optIn !== null) env.MCP_OAUTH_ALLOW_LOOPBACK_HTTP = row.optIn;
-            try { oauthConfigFromEnv(env); return true; } catch { return false; }
-        })));
-    "#,
-        &json!(cases),
-        &[],
-    );
-    assert_eq!(json!(rust), node);
+        if let Some(opt_in) = case["optIn"].as_str() {
+            env = env.with("MCP_OAUTH_ALLOW_LOOPBACK_HTTP", opt_in);
+        }
+        let result = AppConfig::from_source(&env);
+        if let Err(error) = &result {
+            let message = error.to_string();
+            assert!(message.contains("MCP_OAUTH_"));
+            assert!(!message.contains("synthetic-password"));
+            assert!(!message.contains("synthetic-query-secret"));
+        }
+        assert_eq!(
+            result.is_ok(),
+            case["expected"].as_bool().expect("expected"),
+            "{case}"
+        );
+    }
 }

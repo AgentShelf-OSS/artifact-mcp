@@ -963,3 +963,175 @@ fn a_non_admin_key_never_sees_the_new_tenants_feedback_after_a_move() {
         ["before the move"]
     );
 }
+
+// ---------------------------------------------------------------------------
+// Frozen vectors
+// ---------------------------------------------------------------------------
+
+/// `String.prototype.trim` and `.length` bound every stored feedback body. Rust's own `trim` and
+/// `len` disagree with both on several of these inputs.
+#[test]
+fn body_trim_and_length_match_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // (input, input.trim(), input.trim().length)
+    let cases: [(&str, &str, usize); 12] = [
+        ("  hello  ", "hello", 5),
+        ("\t\r\n hello \t", "hello", 5),
+        ("\u{a0}hello\u{a0}", "hello", 5),
+        ("\u{feff}hello\u{feff}", "hello", 5),
+        ("\u{85}hello\u{85}", "\u{85}hello\u{85}", 7),
+        ("\u{2028}hello\u{2029}", "hello", 5),
+        ("\u{3000}hello\u{3000}", "hello", 5),
+        ("\u{1f600}\u{1f600}", "\u{1f600}\u{1f600}", 4),
+        ("caf\u{e9}", "caf\u{e9}", 4),
+        ("e\u{301}", "e\u{301}", 2),
+        ("   ", "", 0),
+        ("\u{feff}", "", 0),
+    ];
+    for (input, trimmed, length) in cases {
+        assert_eq!(feedback::js_trim(input), trimmed, "trim {input:?}");
+        assert_eq!(
+            feedback::utf16_len(feedback::js_trim(input)),
+            length,
+            "length {input:?}"
+        );
+    }
+}
+
+/// The columns a submission persists, read back from the row, plus which message wins when a
+/// submission is wrong in two ways at once.
+#[test]
+fn submissions_persist_the_frozen_node_vector() {
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let fixture = Fixture::new("u11-frozen-rows");
+    let conn = fixture.conn();
+    let artifact = fixture.seed_artifact("frozen000001", ORG, CLIENT);
+    let org_id = org(ORG);
+
+    let with_anchor = |body: &str, anchor: FeedbackAnchor| SubmitFeedback {
+        anchor: Some(anchor),
+        ..submission(body)
+    };
+    let approx_point = FeedbackAnchor {
+        approx: true,
+        ..point(0.25, 0.75)
+    };
+    let overhanging_box = FeedbackAnchor {
+        approx: false,
+        ..boxed(0.8, 0.9, 0.5, 0.5)
+    };
+    // body, artifact_revision, anchor_x, anchor_y, anchor_w, anchor_h, anchor_approx
+    type StoredRow = (
+        String,
+        i64,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+        i64,
+    );
+    let stored =
+        |body: &str, x, y, w, h, approx| -> StoredRow { (body.to_owned(), 1, x, y, w, h, approx) };
+    // (submission, artifact_revision passed in, row read back)
+    let cases: [(SubmitFeedback, u64, StoredRow); 6] = [
+        // `Number(artifactRevision) || 1`: a zero revision is stored as 1.
+        (
+            submission("zero revision"),
+            0,
+            stored("zero revision", None, None, None, None, 0),
+        ),
+        (
+            submission("\u{85}"),
+            1,
+            stored("\u{85}", None, None, None, None, 0),
+        ),
+        (
+            submission("\u{1f600}\u{1f600}"),
+            1,
+            stored("\u{1f600}\u{1f600}", None, None, None, None, 0),
+        ),
+        (
+            with_anchor("edges", point(0.0, 1.0)),
+            1,
+            stored("edges", Some(0.0), Some(1.0), None, None, 0),
+        ),
+        (
+            with_anchor("approx", approx_point),
+            1,
+            stored("approx", Some(0.25), Some(0.75), None, None, 1),
+        ),
+        // The over-hanging box is trimmed to the edge with plain f64 subtraction.
+        (
+            with_anchor("trimmed", overhanging_box),
+            1,
+            stored(
+                "trimmed",
+                Some(0.8),
+                Some(0.9),
+                Some(0.199_999_999_999_999_96),
+                Some(0.099_999_999_999_999_98),
+                0,
+            ),
+        ),
+    ];
+    for (submitted, revision, expected) in cases {
+        let created = feedback::add(
+            &conn,
+            &fixture.ids,
+            &NewFeedback {
+                artifact_revision: revision,
+                ..new_feedback_in(&artifact, &org_id, &submitted)
+            },
+        )
+        .unwrap_or_else(|error| panic!("{:?}: {error}", expected.0));
+        let row: StoredRow = conn
+            .query_row(
+                "SELECT body, artifact_revision, anchor_x, anchor_y, anchor_w, anchor_h, \
+                 anchor_approx FROM feedback WHERE id = ?1",
+                params![created.id.0],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                        row.get(6)?,
+                    ))
+                },
+            )
+            .expect("read the stored row");
+        assert_eq!(row, expected);
+    }
+
+    // An empty body is reported before a bad anchor; a missing parent before a bad anchor.
+    let far_outside = point(9.0, 9.0);
+    assert_eq!(
+        feedback::add(
+            &conn,
+            &fixture.ids,
+            &new_feedback_in(&artifact, &org_id, &with_anchor("  ", far_outside))
+        ),
+        Err(AppError::Validation(EMPTY_BODY_MESSAGE.to_owned()))
+    );
+    let orphan = SubmitFeedback {
+        parent_id: Some(FeedbackId("not-a-real-id".to_owned())),
+        ..with_anchor("ok", far_outside)
+    };
+    assert_eq!(
+        feedback::add(
+            &conn,
+            &fixture.ids,
+            &new_feedback_in(&artifact, &org_id, &orphan)
+        ),
+        Err(AppError::Validation(PARENT_NOT_FOUND_MESSAGE.to_owned()))
+    );
+    // The messages themselves are part of the API's 400 contract.
+    assert_eq!(EMPTY_BODY_MESSAGE, "Feedback can\u{2019}t be empty.");
+    assert_eq!(PARENT_NOT_FOUND_MESSAGE, "Reply parent not found.");
+    assert_eq!(
+        too_long_message(MAX_BODY),
+        "Feedback is too long (max 4000 characters)."
+    );
+}

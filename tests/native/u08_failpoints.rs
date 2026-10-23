@@ -4,12 +4,12 @@
 //! Two flavours are injected at each boundary:
 //!
 //! * [`ScriptedFaults::fail_once`] — an in-process error, so the operation's compensation runs
-//!   exactly as Node's `catch` block does ([lib/store.js:222-227], [lib/store.js:429-437],
-//!   [lib/store.js:640-643]).
+//!   as the retired Node runtime's `catch` blocks did ([lib/store.js:222-227],
+//!   [lib/store.js:429-437], [lib/store.js:640-643]).
 //! * [`ScriptedFaults::crash_once`] — the process died at that boundary, so **nothing**
 //!   compensates. The surviving on-disk and database state is then handed to
-//!   `audit_storage(clean_transient = true)`, which is exactly what `server.js:89` runs at
-//!   startup.
+//!   `audit_storage(clean_transient = true)`, which is exactly what the binary runs at startup
+//!   (`src/main.rs`).
 //!
 //! Three invariants are asserted after every case:
 //!

@@ -1,23 +1,24 @@
 //! Owned by U16 (terra) — optional preview-renderer HTTP client.
 //!
-//! This module is a **client of the unchanged Node/Chromium sidecar**
-//! (`preview-renderer/server.js`); it does not render anything itself. The sidecar runs under the
+//! This module is a **client of the preview-renderer sidecar** (`preview-renderer/`, the Rust
+//! `artifact-preview` service driving chrome-headless-shell); it does not render anything itself.
+//! The sidecar runs under the
 //! `preview` compose profile ([docker-compose.yml:30]) and is frequently absent, so every entry
 //! point here is total: it returns `None` instead of an error for *any* failure — disabled,
 //! unreachable, slow, non-PNG, oversized, or malformed.
 //!
-//! # Sidecar contract (coded against, verbatim from `preview-renderer/server.js`)
+//! # Sidecar contract (`preview-renderer/src/server.rs`, unchanged from the retired Node `server.js`)
 //!
 //! | Aspect | Contract | Source |
 //! |---|---|---|
-//! | Endpoint | `POST <PREVIEW_RENDERER_URL>/render` | [preview-renderer/server.js:99] |
-//! | Request | `content-type: application/json`, body `{"html":…,"width":…,"height":…}` | [lib/preview.js:57-63], [preview-renderer/server.js:110-116] |
-//! | Health | `GET /health` → `{"status":"ok"}` (not used by the client) | [preview-renderer/server.js:95-98] |
-//! | Success | `200` + `content-type: image/png` + `content-length` + the PNG body | [preview-renderer/server.js:27-36], [preview-renderer/server.js:118] |
-//! | Busy | `503 {"error":"renderer busy"}` — one render at a time, server side | [preview-renderer/server.js:103-106] |
-//! | Bad input | `400 {"error":"html must be a string"}`, `413 {"error":"request too large"}` | [preview-renderer/server.js:111-113], [preview-renderer/server.js:43] |
-//! | Failure | `500 {"error":"render failed"}` | [preview-renderer/server.js:120] |
-//! | Server timeout | `RENDER_TIMEOUT_MS` (default 7 s), below the client's 8 s | [preview-renderer/server.js:8], [lib/preview.js:6] |
+//! | Endpoint | `POST <PREVIEW_RENDERER_URL>/render` | [preview-renderer/src/server.rs `handle`] |
+//! | Request | `content-type: application/json`, body `{"html":…,"width":…,"height":…}` | [lib/preview.js:57-63], [preview-renderer/src/server.rs `render_route`] |
+//! | Health | `GET /health` → `{"status":"ok"}` (not used by the client) | [preview-renderer/src/server.rs `handle`] |
+//! | Success | `200` + `content-type: image/png` + `content-length` + the PNG body | [preview-renderer/src/server.rs `respond`, `render_route`] |
+//! | Busy | `503 {"error":"renderer busy"}` — one render at a time, server side | [preview-renderer/src/server.rs `BusySlot`] |
+//! | Bad input | `400 {"error":"html must be a string"}`, `413 {"error":"request too large"}` | [preview-renderer/src/server.rs `render_route`, `read_body`] |
+//! | Failure | `500 {"error":"render failed"}` | [preview-renderer/src/server.rs `render_route`] |
+//! | Server timeout | `RENDER_TIMEOUT_MS` (default 7 s), below the client's 8 s | [preview-renderer/src/config.rs `DEFAULT_RENDER_TIMEOUT_MS`], [lib/preview.js:6] |
 //! | Redirects | never issued; a redirect is treated as a failure | [lib/preview.js:62] |
 //!
 //! Because the sidecar rejects concurrent renders with `503`, the client must not fan out. The

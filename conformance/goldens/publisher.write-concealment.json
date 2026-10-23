@@ -33,7 +33,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -47,7 +52,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -61,7 +71,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -75,7 +90,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -89,7 +109,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -113,7 +138,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -127,7 +157,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -141,7 +176,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -155,7 +195,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }
@@ -169,7 +214,12 @@
           "id": 39,
           "jsonrpc": "2.0",
           "result": {
-            "content": [{ "text": "Unknown artifact: ${publisher_write_id}", "type": "text" }],
+            "content": [
+              {
+                "text": "Unknown artifact: ${publisher_write_id}",
+                "type": "text"
+              }
+            ],
             "isError": true
           }
         }

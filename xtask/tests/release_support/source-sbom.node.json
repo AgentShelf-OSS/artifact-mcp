@@ -1,0 +1,279 @@
+{
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "spdxVersion": "SPDX-2.3",
+  "name": "artifact-mcp-source-1.6.0-rc.1",
+  "dataLicense": "CC0-1.0",
+  "documentNamespace": "https://github.com/AgentShelf-OSS/artifact-mcp/releases/source/COMMIT",
+  "creationInfo": {
+    "creators": [
+      "Tool: artifact-mcp-release-source-sbom"
+    ],
+    "created": "2026-07-29T18:00:00Z"
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package-artifact-mcp",
+      "name": "artifact-mcp",
+      "versionInfo": "1.6.0-rc.1",
+      "downloadLocation": "NOASSERTION",
+      "filesAnalyzed": true,
+      "licenseConcluded": "Apache-2.0",
+      "licenseDeclared": "Apache-2.0",
+      "copyrightText": "NOASSERTION",
+      "externalRefs": [
+        {
+          "referenceCategory": "OTHER",
+          "referenceType": "git",
+          "referenceLocator": "git+https://github.com/AgentShelf-OSS/artifact-mcp@COMMIT"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-1",
+      "fileName": "./B.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e83189db38554920ea572093f9ad32facf682f28ccecdac085c1511735a2b492"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-2",
+      "fileName": "./Cargo.lock",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "718475cd179c5fce5f3cbaf68fb45b15017015ebeec359c040cf704e3f1c86b6"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-3",
+      "fileName": "./README.md",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-4",
+      "fileName": "./a/x.rs",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "536e506bb90914c243a12b397b9a998f85ae2cbd9ba02dfd03a9e155ca5ca0f4"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-5",
+      "fileName": "./b.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "b908e4daaf9d57fe9cb551a689a35c9a9e0fac85fdf11faaa0a1ba0e5efc06fd"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-6",
+      "fileName": "./back\\slash.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "2ec0cfe9c0f501021df290b9dbfdba6466bd5f8136d601b302705b87a74ada83"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-7",
+      "fileName": "./empty",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-8",
+      "fileName": "./link",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5891b5b522d5df086d0ff0b110fbd9d21bb4fc7163af34d08286a2e846f6be03"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-9",
+      "fileName": "./quote\"name.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "88bdeff7ba192fa68d48df993f971cd5255263240018cf9e7021e116ba01ee64"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-10",
+      "fileName": "./space name.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "9d39745403e5faf662463b32d613eedf45037d0180983ae8bc87f538cf0c9653"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-11",
+      "fileName": "./tab\tname.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "40cfae8acb2627ac5b6b871b5a3ed1dcb5315ff489ad3dd5d192dff5d59405cf"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-12",
+      "fileName": "./é.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "8f8df9963c9628741bfeeac7efb739164d0858fd03eb1950f385bb26512cef55"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-13",
+      "fileName": "./😀.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "5cc892e8dd79d45dfef21f9a87e7955896c96ab9b791f2345e5a456bca444f61"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    },
+    {
+      "SPDXID": "SPDXRef-File-14",
+      "fileName": "./～.txt",
+      "checksums": [
+        {
+          "algorithm": "SHA256",
+          "checksumValue": "7400b0415e2b70862606e30cff732ce2c91ac683dc0296554d72b5aad650c161"
+        }
+      ],
+      "licenseConcluded": "NOASSERTION",
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package-artifact-mcp"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-1"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-2"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-3"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-4"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-5"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-6"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-7"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-8"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-9"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-10"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-11"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-12"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-13"
+    },
+    {
+      "spdxElementId": "SPDXRef-Package-artifact-mcp",
+      "relationshipType": "CONTAINS",
+      "relatedSpdxElement": "SPDXRef-File-14"
+    }
+  ]
+}

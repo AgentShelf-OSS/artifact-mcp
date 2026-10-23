@@ -72,13 +72,14 @@ Pocket and Kokoro remain on CPU; no automatic GPU switching occurs.
 
 ## Paragraph prefetch regression check
 
-After building the native release and installing `playwright/` dependencies, run:
+After building the native release, run (see `browser-tests/README.md` for the browser path):
 
 ```sh
-node playwright/tests/reader-prefetch.cjs
+ARTIFACT_MCP_BIN=$PWD/target/release/artifact-mcp \
+  cargo test --manifest-path browser-tests/Cargo.toml --test reader -- reader-prefetch
 ```
 
-Set `STREAM_TEST_BINARY` to use a binary built outside this worktree. The test uses
+`ARTIFACT_MCP_BIN` selects the server binary. The test uses
 synthetic PCM and delayed delivery to verify that the next paragraph is requested
 during playback, the prepared transition stays below 100 ms, lookahead remains
 bounded, and Stop aborts outstanding work. It does not measure model-generated

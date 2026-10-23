@@ -1,0 +1,482 @@
+{
+  "description": "Requests and output of scripts/publish-data-artifact.mjs (Node) for each scenario in tests/ops_publish_data_artifact.rs, against the same mock MCP server.",
+  "node": "v22.23.4",
+  "scenarios": {
+    "bad-url": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "Invalid URL\n",
+      "stdout": ""
+    },
+    "bindings-http-500": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"publish_artifact\",\"arguments\":{\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"set_data_bindings\",\"arguments\":{\"id\":\"a1b2c3d4e5\",\"bindings\":{\"2\":{\"source\":\"github\",\"operations\":[],\"options\":{\"z\":1,\"a\":[1,2.5,1000,0],\"b\":\"é \\t\"}},\"10\":{\"source\":\"ci\",\"operations\":[\"status\"]},\"prs\":{\"source\":\"github\",\"operations\":[\"list_prs\",\"get_pr\"],\"subscriptions\":[\"pr_updates\"]},\"checks\":{\"source\":\"ci\",\"subscriptions\":[],\"prs\":{\"dup\":2}}}}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP request failed with HTTP 500. HTML was published at artifact a1b2c3d4e5; retry with --artifact-id a1b2c3d4e5 after correcting the bindings.\n",
+      "stdout": ""
+    },
+    "bindings-not-an-object": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "The bindings file must contain a bindings object.\n",
+      "stdout": ""
+    },
+    "bindings-null": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "Cannot read properties of null (reading 'bindings')\n",
+      "stdout": ""
+    },
+    "bindings-rejected": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"publish_artifact\",\"arguments\":{\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"set_data_bindings\",\"arguments\":{\"id\":\"a1b2c3d4e5\",\"bindings\":{\"2\":{\"source\":\"github\",\"operations\":[],\"options\":{\"z\":1,\"a\":[1,2.5,1000,0],\"b\":\"é \\t\"}},\"10\":{\"source\":\"ci\",\"operations\":[\"status\"]},\"prs\":{\"source\":\"github\",\"operations\":[\"list_prs\",\"get_pr\"],\"subscriptions\":[\"pr_updates\"]},\"checks\":{\"source\":\"ci\",\"subscriptions\":[],\"prs\":{\"dup\":2}}}}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP set_data_bindings failed. Check source configuration and publisher permissions. HTML was published at artifact a1b2c3d4e5; retry with --artifact-id a1b2c3d4e5 after correcting the bindings.\n",
+      "stdout": ""
+    },
+    "bindings-truncated": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "Unexpected end of JSON input\n",
+      "stdout": ""
+    },
+    "connection-refused": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "fetch failed\n",
+      "stdout": ""
+    },
+    "ftp-url": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "--mcp must be an HTTP(S) endpoint without credentials, query or fragment.\n",
+      "stdout": ""
+    },
+    "html-is-a-directory": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "EISDIR: illegal operation on a directory, read\n",
+      "stdout": ""
+    },
+    "initialize-http-401": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP request failed with HTTP 401.\n",
+      "stdout": ""
+    },
+    "initialize-redirect": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "fetch failed\n",
+      "stdout": ""
+    },
+    "list-rpc-error": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP list_data_sources failed. Check source configuration and publisher permissions.\n",
+      "stdout": ""
+    },
+    "missing-html": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "ENOENT: no such file or directory, open 'missing.html'\n",
+      "stdout": ""
+    },
+    "missing-title": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "Required arguments: --mcp, --html, --bindings, --title. Use --help for an example.\n",
+      "stdout": ""
+    },
+    "missing-token": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "Set ARTIFACT_MCP_API_KEY through your secret manager.\n",
+      "stdout": ""
+    },
+    "publish": {
+      "exit": 0,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{\"org\":\"homelab\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"publish_artifact\",\"arguments\":{\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\",\"description\":\"Live PRs\",\"org\":\"homelab\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"set_data_bindings\",\"arguments\":{\"id\":\"a1b2c3d4e5\",\"bindings\":{\"2\":{\"source\":\"github\",\"operations\":[],\"options\":{\"z\":1,\"a\":[1,2.5,1000,0],\"b\":\"é \\t\"}},\"10\":{\"source\":\"ci\",\"operations\":[\"status\"]},\"prs\":{\"source\":\"github\",\"operations\":[\"list_prs\",\"get_pr\"],\"subscriptions\":[\"pr_updates\"]},\"checks\":{\"source\":\"ci\",\"subscriptions\":[],\"prs\":{\"dup\":2}}}}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "",
+      "stdout": "{\n  \"id\": \"a1b2c3d4e5\",\n  \"url\": \"https://artifacts.example.com/a/a1b2c3d4e5\",\n  \"bindings\": [\n    \"2\",\n    \"10\",\n    \"prs\",\n    \"checks\"\n  ]\n}\n"
+    },
+    "publish-tool-error": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"publish_artifact\",\"arguments\":{\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP publish_artifact failed. Check source configuration and publisher permissions.\n",
+      "stdout": ""
+    },
+    "publish-without-result": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"publish_artifact\",\"arguments\":{\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "MCP publish_artifact returned no structured result.\n",
+      "stdout": ""
+    },
+    "unavailable-operation": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "A binding requests an unavailable operation.\n",
+      "stdout": ""
+    },
+    "unavailable-source": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "A bound source is unavailable to this publisher. Check the source organization before publishing.\n",
+      "stdout": ""
+    },
+    "unavailable-subscription": {
+      "exit": 1,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "A binding requests an unavailable subscription.\n",
+      "stdout": ""
+    },
+    "update": {
+      "exit": 0,
+      "requests": [
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"initialize\",\"params\":{\"protocolVersion\":\"2025-06-18\",\"capabilities\":{},\"clientInfo\":{\"name\":\"artifact-data-publisher\",\"version\":\"1.0.0\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":2,\"method\":\"tools/call\",\"params\":{\"name\":\"list_data_sources\",\"arguments\":{}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":3,\"method\":\"tools/call\",\"params\":{\"name\":\"update_artifact\",\"arguments\":{\"id\":\"abc123def\",\"html\":\"<!doctype html><title>PR \\\"Watch\\\"</title>\\n<script>var s='</scr'+'ipt>\\\\\\\\';</script>\\t\\u0001é😀 �</p>\",\"title\":\"PR Watch\"}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        },
+        {
+          "body": "{\"jsonrpc\":\"2.0\",\"id\":4,\"method\":\"tools/call\",\"params\":{\"name\":\"set_data_bindings\",\"arguments\":{\"id\":\"abc123def\",\"bindings\":{\"2\":{\"source\":\"github\",\"operations\":[],\"options\":{\"z\":1,\"a\":[1,2.5,1000,0],\"b\":\"é \\t\"}},\"10\":{\"source\":\"ci\",\"operations\":[\"status\"]},\"prs\":{\"source\":\"github\",\"operations\":[\"list_prs\",\"get_pr\"],\"subscriptions\":[\"pr_updates\"]},\"checks\":{\"source\":\"ci\",\"subscriptions\":[],\"prs\":{\"dup\":2}}}}}}",
+          "headers": {
+            "accept": "application/json, text/event-stream",
+            "authorization": "Bearer <TOKEN>",
+            "content-type": "application/json"
+          },
+          "method": "POST",
+          "target": "/mcp"
+        }
+      ],
+      "stderr": "",
+      "stdout": "{\n  \"id\": \"abc123def\",\n  \"url\": \"https://artifacts.example.com/a/abc123def\",\n  \"bindings\": [\n    \"2\",\n    \"10\",\n    \"prs\",\n    \"checks\"\n  ]\n}\n"
+    },
+    "url-with-credentials": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "--mcp must be an HTTP(S) endpoint without credentials, query or fragment.\n",
+      "stdout": ""
+    },
+    "url-with-query": {
+      "exit": 1,
+      "requests": [],
+      "stderr": "--mcp must be an HTTP(S) endpoint without credentials, query or fragment.\n",
+      "stdout": ""
+    }
+  }
+}

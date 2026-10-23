@@ -48,7 +48,7 @@
 //! # Serialisation
 //!
 //! The sidecar renders one page at a time and answers `503 {"error":"renderer busy"}` to anything
-//! concurrent ([preview-renderer/server.js:103-106]). [`ThumbnailQueue`] is the single lane that
+//! concurrent ([preview-renderer/src/server.rs]). [`ThumbnailQueue`] is the single lane that
 //! keeps the client inside that contract, with interactive (`High`) jobs always selected before
 //! startup backfill (`Low`) — [lib/thumbnails.js:216-217].
 //!
@@ -125,7 +125,8 @@ pub fn valid_png(value: &[u8], max_bytes: u64) -> bool {
 ///    only the **first UTF-16 code unit** of each one. For an astral character the trailing
 ///    surrogate is silently dropped: `"🎉"` contributes `0xD83C` alone. Iterating
 ///    `str::encode_utf16` instead would feed both surrogates in and produce a different hue —
-///    verified against the Node oracle in `tests/native/u16_node_parity.rs`.
+///    frozen from the retired Node runtime in
+///    `tests/native/u16_thumbnails.rs` (`the_placeholder_matches_the_frozen_node_bytes`).
 #[must_use]
 pub fn safe_color(accent: Option<&str>, org: &str) -> String {
     let color = accent.unwrap_or_default().trim();
@@ -761,7 +762,7 @@ pub struct QueueDepth {
 /// `createThumbnailQueue({ thumbnails })` — [lib/thumbnails.js:207-236]
 ///
 /// One serial lane: exactly one render is in flight at a time, which is what the sidecar's
-/// single-render contract requires ([preview-renderer/server.js:103-106]). Interactive mutation
+/// single-render contract requires ([preview-renderer/src/server.rs]). Interactive mutation
 /// events (`High`) are always selected ahead of startup backfill (`Low`), so publishing an
 /// artifact does not queue behind thousands of backfill jobs.
 #[derive(Debug)]

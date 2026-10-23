@@ -1,6 +1,6 @@
 [package]
 name = "artifact-mcp"
-version = "1.26.0"
+version = "1.27.0"
 edition = "2024"
 license = "Apache-2.0"
 publish = false
@@ -49,5 +49,15 @@ twilight-gateway = { version = "0.17.1", default-features = false, features = ["
 twilight-model = "0.17.1"
 url = "2"
 
+[dev-dependencies]
+# In-process TLS fixture for the JWKS transport tests; pinned to the version reqwest already locks.
+tokio-rustls = { version = "0.26.4", default-features = false, features = ["aws-lc-rs"] }
+
 [profile.release]
 panic = "abort"
+
+# The root package stays the default member, so `cargo build`, `cargo test`, and the Docker build
+# at the repository root still build only the server. `xtask/` holds `cargo xtask` maintenance
+# commands and is built only when selected (`cargo xtask ...`, `--package xtask`, `--workspace`).
+[workspace]
+members = [".", "xtask"]

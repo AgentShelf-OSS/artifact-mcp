@@ -4,7 +4,7 @@
 //! target-tenant attribution, secret minimization, no-op suppression, and rollback when the
 //! authenticated audit chain rejects an append.
 
-use std::{path::PathBuf, process::Command, sync::Arc};
+use std::sync::Arc;
 
 use artifact_mcp::config::{
     Clock, FixedClock, IdSource, SeededRandom, SequentialIdSource, is_valid_webhook_id,
@@ -169,50 +169,19 @@ fn authorize_artifact() -> AuthorizedArtifact {
 }
 
 #[test]
-fn node_and_rust_accept_only_the_persisted_webhook_id_shape() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let cases = serde_json::json!([
+fn audit_accepts_only_the_persisted_webhook_id_shape() {
+    let cases = [
         "wh0000000001",
         "000000000000",
         "a-real-webhook-token",
         "https://discord.com/api/webhooks/1/secret",
         "wh000000000l",
-        "WH0000000001"
-    ]);
-    let driver = r#"
-const root = process.argv[1];
-const values = JSON.parse(process.argv[2]);
-import(`file://${root}/lib/audit.js`)
-  .then(({ isValidAuditWebhookId }) => {
-    process.stdout.write(JSON.stringify(values.map((value) => isValidAuditWebhookId(value))));
-  })
-  .catch((error) => { console.error(error); process.exit(1); });
-"#;
-    let output = Command::new("node")
-        .current_dir(&root)
-        .arg("-e")
-        .arg(driver)
-        .arg(&root)
-        .arg(cases.to_string())
-        .output()
-        .expect("run Node audit validator");
-    assert!(
-        output.status.success(),
-        "Node audit validator failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let node: Vec<bool> =
-        serde_json::from_slice(&output.stdout).expect("Node validator emitted JSON booleans");
+        "WH0000000001",
+    ];
     let rust = cases
-        .as_array()
-        .expect("case array")
         .iter()
-        .map(|value| {
-            is_valid_webhook_id(value.as_str().expect("string webhook identifier fixture"))
-        })
+        .map(|value| is_valid_webhook_id(value))
         .collect::<Vec<_>>();
-    assert_eq!(node, rust, "Node and Rust webhook-id guards drifted");
     assert_eq!(rust, [true, true, false, false, false, false]);
 }
 

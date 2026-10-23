@@ -1,7 +1,5 @@
 use std::{
     collections::BTreeMap,
-    path::{Path as FsPath, PathBuf},
-    process::Command,
     sync::{Arc, Mutex},
 };
 
@@ -27,125 +25,6 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
 };
 use tower::ServiceExt;
-
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
-
-const NODE_ROUTE_DRIVER: &str = r#"
-import(process.argv[1]).then(async ({ createApp }) => {
-  const meta = {
-    id: "abc123def456", client_id: "publisher", org: "acme", title: "Artifact",
-    description: "Description", bytes: 42, created_at: "2026-07-20T00:00:00.000Z",
-    updated_at: "2026-07-20T00:00:00.000Z", uploader_label: "Publisher",
-    is_bundle: 0, entry: "", revision: 2, category: "Reports", hidden: 0,
-    body_sha256: "0".repeat(64)
-  };
-  const revision = {
-    artifact_id: meta.id, org: meta.org, revision: 1, title: "Earlier",
-    description: "Earlier description", category: "Archive", bytes: 21,
-    is_bundle: 0, entry: "", body_sha256: "1".repeat(64),
-    created_at: "2026-07-19T00:00:00.000Z"
-  };
-  const feedbackRow = {
-    id: "feedback-id", artifact_id: meta.id, org: meta.org,
-    viewer_email: "viewer@example.test", body: "Note", artifact_revision: 2,
-    created_at: "2026-07-21 00:00:00", resolved_at: null, resolved_by: null,
-    parent_id: null, anchor_path: null, anchor_x: null, anchor_y: null,
-    anchor_w: null, anchor_h: null, anchor_approx: 0, anchor_page: null
-  };
-  let viewer = { email: "viewer@example.test", org: "acme", isAdmin: false };
-  const artifacts = {
-    isReserved: () => false,
-    getArtifactMeta: () => meta,
-    deleteArtifactById: () => true,
-    setCategory: (_id, category) => ({ ok: true, id: meta.id, category: String(category || "") }),
-    setHidden: (_id, hidden) => ({ ok: true, id: meta.id, hidden: Boolean(hidden) }),
-    moveArtifactToOrg: (_id, org, category) => ({ ok: true, id: meta.id, org, category }),
-    listRevisions: () => ({ current: 2, revisions: [revision] }),
-    restoreArtifactRevision: (_id, restoredFrom) => ({ ok: true, revision: 3, restoredFrom, bytes: 42 })
-  };
-  const shares = {
-    create: () => ({ token: "share-token", expires_at: null }),
-    listForArtifact: () => [{
-      token: "share-token", expires_at: null, created_at: "2026-07-20 00:00:00",
-      created_by: "viewer@example.test"
-    }],
-    revoke: () => true,
-    resolve: () => null
-  };
-  const feedback = {
-    listForArtifact: () => [feedbackRow],
-    add: () => feedbackRow,
-    getFeedback: () => feedbackRow,
-    deleteFeedback: (id) => ({ ok: true, id }),
-    resolveByViewer: (id) => ({ ok: true, id, changed: true })
-  };
-  const app = createApp({
-    checkPublisherKey: () => ({ ok: false }),
-    handleMcp: async () => null,
-    resolveViewer: async () => viewer,
-    artifacts,
-    shares,
-    keys: {},
-    orgs: {},
-    webhooks: {},
-    notify: { emit() {}, test: async () => ({ ok: false }) },
-    reactions: { set: () => ({ favorite: 0, vote: -1 }) },
-    feedback,
-    thumbnails: { removeArtifact: async () => {} },
-    pages: { notFound: () => "Not found" },
-    logger: {},
-    publicBase: "http://localhost:3480"
-  });
-
-  async function invoke(routePath, method, params, body, nextViewer = viewer) {
-    viewer = nextViewer;
-    const layer = app._router.stack.find((candidate) =>
-      candidate.route?.path === routePath && candidate.route.methods[method]
-    );
-    if (!layer) throw new Error(`missing route ${method} ${routePath}`);
-    const handler = layer.route.stack[layer.route.stack.length - 1].handle;
-    const response = {
-      statusCode: 200,
-      headers: {},
-      body: null,
-      status(code) { this.statusCode = code; return this; },
-      set(name, value) {
-        if (typeof name === "object") {
-          for (const [key, item] of Object.entries(name)) this.headers[key.toLowerCase()] = String(item);
-        } else {
-          this.headers[String(name).toLowerCase()] = String(value);
-        }
-        return this;
-      },
-      json(value) { this.body = value; return this; },
-      send(value) { this.body = value; return this; },
-      end() { return this; }
-    };
-    await handler({ params, body }, response);
-    return { status: response.statusCode, body: response.body };
-  }
-
-  const signed = { email: "viewer@example.test", org: "acme", isAdmin: false };
-  const cross = { email: "viewer@example.test", org: "beta", isAdmin: false };
-  const out = {};
-  out.delete = await invoke("/:id", "delete", { id: meta.id }, undefined, signed);
-  out.react = await invoke("/:id/react", "post", { id: meta.id }, { favorite: 0, vote: -1 }, signed);
-  out.category = await invoke("/:id/category", "post", { id: meta.id }, { category: "Dashboards" }, signed);
-  out.visibility = await invoke("/:id/visibility", "post", { id: meta.id }, { hidden: true }, signed);
-  out.moveCrossOrg = await invoke("/:id/move", "post", { id: meta.id }, { org: "beta" }, cross);
-  out.moveSameOrg = await invoke("/:id/move", "post", { id: meta.id }, { org: "beta" }, signed);
-  out.shareCreate = await invoke("/:id/share", "post", { id: meta.id }, { expires: "never" }, signed);
-  out.shareList = await invoke("/:id/shares", "get", { id: meta.id }, undefined, signed);
-  out.shareRevoke = await invoke("/:id/shares/:token", "delete", { id: meta.id, token: "share-token" }, undefined, signed);
-  out.feedbackList = await invoke("/:id/feedback", "get", { id: meta.id }, undefined, signed);
-  out.feedbackCreate = await invoke("/:id/feedback", "post", { id: meta.id }, { body: " Note ", anchor: null }, signed);
-  out.feedbackDelete = await invoke("/:id/feedback/:fid", "delete", { id: meta.id, fid: "feedback-id" }, undefined, signed);
-  out.feedbackResolve = await invoke("/:id/feedback/:fid/resolve", "post", { id: meta.id, fid: "feedback-id" }, undefined, signed);
-  out.history = await invoke("/:id/history", "get", { id: meta.id }, undefined, signed);
-  out.restore = await invoke("/:id/restore", "post", { id: meta.id }, { revision: "1" }, signed);
-  process.stdout.write(JSON.stringify(out));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
 
 fn unavailable<'a, T>() -> BoxFuture<'a, Result<T, AppError>> {
     Box::pin(async {
@@ -1749,53 +1628,24 @@ async fn every_u19_route_conceals_cross_org_unsigned_and_missing_before_subordin
     }
 }
 
-fn node_reference_available(root: &FsPath) -> bool {
-    let required = std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1");
-    let unavailable = if !root.join("lib/app.js").is_file() {
-        Some("lib/app.js is missing")
-    } else if !root.join("node_modules/express").is_dir() {
-        Some("the Node reference dependencies are missing")
-    } else {
-        match Command::new("node").arg("--version").output() {
-            Ok(output) if output.status.success() => None,
-            _ => Some("node is not on PATH"),
-        }
-    };
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !required,
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node route reference is unavailable \
-                 ({reason}); the U19 HTTP parity proof did not run"
-            );
-            eprintln!("skipping U19 Node route parity proof: {reason}");
-            eprintln!("set {REQUIRE_NODE_REFERENCE}=1 to make this a failure instead");
-            false
-        }
-    }
-}
-
-fn run_node_route_reference(root: &FsPath) -> serde_json::Value {
-    let module = format!("file://{}", root.join("lib/app.js").display());
-    let output = Command::new("node")
-        .current_dir(root)
-        .arg("-e")
-        .arg(NODE_ROUTE_DRIVER)
-        .arg(module)
-        .output()
-        .expect("run Node app route reference");
-    assert!(
-        output.status.success(),
-        "Node app route reference failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).unwrap_or_else(|error| {
-        panic!(
-            "Node app route reference emitted invalid JSON ({error}):\n{}",
-            String::from_utf8_lossy(&output.stdout)
-        )
+/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
+fn frozen_action_route_results() -> serde_json::Value {
+    serde_json::json!({
+        "delete": {"status": 403, "body": {"error": "Forbidden"}},
+        "react": {"status": 200, "body": {"favorite": 0, "vote": -1}},
+        "category": {"status": 200, "body": {"id": "abc123def456", "category": "Dashboards"}},
+        "visibility": {"status": 403, "body": {"error": "Forbidden"}},
+        "moveCrossOrg": {"status": 404, "body": {"error": "Not found"}},
+        "moveSameOrg": {"status": 403, "body": {"error": "Admins only"}},
+        "shareCreate": {"status": 200, "body": {"token": "share-token", "expires_at": null, "url": "http://localhost:3480/s/share-token"}},
+        "shareList": {"status": 200, "body": {"shares": [{"token": "share-token", "expires_at": null, "created_at": "2026-07-20 00:00:00", "created_by": "viewer@example.test"}]}},
+        "shareRevoke": {"status": 200, "body": {"token": "share-token", "revoked": true}},
+        "feedbackList": {"status": 200, "body": [{"id": "feedback-id", "artifact_id": "abc123def456", "org": "acme", "viewer_email": "viewer@example.test", "body": "Note", "artifact_revision": 2, "created_at": "2026-07-21 00:00:00", "resolved_at": null, "resolved_by": null, "parent_id": null, "anchor_path": null, "anchor_x": null, "anchor_y": null, "anchor_w": null, "anchor_h": null, "anchor_approx": 0, "anchor_page": null, "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null, "anchor_version": 0, "author": {"source": "artifact", "viewer_email": "viewer@example.test"}}]},
+        "feedbackCreate": {"status": 201, "body": {"id": "feedback-id", "artifact_id": "abc123def456", "viewer_email": "viewer@example.test", "author": {"source": "artifact", "viewer_email": "viewer@example.test"}, "body": "Note", "parent_id": null, "anchor_path": null, "anchor_x": null, "anchor_y": null, "anchor_w": null, "anchor_h": null, "anchor_approx": 0, "anchor_page": null, "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null, "anchor_version": 0, "artifact_revision": 2, "created_at": "2026-07-21 00:00:00"}},
+        "feedbackDelete": {"status": 200, "body": {"id": "feedback-id", "deleted": true}},
+        "feedbackResolve": {"status": 200, "body": {"id": "feedback-id", "resolved": true}},
+        "history": {"status": 200, "body": {"current": 2, "revisions": [{"artifact_id": "abc123def456", "org": "acme", "revision": 1, "title": "Earlier", "description": "Earlier description", "category": "Archive", "bytes": 21, "is_bundle": 0, "entry": "", "body_sha256": "1111111111111111111111111111111111111111111111111111111111111111", "created_at": "2026-07-19T00:00:00.000Z"}]}},
+        "restore": {"status": 200, "body": {"id": "abc123def456", "revision": 3, "restoredFrom": 1}},
     })
 }
 
@@ -1826,12 +1676,7 @@ async fn rust_route_result(
 }
 
 #[tokio::test]
-async fn rust_action_responses_match_the_real_node_app_routes() {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    if !node_reference_available(&root) {
-        return;
-    }
-
+async fn action_route_responses_match_frozen_vectors() {
     let signed = viewer("acme", false);
     let cases = [
         ("delete", "DELETE", "/abc123def456", None, signed.clone()),
@@ -1944,7 +1789,7 @@ async fn rust_action_responses_match_the_real_node_app_routes() {
 
     assert_eq!(
         serde_json::Value::Object(rust),
-        run_node_route_reference(&root)
+        frozen_action_route_results()
     );
 }
 

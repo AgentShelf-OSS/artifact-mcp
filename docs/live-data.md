@@ -195,7 +195,7 @@ bun scripts/export-dashboard-artifact.ts --output /tmp/pr-watch.html
 Then publish the resulting HTML and binding manifest from Artifact MCP:
 
 ```sh
-node scripts/publish-data-artifact.mjs \
+cargo xtask publish-data-artifact \
   --mcp https://YOUR_ARTIFACT_HOST/mcp \
   --html /path/to/pr-watch.html \
   --bindings ops/data-bindings.pr-watch.example.json \
@@ -204,13 +204,13 @@ node scripts/publish-data-artifact.mjs \
 
 Supply `ARTIFACT_MCP_API_KEY` through your secret manager. An admin key can use `--org` to select
 the artifact organization. Add `--artifact-id` to update an existing dashboard at the same URL.
-The publisher script checks source discovery before publishing HTML, then applies its bindings.
+The publisher checks source discovery before publishing HTML, then applies its bindings.
 If binding assignment fails, the error identifies the artifact so the operation can be retried.
 
 ### Managed publishing on pve1
 
 Neil's pve1 installation has a scoped launcher that fetches the selected
-organization token from Infisical. It runs this same publisher script:
+organization token from Infisical. It runs this same publisher:
 
 ```sh
 homelab-artifact-publish --org homelab \
@@ -221,11 +221,11 @@ homelab-artifact-publish --org homelab \
 
 Choose `agentshelf`, `trustedtech`, `cairn`, or `homelab`. This choice selects
 an existing manager reference. The launcher pins the approved MCP endpoint
-and does not pass the script's administrator `--org` option. It does not read
+and does not pass the publisher's administrator `--org` option. It does not read
 the repository `.env` or accept inherited credentials as a fallback.
 
 An empty manifest, `{"bindings": {}}`, is valid for static HTML. For live data,
-select sources available to the chosen organization. The script checks source
+select sources available to the chosen organization. The publisher checks source
 discovery before writing. The local repository `.env` remains a separate
 development Compose input and is not removed by this publishing workflow.
 

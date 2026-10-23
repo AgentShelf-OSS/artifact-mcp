@@ -12,6 +12,7 @@ use rusqlite::types::Value;
 
 use crate::u03_support::{
     TempDataDir, column_names, foreign_key_violations, quick_check, recorded_migrations, scalar,
+    schema_objects,
 };
 
 fn write_legacy_database(dir: &TempDataDir, sql: &str) {
@@ -273,6 +274,43 @@ fn migration_seven_seeds_nothing_without_environment_domains() {
 
     assert_eq!(scalar::<i64>(&conn, "SELECT COUNT(*) FROM orgs"), 0);
     assert_eq!(scalar::<i64>(&conn, "SELECT COUNT(*) FROM org_domains"), 0);
+}
+
+#[test]
+fn environment_domain_seeding_trims_like_the_retired_node_runtime() {
+    // JavaScript's `trim` strips U+FEFF but keeps U+0085, so the seeded rows differ from what a
+    // Rust `trim` would produce. Rows Node seeded this way must stay the rows Rust seeds.
+    let dir = TempDataDir::new("org-registry-js-trim");
+    let pool = migrate(
+        &dir,
+        &MigrationContext {
+            org_email_domains:
+                "\u{feff}example.com:acme,\u{85}nel.example:nel,globex.io:globex,skip.example:admin,broken"
+                    .to_owned(),
+        },
+    );
+    let conn = db::checkout(&pool).expect("checkout");
+    let rows = |sql: &str| {
+        let mut stmt = conn.prepare(sql).expect("prepare");
+        stmt.query_map([], |row| row.get::<_, String>(0))
+            .expect("query")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("rows")
+    };
+
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    assert_eq!(
+        rows("SELECT domain || '=' || org FROM org_domains ORDER BY domain"),
+        [
+            "example.com=acme",
+            "globex.io=globex",
+            "\u{85}nel.example=nel"
+        ]
+    );
+    assert_eq!(
+        rows("SELECT name FROM orgs ORDER BY name"),
+        ["acme", "globex", "nel"]
+    );
 }
 
 #[test]
@@ -673,6 +711,86 @@ fn populated_schema_31_databases_upgrade_to_the_latest_version_and_reopen_cleanl
         0,
         "the anchor-v2 columns remain null after the reopen"
     );
+}
+
+/// The newest migration-boundary fixture. `scripts/generate-historical-fixtures.mjs` wrote it with
+/// the retired Node runtime's `lib/migrations.js`, so it stands in for a production database that
+/// Node created and Rust now opens.
+const NODE_CREATED_FIXTURE: &str = "conformance/fixtures/historical/boundary-v40/artifacts.db";
+/// The schema version the Node runtime migrated [`NODE_CREATED_FIXTURE`] to.
+const NODE_CREATED_VERSION: i64 = 40;
+
+#[test]
+fn a_node_created_database_has_the_rust_schema_and_reopens_without_remigrating() {
+    let node_dir = TempDataDir::new("node-created");
+    let node_db = db::database_path(node_dir.path());
+    std::fs::copy(
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(NODE_CREATED_FIXTURE),
+        &node_db,
+    )
+    .expect("copy the immutable Node-created fixture");
+
+    // Rust bootstrap applies only migrations newer than the ones Node already recorded.
+    let mut conn = db::open_bootstrap_connection(&node_db).expect("bootstrap connection");
+    assert_eq!(
+        migrations::current_version(&conn).expect("version"),
+        NODE_CREATED_VERSION
+    );
+    let applied: Vec<i64> = migrations::apply(&mut conn, &MigrationContext::empty())
+        .expect("apply")
+        .iter()
+        .map(|migration| migration.version)
+        .collect();
+    assert_eq!(
+        applied,
+        (1..=LATEST_SCHEMA_VERSION)
+            .filter(|version| *version > NODE_CREATED_VERSION)
+            .collect::<Vec<_>>(),
+        "Rust re-applied a migration Node had already recorded"
+    );
+    assert_eq!(quick_check(&conn), "ok");
+    assert_eq!(foreign_key_violations(&conn), 0);
+    drop(conn);
+
+    let rust_dir = TempDataDir::new("rust-created");
+    let pool = migrate(&rust_dir, &MigrationContext::empty());
+    let rust_conn = db::checkout(&pool).expect("checkout");
+    let node_conn = Connection::open(&node_db).expect("open the Node-created copy");
+
+    // Same ledger, same objects with the same DDL text, same columns in the same order.
+    assert_eq!(
+        recorded_migrations(&rust_conn),
+        recorded_migrations(&node_conn)
+    );
+    let node_objects = schema_objects(&node_conn);
+    assert!(
+        !node_objects.is_empty(),
+        "the fixture has no schema objects"
+    );
+    let rust_objects = schema_objects(&rust_conn);
+    for (node_object, rust_object) in node_objects.iter().zip(rust_objects.iter()) {
+        assert_eq!(rust_object, node_object, "sqlite_master entry diverged");
+    }
+    assert_eq!(rust_objects.len(), node_objects.len());
+
+    let columns = |conn: &Connection, table: &str| {
+        let mut stmt = conn
+            .prepare("SELECT name || ' ' || type FROM pragma_table_info(?1)")
+            .expect("prepare table_info");
+        stmt.query_map([table], |row| row.get::<_, String>(0))
+            .expect("query table_info")
+            .collect::<rusqlite::Result<Vec<_>>>()
+            .expect("read table_info")
+    };
+    for (kind, table, _, _) in &node_objects {
+        if kind == "table" && !table.starts_with("sqlite_") {
+            assert_eq!(
+                columns(&rust_conn, table),
+                columns(&node_conn, table),
+                "columns of {table} diverged"
+            );
+        }
+    }
 }
 
 #[test]

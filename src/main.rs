@@ -2554,18 +2554,31 @@ fn init_tracing() {
         .try_init();
 }
 
+#[cfg(unix)]
+const USAGE: &str = artifact_mcp::ops::cli::USAGE;
+#[cfg(not(unix))]
+const USAGE: &str = "usage: artifact-mcp [healthcheck | check-action-grants FILE]";
+
 fn is_healthcheck(args: &[String]) -> Result<bool, RuntimeError> {
     match args {
         [] => Ok(false),
         [command] if command == "healthcheck" => Ok(true),
-        _ => Err(RuntimeError::Healthcheck(
-            "usage: artifact-mcp [healthcheck | check-action-grants FILE]".to_owned(),
-        )),
+        _ => Err(RuntimeError::Healthcheck(USAGE.to_owned())),
     }
 }
 
 #[tokio::main]
 async fn main() -> ExitCode {
+    // Operator subcommands (backup, verify-backup, web-push-keys) print plain text for a person
+    // or a cron job, so they run before the JSON log subscriber is installed. Paths may be
+    // non-UTF-8, so they see the raw arguments.
+    #[cfg(unix)]
+    {
+        let raw_args = std::env::args_os().skip(1).collect::<Vec<_>>();
+        if let Some(code) = artifact_mcp::ops::cli::dispatch(&raw_args).await {
+            return code;
+        }
+    }
     init_tracing();
     let args = std::env::args().skip(1).collect::<Vec<_>>();
     // Validate the exact reviewed grants before a deployment stops the live server.

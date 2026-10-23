@@ -55,10 +55,6 @@ jobs:
           [[ "$tag" == "v$version" ]] || {
             echo "Tag $tag does not match Cargo.toml version $version" >&2; exit 1;
           }
-          package_version="$(node -p "require('./package.json').version")"
-          [[ "$version" == "$package_version" ]] || {
-            echo "Cargo.toml version $version does not match package.json version $package_version" >&2; exit 1;
-          }
           schema_current="$(sed -nE 's/^pub const LATEST_SCHEMA_VERSION: i64 = ([0-9]+);/\1/p' src/persistence/migrations.rs)"
           [[ -n "$schema_current" ]] || { echo "Could not determine schema version" >&2; exit 1; }
           created="$(git for-each-ref --format='%(taggerdate:iso-strict)' "refs/tags/$tag")"
@@ -122,6 +118,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
+      - name: Build release tooling (cargo xtask)
+        run: |
+          set -euo pipefail
+          # rustup installs the toolchain pinned in rust-toolchain.toml on first use. Build
+          # before any registry or release side effect, so a tooling failure stops the job early.
+          cargo --version
+          cargo build --locked --package xtask
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -131,7 +134,8 @@ jobs:
       - name: Generate deterministic source SBOM
         run: |
           mkdir release
-          node scripts/release/generate-source-sbom.mjs \
+          # Refuses a checkout whose tracked files differ from the tagged commit.
+          cargo --locked xtask release source-sbom \
             --out release/source.spdx.json \
             --commit '${{ needs.prepare.outputs.commit }}' \
             --version '${{ needs.prepare.outputs.version }}' \
@@ -141,7 +145,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          file: Dockerfile.rust
+          file: Dockerfile
           push: true
           tags: ${{ env.IMAGE }}:candidate-${{ needs.prepare.outputs.commit }}
           build-args: |
@@ -174,7 +178,7 @@ jobs:
             docker logs artifact-mcp-release-candidate >&2 || true
             exit 1
           fi
-          node scripts/release/verify-historical-fixtures-in-image.mjs \
+          cargo --locked xtask release verify-fixtures-in-image \
             "$IMAGE@$DIGEST" release/historical-fixture-preflight.json
           container="$(docker create "$IMAGE@$DIGEST")"
           docker cp "$container:/artifact-mcp" release/artifact-mcp
@@ -233,6 +237,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
+      - name: Build release tooling (cargo xtask)
+        run: |
+          set -euo pipefail
+          # rustup installs the toolchain pinned in rust-toolchain.toml on first use. Build
+          # before any registry or release side effect, so a tooling failure stops the job early.
+          cargo --version
+          cargo build --locked --package xtask
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-candidate-${{ needs.prepare.outputs.tag }}
@@ -284,7 +295,7 @@ jobs:
           set -euo pipefail
           cd release
           cp "../docs/releases/$TAG.md" migration-notes.md
-          node ../scripts/release/generate-manifest.mjs \
+          cargo --locked xtask release manifest \
             --out release-manifest.json \
             --tag "$TAG" \
             --version '${{ needs.prepare.outputs.version }}' \
@@ -303,7 +314,7 @@ jobs:
             --repository '${{ github.repository }}' \
             --binary-attestation '${{ needs.candidate.outputs.binary_attestation }}' \
             --image-attestation '${{ needs.candidate.outputs.image_attestation }}'
-          node ../scripts/release/verify-manifest.mjs release-manifest.json
+          cargo --locked xtask release verify-manifest release-manifest.json
           sha256sum artifact-mcp source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
           sha256sum --check SHA256SUMS
       - id: release_state

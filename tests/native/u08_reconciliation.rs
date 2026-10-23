@@ -4,7 +4,8 @@
 //! them directly on disk and in the database, so each ADR-0002 rule is pinned in isolation and a
 //! future refactor cannot make a rule untestable by changing when it is reachable.
 //!
-//! Node oracle: `auditStorage({ cleanTransient })` — [lib/store.js:675-744].
+//! Ported from the retired Node runtime's `auditStorage({ cleanTransient })`
+//! ([lib/store.js:675-744]).
 
 use artifact_mcp::model::ArtifactMeta;
 use artifact_mcp::ports::ArtifactService as _;

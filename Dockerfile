@@ -1,10 +1,57 @@
-FROM node:22-slim
-RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
-    && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-COPY package*.json ./
-RUN npm install --omit=dev
-COPY . .
+# syntax=docker/dockerfile:1.7
+
+# These bases are digest-pinned so a tag update cannot silently change a release build.
+FROM rust:1.97.1-alpine3.23@sha256:c4a364ddbf684fe038e6fa6a4f25b30c8dc85247423e0e660676ece0d17be4a2 AS builder
+
+RUN apk add --no-cache binutils build-base ca-certificates cmake \
+    && rustup target add x86_64-unknown-linux-musl \
+    && mkdir -p /runtime-data
+
+WORKDIR /build
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+# `xtask` is a workspace member, so Cargo needs its manifest to load the workspace. The build
+# below still compiles only the root `artifact-mcp` package.
+COPY xtask ./xtask
+COPY src ./src
+COPY templates ./templates
+COPY assets ./assets
+COPY migrations ./migrations
+COPY conformance/mcp.tool-output-schemas.json ./conformance/mcp.tool-output-schemas.json
+
+ENV RUSTUP_TOOLCHAIN=1.97.1 \
+    CC_x86_64_unknown_linux_musl=cc \
+    AR_x86_64_unknown_linux_musl=ar \
+    RUSTFLAGS="-C strip=symbols"
+RUN cargo build --release --locked --target x86_64-unknown-linux-musl \
+    && strip target/x86_64-unknown-linux-musl/release/artifact-mcp
+
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
+
+ARG VERSION=dev
+ARG REVISION=unknown
+ARG CREATED=1970-01-01T00:00:00Z
+ARG SOURCE=https://github.com/AgentShelf-OSS/artifact-mcp
+LABEL org.opencontainers.image.title="artifact-mcp" \
+      org.opencontainers.image.description="Self-hostable MCP server for publishing agent-made artifacts" \
+      org.opencontainers.image.licenses="Apache-2.0" \
+      org.opencontainers.image.source="$SOURCE" \
+      org.opencontainers.image.version="$VERSION" \
+      org.opencontainers.image.revision="$REVISION" \
+      org.opencontainers.image.created="$CREATED"
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=builder --chown=nonroot:nonroot /runtime-data /data-rust
+COPY --from=builder --chown=nonroot:nonroot \
+    /build/target/x86_64-unknown-linux-musl/release/artifact-mcp /artifact-mcp
+
+USER nonroot:nonroot
 EXPOSE 3480
-ENV PORT=3480 DATA_DIR=/data NODE_ENV=production
-CMD ["node", "server.js"]
+ENV PORT=3480 \
+    DATA_DIR=/data-rust \
+    SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt \
+    RUST_LOG=artifact_mcp=info,tower_http=info
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=5 \
+    CMD ["/artifact-mcp", "healthcheck"]
+
+ENTRYPOINT ["/artifact-mcp"]

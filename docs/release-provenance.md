@@ -5,8 +5,8 @@ approve or perform a deployment.
 
 ## Public release flow
 
-1. The workflow accepts an annotated `vMAJOR.MINOR.PATCH` tag. The tag must match both
-   `Cargo.toml` and `package.json`, and its commit must be on the default branch.
+1. The workflow accepts an annotated `vMAJOR.MINOR.PATCH` tag. The tag must match the `Cargo.toml`
+   version, and its commit must be on the default branch.
 2. A successful `CI` push run must already exist for the exact tagged commit.
 3. The workflow builds one candidate image, boots every frozen historical fixture with that exact
    digest, generates source and image SBOMs, and rejects high or critical vulnerability findings.
@@ -53,16 +53,45 @@ Each GitHub Release contains:
   report, and GitHub attestations; and
 - `SHA256SUMS`, which covers every downloadable evidence file.
 
-Verify downloaded assets before using them:
+Verify downloaded assets before using them. Run `cargo xtask` from a checkout of the release tag;
+the manifest path can be absolute or relative to the current directory:
 
 ```sh
-sha256sum --check SHA256SUMS
-node scripts/release/verify-manifest.mjs release-manifest.json
-gh attestation verify artifact-mcp --repo AgentShelf-OSS/artifact-mcp
+(cd <download-dir> && sha256sum --check SHA256SUMS)
+cargo --locked xtask release verify-manifest <download-dir>/release-manifest.json
+gh attestation verify <download-dir>/artifact-mcp --repo AgentShelf-OSS/artifact-mcp
 gh attestation verify \
   oci://ghcr.io/agentshelf-oss/artifact-mcp@sha256:<digest> \
   --repo AgentShelf-OSS/artifact-mcp
 ```
+
+`verify-manifest` exits 0 and prints `verified <tag> (<digest>)` when the manifest and every file
+it names are consistent. It exits 1 and prints `release manifest verification failed: <reason>`
+otherwise.
+
+## Release tooling
+
+The workflow runs these `cargo xtask release` commands. Each job builds the tool with
+`cargo build --locked --package xtask` before its first registry or release side effect.
+
+| Command | Purpose |
+| --- | --- |
+| `source-sbom --out PATH --commit SHA --version X.Y.Z --created UTC --repository OWNER/REPO` | Write the SPDX 2.3 inventory of the files committed at `HEAD`. It refuses a different commit, or a tracked file that differs from `HEAD`. |
+| `verify-fixtures-in-image IMAGE@sha256:DIGEST OUT.json` | Copy every frozen historical fixture, boot each copy with the exact image through Docker, and write the preflight report. |
+| `manifest --out PATH --tag TAG ...` | Write `release-manifest.json` from arguments only. Run `cargo xtask release manifest --help` for the flags. |
+| `verify-manifest FILE` | Check the manifest, the files beside it, and their bindings to the tag, commit, image digest, and attestations. |
+
+`verify-fixtures-in-image --binary PATH [--fixtures DIR] OUT.json` runs the same fixture checks
+against a native `artifact-mcp` binary, for a host without a Docker daemon. Its report records
+`local-binary:<path>@sha256:<digest>` as the image, so `verify-manifest` never accepts it as
+release evidence.
+
+Deployment scripts that ran `node scripts/release/verify-manifest.mjs <manifest>` must run
+`cargo --locked xtask release verify-manifest <manifest>` from a checkout of the release tag
+instead. A host without a Rust toolchain can use a prebuilt tool: run
+`cargo build --locked --release --package xtask` on a build host, copy `target/release/xtask`,
+and run `xtask release verify-manifest <manifest>`. The argument, the failure messages, and the
+exit codes (0 verified, 1 rejected) are the same as those of the Node script.
 
 ## Deployment boundary
 

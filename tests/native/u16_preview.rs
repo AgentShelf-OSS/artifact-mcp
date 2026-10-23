@@ -1,10 +1,10 @@
 //! U16: the preview-renderer HTTP client against a stubbed sidecar.
 //!
 //! Every test here drives [`PreviewRenderer`] over a real loopback socket served by
-//! [`crate::u16_support::StubRenderer`], which speaks the sidecar contract from
-//! `preview-renderer/server.js`. Nothing here needs Chromium, the `preview` compose profile, or
-//! the real sidecar — that is deliberate: the renderer is optional in production and the suite
-//! must prove the client's behaviour when it is absent, slow, or lying.
+//! [`crate::u16_support::StubRenderer`], which speaks the sidecar contract of the
+//! `artifact-preview` binary in `preview-renderer/`. Nothing here needs Chromium, the `preview`
+//! compose profile, or the real sidecar — that is deliberate: the renderer is optional in
+//! production and the suite must prove the client's behaviour when it is absent, slow, or lying.
 //!
 //! The contract exercised:
 //!

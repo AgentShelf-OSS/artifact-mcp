@@ -1,0 +1,52 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2026 Neil Blackman
+#
+# Browser tests for the JavaScript in `../assets`, driven in real chrome-headless-shell over a
+# private DevTools pipe. Like `../preview-renderer`, this directory is its own workspace with its
+# own Cargo.lock: the server build never compiles it, and root `cargo test --workspace` never needs
+# a browser. It shares the transport and launcher with the renderer through `artifact-cdp`.
+[package]
+name = "browser-tests"
+version = "0.1.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Real-browser test harness for artifact-mcp's browser assets"
+
+[lib]
+name = "browser_tests"
+path = "src/lib.rs"
+
+# `tests/js.rs` runs every `js/*.test.js` file and reports each JavaScript case by name, so it has
+# its own `main` instead of the libtest harness.
+[[test]]
+name = "js"
+path = "tests/js.rs"
+harness = false
+
+# `tests/e2e` drives the artifact-mcp release binary (`ARTIFACT_MCP_BIN`) in the browser: the
+# journeys ported from `playwright/tests`. One server and one browser serve every case, so it has
+# its own `main` with a global setup and teardown.
+[[test]]
+name = "e2e"
+path = "tests/e2e/main.rs"
+harness = false
+
+# `tests/reader` is the reader regression suite ported from `playwright/reader-runner.mjs`: each
+# case gets its own browser, and the server-backed cases their own server and stub speech worker,
+# so it has its own `main` too.
+[[test]]
+name = "reader"
+path = "tests/reader/main.rs"
+harness = false
+
+[workspace]
+
+[dependencies]
+artifact-cdp = { path = "../preview-renderer/cdp" }
+base64 = "0.22"
+serde_json = { version = "1", features = ["float_roundtrip"] }
+tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time"] }
+
+[lints.rust]
+unsafe_code = "forbid"

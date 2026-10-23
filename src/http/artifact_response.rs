@@ -146,7 +146,8 @@ pub fn inject_anchor_bridge(content: &[u8], page_path: Option<&str>) -> Vec<u8> 
                 .unwrap_or_else(|_| "null".to_owned())
                 .replace('<', "\\u003c");
             let replacement = format!("var d=document,w=window,page={encoded}");
-            js_replace_first(ANCHOR_BRIDGE, PAGE_INITIALIZER, &replacement)
+            // Literal replacement: `$` in a page path is data, not a replacement pattern.
+            ANCHOR_BRIDGE.replacen(PAGE_INITIALIZER, &replacement, 1)
         },
     );
     let insertion = last_closing_tag(&html, "body").unwrap_or(html.len());
@@ -356,41 +357,4 @@ fn find_ascii_case_insensitive(haystack: &[u8], needle: &[u8], from: usize) -> O
         .windows(needle.len())
         .position(|window| window.eq_ignore_ascii_case(needle))
         .map(|offset| from + offset)
-}
-
-fn js_replace_first(haystack: &str, needle: &str, replacement: &str) -> String {
-    let Some(start) = haystack.find(needle) else {
-        return haystack.to_owned();
-    };
-    let end = start + needle.len();
-    let prefix = &haystack[..start];
-    let suffix = &haystack[end..];
-    let mut expanded = String::with_capacity(replacement.len());
-    let mut characters = replacement.chars().peekable();
-    while let Some(character) = characters.next() {
-        if character != '$' {
-            expanded.push(character);
-            continue;
-        }
-        match characters.peek().copied() {
-            Some('$') => {
-                characters.next();
-                expanded.push('$');
-            }
-            Some('&') => {
-                characters.next();
-                expanded.push_str(needle);
-            }
-            Some('`') => {
-                characters.next();
-                expanded.push_str(prefix);
-            }
-            Some('\'') => {
-                characters.next();
-                expanded.push_str(suffix);
-            }
-            _ => expanded.push('$'),
-        }
-    }
-    format!("{prefix}{expanded}{suffix}")
 }

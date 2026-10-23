@@ -1,8 +1,4 @@
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-    sync::Arc,
-};
+use std::sync::Arc;
 
 use artifact_mcp::{
     config::AccessIdentityMode,
@@ -24,77 +20,29 @@ use axum::{
 use serde_json::json;
 use tower::ServiceExt;
 
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn node_reference_available(root: &Path) -> bool {
-    let required = std::env::var(REQUIRE_NODE_REFERENCE).is_ok_and(|value| value == "1");
-    let unavailable = if !root.join("node_modules/etag/index.js").is_file() {
-        Some("node_modules/etag is missing")
-    } else {
-        match Command::new("node").arg("--version").output() {
-            Ok(output) if output.status.success() => None,
-            _ => Some("node is not on PATH"),
-        }
-    };
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                !required,
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node etag reference is unavailable \
-                 ({reason}); the U21 ETag parity proof did not run"
-            );
-            eprintln!("skipping U21 Node ETag parity proof: {reason}");
-            false
-        }
-    }
-}
-
 #[test]
-fn weak_etag_is_byte_identical_to_the_real_node_package() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
-    let samples = vec![
-        Vec::new(),
-        b"<!doctype html><p>hi</p>".to_vec(),
-        "ETags hash UTF-8 bytes: 🎉".as_bytes().to_vec(),
-        vec![0, 1, 2, 127, 128, 254, 255],
+fn weak_etag_matches_the_frozen_express_etag_vectors() {
+    let samples: [&[u8]; 4] = [
+        b"",
+        b"<!doctype html><p>hi</p>",
+        "ETags hash UTF-8 bytes: \u{1f389}".as_bytes(),
+        &[0, 1, 2, 127, 128, 254, 255],
     ];
-    let script = r#"
-const etag = require("etag");
-const samples = JSON.parse(process.argv[1]);
-process.stdout.write(JSON.stringify(samples.map((bytes) => etag(Buffer.from(bytes), { weak: true }))));
-"#;
-    let output = Command::new("node")
-        .current_dir(&root)
-        .arg("-e")
-        .arg(script)
-        .arg(serde_json::to_string(&samples).expect("serialize ETag samples"))
-        .output()
-        .expect("run Node etag reference");
-    assert!(
-        output.status.success(),
-        "Node etag reference failed:\n{}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-    let expected: Vec<String> =
-        serde_json::from_slice(&output.stdout).expect("Node etag reference emitted JSON");
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let expected = [
+        "W/\"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk\"",
+        "W/\"18-UaVUwJRaEdYpGlgIIEN1QooEbkw\"",
+        "W/\"1c-hYu6oZsp6IAviEb4dV0zVUkblYA\"",
+        "W/\"7-tKcZUKYW/xfCNelzHFjTj8cD/yM\"",
+    ];
     let actual = samples
         .iter()
         .map(|sample| weak_etag(sample))
         .collect::<Vec<_>>();
-    assert_eq!(actual, expected);
     assert_eq!(
-        actual[0], "W/\"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk\"",
-        "the etag package has a fixed empty-body fast path"
+        actual, expected,
+        "the weak ETag is `W/\"<hex length>-<base64 SHA-1, 27 chars>\"`, with a fixed empty-body value"
     );
-    assert_eq!(actual[1], "W/\"18-UaVUwJRaEdYpGlgIIEN1QooEbkw\"");
 }
 
 async fn send_body() -> Response {

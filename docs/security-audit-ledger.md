@@ -84,9 +84,8 @@ A valid whole-database snapshot rollback can restore an earlier valid head. Reta
 trusted checkpoint/head anchor and alert if the observed head moves backward; this anchor must not
 be restored from the same SQLite snapshot.
 
-`AUDIT_LEDGER_HMAC_KEY` is a required canonical base64 value decoding to exactly 32 bytes. Node
-startup fails closed without it; fixtures supply a deterministic key. The same fail-closed
-configuration and byte protocol are required for the Rust runtime before it serves mutations.
+`AUDIT_LEDGER_HMAC_KEY` is a required canonical base64 value decoding to exactly 32 bytes. The
+server refuses to serve mutations without it; fixtures supply a deterministic key.
 
 ## Signals
 

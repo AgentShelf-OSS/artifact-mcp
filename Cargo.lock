@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "artifact-mcp"
-version = "1.26.0"
+version = "1.27.0"
 dependencies = [
  "aes-gcm",
  "askama",
@@ -77,6 +77,7 @@ dependencies = [
  "thiserror",
  "time",
  "tokio",
+ "tokio-rustls",
  "tower",
  "tower-http 0.7.0",
  "tracing",
@@ -2838,6 +2839,23 @@ name = "writeable"
 version = "0.6.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1ffae5123b2d3fc086436f8834ae3ab053a283cfac8fe0a0b8eaae044768a4c4"
+
+[[package]]
+name = "xtask"
+version = "0.0.0"
+dependencies = [
+ "aes-gcm",
+ "artifact-mcp",
+ "base64",
+ "hex",
+ "reqwest",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tokio",
+ "url",
+]
 
 [[package]]
 name = "yoke"

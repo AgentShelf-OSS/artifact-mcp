@@ -1,7 +1,7 @@
 # Scheduled reminders and Web Push — implementation contract
 
-This is the contract for ADR-0012. Node (`lib/`) and Rust (`src/`) must expose identical HTTP, MCP, and
-schema behavior. Only Rust runs the sweeper and the push sender.
+This is the contract for ADR-0012. It defines the HTTP, MCP, and schema behavior of the reminder
+routes, the sweeper, and the push sender.
 
 ## Configuration
 
@@ -14,13 +14,12 @@ schema behavior. Only Rust runs the sweeper and the push sender.
 The feature is **enabled** only when the VAPID key parses as a valid P-256 scalar, the subject is valid, and
 `WEBHOOK_ENC_KEY` (the existing encryption key) is configured. An invalid VAPID key or subject is a startup
 configuration error, matching other config validation. The public key is derived from the private key
-(uncompressed point, 65 bytes, base64url). `node scripts/web-push-keys.mjs` prints a new key pair.
+(uncompressed point, 65 bytes, base64url). `artifact-mcp web-push-keys` prints a new key pair.
 
 ## Schema (migration 39 `web-push-reminders`, shared SQL file)
 
 Migrations 37 and 38 were already used by collections, so this is **migration 39**, named
-`web-push-reminders`. Both runtimes execute the shared file `migrations/039-web-push-reminders.sql`
-(Node reads it with `readFileSync`; Rust uses `include_str!`), so `sqlite_master` stays byte-identical.
+`web-push-reminders`. The server loads `migrations/039-web-push-reminders.sql` with `include_str!`.
 
 ```sql
 CREATE TABLE IF NOT EXISTS push_subscriptions (
@@ -90,8 +89,7 @@ Notes:
 - `endpoint_ciphertext` holds the existing `WEBHOOK_ENC_KEY` AES-256-GCM record in one column:
   `v1:<nonce>:<ciphertext>:<tag>`, each part standard base64 (12-byte nonce, 16-byte tag).
 - `p256dh` and `auth` are stored exactly as received.
-- Follow each runtime's existing migration conventions (checksums, schema fixtures, historical fixture tests).
-  If a runtime has a schema snapshot or parity test, update it so both runtimes still agree.
+- Follow the existing migration conventions (checksums, schema fixtures, historical fixture tests).
 
 ## Validation shared by routes and MCP
 
@@ -109,7 +107,7 @@ Notes:
 - A time field that is present counts as given, even when it is `null`. So `null` alone, or `null` next to the
   other field, is `bad_time`, as is any present value that is not a safe integer (for example a string). Over MCP the
   input schema types both fields as `integer`, so a `null` there fails argument validation (JSON-RPC `-32602`)
-  before the tool runs, in both runtimes.
+  before the tool runs.
 - Setting a key upserts the row: new `fire_at`, title, body, `state='armed'`, `fired_at=NULL`,
   `revision = revision + 1` (1 on insert).
 
@@ -133,8 +131,8 @@ state rate-limit budget (`INGRESS_STATE_PER_WINDOW`). When the feature is disabl
 | `PUT /{id}/reminders/{key}?scope=org|viewer` | `{"fire_at"?:int,"delay_seconds"?:int,"title":string,"body":string?}` | `200 {"key","scope","fire_at","revision"}` |
 | `DELETE /{id}/reminders/{key}?scope=org|viewer` | — | `204` (also when absent) |
 
-Route details shared by both runtimes:
-- Both runtimes use the same order. For `/{id}/…`: concealed artifact access (`404 {"error":"Not found"}`), then `push_disabled`, then
+Route details:
+- The checks run in this order. For `/{id}/…`: concealed artifact access (`404 {"error":"Not found"}`), then `push_disabled`, then
   (mutations only) the state rate limit `429 {"error":"rate_limited"}`, then `bad_scope`, then `bad_key`, then the
   JSON body (`400 {"error":"bad_body"}` for malformed JSON, a non-object, or unknown fields; `413 {"error":"too_large"}`
   over 8 KiB). `/push/subscriptions` requires a signed-in viewer (else `404 {"error":"Not found"}`), then
@@ -169,7 +167,7 @@ Subscription rules:
 
 ## MCP tool
 
-`set_artifact_reminder` (both runtimes, writer permission through `writeArtifactOrRefuse` or its Rust equivalent):
+`set_artifact_reminder` (writer permission through the same check as the other artifact writes):
 
 ```json
 {"id":"<artifact id>","key":"diaper","fire_at":1791500000000,"delay_seconds":7200,"title":"Diaper change due","body":"...","clear":false}
@@ -222,8 +220,8 @@ artifact is a separate app with its own `id`.
   - `short_name`: `name` cut to 12 code points and trimmed again (fallback `Artifact`).
 - Serialization: compact JSON with the object keys sorted by code unit at every level (`background_color`,
   `description`, `display`, `icons`, `id`, `name`, `scope`, `short_name`, `start_url`, `theme_color`; each
-  icon is `purpose`, `sizes`, `src`, `type`). Node and Rust emit the same bytes; the conformance case
-  `web-push.artifact-manifest` compares them.
+  icon is `purpose`, `sizes`, `src`, `type`). The conformance case `web-push.artifact-manifest`
+  pins the exact bytes.
 - Headers: `content-type: application/manifest+json` (no charset), `cache-control: private, no-cache` (the
   listener appends `no-transform`), and `x-content-type-options: nosniff`.
 - Access is the same as the viewer page: a signed-in viewer of the artifact's organization, or an

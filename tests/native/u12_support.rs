@@ -1,6 +1,6 @@
 //! U12 test support: throwaway webhook databases, scripted transports, and raw TCP servers.
 //!
-//! Everything here is shared by `u12_webhooks.rs`, `u12_notify.rs`, and `u12_node_parity.rs`.
+//! Everything here is shared by `u12_webhooks.rs` and `u12_notify.rs`.
 
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
@@ -56,7 +56,7 @@ impl Drop for TempDir {
     }
 }
 
-/// The canonical 32-byte parity key (standard Base64 of the bytes `0..32`), shared with U04.
+/// The canonical 32-byte test key (standard Base64 of the bytes `0..32`), shared with U04.
 pub fn test_key() -> String {
     BASE64.encode((0..32_u8).collect::<Vec<u8>>())
 }

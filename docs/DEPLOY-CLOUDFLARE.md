@@ -8,7 +8,7 @@ policies: who may sign in and which routes bypass Access are operator-owned secu
 ## Bootstrap order
 
 The order matters because Cloudflare assigns the application's audience (`AUD`) only after the
-application exists, while artifact-mcp reads `CF_ACCESS_AUD` when `lib/identity.js` is imported.
+application exists, while artifact-mcp reads `CF_ACCESS_AUD` once at startup.
 
 1. Create the Cloudflare Tunnel/public hostname and make the origin reachable from Cloudflare.
    Keep the origin private: use the same-network `cloudflared` container, or bind the host publish
@@ -21,8 +21,8 @@ application exists, while artifact-mcp reads `CF_ACCESS_AUD` when `lib/identity.
    export PUBLIC_BASE_URL=https://artifact.example.com
    export CF_ACCESS_IDP_ID=REPLACE_WITH_IDP_ID
 
-   node scripts/cf-access-setup.mjs
-   node scripts/cf-access-setup.mjs --apply
+   cargo xtask cf-access-setup
+   cargo xtask cf-access-setup --apply
    ```
 
    Dry-run is the default. `--apply` creates or finds the catch-all Access app, configures exactly

@@ -22,7 +22,7 @@ before the method runs. Omitting the ID remains a notification with no JSON-RPC 
 Errors with an unreadable ID use `id: null` in the legacy contract and omit `id` in the modern
 contract. Malformed requests with a valid ID preserve it in the error response.
 Use string IDs for values outside JavaScript's safe integer range (`±9007199254740991`) to
-preserve the same identifier in both runtimes.
+preserve the identifier exactly.
 
 Clients without the newer capabilities receive the ordinary text and structured result fallback.
 Artifact resources use private-cache-aware responses through `resources/list`, `resources/read`,
@@ -262,16 +262,17 @@ The release gate derives its report from frozen tool definitions, typed output s
 dispatch, OAuth scope mapping, documentation, conformance cases, and native test registration:
 
 ```bash
-node scripts/check-mcp-surface.mjs
+cargo test --locked --test mcp_surface
 ```
 
-For an intentional compatibility change that spans a branch, include the base revision:
+For an intentional compatibility change that spans a branch, print the paths changed since the base
+revision:
 
 ```bash
-node scripts/check-mcp-surface.mjs --base origin/master
+MCP_SURFACE_BASE=origin/master cargo test --locked --test mcp_surface -- --nocapture
 ```
 
 Update the existing definition, schema, dispatch, docs, and tests together. Do not add a separate
-handwritten registry. Run the conformance and Rust test commands reported by the checker.
+handwritten registry. Then run `cargo test --workspace --all-targets --locked`, which includes the conformance replay.
 
 [Return to the documentation index](README.md).

@@ -1,0 +1,290 @@
+# Runbook: move CT222 from the Node renderer to the Rust renderer
+
+This is a plan. Nobody has run it yet. Do the steps in order and stop at the first failed check.
+
+## Current state (read on 2026-10-22)
+
+| Item | Value |
+|---|---|
+| Container | CT222 `artifact-preview`, Ubuntu 24.04.5, unprivileged LXC, 2 cores, 1024 MB RAM, no swap |
+| Address | `192.168.0.222:3000`. nftables accepts port 3000 only from CT220 (`192.168.0.220`) and drops all output except loopback and established connections. **CT222 cannot download anything.** |
+| Unit | `/etc/systemd/system/artifact-preview.service`, `User=artifact-preview` (uid 999), `ExecStart=/usr/bin/node /opt/artifact-preview/server.js` |
+| Unit environment | `NODE_ENV=production`, `PORT=3000`, `HOME=/var/lib/artifact-preview`, `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` |
+| Unit hardening | `NoNewPrivileges`, `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, `ProtectKernelTunables`, `ProtectKernelModules`, `ProtectKernelLogs`, `ProtectControlGroups`, `RestrictSUIDSGID`, `LockPersonality`, empty `CapabilityBoundingSet` and `AmbientCapabilities`, `TasksMax=256`, `MemoryMax=768M`, `UMask=0077`, `KillMode=mixed` |
+| Node | `nodejs 22.23.4-1nodesource1`, from `/etc/apt/sources.list.d/nodesource.list` with key `/etc/apt/keyrings/nodesource.gpg` |
+| Browser | Playwright 1.61.0, `/opt/ms-playwright/chromium_headless_shell-1228`, which is Chrome for Testing 149.0.7827.55. `/opt/ms-playwright` is 642 MB, including the unused full `chromium-1228`. |
+| Memory | `MemoryPeak` 713 621 504 bytes (680 MiB) of the 768 MiB limit |
+| Tools | `python3`, `file`, `runuser` and `curl` are installed. `unzip` is not. |
+
+The new renderer needs the shared libraries and fonts that Playwright already installed on CT222.
+It needs no network access.
+
+## Values for this release
+
+```sh
+CHROME_VERSION=156.0.8078.47
+CHROME_SHA256=0d5acc62c3e213f8c87d3c298d66ffcf9a236d12ea4b9f85318bf85dbc279daa
+```
+
+They must match `CHROME_VERSION` and `CHROME_SHA256` in `preview-renderer/Dockerfile`.
+
+## 1. Prepare the files on pve1
+
+Run these steps on pve1, which has network access, in an empty working directory.
+
+1. Build the static binary from the release commit:
+
+   ```sh
+   cargo build --release --locked --target x86_64-unknown-linux-musl \
+     --manifest-path <repo>/preview-renderer/Cargo.toml
+   cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/release/artifact-preview" .
+   ```
+
+   Or copy it out of the release image:
+
+   ```sh
+   docker create --name ap-extract <image>
+   docker cp ap-extract:/usr/local/bin/artifact-preview .
+   docker rm ap-extract
+   ```
+
+2. Run `file artifact-preview`. It must say `static-pie linked` or `statically linked`. Record
+   `sha256sum artifact-preview`.
+3. Download the browser and verify it:
+
+   ```sh
+   curl -fsSLO "https://storage.googleapis.com/chrome-for-testing-public/${CHROME_VERSION}/linux64/chrome-headless-shell-linux64.zip"
+   echo "${CHROME_SHA256}  chrome-headless-shell-linux64.zip" | sha256sum -c -
+   ```
+
+   Stop if the check does not print `OK`.
+
+## 2. Copy the files into CT222
+
+On pve1:
+
+```sh
+pct push 222 artifact-preview /root/artifact-preview.new --perms 0755
+pct push 222 chrome-headless-shell-linux64.zip /root/chrome-headless-shell-linux64.zip
+```
+
+## 3. Install, without touching the running service
+
+In CT222 (`pct enter 222`):
+
+```sh
+set -eu
+CHROME_VERSION=156.0.8078.47
+CHROME_SHA256=0d5acc62c3e213f8c87d3c298d66ffcf9a236d12ea4b9f85318bf85dbc279daa
+
+# Verify again inside the container, then unpack to a versioned directory.
+echo "${CHROME_SHA256}  /root/chrome-headless-shell-linux64.zip" | sha256sum -c -
+DIR=/opt/chrome-headless-shell-${CHROME_VERSION}
+mkdir "$DIR"
+python3 -m zipfile -e /root/chrome-headless-shell-linux64.zip "$DIR"
+mv "$DIR"/chrome-headless-shell-linux64/* "$DIR"/ && rmdir "$DIR"/chrome-headless-shell-linux64
+# python's zipfile drops the executable bits; restore them for the binary and its libraries.
+chmod 0755 "$DIR"/chrome-headless-shell "$DIR"/*.so "$DIR"/*.so.1
+chown -R root:root "$DIR" && chmod -R a+rX,go-w "$DIR"
+# A stable path for the unit; an upgrade only moves this link.
+ln -sfn "$DIR" /opt/chrome-headless-shell
+
+# Every shared library must resolve. This must print nothing.
+ldd /opt/chrome-headless-shell/chrome-headless-shell | grep 'not found' || true
+
+install -o root -g root -m 0755 /root/artifact-preview.new /usr/local/bin/artifact-preview
+rm /root/artifact-preview.new /root/chrome-headless-shell-linux64.zip
+```
+
+If `ldd` reports a missing library, install its Ubuntu package (the `t64` names, for example
+`libasound2t64`). The full package list is in the `Dockerfile`. CT222 has no network, so fetch
+the `.deb` files on pve1 and `pct push` them.
+
+## 4. Test as the service user on a spare port
+
+Port 3999 is reachable only from inside CT222, which is all this test needs.
+
+```sh
+T=$(runuser -u artifact-preview -- mktemp -d)
+runuser -u artifact-preview -- env -i PORT=3999 TMPDIR="$T" \
+  CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell \
+  /usr/local/bin/artifact-preview &
+sleep 1
+PORT=3999 /usr/local/bin/artifact-preview healthcheck && echo healthy
+PREVIEW_RENDERER_URL=http://127.0.0.1:3999 /usr/local/bin/artifact-preview smoke
+kill %1; wait
+ls -A "$T"; rm -rf "$T"
+```
+
+Expected: `healthy`, then `preview renderer smoke test passed (… bytes)`. `ls -A` prints nothing:
+no `artifact-preview-*` directory is left.
+
+## 5. Switch the unit
+
+Use a drop-in, so the rollback only removes one file. Create
+`/etc/systemd/system/artifact-preview.service.d/10-rust-renderer.conf`:
+
+```ini
+[Service]
+# Clear the Node environment, then set the renderer's.
+Environment=
+Environment=PORT=3000
+Environment=RENDER_TIMEOUT_MS=7000
+Environment=CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell
+WorkingDirectory=/
+ExecStart=
+ExecStart=/usr/local/bin/artifact-preview
+```
+
+Keep every hardening line of the main unit. They all still apply:
+
+* `PrivateTmp=true` gives the renderer a private `/tmp` for its per-render directories.
+* `ProtectSystem=strict` is fine: the renderer writes only below `/tmp`.
+* `KillMode=mixed`: on stop, the renderer gets `SIGTERM`, kills the browser's process group and
+  exits. systemd then kills anything left in the cgroup.
+* `TasksMax=256` and `MemoryMax=768M` stay. On pve1, one render peaked at about 450 MiB RSS for
+  the service and browser tree, against about 670 MiB for the Node renderer.
+
+Do not add these:
+
+* `MemoryDenyWriteExecute=yes`: V8's JIT needs writable and executable memory.
+* `PrivateNetwork=yes`: the service must accept connections from CT220.
+
+These should work, but none was tested in an unprivileged LXC: `RestrictNamespaces=yes`,
+`SystemCallArchitectures=native`, `ProtectClock=yes`, `ProtectHostname=yes`,
+`RestrictRealtime=yes`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`. Add them
+one at a time, and run step 6 after each.
+
+Then:
+
+```sh
+systemctl daemon-reload
+systemctl restart artifact-preview
+```
+
+## 6. Verify
+
+In CT222:
+
+```sh
+systemctl is-active artifact-preview                    # active
+journalctl -u artifact-preview -n 5 --no-pager          # [artifact-preview] listening on 0.0.0.0:3000
+systemctl show artifact-preview -p ExecStart | grep -c /usr/local/bin/artifact-preview   # 1
+PORT=3000 /usr/local/bin/artifact-preview healthcheck && echo healthy
+PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke
+pgrep -u artifact-preview -a chrome-headless || echo "no browser while idle"
+nft list chain inet filter output                        # policy drop, unchanged
+```
+
+From the server side, regenerate one artifact preview (MCP tool `regenerate_artifact_preview`)
+and check that the gallery thumbnail appears. A direct check from CT220:
+
+```sh
+curl -s -o /tmp/ct222.png -w '%{http_code} %{content_type}\n' \
+  -H 'content-type: application/json' -d '{"html":"<h1>ct222</h1>"}' \
+  http://192.168.0.222:3000/render                       # 200 image/png
+```
+
+After a few renders, back in CT222:
+
+```sh
+systemctl show artifact-preview -p MemoryPeak -p TasksCurrent
+ls /tmp/systemd-private-*-artifact-preview.service-*/tmp/   # no artifact-preview-* directories while idle
+```
+
+The journal records each failed render with its cause (`render timed out`,
+`render failed: …`, `retrying screenshot: …`). It never logs page content.
+
+## 7. Roll back to the Node service
+
+The Node files, `/opt/ms-playwright` and the `nodejs` package stay untouched until step 8.
+
+```sh
+rm /etc/systemd/system/artifact-preview.service.d/10-rust-renderer.conf
+rmdir /etc/systemd/system/artifact-preview.service.d 2>/dev/null || true
+systemctl daemon-reload
+systemctl restart artifact-preview
+systemctl show artifact-preview -p ExecStart | grep -c /usr/bin/node    # 1
+curl -fsS http://127.0.0.1:3000/health                                  # {"status":"ok"}
+PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke
+```
+
+The `smoke` command works against either renderer.
+
+## 8. Remove Node after the soak period
+
+Wait until the Rust renderer has run without a rollback for at least a week. Then, in CT222:
+
+1. Fold the drop-in into the unit. Write `/etc/systemd/system/artifact-preview.service` as:
+
+   ```ini
+   [Unit]
+   Description=Isolated Artifact HTML preview renderer (Rust, chrome-headless-shell)
+   After=network-online.target
+   Wants=network-online.target
+
+   [Service]
+   Type=simple
+   User=artifact-preview
+   Group=artifact-preview
+   WorkingDirectory=/
+   Environment=PORT=3000
+   Environment=RENDER_TIMEOUT_MS=7000
+   Environment=CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell
+   ExecStart=/usr/local/bin/artifact-preview
+   Restart=on-failure
+   RestartSec=5s
+   TimeoutStopSec=15s
+   KillMode=mixed
+
+   NoNewPrivileges=true
+   PrivateTmp=true
+   ProtectSystem=strict
+   ProtectHome=true
+   ProtectKernelTunables=true
+   ProtectKernelModules=true
+   ProtectKernelLogs=true
+   ProtectControlGroups=true
+   RestrictSUIDSGID=true
+   LockPersonality=true
+   CapabilityBoundingSet=
+   AmbientCapabilities=
+   TasksMax=256
+   MemoryMax=768M
+   UMask=0077
+
+   [Install]
+   WantedBy=multi-user.target
+   ```
+
+   Then remove the drop-in, run `systemctl daemon-reload` and `systemctl restart artifact-preview`,
+   and repeat step 6.
+
+2. Remove Node, Playwright and the old browser. Removal needs no network:
+
+   ```sh
+   apt-get purge -y nodejs
+   rm /etc/apt/sources.list.d/nodesource.list /etc/apt/keyrings/nodesource.gpg
+   rm -rf /opt/artifact-preview /opt/ms-playwright
+   ```
+
+   Keep the shared libraries and the fonts (`fonts-liberation`, `fonts-noto-color-emoji`,
+   `fonts-freefont-ttf`, `fonts-ipafont-gothic`, `fonts-wqy-zenhei`, `fonts-tlwg-loma-otf`,
+   `fonts-unifont`); `chrome-headless-shell` uses them. Do not run `apt-get autoremove` without
+   reading its list first.
+
+3. Repeat step 6. `command -v node` must print nothing.
+4. Update `homelab-automation`: `docs/inventory/live-topology.md` says "Native Playwright", and
+   `docs/ops/native-edge-services-migration-2026-08-01.md` lists Node and Playwright Chromium.
+
+## Later browser upgrades
+
+Unpack the new version into `/opt/chrome-headless-shell-<version>` as in step 3. Run step 4 with
+`CHROME_HEADLESS_SHELL` set to the new directory. Then move the link and restart:
+
+```sh
+ln -sfn /opt/chrome-headless-shell-<version> /opt/chrome-headless-shell
+systemctl restart artifact-preview
+```
+
+Roll back by moving the link back. Delete old directories after the new one has run for a week.

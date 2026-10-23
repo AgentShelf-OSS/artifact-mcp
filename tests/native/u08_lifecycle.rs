@@ -1,19 +1,22 @@
 //! U08 lifecycle semantics: publish, update, restore, delete, re-tenant, and digest backfill.
 //!
 //! These are the *happy* and *rejected* paths. Crash safety lives in `u08_failpoints.rs` and
-//! `u08_reconciliation.rs`; cross-runtime agreement lives in `u08_node_parity.rs`.
+//! `u08_reconciliation.rs`.
 //!
-//! Node oracle: `lib/store.js`.
+//! The behaviour was ported from the retired Node runtime's `lib/store.js`. The persisted
+//! digests and normalized metadata are pinned by frozen vectors captured from that runtime.
 
 use artifact_mcp::artifacts::digest::bundle_manifest_digest;
 use artifact_mcp::config::StorageLimits;
 use artifact_mcp::error::AppError;
-use artifact_mcp::model::{ArtifactContent, ArtifactId, ArtifactUpdate};
+use artifact_mcp::model::{
+    ArtifactContent, ArtifactId, ArtifactUpdate, OrgId, PublishArtifact, PublisherIdentity,
+};
 use artifact_mcp::ports::ArtifactService as _;
 
 use crate::u08_support::{
     Fixture, TEST_CLIENT, TEST_ORG, bundle_content, bundle_update, html_update, mutation_audit,
-    sha256_hex,
+    publisher, sha256_hex,
 };
 
 // ---------------------------------------------------------------------------
@@ -89,6 +92,32 @@ async fn publish_bundle_prefers_index_html_then_an_explicit_entry() {
         .publish_bundle(&[("z.html", "z"), ("index.html", "i")], Some("z.html"))
         .await;
     assert_eq!(explicit.meta.entry, "z.html");
+}
+
+#[tokio::test]
+async fn bundle_files_are_never_round_tripped_through_a_sorted_container() {
+    // Contract delta 4 in one assertion: a sorted container would answer "a.html".
+    let fixture = Fixture::new("order-preservation");
+    let published = fixture
+        .publish_bundle(&[("z.html", "Z"), ("a.html", "A")], None)
+        .await;
+    assert_eq!(published.meta.entry, "z.html");
+
+    // The same holds through an update, where `preferEntry` only applies when it still exists.
+    let updated = fixture
+        .store
+        .update_for(
+            &published.meta,
+            ArtifactUpdate {
+                expected_revision: 1,
+                content: Some(bundle_content(&[("y.html", "Y"), ("b.html", "B")], None)),
+                ..ArtifactUpdate::default()
+            },
+            mutation_audit(),
+        )
+        .await
+        .expect("update succeeds");
+    assert_eq!(updated.meta.entry, "y.html");
 }
 
 #[tokio::test]
@@ -1028,6 +1057,193 @@ async fn digest_backfill_skips_rows_whose_body_is_gone() {
     assert_eq!(report.scanned, 1);
     assert_eq!(report.updated, 0);
     assert_eq!(fixture.recorded_digest(&meta), "");
+}
+
+// ---------------------------------------------------------------------------
+// frozen storage vectors
+// ---------------------------------------------------------------------------
+
+/// The committed digest is what reads, preview file names, and the crash audit compare against,
+/// so it is pinned to literal values both at publish time and when backfilled from disk.
+#[tokio::test]
+async fn persisted_body_digests_match_frozen_vectors() {
+    /// `(files in publisher order, selected entry, total bytes, committed digest)`.
+    type BundleVector = (
+        &'static [(&'static str, &'static str)],
+        &'static str,
+        u64,
+        &'static str,
+    );
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let bundles: [BundleVector; 4] = [
+        (
+            &[("z.html", "Z"), ("a.html", "A")],
+            "z.html",
+            2,
+            "0b51844f2341d1d9e470036f17806f5adb490e3e45766fc516e8d5426de8cd79",
+        ),
+        (
+            &[("z.html", "Z"), ("index.html", "I"), ("a.html", "A")],
+            "index.html",
+            3,
+            "ec200b5d7068a363a800c701936a37a391eeed33738093aa21fcb42a598fa306",
+        ),
+        (
+            &[("b.htm", "B"), ("c.html", "C")],
+            "c.html",
+            2,
+            "556254e2b01fbc70bfa9c76f8c8341445952f9d4baa6c7899735251228034792",
+        ),
+        (
+            &[("nested/deep/page.html", "P"), ("style.css", "S")],
+            "nested/deep/page.html",
+            2,
+            "b05b039f012cfcf39034a7374f453a1731e84f7d59743a0362054eadff720d70",
+        ),
+    ];
+
+    let fixture = Fixture::new("frozen-digests");
+    let mut published = Vec::new();
+    for (files, entry, bytes, digest) in bundles {
+        let meta = fixture.publish_bundle(files, None).await.meta;
+        assert_eq!(meta.entry, entry, "{files:?}");
+        assert_eq!(meta.bytes, bytes, "{files:?}");
+        assert_eq!(meta.body_sha256, digest, "{files:?}");
+        published.push((meta, digest));
+    }
+    let single = fixture.publish_single("<p>OLD</p>").await;
+    let single_digest = "4beb208b7cdbe7ab23e34ac2ad4a896d25e0581704ca02929c3e55fa07bb9ee2";
+    assert_eq!(single.body_sha256, single_digest);
+    published.push((single, single_digest));
+    let index_only = fixture
+        .publish_bundle(&[("index.html", "<p>NEW body, different length</p>")], None)
+        .await
+        .meta;
+    published.push((
+        index_only,
+        "9457bafd3e55baaddcc6b67e11c0e86c9c78fa17295c83307bc93c9d5f5755e1",
+    ));
+
+    // Recomputing every digest from the installed files lands on the same values.
+    fixture.execute("UPDATE artifacts SET body_sha256 = ''");
+    let report = fixture
+        .store
+        .backfill_body_digests()
+        .await
+        .expect("backfill runs");
+    assert_eq!(report.updated, published.len());
+    for (meta, digest) in &published {
+        assert_eq!(fixture.recorded_digest(meta), *digest, "{}", meta.id.0);
+    }
+}
+
+#[tokio::test]
+async fn publish_normalizes_metadata_like_the_frozen_vectors() {
+    // `(title, description, category, uploader label, target org)` in, the stored row out.
+    type Fields<'a> = (
+        Option<&'a str>,
+        Option<&'a str>,
+        Option<&'a str>,
+        &'a str,
+        &'a str,
+    );
+    let long_title = "t".repeat(250);
+    let long_description = "d".repeat(600);
+    let long_category = "c".repeat(100);
+    let long_label = "l".repeat(80);
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let cases: [(Fields<'_>, [&str; 5]); 5] = [
+        (
+            (
+                Some("Plain title"),
+                Some("A description"),
+                Some("docs"),
+                "Fixture publisher",
+                "acme",
+            ),
+            [
+                "Plain title",
+                "A description",
+                "docs",
+                "Fixture publisher",
+                "acme",
+            ],
+        ),
+        (
+            (None, None, None, "", ""),
+            ["Untitled artifact", "", "", "", "default"],
+        ),
+        (
+            (Some(""), Some(""), Some("   spaced    out   "), "l", "acme"),
+            ["Untitled artifact", "", "spaced out", "l", "acme"],
+        ),
+        (
+            (
+                Some("Ünïcødé — 🎉 title"),
+                Some("déscriptïon 🎉"),
+                Some("caté gory"),
+                "Ünïcødé label",
+                "acme",
+            ),
+            [
+                "Ünïcødé — 🎉 title",
+                "déscriptïon 🎉",
+                "caté gory",
+                "Ünïcødé label",
+                "acme",
+            ],
+        ),
+        (
+            (
+                Some(long_title.as_str()),
+                Some(long_description.as_str()),
+                Some(long_category.as_str()),
+                long_label.as_str(),
+                "acme",
+            ),
+            [
+                &long_title[..200],
+                &long_description[..500],
+                &long_category[..60],
+                &long_label[..60],
+                "acme",
+            ],
+        ),
+    ];
+
+    let fixture = Fixture::new("frozen-metadata");
+    for ((title, description, category, label, org), expected) in cases {
+        let meta = fixture
+            .try_publish_request(PublishArtifact {
+                publisher: PublisherIdentity {
+                    label: label.to_owned(),
+                    ..publisher()
+                },
+                target_org: OrgId(org.to_owned()),
+                title: title.map(ToOwned::to_owned),
+                description: description.map(ToOwned::to_owned),
+                category: category.map(ToOwned::to_owned),
+                content: ArtifactContent::SingleHtml("<p>metadata</p>".to_owned()),
+                artifact_key: None,
+            })
+            .await
+            .expect("publish succeeds")
+            .meta;
+        assert_eq!(
+            [
+                meta.title.as_str(),
+                meta.description.as_str(),
+                meta.category.as_str(),
+                meta.uploader_label.as_str(),
+                meta.org.0.as_str(),
+            ],
+            expected
+        );
+        assert_eq!(meta.revision, 1);
+        assert!(!meta.hidden);
+        assert!(!meta.is_bundle);
+        assert_eq!(meta.entry, "");
+    }
 }
 
 // ---------------------------------------------------------------------------

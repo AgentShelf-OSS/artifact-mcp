@@ -1,8 +1,4 @@
-use std::{
-    collections::BTreeMap,
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::collections::BTreeMap;
 
 use artifact_mcp::{
     config::AppConfig,
@@ -22,67 +18,6 @@ use artifact_mcp::{
     },
     security::access::AccessPolicy,
 };
-use serde_json::{Value, json};
-
-const REQUIRE_NODE_REFERENCE: &str = "REQUIRE_NODE_REFERENCE";
-
-const NODE_RENDER_DRIVER: &str = r#"
-Promise.all([import(process.argv[1]), import(process.argv[2])]).then(([portal, settings]) => {
-  const input = JSON.parse(process.argv[3]);
-  Date.now = () => input.nowMs;
-  const maps = (rows) => new Map(rows || []);
-  const gallery = portal.renderGallery(
-    input.viewer,
-    input.sections,
-    maps(input.reactions),
-    maps(input.sentiment),
-    maps(input.viewCounts),
-    maps(input.topViewed),
-    input.orgColors,
-    input.notifications,
-    input.orgCategories
-  );
-  const shell = portal.renderArtifactShell(
-    input.meta,
-    input.nav,
-    input.reaction,
-    input.feedback,
-    input.analytics,
-    input.viewer,
-    input.orgAccent
-  );
-  const settingsHtml = settings.renderSettings(input.admin, input.keys, input.organizations);
-  const match = (html, pattern) => { const found = html.match(pattern); return found ? found[1] : null; };
-  const decodeAttr = (value) => value == null ? null : value
-    .replaceAll('&quot;', '"').replaceAll('&#39;', "'")
-    .replaceAll('&lt;', '<').replaceAll('&gt;', '>').replaceAll('&amp;', '&');
-  const blocks = (html, tag) => Array.from(html.matchAll(new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>', 'g')), row => row[1]);
-  const galleryMarkup = (gallery.match(/<main\b[^>]*>([\s\S]*?)<\/main>/) || ['', ''])[1];
-  const lastBlock = (html, tag) => { const found = blocks(html, tag); return found[found.length - 1] || null; };
-  process.stdout.write(JSON.stringify({
-    portalCss: portal.PORTAL_CSS,
-    portalScript: blocks(gallery, 'script').at(-3),
-    collectionToolbarScript: blocks(gallery, 'script').at(-2),
-    collectionScript: lastBlock(gallery, 'script'),
-    shellCss: lastBlock(shell, 'style'),
-    settingsCss: lastBlock(settingsHtml, 'style'),
-    settingsScript: blocks(settingsHtml, 'script').at(-2),
-    connectionsScript: lastBlock(settingsHtml, 'script'),
-    orgColor: portal.orgColor(input.meta.org, input.orgAccent),
-    sandbox: match(shell, /sandbox="([^"]+)"/),
-    shellSrc: match(shell, /id="vframe" src="([^"]+)"/),
-    viewerLiteral: decodeAttr(match(shell, /data-viewer-email="([^"]*)"/)),
-    feedbackLiteral: decodeAttr(match(shell, /data-feedback="([^"]*)"/)),
-    thumbnailSrc: match(gallery, /<img class="pv" src="([^"]+)"/),
-    galleryHasBytes: gallery.includes('1.3 MB'),
-    galleryHasJustNow: gallery.includes('Just now'),
-    settingsEscaped: !settingsHtml.includes(input.attack) && settingsHtml.includes('Specific emails'),
-    categoryFilters: Array.from((gallery.match(/<select id="category-filter"[^>]*>([\s\S]*?)<\/select>/) || ['', ''])[1].matchAll(/<option value="([^"]*)"/g), row => row[1]).slice(1),
-    cardOrder: Array.from(galleryMarkup.matchAll(/<article class="card[^"]*"[^>]*data-id="([^"]*)"/g), row => row[1]),
-    notificationHref: match(gallery, /<a class="notif-row[^\"]*" href="([^"]+)"/)
-  }));
-}).catch((error) => { console.error(error); process.exit(1); });
-"#;
 
 #[test]
 fn standalone_pages_autoescape_request_derived_values() {
@@ -204,7 +139,7 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
 }
 
 #[test]
-fn artifact_install_names_match_the_node_rules() {
+fn artifact_install_names_are_trimmed_sanitized_and_bounded() {
     assert_eq!(artifact_install_name("  Plain title  "), "Plain title");
     assert_eq!(
         artifact_install_name("\u{0}Tab\tand\u{9f}C1\u{7f}"),
@@ -434,144 +369,29 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
 }
 
 #[test]
-fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
-    let root = repo_root();
-    if !node_reference_available(&root) {
-        return;
-    }
+fn fixed_clock_rendering_snapshot_matches_frozen_vectors() {
     let attack = "</script>\"&\u{2028}\u{2029}🎉";
-    let input = json!({
-        "nowMs": 0,
-        "attack": attack,
-        "viewer": { "email": attack, "org": "acme🎉", "isAdmin": false },
-        "admin": { "email": attack, "org": "admin", "isAdmin": true },
-        "meta": {
-            "id": "artifact1234", "client_id": "publisher", "org": "acme🎉",
-            "title": attack, "description": attack, "bytes": 1310720,
-            "created_at": "1970-01-01 00:00:00", "updated_at": "1970-01-01 00:00:00",
-            "uploader_label": "", "is_bundle": 0, "entry": "", "revision": 3,
-            "category": "Reports", "hidden": 0, "body_sha256": "deadbeefcafebabe"
-        },
-        "nav": { "prevId": "newer123456", "nextId": "older123456", "index": 2, "total": 4 },
-        "reaction": { "favorite": 1, "vote": -1 },
-        "feedback": [{
-            "id": "feedback-1", "artifact_id": "artifact1234", "org": "acme🎉",
-            "parent_id": null, "viewer_email": attack, "body": attack,
-            "artifact_revision": 3, "anchor_path": attack, "anchor_x": 0.1,
-            "anchor_y": 0.2, "anchor_w": 0.3, "anchor_h": 0.4,
-            "anchor_approx": false, "anchor_page": attack,
-            "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null,
-            "anchor_version": 1,
-            "created_at": "1970-01-01 00:00:00", "resolved_at": null
-        }],
-        "analytics": { "counts": { "views": 5, "unique_viewers": 2 }, "viewers": null },
-        "orgAccent": null,
-        "sections": [{ "org": "empty", "items": [] }, { "org": "acme🎉", "items": [
-            {
-                "id": "artifact1234", "client_id": "publisher", "org": "acme🎉",
-                "title": attack, "description": attack, "bytes": 1310720,
-                "created_at": "1970-01-01 00:00:00", "updated_at": "1970-01-01 00:00:00",
-                "uploader_label": "", "is_bundle": 0, "entry": "", "revision": 3,
-                "category": "Reports", "hidden": 0, "body_sha256": "deadbeefcafebabe"
-            },
-            {
-                "id": "artifact5678", "client_id": "publisher", "org": "acme🎉",
-                "title": "Uncategorized", "description": "", "bytes": 1,
-                "created_at": "1970-01-01 00:00:00", "updated_at": "1970-01-01 00:00:00",
-                "uploader_label": "", "is_bundle": 0, "entry": "", "revision": 1,
-                "category": "", "hidden": 0, "body_sha256": ""
-            }
-        ]}],
-        "reactions": [], "sentiment": [], "viewCounts": [], "topViewed": [],
-        "orgColors": { "acme🎉": null },
-        "orgCategories": { "empty": [], "acme🎉": ["Reports"] },
-        "notifications": { "unread": 1, "items": [{
-            "id": "feedback-1", "artifact_id": "artifact1234", "artifact_title": attack,
-            "viewer_email": attack, "body": attack, "created_at": "1970-01-01 00:00:00", "unread": 1
-        }]},
-        "keys": [{
-            "client_id": "publisher", "org": "acme🎉", "label": attack,
-            "created_at": "2026-07-21 12:00:00", "revoked_at": null
-        }],
-        "organizations": [{
-            "name": "acme🎉", "label": attack, "color": null, "domains": [],
-            "emails": [attack], "categories": ["Reports"], "keyCount": 1, "webhooks": []
-        }]
-    });
-    let node = run_node_render(&root, &input);
-
-    assert_eq!(
-        node["portalCss"].as_str().expect("Node portal CSS"),
-        include_str!("../../assets/portal.css")
+    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    let sandbox = "allow-scripts allow-popups allow-forms allow-modals";
+    let shell_src = "/raw/artifact1234?anchor=1&reader=1&v=deadbeefcafe";
+    let viewer_literal = r#""\u003c/script\u003e\"\u0026\u2028\u2029🎉""#;
+    let feedback_literal = concat!(
+        r#""[{\"id\":\"feedback-1\",\"parent_id\":null,"#,
+        r#"\"viewer_email\":\"\u003c/script\u003e\\\"\u0026\u2028\u2029🎉\","#,
+        r#"\"author_source\":null,\"external_author_display\":null,"#,
+        r#"\"body\":\"\u003c/script\u003e\\\"\u0026\u2028\u2029🎉\","#,
+        r#"\"created_at\":\"1970-01-01 00:00:00\",\"resolved_at\":null,"#,
+        r#"\"anchor_path\":\"\u003c/script\u003e\\\"\u0026\u2028\u2029🎉\","#,
+        r#"\"anchor_x\":0.1,\"anchor_y\":0.2,\"anchor_w\":0.3,\"anchor_h\":0.4,"#,
+        r#"\"anchor_approx\":false,"#,
+        r#"\"anchor_page\":\"\u003c/script\u003e\\\"\u0026\u2028\u2029🎉\","#,
+        r#"\"anchor_page_stale\":false,\"anchor_kind\":null,\"anchor_node_id\":null,"#,
+        r#"\"anchor_quote\":null,\"anchor_version\":1,\"artifact_revision\":3}]""#,
     );
-    assert_eq!(
-        node["portalScript"].as_str().expect("Node portal script"),
-        include_str!("../../assets/portal.js")
-    );
-    assert_eq!(
-        node["collectionToolbarScript"]
-            .as_str()
-            .expect("Node collection toolbar script"),
-        include_str!("../../assets/collection-toolbar.js")
-    );
-    assert_eq!(
-        node["collectionScript"]
-            .as_str()
-            .expect("Node collection script"),
-        include_str!("../../assets/collections.js")
-    );
-    assert_eq!(
-        node["shellCss"].as_str().expect("Node shell CSS"),
-        concat!(
-            include_str!("../../assets/dialogs.css"),
-            "\n",
-            include_str!("../../assets/shell.css")
-        )
-    );
-    assert_eq!(
-        node["settingsCss"].as_str().expect("Node settings CSS"),
-        format!(
-            "{}{}\n{}{}",
-            include_str!("../../assets/portal.css"),
-            include_str!("../../assets/dialogs.css"),
-            include_str!("../../assets/settings.css"),
-            include_str!("../../assets/connections.css")
-        )
-    );
-    assert_eq!(
-        node["settingsScript"]
-            .as_str()
-            .expect("Node settings script"),
-        concat!(
-            include_str!("../../assets/dialogs.js"),
-            "\n",
-            include_str!("../../assets/settings.js")
-        )
-    );
-    assert_eq!(
-        node["connectionsScript"]
-            .as_str()
-            .expect("Node connections script"),
-        include_str!("../../assets/connections.js")
-    );
-    assert_eq!(
-        node["sandbox"],
-        "allow-scripts allow-popups allow-forms allow-modals"
-    );
-    assert_eq!(node["viewerLiteral"], js_literal(attack));
-    assert_eq!(
-        node["thumbnailSrc"],
-        "/thumbnails/artifact1234?v=deadbeefcafebabe"
-    );
-    assert_eq!(node["galleryHasBytes"], true);
-    assert_eq!(node["galleryHasJustNow"], true);
-    assert_eq!(node["settingsEscaped"], true);
-    assert_eq!(node["categoryFilters"], json!(["Reports", ""]));
-    assert_eq!(node["cardOrder"], json!(["artifact1234", "artifact5678"]));
-    assert_eq!(
-        node["notificationHref"],
-        "/artifact1234?feedback=feedback-1"
-    );
+    let thumbnail_src = "/thumbnails/artifact1234?v=deadbeefcafebabe";
+    let org_color = "hsl(321 68% 52%)";
+    let notification_href = "/artifact1234?feedback=feedback-1";
+    assert_eq!(js_literal(attack), viewer_literal);
 
     let renderer = AskamaPageRenderer::with_fixed_clock(&AppConfig::default(), 0);
     let viewer = Viewer {
@@ -611,20 +431,18 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         .expect("Rust shell parity fixture");
     assert!(shell.contains("data-cast-enabled=\"0\""));
     assert!(!shell.contains("type: 'cast:host-init'"));
-    assert_eq!(html_attribute(&shell, "sandbox"), node["sandbox"]);
+    assert_eq!(html_attribute(&shell, "sandbox"), sandbox);
     assert_eq!(
         decode_html_attribute(&html_attribute(&shell, "src")),
-        node["shellSrc"]
+        shell_src
     );
     assert_eq!(
         decode_html_attribute(&html_attribute(&shell, "data-viewer-email")),
-        node["viewerLiteral"].as_str().expect("Node viewer literal")
+        viewer_literal
     );
     assert_eq!(
         decode_html_attribute(&html_attribute(&shell, "data-feedback")),
-        node["feedbackLiteral"]
-            .as_str()
-            .expect("Node feedback literal")
+        feedback_literal
     );
 
     let mut uncategorized = parity_meta("Uncategorized");
@@ -672,12 +490,7 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
             unread_notifications: 1,
         })
         .expect("Rust gallery parity fixture");
-    assert_eq!(
-        html_attribute(&gallery, "src"),
-        node["thumbnailSrc"]
-            .as_str()
-            .expect("Node thumbnail source")
-    );
+    assert_eq!(html_attribute(&gallery, "src"), thumbnail_src);
     assert!(gallery.contains("id=\"org-filter\""));
     assert!(gallery.contains("id=\"category-filter\""));
     assert!(gallery.contains("<option value=\"Reports\">Reports (1)</option>"));
@@ -691,13 +504,10 @@ fn fixed_clock_rendering_snapshot_matches_the_real_node_oracle() {
         ),
         vec!["artifact1234", "artifact5678"]
     );
-    assert!(gallery.contains(&format!(
-        "--org-k:{};",
-        node["orgColor"].as_str().expect("Node organization color")
-    )));
+    assert!(gallery.contains(&format!("--org-k:{org_color};")));
     assert_eq!(
         html_attribute_after(&gallery, "<a class=\"notif-row", "href"),
-        node["notificationHref"]
+        notification_href
     );
 }
 
@@ -768,57 +578,6 @@ fn parity_feedback(attack: &str) -> Feedback {
         external_edited_at: None,
         external_deleted_at: None,
     }
-}
-
-fn repo_root() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-}
-
-fn node_reference_available(root: &Path) -> bool {
-    let unavailable =
-        if root.join("lib/portal.js").is_file() && root.join("lib/settings.js").is_file() {
-            match Command::new("node").arg("--version").output() {
-                Ok(output) if output.status.success() => None,
-                _ => Some("node is not on PATH"),
-            }
-        } else {
-            Some("lib/portal.js or lib/settings.js is missing")
-        };
-    match unavailable {
-        None => true,
-        Some(reason) => {
-            assert!(
-                std::env::var(REQUIRE_NODE_REFERENCE).ok().as_deref() != Some("1"),
-                "{REQUIRE_NODE_REFERENCE}=1 but the Node renderer is unavailable ({reason})"
-            );
-            eprintln!("skipping U15 Node rendering parity proof: {reason}");
-            false
-        }
-    }
-}
-
-fn run_node_render(root: &Path, input: &Value) -> Value {
-    let portal = format!("file://{}", root.join("lib/portal.js").display());
-    let settings = format!("file://{}", root.join("lib/settings.js").display());
-    let output = Command::new("node")
-        .current_dir(root)
-        .arg("-e")
-        .arg(NODE_RENDER_DRIVER)
-        .arg(portal)
-        .arg(settings)
-        .arg(input.to_string())
-        .env("PUBLIC_BASE_URL", "http://localhost:3480")
-        .env("APP_NAME", "Artifact Index")
-        .env("APP_BRAND", "A")
-        .output()
-        .expect("run Node renderer oracle");
-    assert!(
-        output.status.success(),
-        "Node renderer failed:\n{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    serde_json::from_slice(&output.stdout).expect("Node renderer emitted JSON")
 }
 
 fn html_attribute(html: &str, name: &str) -> String {

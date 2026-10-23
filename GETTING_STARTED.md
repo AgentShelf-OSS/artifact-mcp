@@ -94,10 +94,6 @@ docker compose up -d --build
 docker logs artifact-mcp 2>&1 | grep "viewer identity mode ready"
 ```
 
-> Need the compatibility twin for development? `npm install && npm run dev` starts the Node
-> reference runtime directly with loopback header-trust already enabled. The shipped Compose
-> service and production image use Rust.
-
 You should see a structured log with `"identity_mode":"header-trust"`. Publish a test artifact:
 
 ```bash
@@ -144,8 +140,8 @@ export CF_ACCOUNT_ID=REPLACE_WITH_ACCOUNT_ID
 export PUBLIC_BASE_URL=https://artifact.your-domain
 export CF_ACCESS_IDP_ID=REPLACE_WITH_YOUR_ONE_IDP_ID
 
-node scripts/cf-access-setup.mjs          # dry-run
-node scripts/cf-access-setup.mjs --apply  # explicit mutation
+cargo xtask cf-access-setup          # dry-run
+cargo xtask cf-access-setup --apply  # explicit mutation
 ```
 
 The command finds or creates the catch-all app, configures one allowed IdP with automatic redirect,
@@ -367,7 +363,7 @@ identity.
 | Share link 404s | Expired, revoked, unknown token, or `/s/*` Access app missing/not Bypass | Recreate the link; confirm the `/s/*` Bypass app exists. |
 | Server won't start, logs `REQUIRE_ACCESS_JWT` | Strict mode on without JWT vars | Set both JWT vars, or drop `REQUIRE_ACCESS_JWT`. |
 | Hundreds of blocked `email-decode.min.js` scripts | An old response lacks the origin `no-transform` directive | Confirm `Cache-Control` contains `no-transform`; see the Cloudflare deployment runbook. |
-| Access shows a redundant method picker | Catch-all app has several allowed IdPs or auto-redirect is off | Rerun `cf-access-setup.mjs` and apply the proposed app update. |
+| Access shows a redundant method picker | Catch-all app has several allowed IdPs or auto-redirect is off | Rerun `cargo xtask cf-access-setup` and apply the proposed app update. |
 | Site down right after loopback bind | Tunnel still targets a host IP | Point the tunnel origin at `http://artifact-mcp:3480` on the shared network (Phase 4d). |
 | MCP client doesn't see new tools | Clients cache `tools/list` at connect | Reconnect the integration after a server update. |
 

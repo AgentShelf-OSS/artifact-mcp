@@ -2,28 +2,35 @@
 
 A language-neutral, black-box conformance suite for artifact-mcp. It drives a **real server
 process** over HTTP, then inspects the persistent state it left behind. It never imports
-application code, so the same cases judge the Node reference today and the Rust rewrite at
-M1+ — this is the executable definition of "the rewrite behaves identically".
+application code. The goldens were first recorded from the retired Node reference server and
+are now the executable contract for the Rust server: a golden diff is a behavior change.
 
 Implements blueprint §B2 (harness design), §B3 (comparison modes) and §B4 (required
 conformance families).
 
 ## Running
 
+The runner is a Rust integration test, `tests/conformance/`. It starts the `artifact-mcp`
+binary that Cargo builds for the same test run (`CARGO_BIN_EXE_artifact-mcp`), so no separate
+build step or binary path is needed.
+
 ```bash
-node conformance/runner.mjs --impl node            # gate: replay every recorded golden
-node conformance/runner.mjs --impl both            # Node fully; Rust degrades if unbuilt
-node conformance/runner.mjs --impl rust            # M1+ only
-node conformance/runner.mjs --impl node --record   # regenerate goldens (see discipline)
-node conformance/runner.mjs --impl node --filter raw   # subset by case id or tag
+cargo test --test conformance                                 # gate: replay every recorded golden
+CONFORMANCE_FILTER=raw cargo test --test conformance          # subset by case id or tag
+CONFORMANCE_RECORD=1 cargo test --test conformance            # regenerate goldens (see discipline)
+cargo test --test conformance -- --nocapture                  # also print every case result
 ```
 
-Exit codes: `0` all good, `1` a diff / failed assertion / runner error, `2` bad usage.
+| Variable | Effect |
+|---|---|
+| `CONFORMANCE_FILTER=<text>` | Run only cases whose id or any tag contains `<text>`. No match is a failure. |
+| `CONFORMANCE_RECORD=1` | Write goldens instead of comparing. Any other non-empty value except `0` is a usage error. |
+| `CONFORMANCE_JOBS=<n>` | Number of cases that run at the same time (default: CPU count, at most 4). Each case still has its own server and data dir. |
 
-`--impl rust` fails while no binary exists (nothing ran is not success). `--impl both`
-deliberately does **not** fail for a missing Rust binary — it reports `[SKIP]` and gates on
-Node, so `both` is safe to wire into CI now and gains Rust coverage for free later. Point
-`RUST_ARTIFACT_MCP_BIN` at the binary (or `RUST_ARTIFACT_MCP_DIR` at the crate) to enable it.
+The test fails on any diff, failed assertion, missing golden, or runner error. All case
+failures are reported together in one panic message. A server that does not start, exits
+before `/health` answers, or misses the 15 s health deadline fails its case, and the failure
+includes the server output.
 
 ### Per case, the runner
 
@@ -36,8 +43,10 @@ Node, so `both` is safe to wire into CI now and gains Rust coverage for free lat
 7. stops the server **cleanly**, then
 8. runs post-state SQL / file-hash / directory assertions.
 
-Node and Rust never share a data directory: each implementation gets its own `mkdtemp` copy
-of the fixture, and the temp dir is removed afterwards.
+Cases never share a data directory: each run gets its own temporary copy of the fixture, and
+the temp dir is removed afterwards. The server binds its port only after it migrates the data
+dir, so a start that fails with `Address already in use` is retried (at most 3 times) with a
+new port and a fresh data dir. No other failure is retried.
 
 ## Case schema
 
@@ -46,7 +55,7 @@ One JSON file per case in `cases/`. The file name is the case id.
 ```jsonc
 {
   "id": "raw.single-html.delivery",
-  "tags": ["raw", "csp", "invariant-4"],   // --filter matches id or any tag
+  "tags": ["raw", "csp", "invariant-4"],   // CONFORMANCE_FILTER matches id or any tag
   "fixture": "empty-v21",                   // directory under fixtures/
   "env": { "MCP_JSON_LIMIT": "1mb" },       // merged over the base env, per case
   "pending": "reason",                      // present => reported PEND, never gates
@@ -90,13 +99,13 @@ One JSON file per case in `cases/`. The file name is the case id.
 
 Steps may declare `mcpSuccess: true` or an exact `mcpError` under `expect` for assertions that
 remain active while recording. An `afterSql` array runs after that step's captures and exists only
-for cross-runtime-neutral fixture shaping that public APIs cannot express, such as changing an
+for implementation-neutral fixture shaping that public APIs cannot express, such as changing an
 existing author key to reader after it published the reader-own fixture. It is not a production
 workflow mechanism.
 
 `${name}` is substituted into paths, header values, JSON bodies and SQL queries.
 
-- **Constants** (`testkit.mjs`): publisher secrets `${key_acme}`, `${key_acme2}`,
+- **Constants** (`tests/conformance/main.rs`): publisher secrets `${key_acme}`, `${key_acme2}`,
   `${key_beta}`, `${key_admin}`; client ids; viewer emails `${viewer_acme}`,
   `${viewer_beta}`, `${admin_email}`; `${public_base}`. Forward-substituted only.
 - **Captures**: values pulled out of a response via `capture` (a dot path into the parsed
@@ -112,7 +121,7 @@ and length** (artifact ids 12 chars of `0123456789abcdefghijkmnpqrstuvwxyz`; sha
 ### Authentication in cases
 
 - **MCP** (`POST /mcp`) — `authorization: Bearer ${key_*}`. Keys are seeded from
-  `ARTIFACT_API_KEYS` at boot, exactly as `npm run dev` does.
+  `ARTIFACT_API_KEYS` at boot.
 - **Human routes** — `cf-access-authenticated-user-email: ${viewer_*}` with
   `TRUST_ACCESS_HEADERS=1`. `acme.test` → org `acme`, `beta.test` → org `beta`,
   `${admin_email}` is an admin. Sending no such header models an unsigned visitor.
@@ -159,9 +168,10 @@ it means a change in bytes.
 
 ## Record discipline
 
-- `--record` is only accepted with `--impl node`. Goldens are recorded from the Node
-  reference; recording from the implementation under test would be circular.
-- **`--record` is forbidden in CI.** CI runs `--impl node` (or `--impl both`) only.
+- Goldens are recorded from the Rust server, which is now the only implementation. Recording
+  is therefore circular by construction: it freezes whatever the server does today. Record
+  only to adopt an intended behavior change, and review the golden diff as that change.
+- **`CONFORMANCE_RECORD=1` is forbidden in CI.** CI only replays the goldens.
 - Recording is refused for any case whose runtime assertions fail, so a broken state can
   never be frozen as "expected".
 - A golden diff is a **contract change**. Regenerating a golden to make a build pass is only
@@ -176,16 +186,26 @@ manifest does not name its golden file.
 
 | File | Role |
 |---|---|
-| `runner.mjs` | CLI, orchestration, substitution/capture, golden compare, post-state |
-| `node-driver.mjs` | Boots the real `node server.js` |
-| `rust-driver.mjs` | Same interface; explicit "not built yet" stub until M1 |
-| `comparators.mjs` | The B3 modes as pure normalizers |
-| `testkit.mjs` | Credentials, base env, dependency resolution, HTTP client |
+| `../tests/conformance/main.rs` | Test entry point, case loading, substitution/capture, assertions, golden compare, record mode, post-state |
+| `../tests/conformance/server.rs` | Boots the server binary against the case data dir and port; SIGTERM, then SIGKILL after 3 s |
+| `../tests/conformance/http.rs` | HTTP/1.1 client that sends the request-target verbatim and folds response headers as `node:http` does |
+| `../tests/conformance/comparators.rs` | The B3 modes as pure normalizers |
+| `../tests/conformance/js.rs` | JSON with JavaScript semantics (key order, number format, `JSON.stringify` output) |
 | `cases/` | Case manifests |
 | `goldens/` | Recorded expectations |
 | `fixtures/` | Starting `DATA_DIR` states (see `fixtures/README.md`) |
 | `NOTES.md` | Deferrals, stubs, and source changes wanted but out of scope |
 
-Node stdlib only — no new dependencies. `better-sqlite3` is resolved at runtime from an
-existing built `node_modules` purely to read post-state (override with
-`CONFORMANCE_NODE_MODULES`).
+The runner uses only crates the server already depends on. Post-state SQL uses `rusqlite`, opened
+the way `node:sqlite` opened it for the original recordings (foreign keys on, double-quoted string
+literals rejected, 5 s busy timeout). Post-state reads open the database read-only after the
+server stops.
+
+### Golden format
+
+The goldens were first written by a Node runner as `JSON.stringify(normal, null, 2)`. The Rust
+runner keeps that format byte for byte: JavaScript property order (array-index keys first, then
+insertion order), JavaScript number formatting, and `JSON.stringify` string escaping. A record run
+with no behavior change therefore rewrites only files that were edited by hand.
+`goldens/publisher.write-concealment.json` is such a file: it has hand-wrapped arrays, so record
+mode reformats it without changing its content.

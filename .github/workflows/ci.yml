@@ -6,18 +6,29 @@ on:
   pull_request:
 
 jobs:
-  mcp-surface:
-    # Derived from the frozen definitions, schemas, dispatch, OAuth scopes, documentation, and
-    # registered contract tests. No hand-maintained second tool catalog is involved.
+  rust:
+    # `cargo test` is the whole server gate: unit and native tests, the HTTP conformance replay
+    # (tests/conformance), the derived MCP surface check (tests/mcp_surface), and the frozen
+    # historical fixtures. Nothing here needs Node.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # The MCP surface report compares against the change base.
           fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          node-version: "22"
-      - name: Check derived MCP surface against the change base
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --workspace --all-targets --locked
+      # If cargo-nextest is ever adopted as the runner it does NOT execute doctests, and the
+      # security::access compile_fail proofs live there — keep an explicit doc-test step.
+      - run: cargo test --doc --locked
+      - name: Regenerate the reproducible historical fixtures and compare them with the committed ones
+        run: cargo xtask historical-fixture --verify-against-committed
+      - name: Report MCP surface paths changed since the change base
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: |
@@ -27,138 +38,69 @@ jobs:
           if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
             base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
           fi
-          node scripts/check-mcp-surface.mjs --base "$base"
+          MCP_SURFACE_BASE="$base" cargo test --locked --test mcp_surface -- --nocapture
 
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - run: npm test
-
-  conformance:
-    # The language-neutral oracle is a hard two-runtime gate. A missing Rust binary is a failure.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
-      - run: node conformance/runner.mjs --impl both
-
-  rust:
-    # Node IS required here, not incidental: the cross-runtime parity proofs drive the real
-    # lib/*.js via `node -e`. Without REQUIRE_NODE_REFERENCE=1 those tests SKIP and report ok, so
-    # the strongest guarantees in the suite would green-pass while testing nothing.
+  preview-renderer:
+    # The isolated HTML-to-PNG sidecar is its own Cargo workspace. Its tests drive the pinned Chrome
+    # for Testing headless shell, so a missing browser is a failure (CI=1), not a skip.
     runs-on: ubuntu-latest
     env:
-      REQUIRE_NODE_REFERENCE: "1"
+      CI: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-      # better-sqlite3 is a native module the parity drivers load from node_modules.
-      - run: npm ci
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
-      - run: cargo test --all-targets --locked
-      # If cargo-nextest is ever adopted as the runner it does NOT execute doctests, and the
-      # security::access compile_fail proofs live there — keep an explicit doc-test step.
-      - run: cargo test --doc --locked
-
-  browser:
-    # Real Chromium journeys run against both complete server packages. Each instance has an
-    # isolated database, and global teardown removes the synthetic organization and artifacts.
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: [mcp-surface, test, conformance, rust]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: "22"
-          cache: npm
-      - run: npm ci
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
-      - run: npm --prefix playwright ci
-      - run: npm --prefix playwright exec -- playwright install --with-deps chromium
-      - name: Run Node and Rust browser parity
-        env:
-          PW_NODE_URL: http://127.0.0.1:3485
-          PW_RUST_URL: http://127.0.0.1:3483
-          PW_ADMIN_EMAIL: admin@example.test
-          PW_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
-          PW_USE_BUNDLED_CHROMIUM: "1"
+          workspaces: preview-renderer
+      - name: Download the pinned chrome-headless-shell from preview-renderer/Dockerfile
         run: |
           set -euo pipefail
-          node_data="$(mktemp -d)"
-          rust_data="$(mktemp -d)"
-          node_log="$RUNNER_TEMP/artifact-mcp-node.log"
-          rust_log="$RUNNER_TEMP/artifact-mcp-rust.log"
-          test_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+          version="$(sed -nE 's/^ARG CHROME_VERSION=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          sha256="$(sed -nE 's/^ARG CHROME_SHA256=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          [ -n "$version" ] && [ -n "$sha256" ]
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/chs.zip" \
+            "https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-headless-shell-linux64.zip"
+          echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
+          echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
+      - run: cargo fmt --manifest-path preview-renderer/Cargo.toml --check
+      - run: cargo clippy --manifest-path preview-renderer/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path preview-renderer/Cargo.toml --locked
 
-          env DATA_DIR="$node_data" PORT=3485 LISTEN_HOST=127.0.0.1 \
-            TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS="$PW_ADMIN_EMAIL" NODE_ENV=test \
-            PUBLIC_BASE_URL="$PW_NODE_URL" PREVIEW_RENDERER_URL= \
-            AUDIT_LEDGER_HMAC_KEY="$test_key" WEBHOOK_ENC_KEY="$test_key" \
-            node server.js >"$node_log" 2>&1 &
-          node_pid=$!
-
-          # Give the isolated browser suite enough admission budget for its full workload.
-          env DATA_DIR="$rust_data" PORT=3483 LISTEN_HOST=127.0.0.1 \
-            TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS="$PW_ADMIN_EMAIL" NODE_ENV=test \
-            PUBLIC_BASE_URL="$PW_RUST_URL" PREVIEW_RENDERER_URL= \
-            AUDIT_LEDGER_HMAC_KEY="$test_key" WEBHOOK_ENC_KEY="$test_key" \
-            INGRESS_READS_PER_WINDOW=10000 INGRESS_MUTATIONS_PER_WINDOW=10000 \
-            INGRESS_MCP_PER_WINDOW=10000 INGRESS_UPLOADS_PER_WINDOW=10000 \
-            INGRESS_FEEDBACK_PER_WINDOW=10000 INGRESS_STATE_PER_WINDOW=10000 \
-            INGRESS_ADMIN_PER_WINDOW=10000 INGRESS_VERIFIED_VIEWERS_PER_WINDOW=10000 \
-            INGRESS_SHARES_PER_WINDOW=10000 INGRESS_AUTH_FAILURES_PER_WINDOW=10000 \
-            target/release/artifact-mcp >"$rust_log" 2>&1 &
-          rust_pid=$!
-
-          cleanup() {
-            kill "$node_pid" "$rust_pid" 2>/dev/null || true
-            wait "$node_pid" "$rust_pid" 2>/dev/null || true
-            rm -rf "$node_data" "$rust_data"
-          }
-          trap cleanup EXIT
-
-          for url in "$PW_NODE_URL" "$PW_RUST_URL"; do
-            ready=0
-            for _ in $(seq 1 60); do
-              if curl --fail --silent "$url/health" >/dev/null; then
-                ready=1
-                break
-              fi
-              sleep 1
-            done
-            if [ "$ready" -ne 1 ]; then
-              cat "$node_log" "$rust_log"
-              exit 1
-            fi
-          done
-
-          if ! (cd playwright && npm test); then
-            cat "$node_log" "$rust_log"
-            exit 1
-          fi
-      - name: Run reader regressions in Chromium against Node and Rust
-        run: npm --prefix playwright run test:reader
+  browser:
+    # Browser tests run in the pinned chrome-headless-shell, driven from Rust: the browser-asset
+    # tests and the journeys against the Rust release binary (browser-tests/). Each journey run
+    # has an isolated database, and teardown removes the synthetic organization and artifacts.
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [rust]
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            browser-tests
+      - run: cargo build --release --locked
+      - name: Download the pinned chrome-headless-shell from preview-renderer/Dockerfile
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^ARG CHROME_VERSION=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          sha256="$(sed -nE 's/^ARG CHROME_SHA256=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          [ -n "$version" ] && [ -n "$sha256" ]
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/chs.zip" \
+            "https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-headless-shell-linux64.zip"
+          echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
+          echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
+          echo "ARTIFACT_MCP_BIN=$GITHUB_WORKSPACE/target/release/artifact-mcp" >> "$GITHUB_ENV"
+      - run: cargo fmt --manifest-path browser-tests/Cargo.toml --check
+      - run: cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path browser-tests/Cargo.toml --locked
