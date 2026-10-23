@@ -2,12 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { artifactInstallName, artifactInstallShortName, renderArtifactShell, renderGallery } from "../lib/portal.js";
 
+// Browser-side contracts of the viewer shell assets and the page templates. Server-rendered page
+// markup is covered by the Rust render and route suites.
 const SHELL_ASSET = readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8");
-
-const meta = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 3, bytes: 1, category: "" };
-const nav = { prevId: null, nextId: null, index: 1, total: 1 };
 
 function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false, stateEnabled, windowExtras = {}, navigatorImpl = {}, search = "" } = {}) {
   const created = [];
@@ -118,7 +116,6 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
     open(href, target, features) { opens.push({ href, target, features, userActivation }); return popupBlocked ? null : {}; },
     ...windowExtras
   };
-  const html = renderArtifactShell(meta, nav, {}, []);
   const script = scriptOverride || SHELL_ASSET;
   runInNewContext(script, {
     document, window, URL, URLSearchParams, JSON, Number, Array, String, Math,
@@ -150,99 +147,14 @@ function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision 
   };
 }
 
-test("feedback drawer nests one-level replies and only renders viewer management controls for allowed comments", () => {
-  const feedback = [
-    { id: "parent", viewer_email: "owner@acme.test", body: "Top", artifact_revision: 3, parent_id: null, created_at: "2026-07-12", anchor_x: 0.1, anchor_y: 0.2, anchor_w: 0.3, anchor_h: 0.4 },
-    { id: "reply", viewer_email: "other@acme.test", body: "Reply", artifact_revision: 3, parent_id: "parent", created_at: "2026-07-12", anchor_x: null, anchor_y: null }
-  ];
-  const html = renderArtifactShell(meta, nav, {}, feedback, {}, { email: "owner@acme.test", isAdmin: false });
-  assert.match(html, /data-thread-id="parent"/);
-  assert.match(html, /anchor_w/);
-  assert.match(html, /vanchor-box/);
-  assert.match(html, /data-parent-id="parent"/);
-  assert.ok(html.indexOf('data-id="parent"') < html.indexOf('data-id="reply"'));
-  const drawer = html.slice(html.indexOf('<section class="inspector-pane" id="inspector-feedback"'), html.indexOf('<section class="inspector-pane" id="inspector-details"'));
-  assert.equal((drawer.match(/data-feedback-action=/g) || []).length, 2);
-  const escapedHtml = renderArtifactShell(meta, nav, {}, feedback, {}, { email: "</script><img>", isAdmin: false });
-  assert.ok(escapedHtml.includes('data-viewer-email="&quot;\\u003c/script\\u003e\\u003cimg\\u003e&quot;"'));
-  const adminHtml = renderArtifactShell(meta, nav, {}, feedback, {}, { email: "admin@acme.test", isAdmin: true });
-  const adminDrawer = adminHtml.slice(adminHtml.indexOf('<section class="inspector-pane" id="inspector-feedback"'), adminHtml.indexOf('<section class="inspector-pane" id="inspector-details"'));
-  assert.equal((adminDrawer.match(/data-feedback-action=/g) || []).length, 4);
-
-  const discord = renderArtifactShell(meta, nav, {}, [{ id: "discord-1", viewer_email: null, author_source: "discord", external_author_display: "Díscord <reviewer>", body: "note", artifact_revision: 3, parent_id: null, anchor_x: 0.1, anchor_y: 0.2 }]);
-  assert.match(discord, /author_source/);
-  assert.match(discord, /external_author_display/);
-  assert.match(discord, /Díscord/);
-  assert.doesNotMatch(discord, /Díscord <reviewer>/);
-});
-
-test("notification rows link to a feedback deep link and the shell focuses its fid parameter", () => {
-  const gallery = renderGallery(
-    { email: "viewer@acme.test", org: "acme", isAdmin: false },
-    [{ org: "acme", items: [] }], new Map(), new Map(), new Map(), new Map(), {},
-    { unread: 1, items: [{ id: "feedback-1", artifact_id: "artifact-1", artifact_title: "Quarterly <report>", viewer_email: "author@acme.test", body: "Please review", created_at: "2026-07-14 10:00:00", unread: 1 }] }
-  );
-  assert.match(gallery, /href="\/artifact-1\?feedback=feedback-1"/);
-  assert.match(gallery, /class="notif-count"[^>]*>1</);
-  assert.match(gallery, /Quarterly &lt;report&gt;/);
-  assert.doesNotMatch(gallery, /Quarterly <report>/);
-
-  const shell = renderArtifactShell(
-    { id: "artifact-1", org: "acme", title: "Report", client_id: "publisher", revision: 1, is_bundle: 0, category: "" },
-    { prevId: null, nextId: null, index: 1, total: 1 }, {},
-    [{ id: "feedback-1", viewer_email: "author@acme.test", body: "Please review", parent_id: null, resolved_at: null, artifact_revision: 1 }]
-  );
+test("the shell focuses the feedback named by its fid deep-link parameter", () => {
   assert.match(SHELL_ASSET, /new URLSearchParams\(window\.location\.search\)\.get\('feedback'\)/);
   assert.match(SHELL_ASSET, /focusFeedback\(requestedFeedback\)/);
 });
 
-test("viewer shell includes an escaped public-share inspector", () => {
-  const dangerous = { ...meta, id: "abc123", title: "</script><img>" };
-  const html = renderArtifactShell(dangerous, nav, {}, [], {}, { email: "member@acme.test", isAdmin: false });
-  assert.match(html, /id="vshare-toggle"/);
-  assert.match(html, /24 hours/);
-  assert.match(html, /Until a date/);
-  assert.match(html, /No expiration/);
-  assert.match(html, /data-artifact-id="&quot;abc123&quot;"/);
-  assert.match(html, /data-cast-enabled="0"/);
-  assert.doesNotMatch(html, /cast:host-init/);
-  assert.doesNotMatch(html, /<script><\/script><img>/);
-});
-
-test("viewer shell gives review actions priority and keeps secondary actions in deterministic menus", () => {
-  const html = renderArtifactShell(
-    meta,
-    { prevId: "newer", nextId: "older", index: 2, total: 3 },
-    { favorite: 1, vote: -1 },
-    [],
-    { counts: { views: 7 }, viewers: [] },
-  );
-  const titleMenu = html.slice(html.indexOf('id="vtitle-menu"'), html.indexOf('id="vmore-menu"'));
-  const moreMenu = html.slice(html.indexOf('id="vmore-menu"'), html.indexOf('</header>'));
-
-  assert.match(html, /aria-label="Back to artifact library"/);
-  assert.match(html, /id="vtitle-toggle"[^>]*aria-controls="vtitle-menu"/);
-  assert.match(html, /id="vcomment-toggle"[^>]*aria-label="Comment on a place"/);
-  assert.match(html, /id="vcomment-toggle"[^>]*><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15/);
-  assert.doesNotMatch(html, /id="vcomment-toggle"[^>]*>▣/);
-  assert.match(html, /id="vshare-toggle"/);
-  assert.match(html, /id="vmore-toggle"/);
-  assert.match(html, /id="vinspector"[^>]*aria-hidden="true"[^>]*inert/);
+test("viewer shell menus keep the inspector inert when closed and support keyboard navigation", () => {
   assert.match(SHELL_ASSET, /inspector\.removeAttribute\('inert'\)/);
   assert.match(SHELL_ASSET, /inspector\.setAttribute\('inert',''\)/);
-  assert.match(titleMenu, /data-inspector-open="details"/);
-  assert.match(titleMenu, /data-inspector-open="history"/);
-  assert.match(titleMenu, /data-inspector-open="audience"/);
-  assert.match(titleMenu, /id="vfb-toggle"[^>]*data-inspector-open="feedback"/);
-  assert.match(titleMenu, /href="\/newer"[^>]*rel="prev"/);
-  assert.match(titleMenu, /href="\/older"[^>]*rel="next"/);
-  assert.match(titleMenu, /role="menuitemcheckbox"[^>]*aria-checked="true"/);
-  assert.doesNotMatch(titleMenu, /role="menuitemcheckbox"[^>]*aria-pressed/);
-  assert.doesNotMatch(moreMenu, /data-inspector-open/);
-  assert.match(moreMenu, /Open raw artifact/);
-  assert.match(moreMenu, /Download HTML/);
-  assert.match(moreMenu, /Change theme/);
-  assert.match(moreMenu, /Sign out/);
   assert.match(SHELL_ASSET, /function bindMenu/);
   assert.match(SHELL_ASSET, /e\.key==='ArrowDown'/);
   assert.match(SHELL_ASSET, /closeShellMenus/);
@@ -251,60 +163,7 @@ test("viewer shell gives review actions priority and keeps secondary actions in 
   assert.match(SHELL_ASSET, /commentMode\)\{e\.preventDefault\(\);setCommentMode\(false\)/);
 });
 
-test("delete controls render only for administrators and recorded owners", () => {
-  const ownedMeta = { ...meta, owner_email: "owner@acme.test" };
-  const ownerShell = renderArtifactShell(
-    ownedMeta,
-    nav,
-    {},
-    [],
-    {},
-    { email: "OWNER@ACME.TEST", org: "acme", isAdmin: false },
-  );
-  assert.match(ownerShell, /id="vdelete-trigger"/);
-  assert.match(ownerShell, /id="delete-dialog"/);
-  assert.match(ownerShell, /id="vdiscussion-state"/);
-  assert.match(ownerShell, /id="vdiscussion-actions"/);
-  assert.match(ownerShell, /data-can-manage-discussion="1"/);
-  assert.doesNotMatch(ownerShell, /Open Thread/i);
-
-  const memberShell = renderArtifactShell(
-    ownedMeta,
-    nav,
-    {},
-    [],
-    {},
-    { email: "member@acme.test", org: "acme", isAdmin: false },
-  );
-  assert.doesNotMatch(memberShell, /id="vdelete-trigger"/);
-  assert.doesNotMatch(memberShell, /id="delete-dialog"/);
-  assert.match(memberShell, /id="vdiscussion-state"/);
-  assert.doesNotMatch(memberShell, /id="vdiscussion-actions"/);
-  assert.match(memberShell, /data-can-manage-discussion="0"/);
-
-  const adminShell = renderArtifactShell(
-    { ...meta, owner_email: null },
-    nav,
-    {},
-    [],
-    {},
-    { email: "admin@example.test", org: "admin", isAdmin: true },
-  );
-  assert.match(adminShell, /id="vdelete-trigger"/);
-  assert.match(adminShell, /id="delete-dialog"/);
-  assert.match(adminShell, /id="vdiscussion-actions"/);
-});
-
 test("bundle shell scopes anchors to the current page and resets bridge state on navigation", () => {
-  const bundle = { ...meta, is_bundle: 1, entry: "index.html" };
-  const feedback = [
-    { id: "entry", parent_id: null, anchor_page: "index.html", anchor_x: 0.1, anchor_y: 0.2, artifact_revision: 3 },
-    { id: "page-two", parent_id: null, anchor_page: "pages/two.html", anchor_x: 0.3, anchor_y: 0.4, artifact_revision: 3 },
-    { id: "legacy", parent_id: null, anchor_page: null, anchor_x: 0.5, anchor_y: 0.6, artifact_revision: 3 }
-  ];
-  const html = renderArtifactShell(bundle, nav, {}, feedback);
-
-  assert.match(html, /anchor_page/);
   assert.match(SHELL_ASSET, /pin\.page===null\|\|pin\.page===currentPage/);
   assert.match(SHELL_ASSET, /bridgeReady=false/);
   assert.match(SHELL_ASSET, /hideAllMarkers/);
@@ -312,21 +171,6 @@ test("bundle shell scopes anchors to the current page and resets bridge state on
 });
 
 test("anchored-comment shell retains the v2 envelope and keeps prompt copy separate from saving", () => {
-  const feedback = [{
-    id: "saved-1", parent_id: null, viewer_email: "<author>", body: "<body>",
-    artifact_revision: 2, anchor_path: "main > p", anchor_x: 0.1, anchor_y: 0.2,
-    anchor_w: 0.3, anchor_h: 0.4, anchor_approx: 1, anchor_page: "pages/report.html",
-    anchor_kind: "region", anchor_node_id: "revenue-table", anchor_quote: "Quarterly <revenue>", anchor_version: 2
-  }];
-  const html = renderArtifactShell({ ...meta, is_bundle: 1, revision: 3 }, nav, {}, feedback);
-  assert.match(html, /id="vanchor-composer"/);
-  assert.match(html, /id="vanchor-copy"[^>]*>Copy prompt/);
-  assert.match(html, /id="vanchor-save"[^>]*>Add comment/);
-  assert.match(html, /data-copy-prompt="saved-1"/);
-  assert.match(html, /anchor_kind/);
-  assert.match(html, /anchor_node_id/);
-  assert.match(html, /anchor_quote/);
-  assert.match(html, /anchor_version/);
   assert.match(SHELL_ASSET, /Artifact MCP review handoff/);
   assert.match(SHELL_ASSET, /list_feedback/);
   assert.match(SHELL_ASSET, /single 65,536-byte read may be incomplete/);
@@ -469,7 +313,6 @@ test("marker preview placement clamps horizontally and chooses above or below", 
   assert.ok(nearBottom.left <= 768 - 208 - 8 - 760);
   assert.ok(nearTop.top + 5 >= 8);
   assert.ok(nearBottom.top + 900 + 54 <= stage.height - 8);
-  const html = renderArtifactShell(meta, nav, {}, []);
   assert.match(SHELL_ASSET, /beforeunload/);
   assert.match(SHELL_ASSET, /This discards the current draft comment/);
   assert.match(SHELL_ASSET, /draftAnchor=null;showDraftPosition\(0,0,0,0,true\);appendFeedback\(saved\)/);
@@ -541,183 +384,17 @@ test("shell rejects non-http(s) outbound hrefs before rendering a confirmation",
   assert.deepEqual(shell.opens, []);
 });
 
-test("both shell twins broker outbound links with the same trusted-context behavior", () => {
-  const shellScripts = [
-    null,
-    readFileSync(new URL("../assets/shell.js", import.meta.url), "utf8")
-  ];
-
-  for (const script of shellScripts) {
-    const shell = shellBrokerHarness(script);
-    shell.message({ type: "anchor:navigate", href: "https://admin.example.test/day-11" });
-    shell.confirm();
-    assert.deepEqual(shell.opens, [{
-      href: "https://admin.example.test/day-11",
-      target: "_blank",
-      features: "noopener",
-      userActivation: true
-    }]);
-  }
-});
-
-test("gallery cards use static digest-addressed images while the viewer iframe stays live", () => {
-  const sha = "deadbeefcafebabe00112233445566778899aabbccddeeff0011223344556677";
-  const item = { id: "abc123", org: "acme", title: "Artifact", client_id: "owner", uploader_label: "", is_bundle: 0, revision: 5, body_sha256: sha, bytes: 1, category: "" };
-  const gallery = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, [{ org: "acme", items: [item] }]);
-  assert.match(gallery, /<img class="pv" src="\/thumbnails\/abc123\?v=deadbeefcafebabe00112233445566778899aabbccddeeff0011223344556677" loading="lazy" decoding="async" width="1200" height="750"/);
-  assert.doesNotMatch(gallery, /<iframe class="pv"/);
-  assert.doesNotMatch(gallery, /\?preview/);
-
-  // digest, not revision, drives the token when body_sha256 is present
-  const shell = renderArtifactShell({ ...item }, nav, {}, []);
-  assert.match(shell, /\/raw\/abc123\?anchor=1&reader=1&v=deadbeefcafe/);
-  const castShell = renderArtifactShell({ ...item }, nav, {}, [], {}, {}, null, true);
-  assert.match(castShell, new RegExp(`/raw/abc123\\?anchor=1&reader=1&cast-pin=5\\.${sha}`));
-
-  // a changed body digest changes the token (cache is actually busted)
-  const nextSha = "000000000000111122223333444455556666777788889999aaaabbbbccccdddd";
-  const gallery2 = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, [{ org: "acme", items: [{ ...item, body_sha256: nextSha }] }]);
-  assert.ok(gallery2.includes(`?v=${nextSha}`));
-  assert.doesNotMatch(gallery2, /v=deadbeef/);
-
-  // Missing legacy digests use the no-store placeholder route rather than a live iframe.
-  const noDigest = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, [{ org: "acme", items: [{ ...item, body_sha256: null }] }]);
-  assert.match(noDigest, /src="\/thumbnails\/abc123"/);
-  assert.doesNotMatch(noDigest, /<iframe class="pv"/);
-
-  const bundle = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, [{ org: "acme", items: [{ ...item, is_bundle: 1 }] }]);
-  assert.match(bundle, /src="\/thumbnails\/abc123\?v=/);
-  assert.match(bundle, />Bundle<\/span>/);
-  assert.doesNotMatch(bundle, /<iframe class="pv"/);
-});
-
-test("gallery renders a flat role-aware collection and owner-scoped eyes", () => {
-  const owned = {
-    ...meta,
-    id: "owned123",
-    title: "Owned hidden upload",
-    category: "Reports",
-    hidden: 1,
-    is_owned_by_viewer: true,
-    owner_email: "viewer@acme.test",
-    created_at: "2026-07-01 00:00:00",
-    updated_at: "2026-07-03 00:00:00",
-  };
-  const teammate = {
-    ...meta,
-    id: "other123",
-    title: "Teammate bundle",
-    category: "Dashboards",
-    is_bundle: 1,
-    is_owned_by_viewer: false,
-    owner_email: "other@acme.test",
-    created_at: "2026-07-01 00:00:00",
-    updated_at: "2026-07-02 00:00:00",
-  };
-  const reactions = new Map([["owned123", { favorite: 1, vote: -1 }]]);
-  const member = renderGallery(
-    { email: "viewer@acme.test", org: "acme", isAdmin: false },
-    [{ org: "acme", items: [teammate, owned] }],
-    reactions
-  );
-
-  const memberCards = member.slice(member.indexOf('<main id="stage">'), member.indexOf("</main>"));
-  assert.match(member, /class="artifact-grid"/);
-  assert.doesNotMatch(member, /class="cat-track"/);
-  assert.doesNotMatch(member, /data-ui="nav-administration"/);
-  assert.equal(
-    (memberCards.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
-    1,
-  );
-  assert.match(member, /data-id="owned123"[^>]*data-owned="1"/);
-  assert.match(member, /data-id="other123"[^>]*data-owned="0"/);
-  assert.doesNotMatch(member, /other@acme\.test/);
-  assert.match(member, /My needs-work votes/);
-  assert.match(member, /id="org-filter"[^>]*aria-label="Filter by organization"/);
-  assert.match(member, /id="category-filter"[^>]*aria-label="Filter by category"/);
-  assert.match(member, /<option value="Reports">Reports \(1\)<\/option>/);
-  assert.match(member, /<option value="Dashboards">Dashboards \(1\)<\/option>/);
-  assert.match(member, /Find every published artifact\./);
-  assert.doesNotMatch(member, /data-filter-category=/);
-  assert.ok(member.indexOf('data-id="owned123"') < member.indexOf('data-id="other123"'));
-  assert.equal(
-    (memberCards.match(/<button class="act save[^"]*"[^>]*data-action="favorite"/g) || []).length,
-    2,
-  );
-  assert.equal(
-    (memberCards.match(/<button class="act share"[^>]*data-action="share"/g) || []).length,
-    2,
-  );
-  assert.equal(
-    (memberCards.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
-    1,
-  );
-  assert.match(member, /HTML download unavailable for Teammate bundle/);
-
-  const admin = renderGallery(
-    { email: "admin@example.test", org: "admin", isAdmin: true },
-    [{ org: "acme", items: [teammate, owned] }],
-    reactions
-  );
-  const adminCards = admin.slice(admin.indexOf('<main id="stage">'), admin.indexOf("</main>"));
-  assert.match(admin, /data-ui="nav-administration"/);
-  assert.equal(
-    (adminCards.match(/<button class="act icon-act visibility"[^>]*data-action="visibility"/g) || []).length,
-    2,
-  );
-  assert.equal(
-    (adminCards.match(/<button class="menu-action del"[^>]*data-action="delete"/g) || []).length,
-    2,
-  );
-  assert.match(admin, />Needs review <span>/);
-  assert.doesNotMatch(admin, /My needs-work votes/);
-});
-
-test("viewer shell links the web app manifest and touch icon and renders a hidden bell and prompt region", () => {
-  const html = renderArtifactShell(meta, nav, {}, [], {}, { email: "viewer@acme.test" }, null, true);
-  assert.match(html, /<link rel="manifest" href="\/abc123\/manifest\.webmanifest" crossorigin="use-credentials">/);
-  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Artifact">/);
-  assert.doesNotMatch(html, /href="\/manifest\.webmanifest"/);
-  assert.match(html, /<link rel="apple-touch-icon" href="\/icons\/apple-touch-icon\.png">/);
-  assert.match(html, /<meta name="apple-mobile-web-app-capable" content="yes">/);
-  assert.match(html, /<meta name="mobile-web-app-capable" content="yes">/);
-  assert.match(html, /<button class="vpush-toggle" id="vpush-toggle" type="button" title="Notify me" aria-label="Notify me" aria-pressed="false" data-state="off" hidden>/);
-  assert.match(html, /<div class="vpush-banner" id="vpush-banner" role="region" aria-label="Artifact notifications" hidden>/);
-  assert.match(html, /<button class="vpush-enable" id="vpush-enable" type="button">Turn on notifications<\/button>/);
-  assert.match(html, /id="vpush-dismiss" type="button" aria-label="Dismiss notification prompt"/);
+test("viewer shell template links the web app manifest and touch icon and carries the bell and prompt region", () => {
   const template = readFileSync(new URL("../templates/artifact-shell.html", import.meta.url), "utf8");
   for (const fragment of ['<link rel="manifest" href="/{{ artifact_id }}/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="{{ install_name }}">', '<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png">', 'id="vpush-toggle"', 'id="vpush-banner"', 'id="vpush-reason"', 'id="vpush-enable"', 'id="vpush-dismiss"']) {
-    assert.ok(template.includes(fragment), `Rust template keeps parity: ${fragment}`);
+    assert.ok(template.includes(fragment), `viewer shell template keeps ${fragment}`);
   }
 });
 
-test("viewer shell names the per-artifact install after the escaped, bounded title", () => {
-  const html = renderArtifactShell({ ...meta, title: ' \u0007Q3 <"Board"> & Rock\'n roll plan with a title that runs well past the sixty code point limit ' }, nav, {}, [], {}, { email: "viewer@acme.test" });
-  assert.match(html, /<meta name="apple-mobile-web-app-title" content="Q3 &lt;&quot;Board&quot;&gt; &amp; Rock&#39;n roll plan with a title that runs well">/);
-});
-
-test("artifact install names strip controls, trim, bound code points, and fall back", () => {
-  assert.equal(artifactInstallName("  Plain title  "), "Plain title");
-  assert.equal(artifactInstallName("\u0000Tab\tand\u009fC1\u007f"), "TabandC1");
-  assert.equal(artifactInstallName("x".repeat(80)), "x".repeat(60));
-  assert.equal(artifactInstallName(" \u0001\n\u3000 "), "Artifact");
-  assert.equal(artifactInstallName(null), "Artifact");
-  assert.equal(artifactInstallShortName("Quarterly planning board"), "Quarterly pl");
-  assert.equal(artifactInstallShortName("Daily  standup"), "Daily  stand");
-  assert.equal(artifactInstallShortName("Weekly notes"), "Weekly notes");
-  assert.equal(artifactInstallShortName("Ten chars  x"), "Ten chars  x");
-  assert.equal(artifactInstallShortName("Ten chars   tail"), "Ten chars");
-  assert.equal(artifactInstallShortName("\u{1F600}".repeat(20)), "\u{1F600}".repeat(12));
-  assert.equal(artifactInstallShortName(""), "Artifact");
-});
-
-test("the library links the site manifest and the generic Home Screen title", () => {
-  const gallery = renderGallery({ email: "v@acme.test", org: "acme", isAdmin: false }, []);
-  assert.match(gallery, /<link rel="manifest" href="\/manifest\.webmanifest" crossorigin="use-credentials">/);
-  assert.match(gallery, /<meta name="apple-mobile-web-app-title" content="Artifacts">/);
+test("the library template links the site manifest and the generic Home Screen title", () => {
   const template = readFileSync(new URL("../templates/gallery.html", import.meta.url), "utf8");
   for (const fragment of ['<link rel="manifest" href="/manifest.webmanifest" crossorigin="use-credentials">', '<meta name="apple-mobile-web-app-title" content="Artifacts">']) {
-    assert.ok(template.includes(fragment), `Rust gallery template keeps parity: ${fragment}`);
+    assert.ok(template.includes(fragment), `gallery template keeps ${fragment}`);
   }
 });
 

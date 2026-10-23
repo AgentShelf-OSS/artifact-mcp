@@ -292,19 +292,12 @@ test.describe("artifact viewer", () => {
     expect(hist.status()).toBe(200);
   });
 
-  test("discussion details fail safely on Node and expose guarded Rust policy controls without an untrusted thread link", async ({ page, request, publisherKey, org }, testInfo) => {
+  test("discussion details expose guarded policy controls without an untrusted thread link", async ({ page, request, publisherKey, org }) => {
     const artifact = await publish(request, publisherKey, { title: `PW Discussion ${org}`, html: "<!doctype html><h1>discussion</h1>" });
     await page.goto(`/${artifact.id}`);
     await page.locator("#vtitle-toggle").click();
     await page.getByRole("menuitem", { name: "Details" }).click();
     await expect(page.getByRole("link", { name: /Open Thread/i })).toHaveCount(0);
-
-    if (testInfo.project.name === "node") {
-      await expect(page.locator("#vdiscussion-state")).toHaveText("Status unavailable");
-      await expect(page.locator("#vdiscussion-actions button")).toHaveCount(0);
-      await expect(page.getByText(/Artifact content and feedback remain available/i)).toBeVisible();
-      return;
-    }
 
     await expect(page.locator("#vdiscussion-state")).toHaveText("Artifact MCP only");
     await expect(page.getByRole("button", { name: "Keep discussion in Artifact MCP" })).toBeVisible();

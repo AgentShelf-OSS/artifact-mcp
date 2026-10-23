@@ -1,4 +1,4 @@
-// Reader shell/scopes regression against the shared Node/Rust fixture.
+// Reader shell/scopes regression against the shared Rust server fixture.
 const assert = require('node:assert/strict');
 const { createReaderFixture, launchChromium } = require('../reader-fixture.cjs');
 

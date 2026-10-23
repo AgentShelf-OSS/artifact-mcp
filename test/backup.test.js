@@ -5,7 +5,15 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import Database from "better-sqlite3";
+import { DatabaseSync } from "node:sqlite";
+
+// Keep the former better-sqlite3 semantics these fixtures rely on: a 5 s busy timeout and an
+// optional read-only open.
+class Database extends DatabaseSync {
+  constructor(file, { readonly = false } = {}) {
+    super(file, { readOnly: readonly, timeout: 5000 });
+  }
+}
 
 const script = process.env.ARTIFACT_MCP_BACKUP_SCRIPT || path.resolve("scripts/backup.sh");
 const sqlite = spawnSync("which", ["sqlite3"], { encoding: "utf8" }).stdout.trim();
@@ -46,7 +54,7 @@ if [[ "\${1:-}" == "-a" && "\${2:-}" == */previews && -n "\${BACKUP_TEST_CORRUPT
 fi
 `, { mode: 0o755 });
   const db = new Database(path.join(data, "artifacts.db"));
-  t.after(() => { if (db.open) db.close(); });
+  t.after(() => { if (db.isOpen) db.close(); });
   db.exec("CREATE TABLE artifacts (id TEXT PRIMARY KEY, is_bundle INTEGER NOT NULL, body_sha256 TEXT NOT NULL); CREATE TABLE artifact_revisions (artifact_id TEXT NOT NULL, revision INTEGER NOT NULL, is_bundle INTEGER NOT NULL, body_sha256 TEXT NOT NULL); CREATE TABLE artifact_durability_intents (id TEXT PRIMARY KEY)");
   return { root, data, backups, db };
 }
@@ -101,7 +109,7 @@ test("active publish between file copy and SQLite snapshot cannot yield a missin
 
   const [name] = await fs.readdir(backups);
   const backupDb = new Database(path.join(backups, name, "artifacts.db"), { readonly: true });
-  assert.deepEqual(backupDb.prepare("SELECT id FROM artifacts ORDER BY id").all(), [{ id: "before" }, { id: "during" }]);
+  assert.deepEqual(backupDb.prepare("SELECT id FROM artifacts ORDER BY id").all().map((row) => ({ ...row })), [{ id: "before" }, { id: "during" }]);
   assert.equal(await fs.readFile(path.join(backups, name, "artifacts", "during.html"), "utf8"), "during");
   backupDb.close();
   assert.equal(await fs.readFile(path.join(backups, name, "artifacts", ".history", "before", "1.html"), "utf8"), "previous");

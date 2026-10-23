@@ -66,8 +66,7 @@ test.describe("portal request authenticity", () => {
     expect(result.id).toBeTruthy();
   });
 
-  test("the discussion control uses the same CSRF mutation header", async ({ page, request, publisherKey, org }, testInfo) => {
-    test.skip(testInfo.project.name === "node", "organization threading overrides are Rust-owned");
+  test("the discussion control uses the same CSRF mutation header", async ({ page, request, publisherKey, org }) => {
     const artifact = await publish(request, publisherKey, {
       title: `PW CSRF discussion ${org}`,
       html: "<!doctype html><h1>discussion action</h1>"

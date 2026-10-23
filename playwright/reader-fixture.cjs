@@ -38,12 +38,10 @@ function fetchBounded(input, init = {}, timeoutMs = 10_000) {
   return fetch(input, { ...init, signal: AbortSignal.timeout(timeoutMs) });
 }
 
-function requiredRuntime() {
-  const runtime = String(process.env.READER_RUNTIME || '').trim().toLowerCase();
-  if (runtime !== 'node' && runtime !== 'rust') {
-    throw new Error('READER_RUNTIME must be node or rust');
-  }
-  return runtime;
+function requiredBinary() {
+  const binary = String(process.env.RUST_ARTIFACT_MCP_BIN || '').trim();
+  if (!binary) throw new Error('RUST_ARTIFACT_MCP_BIN is required for reader fixtures');
+  return binary;
 }
 
 function requiredRoot() {
@@ -206,7 +204,7 @@ function createWorker() {
   };
 }
 
-function baseEnvironment({ runtime, dataDir, port, base, apiKey, workerUrl, tokenFile }) {
+function baseEnvironment({ dataDir, port, base, apiKey, workerUrl, tokenFile }) {
   const env = {
     PATH: process.env.PATH || '/usr/local/bin:/usr/bin:/bin',
     HOME: process.env.HOME || os.tmpdir(),
@@ -227,13 +225,11 @@ function baseEnvironment({ runtime, dataDir, port, base, apiKey, workerUrl, toke
     QWEN_TTS_REFERENCE_VOICE_ENABLED: '1', QWEN_TTS_CUSTOM_VOICES_ENABLED: '1',
     RAVEN_TTS_WORKER_URL: workerUrl, RAVEN_TTS_WORKER_TOKEN_FILE: tokenFile,
     MOSS_TTS_WORKER_URL: workerUrl, MOSS_TTS_WORKER_TOKEN_FILE: tokenFile,
+    INGRESS_READS_PER_WINDOW: '1000',
+    INGRESS_MUTATIONS_PER_WINDOW: '1000',
+    INGRESS_MCP_PER_WINDOW: '1000',
+    INGRESS_UPLOADS_PER_WINDOW: '1000',
   };
-  if (runtime === 'rust') {
-    env.INGRESS_READS_PER_WINDOW = '1000';
-    env.INGRESS_MUTATIONS_PER_WINDOW = '1000';
-    env.INGRESS_MCP_PER_WINDOW = '1000';
-    env.INGRESS_UPLOADS_PER_WINDOW = '1000';
-  }
   return env;
 }
 
@@ -265,13 +261,8 @@ async function startWorker(worker) {
   return `http://127.0.0.1:${address.port}`;
 }
 
-async function startApp(env, runtime) {
-  const command = runtime === 'rust'
-    ? (process.env.RUST_ARTIFACT_MCP_BIN || '')
-    : process.execPath;
-  if (runtime === 'rust' && !command) throw new Error('RUST_ARTIFACT_MCP_BIN is required for Rust fixtures');
-  const args = runtime === 'rust' ? [] : [path.join(ROOT, 'server.js')];
-  const child = spawn(command, args, { cwd: ROOT, env, detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
+async function startApp(env, binary) {
+  const child = spawn(binary, [], { cwd: ROOT, env, detached: true, stdio: ['ignore', 'ignore', 'pipe'] });
   let stderr = '';
   let spawnError;
   child.stderr.on('data', chunk => { stderr = `${stderr}${chunk}`.slice(-4000); });
@@ -280,9 +271,9 @@ async function startApp(env, runtime) {
   while (Date.now() < deadline) {
     if (spawnError) {
       await stopProcess(child);
-      throw new Error(`${runtime} server failed to spawn: ${spawnError.message}`);
+      throw new Error(`Rust server failed to spawn: ${spawnError.message}`);
     }
-    if (child.exitCode !== null) throw new Error(`${runtime} server exited during startup: ${stderr}`);
+    if (child.exitCode !== null) throw new Error(`Rust server exited during startup: ${stderr}`);
     try {
       const response = await fetchBounded(`${env.PUBLIC_BASE_URL}/health`, {}, 1500);
       if (response.ok) return child;
@@ -290,11 +281,11 @@ async function startApp(env, runtime) {
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   await stopProcess(child);
-  throw new Error(`${runtime} server startup timed out: ${stderr}`);
+  throw new Error(`Rust server startup timed out: ${stderr}`);
 }
 
 async function createReaderFixture({ audio = {} } = {}) {
-  const runtime = requiredRuntime();
+  const binary = requiredBinary();
   const root = requiredRoot();
   await fs.mkdir(root, { recursive: true });
   const fixtureDir = await fs.mkdtemp(path.join(root, 'reader-fixture-'));
@@ -321,9 +312,9 @@ async function createReaderFixture({ audio = {} } = {}) {
     for (let attempt = 0; attempt < 3 && !child; attempt += 1) {
       port = await freePort();
       base = `http://127.0.0.1:${port}`;
-      env = baseEnvironment({ runtime, dataDir: fixtureDir, port, base, apiKey, workerUrl, tokenFile });
+      env = baseEnvironment({ dataDir: fixtureDir, port, base, apiKey, workerUrl, tokenFile });
       try {
-        child = await startApp(env, runtime);
+        child = await startApp(env, binary);
       } catch (error) {
         startupError = error;
       }

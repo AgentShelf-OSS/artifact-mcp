@@ -182,27 +182,23 @@ test.describe("settings administration", () => {
     }
   });
 
-  test("Discord threading settings keep the organization token write-only and explain inheritance", async ({ page, request, org }, testInfo) => {
+  test("Discord threading settings keep the organization token write-only and explain inheritance", async ({ page, request, org }) => {
     const discussionOrg = `${org}-discussion`;
     const created = await api(request, "post", "/settings/orgs", {
       name: discussionOrg,
       label: "Discussion Test",
     });
     expect(created.status(), await created.text()).toBe(200);
-    // PBI-081's production credential service is Rust-owned. The legacy Node comparison server
-    // deliberately exposes only the safe unavailable projection for this mutation.
-    if (testInfo.project.name === "rust") {
-      const disabled = await api(
-        request,
-        "put",
-        `/settings/orgs/${encodeURIComponent(discussionOrg)}/discord-threading`,
-        { botToken: "", enabled: false },
-      );
-      expect(disabled.status(), await disabled.text()).toBe(200);
-      const disabledBody = await disabled.json();
-      expect(disabledBody.enabled).toBe(false);
-      expect(JSON.stringify(disabledBody)).not.toMatch(/botToken|ciphertext|nonce|tag/i);
-    }
+    const disabled = await api(
+      request,
+      "put",
+      `/settings/orgs/${encodeURIComponent(discussionOrg)}/discord-threading`,
+      { botToken: "", enabled: false },
+    );
+    expect(disabled.status(), await disabled.text()).toBe(200);
+    const disabledBody = await disabled.json();
+    expect(disabledBody.enabled).toBe(false);
+    expect(JSON.stringify(disabledBody)).not.toMatch(/botToken|ciphertext|nonce|tag/i);
 
     await page.goto(`/settings#tab=notifications&org=${encodeURIComponent(discussionOrg)}`);
     const card = page.locator(`[data-discussion-org="${discussionOrg}"]`);

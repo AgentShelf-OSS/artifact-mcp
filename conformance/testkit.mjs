@@ -3,12 +3,13 @@
 //
 // Shared, implementation-neutral constants and helpers for the conformance oracle.
 // Nothing here talks HTTP or spawns processes — that lives in the drivers and runner.
-// Node stdlib only (plus a resolved better-sqlite3 for post-state SQL).
+// Node stdlib only; post-state SQL uses the built-in node:sqlite module.
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { DatabaseSync } from "node:sqlite";
+import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const CONFORMANCE_DIR = HERE;
@@ -20,11 +21,11 @@ export const FIXTURES_DIR = join(HERE, "fixtures");
 // --- Well-known test credentials -------------------------------------------------------
 //
 // These are the ONLY publisher keys and viewer identities the oracle uses. They are seeded
-// into every server (Node or Rust) through env at boot, so both implementations answer the
-// same authenticated requests deterministically. Secrets are long, fixed, and non-secret
-// (this is a test fixture, never a deployment).
+// into every server through env at boot, so the same authenticated requests are answered
+// deterministically. Secrets are long, fixed, and non-secret (this is a test fixture, never a
+// deployment).
 //
-// ARTIFACT_API_KEYS entry format is "clientId:org:secret" (see lib/db.js seedKeysFromEnv).
+// ARTIFACT_API_KEYS entry format is "clientId:org:secret".
 export const CREDENTIALS = {
   acme: { clientId: "pub-acme", org: "acme", secret: "conf-key-acme-000000000000" },
   acme2: { clientId: "pub-acme2", org: "acme", secret: "conf-key-acme2-11111111111" },
@@ -53,7 +54,7 @@ export function baseEnv() {
     ADMIN_EMAILS: VIEWERS.admin_email,
     ORG_EMAIL_DOMAINS: "acme.test:acme,beta.test:beta",
     PUBLIC_BASE_URL: PUBLIC_BASE,
-    // Fixed non-secret test key so both runtimes exercise the mandatory tamper-evident ledger.
+    // Fixed non-secret test key so the server exercises the mandatory tamper-evident ledger.
     AUDIT_LEDGER_HMAC_KEY: Buffer.alloc(32, 7).toString("base64"),
     // Keep preview/thumbnail rendering off so no headless browser is required.
     PREVIEW_RENDERER_URL: "",
@@ -81,41 +82,15 @@ export function constantSymbols() {
   };
 }
 
-// --- Dependency resolution -------------------------------------------------------------
+// --- Post-state database access -------------------------------------------------------
 //
-// The worktree may not carry its own node_modules. Resolve a usable one (with express +
-// better-sqlite3 built for this Node) from, in order: an explicit override, the worktree,
-// then the sibling main checkout. Nothing is installed or written here.
-export function resolveNodeModules() {
-  const candidates = [
-    process.env.CONFORMANCE_NODE_MODULES,
-    join(REPO_ROOT, "node_modules"),
-    resolve(REPO_ROOT, "..", "..", "artifact-mcp", "node_modules")
-  ].filter(Boolean);
-  for (const dir of candidates) {
-    if (existsSync(join(dir, "express")) && existsSync(join(dir, "better-sqlite3"))) {
-      return dir;
-    }
-  }
-  throw new Error(
-    "Could not locate a node_modules with express + better-sqlite3. Checked:\n  " +
-    candidates.join("\n  ") +
-    "\nSet CONFORMANCE_NODE_MODULES to a built node_modules directory."
-  );
-}
-
-let _Database = null;
-// Dynamically load better-sqlite3 from the resolved node_modules (it is not resolvable from
-// the worktree root). Used only for read-only post-state assertions.
-export async function loadBetterSqlite() {
-  if (_Database) return _Database;
-  const nm = resolveNodeModules();
-  const pkgDir = join(nm, "better-sqlite3");
-  const pkg = JSON.parse(readFileSync(join(pkgDir, "package.json"), "utf8"));
-  const mainFile = join(pkgDir, pkg.main || "lib/index.js");
-  const mod = await import(pathToFileURL(mainFile).href);
-  _Database = mod.default || mod;
-  return _Database;
+// Opens the SQLite database a case left behind. Post-state assertions open it read-only after
+// the server has stopped; `afterSql` fixture shaping opens it read-write while the server runs,
+// so a 5 s busy timeout waits out the server's own short write transactions. The file must
+// already exist: the server under test creates it, never this harness.
+export function openDatabase(path, { readOnly = true } = {}) {
+  if (!existsSync(path)) throw new Error(`SQLite database not found: ${path}`);
+  return new DatabaseSync(path, { readOnly, timeout: 5000 });
 }
 
 // --- Small async / net utilities -------------------------------------------------------

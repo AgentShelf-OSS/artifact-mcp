@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Neil Blackman
 //
-// Rust production-server driver. It mirrors node-driver.mjs: start the real server against a
-// caller-owned DATA_DIR and PORT, wait for /health, and return an idempotently stoppable handle.
+// Rust production-server driver: start the real server binary against a caller-owned DATA_DIR
+// and PORT, wait for /health, and return an idempotently stoppable handle.
 
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
@@ -10,9 +10,8 @@ import { isAbsolute, join, resolve } from "node:path";
 import { REPO_ROOT, waitForHealth } from "./testkit.mjs";
 
 const NOT_BUILT_MESSAGE =
-  "Rust artifact-mcp binary is absent. Build it with `cargo build --release`, " +
-  "or set RUST_ARTIFACT_MCP_BIN to the executable. `--impl rust` is a hard failure; " +
-  "`--impl both` will run Node and report this explicit skip.";
+  "Rust artifact-mcp binary is absent. Build it with `cargo build --release --locked`, " +
+  "or set RUST_ARTIFACT_MCP_BIN to the executable. A missing binary fails the run.";
 
 function resolveBinary() {
   const configured = process.env.RUST_ARTIFACT_MCP_BIN;
@@ -60,6 +59,12 @@ export function createRustDriver() {
 
       let exited = false;
       let exitInfo = null;
+      // A spawn failure (for example a non-executable path) emits "error" and never "exit".
+      // Mark the process finished so stop() cannot wait forever on an exit that never comes.
+      child.on("error", (error) => {
+        exited = true;
+        exitInfo = { error: error.message };
+      });
       child.on("exit", (code, signal) => {
         exited = true;
         exitInfo = { code, signal };

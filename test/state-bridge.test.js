@@ -1,68 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { IncomingMessage, ServerResponse } from "node:http";
-import { Duplex } from "node:stream";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
-import { createApp } from "../lib/app.js";
 
-const html = '<!doctype html><h1>Artifact</h1><script>parent.postMessage({type:"state:hello"},"*");</script>';
-const historical = '<!doctype html><h1>Earlier artifact</h1>';
-
-function appForDelivery() {
-  const metas = {
-    single: { id: "single", org: "acme", title: "Artifact", is_bundle: false },
-    bundle: { id: "bundle", org: "acme", title: "Bundle", is_bundle: true, entry: "index.html" },
-  };
-  const file = content => ({ content: Buffer.from(content), contentType: "text/html; charset=utf-8" });
-  return createApp({
-    artifacts: {
-      getArtifactMeta: id => metas[id],
-      readArtifact: () => ({ html }),
-      readBundleFile: () => file(html),
-      readHistoryArtifact: () => ({ html: historical }),
-      readHistoryBundleFile: () => file(historical),
-    },
-    shares: { resolve: token => ({ artifact_id: token, org: "acme" }) },
-    resolveViewer: async req => {
-      assert.ok(!req.path.startsWith("/s/"), "public delivery must not resolve viewer identity");
-      return { email: "viewer@acme.test", org: "acme", isAdmin: false };
-    },
-    pages: { notFound: () => "not found" },
-  });
-}
-
-// Exercise Express delivery without opening a listening socket.
-function get(app, url) {
-  const socket = new Duplex({ read() {}, write(_chunk, _encoding, done) { done(); } });
-  const req = new IncomingMessage(socket);
-  req.method = "GET"; req.url = url; req.headers = {};
-  const res = new ServerResponse(req);
-  return new Promise((resolve, reject) => {
-    res.end = function(chunk) {
-      resolve({ status: res.statusCode, body: Buffer.from(chunk ?? "") });
-      socket.destroy(); return res;
-    };
-    req.on("error", reject); req.push(null);
-    app.handle(req, res, error => reject(error || new Error("unhandled delivery route")));
-  });
-}
-
-for (const [path, expected] of [
-  ["/raw/single", html],
-  ["/raw/single?download", html],
-  ["/raw/bundle/", html],
-  ["/raw/single/rev/1", historical],
-  ["/raw/bundle/rev/1/", historical],
-  ["/s/single", html],
-  ["/s/bundle/", html],
-]) {
-  test(`${path} preserves artifact bytes without a viewer-state responder`, async () => {
-    const response = await get(appForDelivery(), path);
-    assert.equal(response.status, 200);
-    assert.deepEqual(response.body, Buffer.from(expected));
-  });
-}
+// The state bridge example in GETTING_STARTED.md is browser code that artifact authors copy.
+// Exact-byte raw, bundle and public-share delivery is covered by the conformance `raw.*` and
+// `share.public-delivery` cases.
 
 function documentedExample() {
   const guide = readFileSync(new URL("../GETTING_STARTED.md", import.meta.url), "utf8");

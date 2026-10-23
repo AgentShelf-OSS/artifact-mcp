@@ -5,8 +5,8 @@
 import { createHash } from "node:crypto";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
-import Database from "better-sqlite3";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const FIXTURES = join(ROOT, "conformance", "fixtures", "historical");
@@ -39,8 +39,8 @@ for (const name of cases) {
   if (sha256(database) !== manifest.database.sha256) throw new Error(`${name}: artifacts.db digest changed`);
   const entries = await bodyEntries(root);
   if (JSON.stringify(entries) !== JSON.stringify(manifest.bodies)) throw new Error(`${name}: body manifest changed`);
-  const db = new Database(join(root, manifest.database.path), { readonly: true });
-  const integrity = db.pragma("integrity_check", { simple: true });
+  const db = new DatabaseSync(join(root, manifest.database.path), { readOnly: true });
+  const integrity = Object.values(db.prepare("PRAGMA integrity_check").get())[0];
   db.close();
   if (integrity !== "ok") throw new Error(`${name}: pre-migration integrity_check is ${integrity}`);
   console.log(`${name}: origin schema ${manifest.origin.schemaVersion}, immutable bytes and integrity OK`);

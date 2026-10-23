@@ -3,12 +3,12 @@
 //
 // Language-neutral conformance runner (blueprint B2/B3). Node stdlib only.
 //
-//   node conformance/runner.mjs --impl node|rust|both [--record] [--filter <tag>]
+//   node conformance/runner.mjs [--impl rust] [--record] [--filter <tag>]
 //
-// For each case: copy the named fixture to a fresh temp DATA_DIR, start the target server on
-// a random loopback port, wait for /health, execute the HTTP steps, normalize only declared-
+// For each case: copy the named fixture to a fresh temp DATA_DIR, start the Rust server on a
+// random loopback port, wait for /health, execute the HTTP steps, normalize only declared-
 // volatile fields, compare per the case's declared modes, stop the server cleanly, then run
-// post-state SQL / file / directory assertions. Node and Rust NEVER share a data dir.
+// post-state SQL / file / directory assertions. Every case gets its own data dir.
 //
 // Exit nonzero on any diff, failed assertion, or runner error.
 
@@ -33,7 +33,7 @@ import {
   constantSymbols,
   freePort,
   httpRequest,
-  loadBetterSqlite,
+  openDatabase,
   waitForHealth
 } from "./testkit.mjs";
 import {
@@ -44,12 +44,11 @@ import {
   normalizeHeaders,
   sha256Hex
 } from "./comparators.mjs";
-import { createNodeDriver } from "./node-driver.mjs";
 import { createRustDriver } from "./rust-driver.mjs";
 
 // --- CLI -------------------------------------------------------------------------------
 function parseArgs(argv) {
-  const args = { impl: null, record: false, filter: null };
+  const args = { impl: "rust", record: false, filter: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--impl") args.impl = argv[++i];
@@ -61,12 +60,14 @@ function parseArgs(argv) {
   return args;
 }
 
-const USAGE = `Usage: node conformance/runner.mjs --impl node|rust|both [--record] [--filter <tag>]
+const USAGE = `Usage: node conformance/runner.mjs [--impl rust] [--record] [--filter <tag>]
 
-  --impl node    Run every recorded case against the real Node server (works today).
-  --impl rust    Run against the Rust server (not built until M1+; fails clearly).
-  --impl both    Run Node fully; degrade cleanly if the Rust binary is absent.
-  --record       Regenerate goldens FROM the Node server. Forbidden with rust/both and in CI.
+  Runs every case against the Rust server binary (target/release/artifact-mcp, or
+  RUST_ARTIFACT_MCP_BIN). A missing binary is a failure.
+
+  --impl rust    Accepted for compatibility; rust is the only implementation.
+  --record       Regenerate goldens from the Rust server. Refuses cases whose assertions
+                 fail. Never use in CI.
   --filter <t>   Only run cases whose id or tags contain <t>.`;
 
 // --- Case & golden IO ------------------------------------------------------------------
@@ -320,9 +321,7 @@ async function normalizePostState(postState, dataDir, symbols, captures) {
 
   if (Array.isArray(postState.sql) && postState.sql.length) {
     out.sql = {};
-    const Database = await loadBetterSqlite();
-    const dbPath = join(dataDir, "artifacts.db");
-    const db = new Database(dbPath, { fileMustExist: true });
+    const db = openDatabase(join(dataDir, "artifacts.db"), { readOnly: true });
     try {
       for (const spec of postState.sql) {
         const query = substStr(spec.query, symbols);
@@ -347,9 +346,7 @@ async function normalizePostState(postState, dataDir, symbols, captures) {
 
 async function applyAfterSql(statements, dataDir, symbols) {
   if (!Array.isArray(statements) || statements.length === 0) return;
-  const Database = await loadBetterSqlite();
-  const dbPath = join(dataDir, "artifacts.db");
-  const db = new Database(dbPath, { fileMustExist: true });
+  const db = openDatabase(join(dataDir, "artifacts.db"), { readOnly: false });
   try {
     for (const statement of statements) db.exec(substStr(statement, symbols));
   } finally {
@@ -491,7 +488,7 @@ async function runImpl(driver, cases, { record }) {
     try {
       const { normalized, assertionFailures } = await runCaseAgainst(driver, caseDef);
 
-      if (record && driver.name === "node") {
+      if (record) {
         if (assertionFailures.length) {
           results.push({ id: caseDef.id, status: "fail", detail: `refusing to record (assertions failed):\n  ${assertionFailures.join("\n  ")}` });
           continue;
@@ -503,7 +500,7 @@ async function runImpl(driver, cases, { record }) {
 
       const golden = loadGolden(caseDef.id);
       if (!golden) {
-        results.push({ id: caseDef.id, status: "fail", detail: "no golden recorded (run with --record --impl node)" });
+        results.push({ id: caseDef.id, status: "fail", detail: "no golden recorded (run with --record)" });
         continue;
       }
       const diffs = diffNormalized(golden, normalized);
@@ -535,19 +532,30 @@ function printResults(implName, results) {
   );
 }
 
+// Every completed run ends through exit(). A natural exit with code 0 means a pending promise was
+// abandoned with an empty event loop (for example a server handle that never settled), so fail
+// instead of reporting a silent success.
+let finished = false;
+function exit(code) {
+  finished = true;
+  process.exit(code);
+}
+process.on("exit", (code) => {
+  if (!finished && code === 0) {
+    console.error("runner exited before reporting results");
+    process.exitCode = 1;
+  }
+});
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  if (args.help || !args.impl) {
+  if (args.help) {
     console.log(USAGE);
-    process.exit(args.help ? 0 : 2);
+    exit(0);
   }
-  if (!["node", "rust", "both"].includes(args.impl)) {
-    console.error(`--impl must be node|rust|both (got "${args.impl}")`);
-    process.exit(2);
-  }
-  if (args.record && args.impl !== "node") {
-    console.error("--record is only valid with --impl node (goldens are recorded from the Node reference).");
-    process.exit(2);
+  if (args.impl !== "rust") {
+    console.error(`--impl must be rust (got "${args.impl}"); the Node reference server was retired.`);
+    exit(2);
   }
 
   let cases = loadCases();
@@ -556,43 +564,25 @@ async function main() {
   }
   if (cases.length === 0) {
     console.error("No cases matched.");
-    process.exit(2);
+    exit(2);
   }
 
-  const impls = args.impl === "both" ? ["node", "rust"] : [args.impl];
-  let anyFailure = false;
-
-  for (const impl of impls) {
-    if (impl === "node") {
-      const driver = createNodeDriver();
-      try {
-        const results = await runImpl(driver, cases, { record: args.record });
-        printResults("node", results);
-        if (results.some((r) => r.status === "fail" || r.status === "error")) anyFailure = true;
-      } finally {
-        driver.dispose();
-      }
-    } else {
-      const driver = createRustDriver();
-      if (!driver.available()) {
-        console.log(`\n=== impl: rust ===`);
-        console.log(`  [SKIP ] rust unavailable — ${driver.unavailableReason()}`);
-        if (args.impl === "rust") {
-          anyFailure = true; // an explicit --impl rust with no binary is a hard failure
-        }
-        continue;
-      }
-      const results = await runImpl(driver, cases, { record: false });
-      printResults("rust", results);
-      if (results.some((r) => r.status === "fail" || r.status === "error")) anyFailure = true;
-      driver.dispose();
-    }
+  const driver = createRustDriver();
+  if (!driver.available()) {
+    console.error(`rust unavailable — ${driver.unavailableReason()}`);
+    exit(1);
   }
-
-  process.exit(anyFailure ? 1 : 0);
+  let results;
+  try {
+    results = await runImpl(driver, cases, { record: args.record });
+  } finally {
+    driver.dispose();
+  }
+  printResults("rust", results);
+  exit(results.some((r) => r.status === "fail" || r.status === "error") ? 1 : 0);
 }
 
 main().catch((err) => {
   console.error("runner crashed:", err.stack || err);
-  process.exit(1);
+  exit(1);
 });

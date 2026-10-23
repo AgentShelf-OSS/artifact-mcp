@@ -119,7 +119,6 @@ const tasks = read("src/mcp/tasks.rs");
 const oauth = read("src/security/oauth.rs");
 const mcpDocs = read("docs/mcp-api.md");
 const cargo = read("Cargo.toml");
-const packageJson = JSON.parse(read("package.json"));
 const nativeTests = read("tests/native/main.rs");
 const frozenTools = JSON.parse(rustRawString(toolDefinitions, "FROZEN_TOOL_DEFINITIONS_JSON"));
 const outputSchemas = JSON.parse(read("conformance/mcp.tool-output-schemas.json"));
@@ -199,7 +198,7 @@ check(
 );
 
 const cargoVersion = cargo.match(/^version\s*=\s*"([^"]+)"/m)?.[1];
-check(cargoVersion === packageJson.version, `Cargo.toml (${cargoVersion}) and package.json (${packageJson.version}) versions differ`);
+check(Boolean(cargoVersion), "could not read the Cargo.toml package version");
 check(dispatch.includes('pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION")'), "MCP serverInfo is not derived from Cargo package version");
 for (const version of protocolVersions) {
   check(dispatch.includes(`"${version}"`), `${version} is missing from Rust protocol declarations`);
@@ -247,13 +246,13 @@ if (baseIndex >= 0 && !process.argv[baseIndex + 1]) {
 }
 const base = baseIndex >= 0 ? process.argv[baseIndex + 1] : undefined;
 const changes = changedPaths(base);
-const impactPaths = changes.filter((path) => /^(src\/mcp\/|src\/security\/oauth\.rs|src\/http\/routes\/mcp\.rs|conformance\/|scripts\/check-mcp-surface|README\.md|Cargo\.toml|package\.json|tests\/native\/u2[56]_)/.test(path));
+const impactPaths = changes.filter((path) => /^(src\/mcp\/|src\/security\/oauth\.rs|src\/http\/routes\/mcp\.rs|conformance\/|scripts\/check-mcp-surface|README\.md|Cargo\.toml|tests\/native\/u2[56]_)/.test(path));
 const compatibilityDecision = impactPaths.length === 0 ? "not-applicable" : "review-required";
 const report = {
   invariant: "PBI-059/mcp-surface-sync",
   compatibilityDecision,
   rejectedDuplicates,
-  versions: { package: packageJson.version, protocols: protocolVersions },
+  versions: { package: cargoVersion, protocols: protocolVersions },
   tools: {
     legacyCount: legacyTools.length,
     modernBaseCount: legacyTools.length + modernBaseTools.length,
@@ -267,7 +266,7 @@ const report = {
   changedSurfacePaths: impactPaths,
   commands: [
     "node scripts/check-mcp-surface.mjs",
-    "node conformance/runner.mjs --impl both",
+    "node conformance/runner.mjs",
     "cargo test --all-targets --locked",
   ],
 };

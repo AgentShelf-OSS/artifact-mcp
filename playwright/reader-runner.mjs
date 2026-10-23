@@ -2,7 +2,6 @@
 import { spawn, spawnSync } from "node:child_process";
 import { constants } from "node:fs";
 import { access, mkdtemp, readdir, rm } from "node:fs/promises";
-import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,16 +14,16 @@ const cases = [
   ["reader-scopes", "chromium"],
   ["reader-sections", "chromium"],
   ["reader-word-highlights", "chromium"],
-  ["reader-controls", "both"],
-  ["reader-player-scopes", "both"],
-  ["reader-prefetch", "both"],
-  ["reader-pronunciation", "both"],
-  ["reader-pacing", "both"],
-  ["reader-wav", "both"],
-  ["reader-voice-cast", "both"],
-  ["reader-place-sync", "both"],
-  ["reader-forward", "both"],
-  ["reader-read-ahead", "both"],
+  ["reader-controls", "rust"],
+  ["reader-player-scopes", "rust"],
+  ["reader-prefetch", "rust"],
+  ["reader-pronunciation", "rust"],
+  ["reader-pacing", "rust"],
+  ["reader-wav", "rust"],
+  ["reader-voice-cast", "rust"],
+  ["reader-place-sync", "rust"],
+  ["reader-forward", "rust"],
+  ["reader-read-ahead", "rust"],
 ];
 const caseTimeoutMs = 90_000;
 const runTimeoutMs = 10 * 60_000;
@@ -66,7 +65,7 @@ async function execute(name, runtime, environment) {
   console.log(`RUN ${label}`);
   const child = spawn(process.execPath, [join(tests, `${name}.cjs`)], {
     cwd: repository,
-    env: { ...environment, READER_RUNTIME: runtime },
+    env: environment,
     detached: true,
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -127,26 +126,22 @@ async function main() {
   }
   const chosen = cases.filter(([name]) => !selected || name === selected);
   if (!chosen.length) throw new Error(`Unknown reader case: ${selected}`);
-  const matrix = chosen.flatMap(([name, runtime]) => runtime === "both"
-    ? [[name, "node"], [name, "rust"]] : [[name, runtime]]);
   if (list) {
-    for (const [name, runtime] of matrix) console.log(`${name} [${runtime}]`);
-    console.log(`${cases.length} scripts; ${matrix.length} planned executions`);
+    for (const [name, runtime] of chosen) console.log(`${name} [${runtime}]`);
+    console.log(`${cases.length} scripts; ${chosen.length} planned executions`);
     return;
   }
   if (Number(process.versions.node.split(".")[0]) < 22) throw new Error("Reader checks require Node 22+");
-  const require = createRequire(join(repository, "package.json"));
-  require.resolve("better-sqlite3");
   const rustBinary = resolve(process.env.RUST_ARTIFACT_MCP_BIN || join(repository, "target/release/artifact-mcp"));
-  // Both runtimes are prerequisites even for a focused run. A missing build is a failure,
-  // never a skipped runtime that makes the complete command appear green.
+  // The Rust binary is a prerequisite even for a focused run. A missing build is a failure,
+  // never a skipped check that makes the complete command appear green.
   await access(rustBinary, constants.X_OK).catch(() => {
     throw new Error("Rust binary unavailable; run cargo build --release --locked or set RUST_ARTIFACT_MCP_BIN");
   });
   const root = await mkdtemp(join(tmpdir(), "artifact-reader-ci-"));
   const deadline = setTimeout(() => abort.abort(new Error("Reader run exceeded 10 minutes")), runTimeoutMs);
   try {
-    for (const [name, runtime] of matrix) {
+    for (const [name, runtime] of chosen) {
       await execute(name, runtime, {
         ...process.env,
         RUST_ARTIFACT_MCP_BIN: rustBinary,
@@ -154,7 +149,7 @@ async function main() {
         PW_USE_BUNDLED_CHROMIUM: "1",
       });
     }
-    console.log(`Reader regressions: ${matrix.length} executions passed; 0 skipped`);
+    console.log(`Reader regressions: ${chosen.length} executions passed; 0 skipped`);
   } finally {
     clearTimeout(deadline);
     await rm(root, { recursive: true, force: true });

@@ -17,7 +17,6 @@ const requiredFiles = [
   "src/security/oauth.rs",
   "docs/mcp-api.md",
   "Cargo.toml",
-  "package.json",
   "tests/native/main.rs",
   "tests/native/u25_api_key_capabilities.rs",
   "tests/native/u26_mcp_2026.rs",

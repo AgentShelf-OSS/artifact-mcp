@@ -1,9 +1,8 @@
-// Drives two running release-candidate instances. All mutations happen inside a throwaway
+// Drives one running Rust release-candidate instance. All mutations happen inside a throwaway
 // `pwtest-<runid>` organization that global teardown removes.
 import { defineConfig } from "@playwright/test";
 
-const NODE_URL = process.env.PW_NODE_URL || "http://127.0.0.1:3485";
-const RUST_URL = process.env.PW_RUST_URL || "http://127.0.0.1:3483";
+const BASE_URL = process.env.PW_RUST_URL || "http://127.0.0.1:3483";
 
 export default defineConfig({
   testDir: "./tests",
@@ -14,6 +13,7 @@ export default defineConfig({
   globalSetup: "./global-setup.mjs",
   globalTeardown: "./global-teardown.mjs",
   use: {
+    baseURL: BASE_URL,
     extraHTTPHeaders: {
       "Cf-Access-Authenticated-User-Email": process.env.PW_ADMIN_EMAIL || "admin@example.test"
     },
@@ -22,7 +22,6 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   },
   projects: [
-    { name: "node", use: { baseURL: NODE_URL } },
-    { name: "rust", use: { baseURL: RUST_URL } },
+    { name: "rust" },
   ],
 });

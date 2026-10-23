@@ -21,7 +21,9 @@ test("public release workflow stays independent of homelab deployment", async ()
   assert.doesNotMatch(workflow, /environment:\s*production/);
 
   assert.match(workflow, /Release tags must be annotated/);
-  assert.match(workflow, /package\.json version/);
+  // Cargo.toml is the single release version source; package.json carries no version.
+  assert.match(workflow, /Tag \$tag does not match Cargo\.toml version \$version/);
+  assert.doesNotMatch(workflow, /package\.json/);
   assert.match(workflow, /Require successful CI for tagged commit/);
   assert.match(workflow, /actions\/workflows\/ci\.yml\/runs\?head_sha=/);
   assert.match(workflow, /status=completed/);

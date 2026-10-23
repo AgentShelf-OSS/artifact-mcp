@@ -32,8 +32,7 @@ test.describe("feedback", () => {
     expect(res.status()).toBe(400);
   });
 
-  test("discussion modes are explicit and two-way fails closed without organization readiness", async ({ page, request, publisherKey, org }, testInfo) => {
-    test.skip(testInfo.project.name === "node", "PBI-080 runtime activation exists only in the Rust production server.");
+  test("discussion modes are explicit and two-way fails closed without organization readiness", async ({ page, request, publisherKey, org }) => {
     const a = await publish(request, publisherKey, {
       title: `PW Discussion modes ${org}`,
       html: "<!doctype html><h1>discussion modes</h1>",

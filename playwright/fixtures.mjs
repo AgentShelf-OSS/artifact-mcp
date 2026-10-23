@@ -1,5 +1,5 @@
-// Drives two RUNNING instances (prod's image and the Rust build) rather than booting servers, so
-// the code under test is exactly what ships.
+// Drives a RUNNING Rust release-candidate instance rather than booting a server, so the code under
+// test is exactly what ships.
 //
 // SAFETY: every test runs inside a throwaway organization named `pwtest-<runid>`, created at setup
 // and deleted at teardown. Artifacts, keys, categories, shares, and feedback all live under that

@@ -18,17 +18,22 @@ deterministic recovery states. The only values resembling credentials are explic
 synthetic test material (`fixture-public-token-v1` and a zero-byte fixture encryption key); no
 production data or secrets are included.
 
-To reproduce the corpus from the frozen source refs in a clone with release tags available:
+The corpus is frozen. Check its immutable bytes and pre-migration SQLite integrity with:
 
 ```sh
-node scripts/generate-historical-fixtures.mjs --write
 node scripts/verify-historical-fixtures.mjs
 ```
 
-`npm test` checks the Node runtime over copies; `cargo test --test native u50_historical_fixtures`
-checks the Rust production boot, reconciliation, digest backfill, authenticated read, write,
-update, restore, share lifecycle, and encrypted-webhook delivery. The release workflow additionally
-runs the same corpus through the exact candidate OCI digest and attaches a checksummed report.
+The generator, `scripts/generate-historical-fixtures.mjs`, was removed with the Node
+compatibility server because it ran the Node migration ledger (`lib/migrations.js`). It was last
+present at commit `7211de0`. The `generation` field in each `fixture.json` records that
+historical provenance. Adding a fixture for a new migration boundary needs a Rust-side generator;
+that is a known follow-up.
+
+`cargo test --test native u50_historical_fixtures` checks the Rust production boot,
+reconciliation, digest backfill, authenticated read, write, update, restore, share lifecycle,
+and encrypted-webhook delivery. The release workflow additionally runs the same corpus through
+the exact candidate OCI digest and attaches a checksummed report.
 
 ## `empty-v21`
 

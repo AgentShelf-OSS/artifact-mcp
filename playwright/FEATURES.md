@@ -1,7 +1,8 @@
 # Feature inventory & browser-test coverage
 
-Every user-reachable feature, and whether the Playwright harness exercises it. Derived from the 40
-HTTP routes in `lib/app.js` and the 19 frozen MCP tools.
+Every user-reachable feature, and whether the Playwright harness exercises it. Originally derived
+from the 40 HTTP routes of the retired Node server and the 19 frozen MCP tools; the Rust server now
+serves the same routes.
 
 Status: **✅ covered** · **🔸 partial** · **⬜ not covered**
 
@@ -85,13 +86,13 @@ Status: **✅ covered** · **🔸 partial** · **⬜ not covered**
 | Send test webhook | ⬜ | would post to a real Discord endpoint |
 
 ## 9. MCP surface (19 tools)
-Covered byte-for-byte by `conformance/` (`--impl both`, 23 cases incl. the frozen `tools/list`
+Covered byte-for-byte by `conformance/` (the recorded goldens, including the frozen `tools/list`
 golden), not re-tested here. The harness uses `publish_artifact` / `publish_bundle` only as fixture
 setup.
 
 ## Deliberately out of scope
-- **Live production instance** — mutating tests would create and delete real artifacts. The `node`
-  project runs prod's exact code against throwaway data instead; a separate read-only smoke checks
-  the live instance.
+- **Live production instance** — mutating tests would create and delete real artifacts. The harness
+  runs the release-candidate Rust binary against throwaway data instead; a separate read-only smoke
+  checks the live instance.
 - **Send-test-webhook** — posts to a real external endpoint.
 - **Anchored feedback** — depends on the artifact-iframe bridge; needs a dedicated fixture.

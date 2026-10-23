@@ -1,7 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { renderGallery } from "../lib/portal.js";
 
 const root = new URL("../", import.meta.url);
 
@@ -59,60 +58,4 @@ test("active primary navigation paints one short accent indicator", async () => 
 
   assert.doesNotMatch(css, /\.nav-link\.active\{[^}]*border-bottom-color:var\(--brass\)/);
   assert.match(css, /\.nav-link\.active::after\{background:var\(--brass\)\}/);
-});
-
-test("Node gallery renderer mirrors the no-rail toolbar contract", () => {
-  const html = renderGallery(
-    { email: "admin@example.test", org: "admin", isAdmin: true },
-    [{ org: "acme", items: [{ id: "artifact-1", org: "acme", title: "Library test", client_id: "test", is_bundle: 0, bytes: 1, category: "Reports" }] }],
-  );
-
-  assert.match(html, /<section class="collection-tools" aria-label="Artifact library controls">/);
-  assert.match(html, /data-filter-view="hidden"/);
-  assert.match(html, /id="org-filter" aria-label="Filter by organization"/);
-  assert.match(html, /id="category-filter" aria-label="Filter by category"/);
-  assert.match(html, /<option value="Reports">Reports \(1\)<\/option>/);
-  assert.match(html, /id="sort" aria-label="Sort artifacts"/);
-  assert.match(html, /data-reset-filters/);
-  assert.doesNotMatch(html, /<aside[^>]*filter-rail/);
-  assert.doesNotMatch(html.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, ""), /<aside/);
-});
-
-test("Node gallery cards expose configured organization colors to the shared stripe", () => {
-  const html = renderGallery(
-    { email: "admin@example.test", org: "admin", isAdmin: true },
-    [{ org: "acme", items: [{ id: "artifact-1", org: "acme", title: "Library test", client_id: "test", is_bundle: 0, bytes: 1 }] }],
-    new Map(),
-    new Map(),
-    new Map(),
-    new Map(),
-    { acme: "#397b6f" },
-  );
-
-  assert.match(html, /<article class="card[^"]*"[^>]*style="--org-k:#397b6f;/);
-});
-
-test("gallery category controls carry organization-scoped options and creation actions", () => {
-  const html = renderGallery(
-    { email: "admin@example.test", org: "admin", isAdmin: true },
-    [
-      { org: "agentshelf", items: [{ id: "artifact-1", org: "agentshelf", title: "Arty", client_id: "test", is_bundle: 0, bytes: 1, category: "UI/UX" }] },
-      { org: "homelab", items: [{ id: "artifact-2", org: "homelab", title: "Dashboard", client_id: "test", is_bundle: 0, bytes: 1, category: "Dashboards" }] },
-    ],
-    new Map(),
-    new Map(),
-    new Map(),
-    new Map(),
-    {},
-    {},
-    { agentshelf: ["Specs", "UI/UX"], homelab: ["Dashboards", "Runbooks"] },
-  );
-
-  const artyCategory = html.match(/<select class="category-menu"[^>]*aria-label="Change category for Arty"[^>]*>([\s\S]*?)<\/select>/)?.[1] || "";
-  assert.match(artyCategory, /<option value="UI\/UX" selected>UI\/UX<\/option>/);
-  assert.match(artyCategory, /<option value="Specs">Specs<\/option>/);
-  assert.doesNotMatch(artyCategory, /Dashboards|Runbooks/);
-  assert.match(artyCategory, /<option value="__create_category__">\+ Category<\/option>/);
-  assert.match(html, /id="category-filter"[^>]*>[\s\S]*?<option value="__create_category__">\+ Category<\/option>/);
-  assert.match(html, /id="org-category-data"[^>]*data-json="[^"]*&quot;agentshelf&quot;[^"]*&quot;homelab&quot;/);
 });

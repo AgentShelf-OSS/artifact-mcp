@@ -30,46 +30,34 @@ jobs:
           node scripts/check-mcp-surface.mjs --base "$base"
 
   test:
+    # Node runs the browser-asset, template, tooling, and workflow tests. The root package has no
+    # npm dependencies, so there is nothing to install.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-          cache: npm
-      - run: npm ci
       - run: npm test
 
   conformance:
-    # The language-neutral oracle is a hard two-runtime gate. A missing Rust binary is a failure.
+    # The language-neutral oracle replays the recorded goldens against the Rust server. A missing
+    # Rust binary is a failure.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
-          cache: npm
-      - run: npm ci
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
-      - run: node conformance/runner.mjs --impl both
+      - run: node conformance/runner.mjs
 
   rust:
-    # Node IS required here, not incidental: the cross-runtime parity proofs drive the real
-    # lib/*.js via `node -e`. Without REQUIRE_NODE_REFERENCE=1 those tests SKIP and report ok, so
-    # the strongest guarantees in the suite would green-pass while testing nothing.
     runs-on: ubuntu-latest
-    env:
-      REQUIRE_NODE_REFERENCE: "1"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-          cache: npm
-      # better-sqlite3 is a native module the parity drivers load from node_modules.
-      - run: npm ci
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
@@ -82,8 +70,8 @@ jobs:
       - run: cargo test --doc --locked
 
   browser:
-    # Real Chromium journeys run against both complete server packages. Each instance has an
-    # isolated database, and global teardown removes the synthetic organization and artifacts.
+    # Real Chromium journeys run against the Rust release binary. The instance has an isolated
+    # database, and global teardown removes the synthetic organization and artifacts.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [mcp-surface, test, conformance, rust]
@@ -93,33 +81,23 @@ jobs:
         with:
           node-version: "22"
           cache: npm
-      - run: npm ci
+          cache-dependency-path: playwright/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - run: cargo build --release --locked
       - run: npm --prefix playwright ci
       - run: npm --prefix playwright exec -- playwright install --with-deps chromium
-      - name: Run Node and Rust browser parity
+      - name: Run browser journeys against the Rust server
         env:
-          PW_NODE_URL: http://127.0.0.1:3485
           PW_RUST_URL: http://127.0.0.1:3483
           PW_ADMIN_EMAIL: admin@example.test
           PW_RUN_ID: ci-${{ github.run_id }}-${{ github.run_attempt }}
           PW_USE_BUNDLED_CHROMIUM: "1"
         run: |
           set -euo pipefail
-          node_data="$(mktemp -d)"
           rust_data="$(mktemp -d)"
-          node_log="$RUNNER_TEMP/artifact-mcp-node.log"
           rust_log="$RUNNER_TEMP/artifact-mcp-rust.log"
           test_key="AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
-
-          env DATA_DIR="$node_data" PORT=3485 LISTEN_HOST=127.0.0.1 \
-            TRUST_ACCESS_HEADERS=1 ADMIN_EMAILS="$PW_ADMIN_EMAIL" NODE_ENV=test \
-            PUBLIC_BASE_URL="$PW_NODE_URL" PREVIEW_RENDERER_URL= \
-            AUDIT_LEDGER_HMAC_KEY="$test_key" WEBHOOK_ENC_KEY="$test_key" \
-            node server.js >"$node_log" 2>&1 &
-          node_pid=$!
 
           # Give the isolated browser suite enough admission budget for its full workload.
           env DATA_DIR="$rust_data" PORT=3483 LISTEN_HOST=127.0.0.1 \
@@ -135,30 +113,28 @@ jobs:
           rust_pid=$!
 
           cleanup() {
-            kill "$node_pid" "$rust_pid" 2>/dev/null || true
-            wait "$node_pid" "$rust_pid" 2>/dev/null || true
-            rm -rf "$node_data" "$rust_data"
+            kill "$rust_pid" 2>/dev/null || true
+            wait "$rust_pid" 2>/dev/null || true
+            rm -rf "$rust_data"
           }
           trap cleanup EXIT
 
-          for url in "$PW_NODE_URL" "$PW_RUST_URL"; do
-            ready=0
-            for _ in $(seq 1 60); do
-              if curl --fail --silent "$url/health" >/dev/null; then
-                ready=1
-                break
-              fi
-              sleep 1
-            done
-            if [ "$ready" -ne 1 ]; then
-              cat "$node_log" "$rust_log"
-              exit 1
+          ready=0
+          for _ in $(seq 1 60); do
+            if curl --fail --silent "$PW_RUST_URL/health" >/dev/null; then
+              ready=1
+              break
             fi
+            sleep 1
           done
-
-          if ! (cd playwright && npm test); then
-            cat "$node_log" "$rust_log"
+          if [ "$ready" -ne 1 ]; then
+            cat "$rust_log"
             exit 1
           fi
-      - name: Run reader regressions in Chromium against Node and Rust
+
+          if ! (cd playwright && npm test); then
+            cat "$rust_log"
+            exit 1
+          fi
+      - name: Run reader regressions in Chromium against the Rust server
         run: npm --prefix playwright run test:reader

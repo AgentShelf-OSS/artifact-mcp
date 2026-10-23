@@ -1,11 +1,25 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
-import { rawArtifactHeaders, injectAnchorBridge, injectDataClient, ANCHOR_BRIDGE_MARKER, ANCHOR_BRIDGE } from "../lib/artifact-http.js";
 
-const ARTIFACT_CSP = "sandbox allow-scripts allow-popups allow-forms allow-modals; default-src 'none'; connect-src 'none'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: blob: https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' data: blob:; worker-src 'self' blob:";
+// The anchor bridge is browser code that the Rust server injects into artifact HTML. Exercise the
+// exact bytes it serves: the raw-string constant in src/http/artifact_response.rs. Injection
+// placement, response headers and the raw.anchor-bridge golden are covered by the Rust suite
+// (tests/native/u14_response.rs) and the conformance oracle.
+function rustRawString(source, constant) {
+  const marker = `pub const ${constant}: &str = r###"`;
+  const start = source.indexOf(marker);
+  assert.ok(start >= 0, `could not find ${constant}`);
+  const end = source.indexOf("\"###;", start + marker.length);
+  assert.ok(end >= 0, `could not find the end of ${constant}`);
+  return source.slice(start + marker.length, end);
+}
+
+const ANCHOR_BRIDGE = rustRawString(
+  readFileSync(new URL("../src/http/artifact_response.rs", import.meta.url), "utf8"),
+  "ANCHOR_BRIDGE",
+);
 
 function anchorBridgeHarness({
   querySelector,
@@ -125,23 +139,6 @@ test("artifact scroll and resize bursts share one geometry update per frame", ()
   assert.equal(bridge.messages.length, 2);
 });
 
-test("anchor bridge injects before the real (last) </body>, not one inside a script string", () => {
-  const html = '<html><body><script>var x = "</body>";</script><p>hi</p></body></html>';
-  const out = injectAnchorBridge(html);
-  const bridgeAt = out.indexOf(ANCHOR_BRIDGE_MARKER);
-  assert.ok(bridgeAt > -1, "bridge injected");
-  assert.equal(out.split(ANCHOR_BRIDGE_MARKER).length - 1, 1, "injected exactly once");
-  // the script string's </body> stays ahead of the bridge; the bridge sits before the LAST </body>
-  assert.ok(out.indexOf("</body>") < bridgeAt, "the earlier (in-script) </body> is untouched");
-  assert.ok(bridgeAt < out.lastIndexOf("</body>"), "bridge is before the final </body>");
-});
-
-test("anchor bridge appends when there is no </body>", () => {
-  const out = injectAnchorBridge("<p>no body tag here</p>");
-  assert.ok(out.endsWith("</script>"));
-  assert.ok(out.includes(ANCHOR_BRIDGE_MARKER));
-});
-
 test("anchor bridge handles pointer drag boxes as well as click points", () => {
   assert.match(ANCHOR_BRIDGE, /pointerdown/);
   assert.match(ANCHOR_BRIDGE, /pointermove/);
@@ -232,16 +229,6 @@ test("anchor bridge does not mistake another origin's raw-looking URL for an in-
   });
 });
 
-test("raw anchor-bridge golden freezes the current injected bridge bytes", () => {
-  const golden = JSON.parse(readFileSync("conformance/goldens/raw.anchor-bridge.json", "utf8"));
-  const body = injectDataClient(injectAnchorBridge("<!doctype html><html><body><p>anchor me</p></body></html>"));
-  const expectedEtag = 'W/"' + Buffer.byteLength(body).toString(16) + "-" +
-    createHash("sha1").update(body).digest("base64").replace(/=$/, "") + '"';
-
-  assert.equal(golden.steps[2].body.data, body);
-  assert.equal(golden.steps[2].headers.headers.etag, expectedEtag);
-});
-
 test("anchor bridge tracks a selector target when the document reflows", () => {
   const selector = "html:nth-child(1)>body:nth-child(2)>section:nth-child(1)";
   let rect = { left: 100, top: 200, width: 40, height: 60 };
@@ -273,31 +260,6 @@ test("anchor bridge reports a lost position when its selector target is missing"
   ]);
 
   assert.deepEqual({ ...message.anchors[0] }, { id: "comment-missing", lost: true });
-});
-
-test("raw HTML responses keep inline content and measured presentation hosts but block other egress", () => {
-  const headers = rawArtifactHeaders("text/html; charset=utf-8");
-
-  assert.equal(headers["content-security-policy"], ARTIFACT_CSP);
-  assert.doesNotMatch(headers["content-security-policy"], /allow-same-origin/);
-  assert.equal(headers["content-security-policy-report-only"], undefined);
-});
-
-test("non-HTML bundle assets keep their content type but are still sandboxed", () => {
-  // .svg / .xml execute scripts when navigated to directly, so the sandbox CSP is applied
-  // to every content type, not just text/html. Content type itself is preserved.
-  const headers = rawArtifactHeaders("image/svg+xml");
-
-  assert.equal(headers["content-security-policy"], ARTIFACT_CSP);
-  assert.doesNotMatch(headers["content-security-policy"], /allow-same-origin/);
-  assert.equal(headers["content-type"], "image/svg+xml");
-});
-
-test("download responses retain sandboxing and attachment disposition", () => {
-  const headers = rawArtifactHeaders("text/html; charset=utf-8", { downloadName: "report.html" });
-
-  assert.equal(headers["content-disposition"], 'attachment; filename="report.html"');
-  assert.equal(headers["content-security-policy"], ARTIFACT_CSP);
 });
 
 // PBI-083 Focused Tests
