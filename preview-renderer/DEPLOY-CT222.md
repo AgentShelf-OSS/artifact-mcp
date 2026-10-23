@@ -31,23 +31,27 @@ They must match `CHROME_VERSION` and `CHROME_SHA256` in `preview-renderer/Docker
 
 ## 1. Prepare the files on pve1
 
-Run these steps on pve1, which has network access, in an empty working directory.
+Run these steps on pve1, which has network access, in an empty working directory. Set `TAG` to the
+release that you install.
 
-1. Build the static binary from the release commit:
-
-   ```sh
-   cargo build --release --locked --target x86_64-unknown-linux-musl \
-     --manifest-path <repo>/preview-renderer/Cargo.toml
-   cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/release/artifact-preview" .
-   ```
-
-   Or copy it out of the release image:
+1. Download the attested renderer binary and the release checksums, and verify both. The flags
+   are the ones the server release check uses: the attestation must come from the release
+   workflow, for this tag and its commit.
 
    ```sh
-   docker create --name ap-extract <image>
-   docker cp ap-extract:/usr/local/bin/artifact-preview .
-   docker rm ap-extract
+   TAG=vX.Y.Z
+   REPO=AgentShelf-OSS/artifact-mcp
+   COMMIT="$(gh api "repos/$REPO/commits/$TAG" --jq .sha)"
+   gh release download "$TAG" --repo "$REPO" -p artifact-preview -p SHA256SUMS
+   sha256sum --check --strict --ignore-missing SHA256SUMS          # artifact-preview: OK
+   gh attestation verify artifact-preview --repo "$REPO" \
+     --cert-identity "https://github.com/$REPO/.github/workflows/release-provenance.yml@refs/tags/$TAG" \
+     --cert-oidc-issuer https://token.actions.githubusercontent.com \
+     --source-ref "refs/tags/$TAG" --source-digest "$COMMIT"
    ```
+
+   Stop if a command fails. `sha256sum` fails with `no file was verified` when `SHA256SUMS` has
+   no `artifact-preview` line. Releases before v1.28.0 have no `artifact-preview` asset.
 
 2. Run `file artifact-preview`. It must say `static-pie linked` or `statically linked`. Record
    `sha256sum artifact-preview`.
@@ -59,6 +63,24 @@ Run these steps on pve1, which has network access, in an empty working directory
    ```
 
    Stop if the check does not print `OK`.
+
+Fallback, only for a release without the `artifact-preview` asset or for a test build: build the
+static binary from the release commit. Such a binary has no attestation, so record its digest
+with the change.
+
+```sh
+cargo build --release --locked --target x86_64-unknown-linux-musl \
+  --manifest-path <repo>/preview-renderer/Cargo.toml
+cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/release/artifact-preview" .
+```
+
+Or copy it out of the release image:
+
+```sh
+docker create --name ap-extract <image>
+docker cp ap-extract:/usr/local/bin/artifact-preview .
+docker rm ap-extract
+```
 
 ## 2. Copy the files into CT222
 
