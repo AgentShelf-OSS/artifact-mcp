@@ -1,0 +1,17 @@
+[package]
+name = "xtask"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+description = "Repository maintenance commands for artifact-mcp (cargo xtask)."
+
+[dependencies]
+aes-gcm = "0.10"
+artifact-mcp = { path = ".." }
+base64 = "0.22"
+hex = "0.4"
+rusqlite = { version = "0.39", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10"

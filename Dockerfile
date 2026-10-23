@@ -9,6 +9,9 @@ RUN apk add --no-cache binutils build-base ca-certificates cmake \
 
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+# `xtask` is a workspace member, so Cargo needs its manifest to load the workspace. The build
+# below still compiles only the root `artifact-mcp` package.
+COPY xtask ./xtask
 COPY src ./src
 COPY templates ./templates
 COPY assets ./assets
