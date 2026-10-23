@@ -244,7 +244,8 @@ docker compose exec artifact-preview /usr/local/bin/artifact-preview smoke
 
 The sidecar is the Rust `artifact-preview` binary driving a pinned Chrome for Testing
 `chrome-headless-shell` over a DevTools pipe. Its own settings are `RENDER_TIMEOUT_MS` (default
-`7000`, kept below `PREVIEW_RENDER_TIMEOUT_MS`) and `CHROME_HEADLESS_SHELL` (the image sets it). See
+`7000`, kept below `PREVIEW_RENDER_TIMEOUT_MS`), `CHROME_HEADLESS_SHELL` (the image sets it), and
+`CHROME_SANDBOX` (default off; see below). See
 [`preview-renderer/README.md`](../preview-renderer/README.md) for the full list, the isolation design,
 and the browser upgrade procedure.
 
@@ -257,9 +258,13 @@ The sidecar renders untrusted HTML. Keep its container boundary intact:
 - Keep it on the internal-only network with resource limits and browser request blocking.
 - Do not publish its port, attach it to the tunnel, mount application data, or provide secrets.
 
-Chromium's in-process sandbox is disabled because it requires `CAP_SYS_CHROOT` or user namespaces
-that the hardened container removes. The container restrictions above provide the compensating
-boundary.
+Compose leaves the renderer's `CHROME_SANDBOX` setting unset, so Chromium runs without its own
+sandbox (`--no-sandbox`) and the container restrictions above are the boundary. Chromium's
+sandbox needs unprivileged user namespaces inside the container. Docker's default seccomp profile
+refuses the namespace flags to a container without `CAP_SYS_ADMIN`, and AppArmor can refuse them
+on Ubuntu hosts. The supplied `seccomp_profile.json` itself allows them, but the sandbox has not
+been tested in the container. A native host that allows user namespaces can set
+`CHROME_SANDBOX=1`; see [`preview-renderer/README.md`](../preview-renderer/README.md#chromium-sandbox-chrome_sandbox).
 
 Valid PNGs live under `DATA_DIR/previews/<artifact-id>/<body_sha256>.png`. Include that directory
 in capacity planning and backups. Startup removes partial or orphaned previews and backfills

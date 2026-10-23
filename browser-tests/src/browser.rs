@@ -84,6 +84,7 @@ impl Browser {
             max_message_bytes: DEFAULT_MAX_MESSAGE_BYTES,
             extra_args: options.extra_args.clone(),
             inherit_stderr: options.inherit_stderr,
+            sandbox: false,
         };
         let (process, pipe) = artifact_cdp::Browser::launch(&options.executable, &launch)
             .map_err(|error| Error::Launch(format!("{}: {error}", options.executable.display())))?;

@@ -83,7 +83,8 @@ impl Server {
     pub async fn bind_to(address: SocketAddr, config: &Config) -> io::Result<Self> {
         let listener = TcpListener::bind(address).await?;
         let state = Arc::new(State {
-            renderer: Renderer::new(config.chrome.clone(), config.render_timeout),
+            renderer: Renderer::new(config.chrome.clone(), config.render_timeout)
+                .with_chrome_sandbox(config.chrome_sandbox),
             max_body_bytes: config.max_body_bytes,
             request_timeout: config.request_timeout(),
             busy: AtomicBool::new(false),

@@ -4,8 +4,8 @@
 //!
 //! Every render starts a fresh browser with [`Hardening::launch_options`]: the network lockdown
 //! switches, a private `artifact-preview-*` temporary directory, and the renderer's own message
-//! cap. The launcher itself (process group, `PR_SET_PDEATHSIG`, cleanup) lives in
-//! `cdp/src/browser.rs`.
+//! cap. `CHROME_SANDBOX` only decides whether `--no-sandbox` is on that line. The launcher itself
+//! (process group, `PR_SET_PDEATHSIG`, cleanup) lives in `cdp/src/browser.rs`.
 
 use artifact_cdp::{LaunchOptions, Network};
 
@@ -38,7 +38,13 @@ impl Hardening {
 
     /// Launch options for one render. `network_flags` selects [`Network::LockedDown`]; tests
     /// that prove the other layers on their own turn it off ([`Network::Unrestricted`]).
-    pub(crate) fn launch_options(self, max_message_bytes: usize) -> LaunchOptions {
+    /// `chrome_sandbox` (`CHROME_SANDBOX`) keeps Chromium's own sandbox by leaving out
+    /// `--no-sandbox`; every other switch stays the same.
+    pub(crate) fn launch_options(
+        self,
+        max_message_bytes: usize,
+        chrome_sandbox: bool,
+    ) -> LaunchOptions {
         LaunchOptions {
             network: if self.network_flags {
                 Network::LockedDown
@@ -46,6 +52,7 @@ impl Hardening {
                 Network::Unrestricted
             },
             max_message_bytes,
+            sandbox: chrome_sandbox,
             ..LaunchOptions::new(TEMP_DIR_PREFIX, LOG_LABEL)
         }
     }
@@ -59,16 +66,16 @@ mod tests {
     use super::*;
 
     /// The arguments the renderer starts Chrome with for one render.
-    fn launch_args(profile_dir: &Path, hardening: Hardening) -> Vec<OsString> {
+    fn launch_args(profile_dir: &Path, hardening: Hardening, sandbox: bool) -> Vec<OsString> {
         artifact_cdp::launch_args(
             profile_dir,
-            &hardening.launch_options(artifact_cdp::DEFAULT_MAX_MESSAGE_BYTES),
+            &hardening.launch_options(artifact_cdp::DEFAULT_MAX_MESSAGE_BYTES, sandbox),
         )
     }
 
     #[test]
     fn launch_args_add_network_switches_only_when_hardened() {
-        let full = launch_args(Path::new("/tmp/p"), Hardening::FULL);
+        let full = launch_args(Path::new("/tmp/p"), Hardening::FULL, false);
         assert!(full.iter().any(|arg| arg == "--proxy-server=127.0.0.1:9"));
         assert!(full.iter().any(|arg| arg == "--no-sandbox"));
         assert!(full.iter().any(|arg| arg == "--remote-debugging-pipe"));
@@ -84,6 +91,7 @@ mod tests {
                 network_flags: false,
                 ..Hardening::FULL
             },
+            false,
         );
         assert!(
             !without
@@ -92,9 +100,9 @@ mod tests {
         );
     }
 
-    /// The exact production launch line, written out independently of the constants that build
-    /// it. Any change to a renderer flag, its order, or the network lockdown must change this
-    /// list on purpose.
+    /// The exact production launch line with `CHROME_SANDBOX` off (the default), written out
+    /// independently of the constants that build it. Any change to a renderer flag, its order,
+    /// or the network lockdown must change this list on purpose.
     const PINNED_PRODUCTION_ARGS: &[&str] = &[
         "--disable-field-trial-config",
         "--disable-background-networking",
@@ -156,7 +164,21 @@ mod tests {
     #[test]
     fn production_launch_args_are_pinned_byte_for_byte() {
         let expected: Vec<OsString> = PINNED_PRODUCTION_ARGS.iter().map(OsString::from).collect();
-        assert_eq!(launch_args(Path::new("/tmp/p"), Hardening::FULL), expected);
+        assert_eq!(
+            launch_args(Path::new("/tmp/p"), Hardening::FULL, false),
+            expected
+        );
+        // `CHROME_SANDBOX=1`: the same line, byte for byte, without `--no-sandbox`.
+        let expected_sandboxed: Vec<OsString> = PINNED_PRODUCTION_ARGS
+            .iter()
+            .filter(|arg| **arg != "--no-sandbox")
+            .map(OsString::from)
+            .collect();
+        assert_eq!(expected_sandboxed.len() + 1, PINNED_PRODUCTION_ARGS.len());
+        assert_eq!(
+            launch_args(Path::new("/tmp/p"), Hardening::FULL, true),
+            expected_sandboxed
+        );
         let expected_without: Vec<OsString> = PINNED_PRODUCTION_ARGS
             .iter()
             .filter(|arg| {
@@ -170,16 +192,23 @@ mod tests {
             network_flags: false,
             ..Hardening::FULL
         };
-        assert_eq!(launch_args(Path::new("/tmp/p"), without), expected_without);
+        assert_eq!(
+            launch_args(Path::new("/tmp/p"), without, false),
+            expected_without
+        );
     }
 
     #[test]
     fn renderer_options_keep_the_private_prefix_and_the_message_cap() {
-        let options = Hardening::FULL.launch_options(1234);
-        assert_eq!(options.temp_dir_prefix, "artifact-preview-");
-        assert_eq!(options.log_label, "[artifact-preview]");
-        assert_eq!(options.max_message_bytes, 1234);
-        assert!(options.extra_args.is_empty());
-        assert!(!options.inherit_stderr);
+        for sandbox in [false, true] {
+            let options = Hardening::FULL.launch_options(1234, sandbox);
+            assert_eq!(options.temp_dir_prefix, "artifact-preview-");
+            assert_eq!(options.log_label, "[artifact-preview]");
+            assert_eq!(options.max_message_bytes, 1234);
+            assert_eq!(options.network, Network::LockedDown);
+            assert_eq!(options.sandbox, sandbox);
+            assert!(options.extra_args.is_empty());
+            assert!(!options.inherit_stderr);
+        }
     }
 }

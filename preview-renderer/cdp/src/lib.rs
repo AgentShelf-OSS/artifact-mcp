@@ -18,7 +18,7 @@ pub mod pipe;
 mod sys;
 
 pub use browser::{
-    Browser, LOCKDOWN_SWITCHES, LOOPBACK_ONLY_SWITCHES, LaunchOptions, Network,
+    Browser, LOCKDOWN_SWITCHES, LOOPBACK_ONLY_SWITCHES, LaunchOptions, NO_SANDBOX_SWITCH, Network,
     PLAYWRIGHT_SWITCHES, launch_args,
 };
 pub use pipe::{

@@ -43,6 +43,7 @@ The service renders one page at a time. It does not queue.
 | `RENDER_TIMEOUT_MS` | `7000` | Wall-clock limit for one render: launch, load and screenshot. Keep it below the client's 8 s timeout. |
 | `MAX_BODY_BYTES` | `5242880` | Request body limit. |
 | `TMPDIR` | `/tmp` | Where the service creates the per-render directories. |
+| `CHROME_SANDBOX` | off | `1` or `true` keeps Chromium's own sandbox: the browser starts without `--no-sandbox`, and every other flag stays the same. `0`, `false`, empty or unset mean off. Any other value stops the service at startup. It needs unprivileged user namespaces and a user other than root; see [Chromium sandbox](#chromium-sandbox-chrome_sandbox). |
 | `LANG`, `LANGUAGE`, `LC_ALL`, `TZ` | unset | Passed to the browser if set. The browser gets no other variable from the service. |
 
 ## Commands
@@ -58,10 +59,48 @@ artifact-preview smoke         # render a test page through $PREVIEW_RENDERER_UR
 
 ## Isolation model
 
-The container or the systemd unit is the security boundary. Chromium runs with `--no-sandbox`,
-as it did under Playwright (`chromiumSandbox: false`), because its sandbox needs user namespaces
-or a setuid helper that the hardened deployment removes. A page that exploits the renderer gets
-the service user inside that boundary. The service adds these layers.
+The container or the systemd unit is the security boundary. By default Chromium runs with
+`--no-sandbox`, as it did under Playwright (`chromiumSandbox: false`), because its sandbox needs
+unprivileged user namespaces (`chrome-headless-shell` ships no setuid helper). A page that
+exploits the renderer then gets the service user inside that boundary. Where user namespaces are
+available, `CHROME_SANDBOX=1` adds Chromium's own sandbox inside the boundary (see
+[Chromium sandbox](#chromium-sandbox-chrome_sandbox)). The service adds these layers.
+
+### Chromium sandbox (`CHROME_SANDBOX`)
+
+With `CHROME_SANDBOX=1`, the service leaves `--no-sandbox` out of the launch line and changes
+nothing else. Chromium then starts each renderer process in new user, PID and network namespaces
+and under its seccomp-bpf system call filter. A page that exploits a renderer must then also
+escape that sandbox to reach the service user.
+
+Requirements:
+
+* The service user can create user namespaces. In a Proxmox LXC container, set
+  `features: nesting=1`. On Ubuntu 23.10 and later, AppArmor restricts unprivileged user
+  namespaces (`kernel.apparmor_restrict_unprivileged_userns`). A quick check as the service user:
+  `unshare --user --map-root-user --pid --net --fork true` must exit 0.
+* The service does not run as root. Chromium refuses its sandbox for root, and every render then
+  fails.
+* The systemd unit has no `RestrictNamespaces=` line. That setting blocks the namespaces.
+
+If the sandbox cannot start, Chromium exits at launch: every render fails with
+`500 {"error":"render failed"}`, and the log shows
+`[artifact-preview] render failed: browser closed the devtools pipe`. Set `CHROME_SANDBOX=0` (or
+remove it) to go back.
+
+To check that the sandbox is active, compare `/proc/<pid>/status` of a renderer process
+(`--type=renderer` in its command line) with that of the service while a render runs. With the
+sandbox, the renderer shows `Seccomp: 2` and a higher `Seccomp_filters` count than the service:
+Chromium's filter is added to any filter the service already has. Without the sandbox, the
+renderer shows the same values as the service: `Seccomp: 0`, or the filters that the container
+or a systemd setting such as `LockPersonality=` or `RestrictSUIDSGID=` gives the whole service.
+`tests/sandbox.rs` makes this check.
+
+The Compose service leaves `CHROME_SANDBOX` unset. The sandbox has not been tested in the
+container. Whether a container can create user namespaces depends on the container runtime and
+the host: Docker's default seccomp profile refuses the `clone` namespace flags to a container
+without `CAP_SYS_ADMIN`, and AppArmor can refuse them on Ubuntu hosts. The supplied
+`seccomp_profile.json` itself allows them (its first rule).
 
 ### One process tree per render
 
@@ -124,8 +163,9 @@ The new renderer is stricter than the Node renderer in these ways:
 | `--force-webrtc-ip-handling-policy=disable_non_proxied_udp` | WebRTC may only use UDP through a proxy, and the only proxy is dead, so STUN and TURN send nothing. |
 
 Every other switch is Playwright's headless list (`chromiumSwitches()` plus the headless
-arguments of `defaultArgs()`), with `--no-sandbox`, `--no-startup-window`, `--user-data-dir` and
-`--remote-debugging-pipe`. The service drops no Playwright switch.
+arguments of `defaultArgs()`), with `--no-sandbox` (left out when `CHROME_SANDBOX` is on),
+`--no-startup-window`, `--user-data-dir` and `--remote-debugging-pipe`. The service drops no other
+Playwright switch.
 
 Why the flags matter: with only interception and offline emulation, which is the Node renderer's
 in-browser protection, tests show that WebRTC TURN-over-TCP connections and speculation-rules
@@ -153,8 +193,8 @@ To upgrade:
 3. Change `CHROME_VERSION` and `CHROME_SHA256` together in the `Dockerfile` and in `DEPLOY-CT222.md`.
 4. Run the full test suite with `CHROME_HEADLESS_SHELL` pointing at the new build.
 
-The browser runs without its sandbox, so browser security fixes matter here. Keep the pin
-current.
+By default the browser runs without its sandbox, so browser security fixes matter here. Keep the
+pin current.
 
 ## Container
 
@@ -200,21 +240,28 @@ cargo test
 ```
 
 Tests that need a browser are skipped (with a message) when `CHROME_HEADLESS_SHELL` is unset.
-When `CI` is set, they fail instead, so a CI job cannot pass by skipping them. The suite covers:
+When `CI` is set, they fail instead, so a CI job cannot pass by skipping them. The tests with
+`CHROME_SANDBOX` on follow the same rule when the environment cannot run Chromium's sandbox: as
+root, or without unprivileged user namespaces. To run the whole suite as root on a development
+host, map root to another user id: `unshare --user --map-user=1000 --map-group=1000 cargo test`.
+The suite covers:
 
 * `cdp/` unit tests: CDP framing, `/proc` parsing, launch switches per network policy, private
   temporary directories;
 * `src/` unit tests: JavaScript number rules, configuration, clip maths, the pinned launch
-  line;
+  line with `CHROME_SANDBOX` off and on;
 * `src/tests.rs`: 37 network vectors per canary address, run with all defences, with each
-  layer alone, and with none (the control). Also checks that every browser process stays in the
-  process group and that none survives;
+  layer alone, and with none (the control). Also checks, with `CHROME_SANDBOX` off and on, that
+  every browser process stays in the process group and that none survives;
 * `tests/contract.rs`: the HTTP contract against the running binary;
 * `tests/isolation.rs`: the vectors against the binary, and `data:` images rendering, checked by
   pixel colour;
 * `tests/lifecycle.rs`: hostile pages hitting the deadline, cleanup after a client disconnect,
   `SIGTERM` and `SIGKILL` of the service, and 20 sequential renders with no process,
-  directory or file descriptor leak.
+  directory or file descriptor leak;
+* `tests/sandbox.rs`: with `CHROME_SANDBOX=1`, a renderer process has `Seccomp: 2` and a seccomp
+  filter of its own while a render runs; with `CHROME_SANDBOX=0`, no renderer has one. An invalid
+  value stops the service.
 
 Lifecycle tests scan for processes started from `CHROME_HEADLESS_SHELL`. Do not run another
 browser from the same path at the same time.

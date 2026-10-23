@@ -7,6 +7,7 @@ This is a plan. Nobody has run it yet. Do the steps in order and stop at the fir
 | Item | Value |
 |---|---|
 | Container | CT222 `artifact-preview`, Ubuntu 24.04.5, unprivileged LXC, 2 cores, 1024 MB RAM, no swap |
+| Features | `nesting=1`. The service user can create user namespaces, and `chrome-headless-shell` starts without `--no-sandbox` there (checked after the feature was set). See [Chrome sandbox](#chrome-sandbox). |
 | Address | `192.168.0.222:3000`. nftables accepts port 3000 only from CT220 (`192.168.0.220`) and drops all output except loopback and established connections. **CT222 cannot download anything.** |
 | Unit | `/etc/systemd/system/artifact-preview.service`, `User=artifact-preview` (uid 999), `ExecStart=/usr/bin/node /opt/artifact-preview/server.js` |
 | Unit environment | `NODE_ENV=production`, `PORT=3000`, `HOME=/var/lib/artifact-preview`, `PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright` |
@@ -149,11 +150,13 @@ Do not add these:
 
 * `MemoryDenyWriteExecute=yes`: V8's JIT needs writable and executable memory.
 * `PrivateNetwork=yes`: the service must accept connections from CT220.
+* `RestrictNamespaces=` (any value): it blocks the user, PID and network namespaces that
+  Chromium's sandbox needs (`CHROME_SANDBOX=1`, see [Chrome sandbox](#chrome-sandbox)).
 
-These should work, but none was tested in an unprivileged LXC: `RestrictNamespaces=yes`,
-`SystemCallArchitectures=native`, `ProtectClock=yes`, `ProtectHostname=yes`,
-`RestrictRealtime=yes`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`. Add them
-one at a time, and run step 6 after each.
+These should work, but none was tested in an unprivileged LXC: `SystemCallArchitectures=native`,
+`ProtectClock=yes`, `ProtectHostname=yes`, `RestrictRealtime=yes`,
+`RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`. Add them one at a time, and run
+step 6 after each.
 
 Then:
 
@@ -276,6 +279,54 @@ Wait until the Rust renderer has run without a rollback for at least a week. The
 3. Repeat step 6. `command -v node` must print nothing.
 4. Update `homelab-automation`: `docs/inventory/live-topology.md` says "Native Playwright", and
    `docs/ops/native-edge-services-migration-2026-08-01.md` lists Node and Playwright Chromium.
+
+## Chrome sandbox
+
+`CHROME_SANDBOX=1` keeps Chromium's own sandbox: the renderer starts the browser without
+`--no-sandbox`, and every other flag stays the same. Each Chromium renderer process then runs in
+new user, PID and network namespaces under a seccomp-bpf filter, inside the unit's hardening.
+CT222 needs `features: nesting=1` for this (it has it). Turn the sandbox on after step 6 passes.
+
+1. In CT222, check that the service user can create the namespaces. This must print `ok`:
+
+   ```sh
+   runuser -u artifact-preview -- unshare --user --map-root-user --pid --net --fork true && echo ok
+   ```
+
+2. Run step 4 again with `CHROME_SANDBOX=1` added to the `env -i` line. `smoke` must pass.
+3. Add one line to the `[Service]` section of the drop-in (or of the unit, after step 8):
+
+   ```ini
+   Environment=CHROME_SANDBOX=1
+   ```
+
+   Do not add `RestrictNamespaces=`. Then run `systemctl daemon-reload`,
+   `systemctl restart artifact-preview`, and step 6.
+4. Check that the sandbox is active. While a slow page renders, every renderer process must show
+   `Seccomp: 2` and more `Seccomp_filters` than the service's main process. `LockPersonality` and
+   `RestrictSUIDSGID` already give the whole service a seccomp filter, so `Seccomp: 2` alone
+   proves nothing here; compare the counts.
+
+   ```sh
+   main=$(systemctl show -p MainPID --value artifact-preview)
+   curl -s -o /dev/null -w '%{http_code}\n' -H 'content-type: application/json' \
+     -d '{"html":"<script>const t = Date.now() + 2000; while (Date.now() < t) {}</script>"}' \
+     http://127.0.0.1:3000/render &
+   sleep 1
+   grep -H '^Seccomp' /proc/"$main"/status
+   for pid in $(pgrep -u artifact-preview -f -- --type=renderer); do grep -H '^Seccomp' /proc/"$pid"/status; done
+   wait                                                     # 200
+   ```
+
+   When the shared token is on (see [Shared token](#shared-token)), add
+   `-H "authorization: Bearer $(cat /etc/artifact-preview/render-token)"` to the `curl` line.
+5. After a few renders, compare `systemctl show artifact-preview -p MemoryPeak` with the value
+   before the change. It must stay below `MemoryMax=768M`.
+
+If every render fails after the change, the journal shows
+`render failed: browser closed the devtools pipe`: Chromium could not start its sandbox. Roll
+back: remove the `Environment=CHROME_SANDBOX=1` line, then run `systemctl daemon-reload` and
+`systemctl restart artifact-preview`, and repeat step 6.
 
 ## Later browser upgrades
 

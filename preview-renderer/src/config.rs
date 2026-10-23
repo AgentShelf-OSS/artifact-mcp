@@ -5,6 +5,7 @@
 //! `PORT`, `RENDER_TIMEOUT_MS` and `MAX_BODY_BYTES` keep the Node renderer's names, defaults and
 //! parsing rules (see [`crate::jsnum`]). `CHROME_HEADLESS_SHELL` is new and required: the service
 //! refuses to start without an absolute path to an executable `chrome-headless-shell`.
+//! `CHROME_SANDBOX` is optional and strict: only `1`, `true`, `0` and `false` are accepted.
 
 use std::fmt;
 use std::os::unix::fs::PermissionsExt;
@@ -27,12 +28,18 @@ pub const DEVICE_SCALE_FACTOR: u32 = 2;
 /// Name of the variable that holds the browser path.
 pub const CHROME_ENV: &str = "CHROME_HEADLESS_SHELL";
 
+/// Name of the variable that keeps Chromium's own sandbox (no `--no-sandbox`).
+pub const SANDBOX_ENV: &str = "CHROME_SANDBOX";
+
 #[derive(Debug, Clone)]
 pub struct Config {
     pub port: u16,
     pub render_timeout: Duration,
     pub max_body_bytes: usize,
     pub chrome: PathBuf,
+    /// `CHROME_SANDBOX`: start the browser without `--no-sandbox`. Off by default; it needs
+    /// unprivileged user namespaces, and Chromium refuses it when it runs as root.
+    pub chrome_sandbox: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,11 +71,13 @@ impl Config {
         let max_body_bytes =
             env_positive_integer(lookup("MAX_BODY_BYTES").as_deref(), DEFAULT_MAX_BODY_BYTES);
         let chrome = chrome_from(lookup(CHROME_ENV))?;
+        let chrome_sandbox = sandbox_from(lookup(SANDBOX_ENV).as_deref())?;
         Ok(Self {
             port,
             render_timeout: Duration::from_millis(render_timeout_ms),
             max_body_bytes: usize::try_from(max_body_bytes).unwrap_or(usize::MAX),
             chrome,
+            chrome_sandbox,
         })
     }
 
@@ -91,6 +100,18 @@ pub fn port_from(value: Option<&str>) -> Result<u16, ConfigError> {
     let port = env_positive_integer(value, DEFAULT_PORT);
     u16::try_from(port)
         .map_err(|_| ConfigError(format!("PORT must be between 1 and 65535, got {port}")))
+}
+
+/// `CHROME_SANDBOX`: unset or empty is off. Any value other than `1`, `true`, `0` or `false`
+/// stops the service at startup, so a typo cannot silently leave the sandbox off.
+fn sandbox_from(value: Option<&str>) -> Result<bool, ConfigError> {
+    match value {
+        None | Some("" | "0" | "false") => Ok(false),
+        Some("1" | "true") => Ok(true),
+        Some(other) => Err(ConfigError(format!(
+            "{SANDBOX_ENV} must be 1, true, 0 or false, got {other:?}"
+        ))),
+    }
 }
 
 fn chrome_from(value: Option<String>) -> Result<PathBuf, ConfigError> {
@@ -142,6 +163,27 @@ mod tests {
         assert_eq!(config.max_body_bytes, 5 * 1024 * 1024);
         assert_eq!(config.request_timeout(), Duration::from_millis(9000));
         assert_eq!(config.headers_timeout(), Duration::from_millis(10_000));
+        assert!(!config.chrome_sandbox, "the sandbox is off by default");
+    }
+
+    #[test]
+    fn chrome_sandbox_accepts_four_values_and_rejects_the_rest() {
+        let sandbox = |value: &str| {
+            Config::from_lookup(lookup(&[(CHROME_ENV, "/bin/sh"), (SANDBOX_ENV, value)]))
+                .map(|config| config.chrome_sandbox)
+        };
+        assert_eq!(sandbox("1"), Ok(true));
+        assert_eq!(sandbox("true"), Ok(true));
+        assert_eq!(sandbox("0"), Ok(false));
+        assert_eq!(sandbox("false"), Ok(false));
+        assert_eq!(sandbox(""), Ok(false), "empty is unset");
+        for bad in ["yes", "on", "TRUE", "True", "2", " 1", "1 ", "true\n", "-1"] {
+            let error = sandbox(bad).unwrap_err();
+            assert!(
+                error.0.starts_with("CHROME_SANDBOX must be"),
+                "{bad:?}: {error}"
+            );
+        }
     }
 
     #[test]
