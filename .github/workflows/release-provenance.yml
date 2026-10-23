@@ -137,7 +137,7 @@ jobs:
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
-          file: Dockerfile.rust
+          file: Dockerfile
           push: true
           tags: ${{ env.IMAGE }}:candidate-${{ needs.prepare.outputs.commit }}
           build-args: |

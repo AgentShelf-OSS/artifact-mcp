@@ -1,9 +1,8 @@
 services:
   artifact-mcp:
-    image: ${ARTIFACT_MCP_IMAGE:-artifact-mcp:1.10.0}
+    image: ${ARTIFACT_MCP_IMAGE:-artifact-mcp:local}
     build:
       context: .
-      dockerfile: Dockerfile.rust
     container_name: artifact-mcp
     restart: unless-stopped
     ports:

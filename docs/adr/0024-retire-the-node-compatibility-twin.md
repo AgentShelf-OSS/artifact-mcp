@@ -46,6 +46,8 @@ Rust is the only server implementation. Remove the Node twin.
 - Move the browser-asset syntax check (`node --check` on every `assets/*.js`) from the Rust suite
   to `npm test`.
 - Playwright runs against the Rust server only.
+- Rename `Dockerfile.rust` to `Dockerfile`. Compose builds it as `artifact-mcp:local` by default,
+  so the default tag no longer goes stale between releases.
 - `Cargo.toml` is the only version source. `package.json` has no version, and the release workflow
   no longer compares the two files.
 - Remove the historical fixture generator, because it ran `lib/migrations.js`. The committed
@@ -103,6 +105,5 @@ The Rust suite lost 52 test functions and gained 43. Most of the new ones hold t
 ## Follow-up work
 
 - Add a Rust-side generator for historical fixtures. The next migration needs it.
-- Rename `Dockerfile.rust` to `Dockerfile`, and update the release workflow, Compose, and docs.
 - Optionally port the release `.mjs` scripts to a `cargo xtask`.
 - Optionally rewrite the `src/` comments that cite the retired twin.
