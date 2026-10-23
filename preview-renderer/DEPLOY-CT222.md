@@ -1,6 +1,12 @@
 # Runbook: move CT222 from the Node renderer to the Rust renderer
 
-This is a plan. Nobody has run it yet. Do the steps in order and stop at the first failed check.
+Do the steps in order and stop at the first failed check.
+
+**Run log.** Steps 1–6 ran on 2026-10-23 with a local build of `a34964b` (sha256 `47af6293…`); CT222
+has served previews from the Rust renderer since 16:17 UTC that day. The same day CT222 got
+`features: nesting=1` (for the Chrome sandbox), 768 MB of memory, and `MemoryMax=640M` in the
+drop-in. Step 8 waits for a one-week soak (`ct222_soak_check.py` in the operator's migration folder).
+From v1.28.0, install the attested release binary as described in step 1 instead of a local build.
 
 ## Current state (read on 2026-10-22)
 
