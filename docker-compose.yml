@@ -34,7 +34,12 @@ services:
     container_name: artifact-preview
     restart: unless-stopped
     init: true
-    user: pwuser
+    # The image's non-root `artifact-preview` user (Rust renderer + chrome-headless-shell, no Node).
+    user: "65532:65532"
+    environment:
+      - PORT=3000
+      - RENDER_TIMEOUT_MS=7000
+      - CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell
     read_only: true
     tmpfs:
       - /tmp:size=256m,mode=1777
@@ -50,7 +55,7 @@ services:
     networks:
       - preview_internal
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', r => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      test: ["CMD", "/usr/local/bin/artifact-preview", "healthcheck"]
       interval: 30s
       timeout: 5s
       retries: 3

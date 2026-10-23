@@ -239,8 +239,14 @@ Enable the Compose profile after setting `PREVIEW_RENDERER_URL=http://artifact-p
 
 ```bash
 docker compose --profile preview up -d --build
-docker compose exec artifact-preview npm run smoke
+docker compose exec artifact-preview /usr/local/bin/artifact-preview smoke
 ```
+
+The sidecar is the Rust `artifact-preview` binary driving a pinned Chrome for Testing
+`chrome-headless-shell` over a DevTools pipe. Its own settings are `RENDER_TIMEOUT_MS` (default
+`7000`, kept below `PREVIEW_RENDER_TIMEOUT_MS`) and `CHROME_HEADLESS_SHELL` (the image sets it). See
+[`preview-renderer/README.md`](../preview-renderer/README.md) for the full list, the isolation design,
+and the browser upgrade procedure.
 
 ### Preview isolation
 

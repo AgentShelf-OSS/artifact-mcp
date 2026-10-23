@@ -51,6 +51,35 @@ jobs:
           fi
           MCP_SURFACE_BASE="$base" cargo test --locked --test mcp_surface -- --nocapture
 
+  preview-renderer:
+    # The isolated HTML-to-PNG sidecar is its own Cargo workspace. Its tests drive the pinned Chrome
+    # for Testing headless shell, so a missing browser is a failure (CI=1), not a skip.
+    runs-on: ubuntu-latest
+    env:
+      CI: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: preview-renderer
+      - name: Download the pinned chrome-headless-shell from preview-renderer/Dockerfile
+        run: |
+          set -euo pipefail
+          version="$(sed -nE 's/^ARG CHROME_VERSION=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          sha256="$(sed -nE 's/^ARG CHROME_SHA256=(.+)$/\1/p' preview-renderer/Dockerfile)"
+          [ -n "$version" ] && [ -n "$sha256" ]
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/chs.zip" \
+            "https://storage.googleapis.com/chrome-for-testing-public/${version}/linux64/chrome-headless-shell-linux64.zip"
+          echo "${sha256}  $RUNNER_TEMP/chs.zip" | sha256sum -c -
+          unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
+          echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
+      - run: cargo fmt --manifest-path preview-renderer/Cargo.toml --check
+      - run: cargo clippy --manifest-path preview-renderer/Cargo.toml --all-targets --locked -- -D warnings
+      - run: cargo test --manifest-path preview-renderer/Cargo.toml --locked
+
   browser:
     # Real Chromium journeys run against the Rust release binary. The instance has an isolated
     # database, and global teardown removes the synthetic organization and artifacts.

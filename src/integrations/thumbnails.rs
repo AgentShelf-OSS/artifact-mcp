@@ -48,7 +48,7 @@
 //! # Serialisation
 //!
 //! The sidecar renders one page at a time and answers `503 {"error":"renderer busy"}` to anything
-//! concurrent ([preview-renderer/server.js:103-106]). [`ThumbnailQueue`] is the single lane that
+//! concurrent ([preview-renderer/src/server.rs]). [`ThumbnailQueue`] is the single lane that
 //! keeps the client inside that contract, with interactive (`High`) jobs always selected before
 //! startup backfill (`Low`) — [lib/thumbnails.js:216-217].
 //!
@@ -762,7 +762,7 @@ pub struct QueueDepth {
 /// `createThumbnailQueue({ thumbnails })` — [lib/thumbnails.js:207-236]
 ///
 /// One serial lane: exactly one render is in flight at a time, which is what the sidecar's
-/// single-render contract requires ([preview-renderer/server.js:103-106]). Interactive mutation
+/// single-render contract requires ([preview-renderer/src/server.rs]). Interactive mutation
 /// events (`High`) are always selected ahead of startup backfill (`Low`), so publishing an
 /// artifact does not queue behind thousands of backfill jobs.
 #[derive(Debug)]

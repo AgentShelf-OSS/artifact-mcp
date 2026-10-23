@@ -1,9 +1,9 @@
-//! U16 test support: an in-process stand-in for the Node/Chromium preview sidecar.
+//! U16 test support: an in-process stand-in for the Chromium preview sidecar.
 //!
-//! The real sidecar (`preview-renderer/server.js`) needs Chromium and a compose profile; no test
-//! in this suite may depend on either. [`StubRenderer`] is a blocking `std::net` HTTP/1.1 server
-//! on an ephemeral loopback port that speaks the exact sidecar contract the Rust client codes
-//! against, and can also misbehave in every way the client must survive:
+//! The real sidecar (the `artifact-preview` binary in `preview-renderer/`) needs Chromium and a
+//! compose profile; no test in this suite may depend on either. [`StubRenderer`] is a blocking
+//! `std::net` HTTP/1.1 server on an ephemeral loopback port that speaks the exact sidecar contract
+//! the Rust client codes against, and can also misbehave in every way the client must survive:
 //!
 //! * scripted per-request replies, with a default for anything past the script;
 //! * arbitrary status, `content-type`, `content-length` (including one that lies), chunked bodies
@@ -68,7 +68,7 @@ pub enum StubReply {
 }
 
 impl StubReply {
-    /// `500 {"error":"render failed"}` — [preview-renderer/server.js:120]
+    /// `500 {"error":"render failed"}` — [preview-renderer/src/server.rs]
     #[must_use]
     pub fn render_failed() -> Self {
         Self::Status {
@@ -78,7 +78,7 @@ impl StubReply {
         }
     }
 
-    /// `503 {"error":"renderer busy"}` — [preview-renderer/server.js:104]
+    /// `503 {"error":"renderer busy"}` — [preview-renderer/src/server.rs]
     #[must_use]
     pub fn renderer_busy() -> Self {
         Self::Status {
