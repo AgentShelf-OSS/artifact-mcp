@@ -6,29 +6,6 @@ on:
   pull_request:
 
 jobs:
-  mcp-surface:
-    # Derived from the frozen definitions, schemas, dispatch, OAuth scopes, documentation, and
-    # registered contract tests. No hand-maintained second tool catalog is involved.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-      - name: Check derived MCP surface against the change base
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -euo pipefail
-          zero_sha="0000000000000000000000000000000000000000"
-          base="$BASE_SHA"
-          if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
-            base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
-          fi
-          node scripts/check-mcp-surface.mjs --base "$base"
-
   test:
     # Node runs the browser-asset, template, tooling, and workflow tests. The root package has no
     # npm dependencies, so there is nothing to install.
@@ -40,41 +17,46 @@ jobs:
           node-version: "22"
       - run: npm test
 
-  conformance:
-    # The language-neutral oracle replays the recorded goldens against the Rust server. A missing
-    # Rust binary is a failure.
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "22"
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release --locked
-      - run: node conformance/runner.mjs
-
   rust:
+    # `cargo test` is the whole server gate: unit and native tests, the HTTP conformance replay
+    # (tests/conformance), the derived MCP surface check (tests/mcp_surface), and the frozen
+    # historical fixtures. Nothing here needs Node.
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The MCP surface report compares against the change base.
+          fetch-depth: 0
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy, rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets --all-features --locked -- -D warnings
-      - run: cargo test --all-targets --locked
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+      - run: cargo test --workspace --all-targets --locked
       # If cargo-nextest is ever adopted as the runner it does NOT execute doctests, and the
       # security::access compile_fail proofs live there — keep an explicit doc-test step.
       - run: cargo test --doc --locked
+      - name: Regenerate the reproducible historical fixtures and compare them with the committed ones
+        run: cargo xtask historical-fixture --verify-against-committed
+      - name: Report MCP surface paths changed since the change base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          zero_sha="0000000000000000000000000000000000000000"
+          base="$BASE_SHA"
+          if [ -z "$base" ] || [ "$base" = "$zero_sha" ]; then
+            base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+          fi
+          MCP_SURFACE_BASE="$base" cargo test --locked --test mcp_surface -- --nocapture
 
   browser:
     # Real Chromium journeys run against the Rust release binary. The instance has an isolated
     # database, and global teardown removes the synthetic organization and artifacts.
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: [mcp-surface, test, conformance, rust]
+    needs: [test, rust]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0

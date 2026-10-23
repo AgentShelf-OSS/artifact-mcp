@@ -22,8 +22,13 @@ production data or secrets are included.
 The corpus is frozen. Check its immutable bytes and pre-migration SQLite integrity with:
 
 ```sh
-node scripts/verify-historical-fixtures.mjs
+cargo test --locked --test native u50
+cargo xtask historical-fixture --verify-against-committed
 ```
+
+The first command boots every fixture and checks its manifest, digests, and that verification
+leaves the source untouched. The second regenerates every reproducible fixture and compares it
+with the committed one.
 
 ### Adding the fixture for a new migration
 

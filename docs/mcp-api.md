@@ -262,16 +262,17 @@ The release gate derives its report from frozen tool definitions, typed output s
 dispatch, OAuth scope mapping, documentation, conformance cases, and native test registration:
 
 ```bash
-node scripts/check-mcp-surface.mjs
+cargo test --locked --test mcp_surface
 ```
 
-For an intentional compatibility change that spans a branch, include the base revision:
+For an intentional compatibility change that spans a branch, print the paths changed since the base
+revision:
 
 ```bash
-node scripts/check-mcp-surface.mjs --base origin/master
+MCP_SURFACE_BASE=origin/master cargo test --locked --test mcp_surface -- --nocapture
 ```
 
 Update the existing definition, schema, dispatch, docs, and tests together. Do not add a separate
-handwritten registry. Run the conformance and Rust test commands reported by the checker.
+handwritten registry. Then run `cargo test --workspace --all-targets --locked`, which includes the conformance replay.
 
 [Return to the documentation index](README.md).

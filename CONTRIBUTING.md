@@ -15,18 +15,17 @@ Thanks for your interest in artifact-mcp. Issues, ideas, and pull requests are w
 ## Development
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features --locked -- -D warnings
-cargo test --all-targets --locked
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
+cargo test --workspace --all-targets --locked   # includes HTTP conformance and the MCP surface check
 cargo test --doc --locked
-cargo build --release --locked
-node conformance/runner.mjs   # HTTP conformance against target/release/artifact-mcp
-npm test                      # browser-asset and tooling tests; no npm install needed
+cargo xtask historical-fixture --verify-against-committed
+npm test                                        # browser-asset tests; no npm install needed
 ```
 
-- `rust-toolchain.toml` pins the Rust toolchain. Node 22.16 or later runs the browser-asset tests,
-  the tooling scripts, the conformance runner, and Playwright. Node does not run the server
-  (ADR-0024).
+- `rust-toolchain.toml` pins the Rust toolchain. Repository tooling is `cargo xtask` (run
+  `cargo xtask --help`). Node 22.16 or later still runs the browser-asset tests and Playwright
+  until those move to Rust. Node does not run the server (ADR-0024).
 - Match the surrounding style: small modules behind the traits in `src/ports/`, and production or
   test adapters passed to `build_router()` through `AppDeps`.
 - Add or update tests for any behavior change. Prefer the deterministic adapters in `tests/native/`
@@ -34,7 +33,9 @@ npm test                      # browser-asset and tooling tests; no npm install 
 - Schema changes go through a new versioned migration in `src/persistence/migrations.rs`
   (append-only; never edit a shipped migration).
 - A change to HTTP or MCP behavior can change a conformance golden. Record it with
-  `node conformance/runner.mjs --record` and review the golden diff as a contract change.
+  `CONFORMANCE_RECORD=1 cargo test --test conformance` and review the golden diff as a contract
+  change.
+- A new migration needs a boundary fixture: `cargo xtask historical-fixture` adds it.
 
 ## Pull requests
 
