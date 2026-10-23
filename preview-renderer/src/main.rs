@@ -2,13 +2,14 @@
 // Copyright 2026 Neil Blackman
 //! `artifact-preview`            serve on 0.0.0.0:$PORT
 //! `artifact-preview healthcheck` exit 0 if GET http://127.0.0.1:$PORT/health returns 200
-//! `artifact-preview smoke`       render a test page via $PREVIEW_RENDERER_URL (smoke.js)
+//! `artifact-preview smoke`       render a test page via $PREVIEW_RENDERER_URL (smoke.js), sending
+//!                                $RENDER_TOKEN or $RENDER_TOKEN_FILE when one is set
 #![deny(unsafe_code)]
 
 use std::process::ExitCode;
 
 use artifact_preview::client;
-use artifact_preview::config::{Config, port_from};
+use artifact_preview::config::{Config, RenderToken, port_from};
 use artifact_preview::server::Server;
 
 const USAGE: &str = "usage: artifact-preview [healthcheck | smoke]";
@@ -110,7 +111,14 @@ async fn healthcheck() -> ExitCode {
 async fn smoke() -> ExitCode {
     let base_url =
         std::env::var("PREVIEW_RENDERER_URL").unwrap_or_else(|_| "http://127.0.0.1:3000".into());
-    match client::smoke(&base_url).await {
+    let token = match RenderToken::from_env() {
+        Ok(token) => token,
+        Err(error) => {
+            eprintln!("preview renderer smoke test failed: {error}");
+            return ExitCode::FAILURE;
+        }
+    };
+    match client::smoke(&base_url, token.as_ref()).await {
         Ok(bytes) => {
             println!("preview renderer smoke test passed ({bytes} bytes)");
             ExitCode::SUCCESS

@@ -17,6 +17,7 @@ The artifact-mcp server calls it through `src/integrations/preview.rs` when
 |---|---|
 | `GET /health` | `200 {"status":"ok"}` |
 | `POST /render` with JSON `{"html": "...", "width": 1200, "height": 630}` | `200`, `content-type: image/png` |
+| `POST /render` without `authorization: Bearer <token>`, when a token is set | `401 {"error":"unauthorized"}`, `www-authenticate: Bearer` |
 | `POST /render` while another render runs | `503 {"error":"renderer busy"}` |
 | Body larger than `MAX_BODY_BYTES` | `413 {"error":"request too large"}` |
 | Body that is not JSON | `400 {"error":"invalid JSON"}` |
@@ -34,6 +35,26 @@ default). Values follow JavaScript `Number()` rules, as before: `"800"`, `8e2`, 
 
 The service renders one page at a time. It does not queue.
 
+### Shared token
+
+`RENDER_TOKEN` or `RENDER_TOKEN_FILE` sets an optional shared bearer token. It is defence in
+depth: the network policy that lets only the artifact-mcp server reach the renderer stays the
+main control.
+
+* When a token is set, `POST /render` requires `authorization: Bearer <token>`. The scheme
+  `Bearer` is case-sensitive, and the comparison takes constant time. A missing or wrong value
+  gets `401 {"error":"unauthorized"}`. The check comes before the busy check and before the body
+  is read, so a client without the token cannot hold the render slot or learn whether a render
+  runs.
+* `GET /health` needs no token.
+* Without a token, the contract is unchanged, and an `authorization` header is ignored. So the
+  server can start to send the token before the renderer requires it.
+* The service never logs the token or puts it in an error message. A rejected request logs
+  `[artifact-preview] rejected a render request without a valid token`.
+
+The artifact-mcp server sends the same value from `PREVIEW_RENDERER_TOKEN` or
+`PREVIEW_RENDERER_TOKEN_FILE` (see `docs/configuration.md`).
+
 ## Configuration
 
 | Variable | Default | Meaning |
@@ -43,6 +64,8 @@ The service renders one page at a time. It does not queue.
 | `RENDER_TIMEOUT_MS` | `7000` | Wall-clock limit for one render: launch, load and screenshot. Keep it below the client's 8 s timeout. |
 | `MAX_BODY_BYTES` | `5242880` | Request body limit. |
 | `TMPDIR` | `/tmp` | Where the service creates the per-render directories. |
+| `RENDER_TOKEN` | unset | The shared bearer token that `POST /render` then requires (see [Shared token](#shared-token)). 32 to 4096 printable ASCII characters without spaces. Empty means unset. |
+| `RENDER_TOKEN_FILE` | unset | Path of a file that holds the token instead. The service reads it once at startup and removes one trailing newline. Setting both variables is an error. |
 | `CHROME_SANDBOX` | off | `1` or `true` keeps Chromium's own sandbox: the browser starts without `--no-sandbox`, and every other flag stays the same. `0`, `false`, empty or unset mean off. Any other value stops the service at startup. It needs unprivileged user namespaces and a user other than root; see [Chromium sandbox](#chromium-sandbox-chrome_sandbox). |
 | `LANG`, `LANGUAGE`, `LC_ALL`, `TZ` | unset | Passed to the browser if set. The browser gets no other variable from the service. |
 
@@ -56,6 +79,8 @@ artifact-preview smoke         # render a test page through $PREVIEW_RENDERER_UR
 
 `healthcheck` lets a container healthcheck run without curl or Node. `smoke` replaces
 `npm run smoke`. It checks the status, the content type, the PNG signature and the 2400×1260 size.
+It reads `RENDER_TOKEN` or `RENDER_TOKEN_FILE` with the same rules as the service and sends the
+token when one is set.
 
 ## Isolation model
 
@@ -253,7 +278,9 @@ The suite covers:
 * `src/tests.rs`: 37 network vectors per canary address, run with all defences, with each
   layer alone, and with none (the control). Also checks, with `CHROME_SANDBOX` off and on, that
   every browser process stays in the process group and that none survives;
-* `tests/contract.rs`: the HTTP contract against the running binary;
+* `tests/contract.rs`: the HTTP contract against the running binary, including the shared
+  token: `401` for a missing, wrong or wrong-case value, `200` for the right one, an open
+  `/health`, `smoke` with the token, and startup errors that never echo the token;
 * `tests/isolation.rs`: the vectors against the binary, and `data:` images rendering, checked by
   pixel colour;
 * `tests/lifecycle.rs`: hostile pages hitting the deadline, cleanup after a client disconnect,
