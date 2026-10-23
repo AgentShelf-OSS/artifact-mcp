@@ -3,11 +3,15 @@
 //! ```text
 //! cargo xtask historical-fixture [--schema N | --case NAME] [--out DIR] [--replace-frozen-fixtures]
 //! cargo xtask historical-fixture --verify-against-committed [--schema N | --case NAME] [--out DIR]
+//! cargo xtask release <subcommand> ...
+//! cargo xtask cf-access-setup | tunnel | publish-data-artifact | benchmark-durability ...
 //! ```
 
 #![forbid(unsafe_code)]
 
 mod fixture;
+mod ops;
+mod release;
 mod verify;
 
 use std::collections::BTreeSet;
@@ -20,6 +24,19 @@ use crate::fixture::{CaseSpec, Outcome};
 
 /// Error type for the maintenance commands; every message reaches the operator verbatim.
 pub type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
+const TOP_USAGE: &str = "\
+usage: cargo xtask <command> [args]
+
+commands:
+  historical-fixture     add or verify frozen historical database fixtures
+  release                release evidence: manifest, source SBOM, verification
+  cf-access-setup        bootstrap the Cloudflare Access application
+  tunnel                 manage the Anthropic MCP tunnel profile
+  publish-data-artifact  publish an HTML artifact with live-data bindings
+  benchmark-durability   measure publish/update latency against an OCI image
+
+Run `cargo xtask <command> --help` for the options of one command.";
 
 const USAGE: &str = "\
 usage: cargo xtask historical-fixture [--schema N | --case NAME] [--out DIR] [--replace-frozen-fixtures]
@@ -290,15 +307,27 @@ fn verify_all(repo: &Path, committed_root: &Path, options: Options) -> Result<bo
 
 fn run() -> Result<bool> {
     let args = std::env::args().skip(1).collect::<Vec<_>>();
-    if args.iter().any(|arg| arg == "-h" || arg == "--help") {
+    let Some((command, rest)) = args.split_first() else {
+        return Err(TOP_USAGE.into());
+    };
+    match command.as_str() {
+        "-h" | "--help" | "help" => {
+            println!("{TOP_USAGE}");
+            Ok(true)
+        }
+        "historical-fixture" => historical_fixture(rest),
+        "release" => release::run(rest),
+        "cf-access-setup" | "tunnel" | "publish-data-artifact" | "benchmark-durability" => {
+            ops::run(command, rest)
+        }
+        other => Err(format!("unknown command {other}\n\n{TOP_USAGE}").into()),
+    }
+}
+
+fn historical_fixture(rest: &[String]) -> Result<bool> {
+    if rest.iter().any(|arg| arg == "-h" || arg == "--help") {
         println!("{USAGE}");
         return Ok(true);
-    }
-    let Some((command, rest)) = args.split_first() else {
-        return Err(USAGE.into());
-    };
-    if command != "historical-fixture" {
-        return Err(format!("unknown command {command}\n\n{USAGE}").into());
     }
     let options = parse(rest)?;
     let repo = repo_root();
