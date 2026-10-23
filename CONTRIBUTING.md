@@ -31,8 +31,9 @@ cargo test --manifest-path browser-tests/Cargo.toml --locked
 - `rust-toolchain.toml` pins the Rust toolchain. Repository tooling is `cargo xtask` (run
   `cargo xtask --help`). The browser-asset tests in `browser-tests/` run the JavaScript in real
   Chrome for Testing, driven from Rust; use the version pinned in `preview-renderer/Dockerfile`.
-  Without `CHROME_HEADLESS_SHELL` they are skipped. Node 22.16 or later still runs the Playwright
-  journeys in `playwright/` until those move to Rust. Node does not run the server (ADR-0024).
+  Without `CHROME_HEADLESS_SHELL` they are skipped. The browser journeys (`--test e2e`) and reader
+  regressions (`--test reader`) in the same crate also need `ARTIFACT_MCP_BIN`. The repository
+  needs no Node (ADR-0024).
 - Changed browser JavaScript in `assets/` needs a test in `browser-tests/js/` when its behaviour
   changes; `browser-assets-parse` checks that every asset still parses.
 - Match the surrounding style: small modules behind the traits in `src/ports/`, and production or

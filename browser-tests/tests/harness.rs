@@ -514,3 +514,167 @@ async fn the_in_page_harness_keeps_node_semantics() {
     );
     browser.close().await;
 }
+
+#[tokio::test]
+async fn exposed_functions_call_into_rust_across_documents() {
+    let Some(browser) = launch(Network::LockedDown).await else {
+        return;
+    };
+    let page = routed_page(&browser).await;
+    let calls = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&calls);
+    page.expose_function("rustAdd", move |args| {
+        counter.fetch_add(1, Ordering::SeqCst);
+        match (
+            args.first().and_then(|a| a.as_f64()),
+            args.get(1).and_then(|b| b.as_f64()),
+        ) {
+            (Some(a), Some(b)) => Ok(json!(a + b)),
+            _ => Err(format!("not two numbers: {args:?}")),
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        page.evaluate("rustAdd(2, 3)").await.unwrap().as_f64(),
+        Some(5.0)
+    );
+    let rejected = page
+        .evaluate("rustAdd('x').then(() => 'resolved', (error) => error.message)")
+        .await
+        .unwrap();
+    assert_eq!(rejected, json!("not two numbers: [String(\"x\")]"));
+    // `document.open` keeps the global; a navigation gets the function again.
+    page.set_content("<p>replaced</p>").await.unwrap();
+    assert_eq!(
+        page.evaluate("rustAdd(1, 1)").await.unwrap().as_f64(),
+        Some(2.0)
+    );
+    page.goto(&format!("{ORIGIN}/")).await.unwrap();
+    assert_eq!(
+        page.evaluate("rustAdd(4, 4)").await.unwrap().as_f64(),
+        Some(8.0)
+    );
+    assert_eq!(calls.load(Ordering::SeqCst), 4);
+    browser.close().await;
+}
+
+#[tokio::test]
+async fn frame_locators_evaluate_wait_and_set_content() {
+    let Some(browser) = launch(Network::LockedDown).await else {
+        return;
+    };
+    let page = routed_page(&browser).await;
+    page.set_content("<iframe id=\"inner\" srcdoc=\"<p id=greeting>hi</p>\"></iframe>")
+        .await
+        .unwrap();
+    let frame = page.frame_locator("#inner");
+    assert_eq!(
+        frame
+            .evaluate(
+                "(suffix) => document.getElementById('greeting').textContent + suffix",
+                json!("!")
+            )
+            .await
+            .unwrap(),
+        json!("hi!")
+    );
+    frame
+        .evaluate(
+            "() => setTimeout(() => { window.done = 42; }, 100)",
+            json!(null),
+        )
+        .await
+        .unwrap();
+    assert_eq!(
+        frame
+            .wait_for_function("() => window.done", json!(null))
+            .await
+            .unwrap(),
+        json!(42)
+    );
+    let error = frame
+        .wait_for_function_with_timeout("() => false", json!(null), Duration::from_millis(200))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::Timeout { .. }), "{error}");
+    frame
+        .set_content("<p id=fresh>new</p><script>window.ran = true</script>")
+        .await
+        .unwrap();
+    assert_eq!(
+        frame
+            .locator("#fresh")
+            .text_content()
+            .await
+            .unwrap()
+            .as_deref(),
+        Some("new")
+    );
+    assert_eq!(
+        frame
+            .evaluate("() => window.ran", json!(null))
+            .await
+            .unwrap(),
+        json!(true)
+    );
+    let started = std::time::Instant::now();
+    let error = page
+        .wait_for_function_with_timeout("() => false", &[], Duration::from_millis(200))
+        .await
+        .unwrap_err();
+    assert!(matches!(error, Error::Timeout { .. }), "{error}");
+    assert!(started.elapsed() < Duration::from_secs(5));
+    browser.close().await;
+}
+
+#[tokio::test]
+async fn drag_mouse_drops_and_still_clicks() {
+    let Some(browser) = launch(Network::LockedDown).await else {
+        return;
+    };
+    let page = routed_page(&browser).await;
+    let html = r#"<div id="source" draggable="true" style="position:absolute;left:20px;top:20px;width:80px;height:40px">drag me</div>
+<div id="target" style="position:absolute;left:300px;top:200px;width:120px;height:80px">drop here</div>
+<script>
+  window.events = [];
+  source.addEventListener('dragstart', (event) => { event.dataTransfer.setData('text/plain', 'payload'); events.push('dragstart'); });
+  target.addEventListener('dragenter', (event) => { event.preventDefault(); events.push('dragenter'); });
+  target.addEventListener('dragover', (event) => event.preventDefault());
+  target.addEventListener('drop', (event) => { event.preventDefault(); events.push('drop:' + event.dataTransfer.getData('text/plain')); });
+</script>"#;
+    page.set_content(html).await.unwrap();
+    let mut mouse = page.drag_mouse();
+    mouse.move_to(60.0, 40.0, 1).await.unwrap();
+    mouse.down().await.unwrap();
+    mouse.move_to(70.0, 50.0, 3).await.unwrap();
+    assert!(mouse.is_dragging());
+    mouse.move_to(360.0, 240.0, 10).await.unwrap();
+    mouse.up().await.unwrap();
+    assert!(!mouse.is_dragging());
+    let events = page.evaluate("events").await.unwrap();
+    assert_eq!(events[0], json!("dragstart"));
+    assert!(
+        events.as_array().unwrap().contains(&json!("dragenter")),
+        "{events}"
+    );
+    assert_eq!(
+        events.as_array().unwrap().last(),
+        Some(&json!("drop:payload"))
+    );
+    // Without a drag, the same mouse clicks as usual.
+    page.set_content(
+        "<button onclick=\"window.clicked = true\" style=\"width:100px;height:40px\">b</button>",
+    )
+    .await
+    .unwrap();
+    let mut mouse = page.drag_mouse();
+    mouse.move_to(30.0, 20.0, 1).await.unwrap();
+    mouse.down().await.unwrap();
+    mouse.up().await.unwrap();
+    assert_eq!(
+        page.evaluate("window.clicked === true").await.unwrap(),
+        json!(true)
+    );
+    browser.close().await;
+}

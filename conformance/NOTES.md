@@ -67,7 +67,7 @@ publisher tenant-lock. Deferred:
 - **UI snapshots** (`html-dom`) — the mode is implemented (exact snapshot) and used for 404
   bodies, but no gallery/shell/settings full-page snapshot is frozen yet. Those pages are
   identity- and content-dependent and belong with the `CONF-UI` unit. Browser behavior is
-  covered by `playwright/`.
+  covered by the journeys in `browser-tests/` (`--test e2e`).
 - **Thumbnails/preview** — `PREVIEW_RENDERER_URL` is pinned empty so no headless browser is
   required. `/thumbnails/:id` therefore serves the placeholder path; the PNG path needs a
   fixture renderer service (`CONF-PREVIEW`).

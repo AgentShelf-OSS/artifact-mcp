@@ -11,6 +11,9 @@ use crate::Error;
 use crate::connection::lock;
 use crate::page::Page;
 
+mod drag;
+pub use drag::DragMouse;
+
 /// Keys held down and the mouse position, per page.
 #[derive(Debug, Default)]
 pub(crate) struct InputState {

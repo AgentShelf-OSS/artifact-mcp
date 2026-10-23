@@ -437,8 +437,19 @@ fn render(value: &Value) -> String {
 
 /// Poll `probe` until `accept` holds for its value (Playwright's `expect.poll`), with the expect
 /// timeout and Playwright's intervals. Returns the accepted value.
-pub async fn poll<T, F, Fut>(
+pub async fn poll<T, F, Fut>(what: &str, probe: F, accept: impl Fn(&T) -> bool) -> Result<T, Error>
+where
+    T: Debug,
+    F: FnMut() -> Fut,
+    Fut: Future<Output = Result<T, Error>>,
+{
+    poll_with_timeout(what, expect_timeout(), probe, accept).await
+}
+
+/// [`poll`] with its own timeout instead of the expect timeout (`expect.poll(fn, { timeout })`).
+pub async fn poll_with_timeout<T, F, Fut>(
     what: &str,
+    timeout: Duration,
     mut probe: F,
     accept: impl Fn(&T) -> bool,
 ) -> Result<T, Error>
@@ -448,7 +459,6 @@ where
     Fut: Future<Output = Result<T, Error>>,
 {
     begin_step(format!("expect.poll: {what}"));
-    let timeout = expect_timeout();
     let deadline = Instant::now() + timeout;
     let mut attempt = 0;
     loop {

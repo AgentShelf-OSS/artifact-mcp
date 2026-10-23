@@ -71,10 +71,8 @@ ARTIFACT_MCP_BIN=$PWD/target/release/artifact-mcp \
   cargo test --manifest-path browser-tests/Cargo.toml --locked --test e2e -- 01-gallery 02-viewer 08-settings
 ```
 
-Specs that are not ported yet still run in the isolated Playwright harness described in [`playwright/README.md`](../playwright/README.md), after starting a disposable Rust server.
-
 Use separate throwaway data directories and disposable test keys. Never point the harness at production data. For a broad contract check, run `cargo test --manifest-path browser-tests/Cargo.toml --locked` and `cargo test --all-targets --locked` from the repository root.
 
 ## Screenshot refresh
 
-The canonical visual evidence is in [`docs/screenshots/`](screenshots/). Refresh screenshots when a layout, breakpoint, theme, access state, settings surface, viewer shell, or comment interaction changes—not for copy-only or test-only edits. Capture the same named states and viewport/theme combinations used by the Playwright specs, review desktop/tablet/phone and light/dark output, then replace only the affected images. Keep screenshots free of credentials, real artifact content, and production identifiers. Record the validating command and affected state in the change description.
+The canonical visual evidence is in [`docs/screenshots/`](screenshots/). Refresh screenshots when a layout, breakpoint, theme, access state, settings surface, viewer shell, or comment interaction changes—not for copy-only or test-only edits. Capture the same named states and viewport/theme combinations used by the browser journeys in `browser-tests/tests/e2e/`, review desktop/tablet/phone and light/dark output, then replace only the affected images. Keep screenshots free of credentials, real artifact content, and production identifiers. Record the validating command and affected state in the change description.

@@ -168,16 +168,15 @@ checks, and browser playback against the real worker before deployment.
 The viewer must support pause/resume, cancellation, next paragraph, voice changes,
 and visible failure recovery without changing annotations or shared state.
 
-Reader control regression fixtures use the release binary and Playwright:
+Reader control regression fixtures use the release binary and the pinned
+chrome-headless-shell (see `browser-tests/README.md`):
 
 ```sh
-node playwright/tests/reader-sections.cjs
-node playwright/tests/reader-controls.cjs
-node playwright/tests/reader-wav.cjs
+export ARTIFACT_MCP_BIN=$PWD/target/release/artifact-mcp CHROME_HEADLESS_SHELL=/path/to/chrome-headless-shell
+cargo test --manifest-path browser-tests/Cargo.toml --test reader -- reader-sections reader-controls reader-wav
 ```
 
-Set `POCKET_TEST_BINARY` or `WAV_TEST_BINARY` if the release binary lives outside
-`target/release/artifact-mcp`. The audio fixtures synthesize deterministic test
+`ARTIFACT_MCP_BIN` selects the server binary. The audio fixtures synthesize deterministic test
 buffers in the browser; they do not require model workers. They verify section
 scope, stale-content rejection, preview checkpoint isolation, streaming and WAV
 rewind, explicit resume, timer expiry, and end-of-section prefetch boundaries.

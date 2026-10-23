@@ -282,7 +282,7 @@ Complete WAV fallback does not supply word timings.
 Validation covered real streamed audio, exact cache replay, legacy PCM/WAV,
 disconnect recovery, nested formatting, paragraph boundaries, line breaks,
 selection offsets beyond the first chunk, and clearing highlights on mutation.
-The browser mapping regression is `playwright/tests/reader-word-highlights.cjs`.
+The browser mapping regression is `reader-word-highlights` in `browser-tests/tests/reader/`.
 See [the initial trial](trials/timestamped/README.md) and [the next RAVEN trial](trials/raven/README.md).
 
 The worker backup is `/opt/docker/artifact-pocket-tts/.pre-timestamped-20260912`.

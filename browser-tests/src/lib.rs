@@ -34,15 +34,18 @@
 //! server run through [`e2e`]; see `README.md`.
 #![forbid(unsafe_code)]
 
+mod binding;
 mod browser;
 mod connection;
 pub mod e2e;
 mod expect;
+mod frame_eval;
 pub mod http;
 mod input;
 mod locator;
 mod network;
 mod page;
+pub mod reader;
 mod route;
 pub mod server;
 mod state;
@@ -57,9 +60,9 @@ pub use browser::{Browser, BrowserOptions, TEMP_DIR_PREFIX};
 pub use connection::Subscription;
 pub use expect::{
     LocatorAssertions, begin_step, current_step, expect, expect_timeout, failure_screenshot, poll,
-    set_current_test, set_expect_timeout, set_failure_dir,
+    poll_with_timeout, set_current_test, set_expect_timeout, set_failure_dir,
 };
-pub use input::{Keyboard, Mouse, MouseButton, Touchscreen};
+pub use input::{DragMouse, Keyboard, Mouse, MouseButton, Touchscreen};
 pub use locator::{
     BoundingBox, ClickOptions, FrameLocator, Locator, Pattern, Role, WaitState, exact, regex,
 };

@@ -751,3 +751,92 @@ async fn expectations_cover_playwright_matchers() {
     assert!(matches!(missing, Pattern::Substring(_)));
     browser.close().await;
 }
+
+#[tokio::test]
+async fn evaluate_all_sees_every_match_and_poll_takes_its_own_timeout() {
+    let Some(browser) = launch().await else {
+        return;
+    };
+    let (page, _) = site(
+        &browser,
+        &[
+            (
+                "/",
+                r#"<!doctype html><ul><li data-n="1">a</li><li data-n="2">b</li><li hidden data-n="3">c</li></ul>
+                <iframe id="inner" src="https://other.test/inner"></iframe>"#,
+            ),
+            ("/inner", "<!doctype html><p>x</p><p>y</p>"),
+        ],
+    )
+    .await;
+    page.goto(&format!("{ORIGIN}/")).await.unwrap();
+    // Every match in document order, hidden ones included, with the argument.
+    let numbers = page
+        .locator("li")
+        .evaluate_all(
+            "(nodes, prefix) => nodes.map((node) => prefix + node.dataset.n)",
+            json!("#"),
+        )
+        .await
+        .unwrap();
+    assert_eq!(numbers, json!(["#1", "#2", "#3"]));
+    // No match is an empty array, at once.
+    let none = page
+        .locator("p")
+        .evaluate_all("(nodes) => nodes.length", Value::Null)
+        .await
+        .unwrap();
+    assert_eq!(none, json!(0));
+    // Chained and filtered locators, and an out-of-process frame.
+    let filtered = page
+        .locator("ul")
+        .locator("li")
+        .filter_has_text("b")
+        .evaluate_all(
+            "(nodes) => nodes.map((node) => node.textContent)",
+            Value::Null,
+        )
+        .await
+        .unwrap();
+    assert_eq!(filtered, json!(["b"]));
+    let framed = page
+        .frame_locator("#inner")
+        .locator("p")
+        .evaluate_all(
+            "async (nodes) => nodes.map((node) => node.textContent).join('')",
+            Value::Null,
+        )
+        .await
+        .unwrap();
+    assert_eq!(framed, json!("xy"));
+
+    // `poll_with_timeout` retries until the value is accepted, and gives up after its own
+    // timeout rather than the expect timeout.
+    let probes = AtomicUsize::new(0);
+    let accepted = browser_tests::poll_with_timeout(
+        "three probes",
+        Duration::from_secs(10),
+        || async { Ok(probes.fetch_add(1, Ordering::SeqCst) + 1) },
+        |count| *count >= 3,
+    )
+    .await
+    .unwrap();
+    assert_eq!(accepted, 3);
+    let started = std::time::Instant::now();
+    let error = browser_tests::poll_with_timeout(
+        "never",
+        Duration::from_millis(300),
+        || async { Ok(false) },
+        |done| *done,
+    )
+    .await
+    .unwrap_err();
+    assert!(matches!(error, Error::Assertion(_)), "{error}");
+    assert!(error.to_string().contains("Timeout:    300ms"), "{error}");
+    assert!(
+        started.elapsed() < Duration::from_secs(2),
+        "{:?}",
+        started.elapsed()
+    );
+    browser.close().await;
+}

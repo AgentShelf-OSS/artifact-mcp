@@ -32,6 +32,14 @@ name = "e2e"
 path = "tests/e2e/main.rs"
 harness = false
 
+# `tests/reader` is the reader regression suite ported from `playwright/reader-runner.mjs`: each
+# case gets its own browser, and the server-backed cases their own server and stub speech worker,
+# so it has its own `main` too.
+[[test]]
+name = "reader"
+path = "tests/reader/main.rs"
+harness = false
+
 [workspace]
 
 [dependencies]

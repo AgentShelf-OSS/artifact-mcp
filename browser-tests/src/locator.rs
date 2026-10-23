@@ -1711,6 +1711,45 @@ impl<'p> Locator<'p> {
             .unwrap_or_default())
     }
 
+    /// Call the JavaScript function `function` (source text) as `function(elements, arg)` with
+    /// every element that matches now, in document order, and return its awaited result as JSON
+    /// (Playwright's `locator.evaluateAll`). It waits for the locator's frame, not for elements:
+    /// no match calls `function([], arg)`.
+    pub async fn evaluate_all(&self, function: &str, arg: Value) -> Result<Value, Error> {
+        retry!(self, "evaluateAll", self.page.timeout, |_attempt| self
+            .try_evaluate_all(function, &arg))
+    }
+
+    async fn try_evaluate_all(&self, function: &str, arg: &Value) -> Result<Attempt<Value>, Error> {
+        let scope = match self.scope().await? {
+            Lookup::Found(scope) => scope,
+            Lookup::Missing(reason) => return Ok(Attempt::Retry(reason)),
+            Lookup::Strict(count, previews) => return Err(self.strict_error(count, &previews)),
+        };
+        let result = self
+            .page
+            .call_in(
+                &scope.ctx,
+                &with_bt(
+                    "steps, arg",
+                    &format!("return ({function})(bt.query(steps), arg);"),
+                ),
+                &[self.steps_json(), arg.clone()],
+                true,
+            )
+            .await;
+        self.release_scope(&scope).await;
+        let result = result?;
+        if is_missing_helper(&result) {
+            return Ok(Attempt::Retry(
+                "the locator engine is not installed yet".into(),
+            ));
+        }
+        Ok(Attempt::Done(
+            result.get("value").cloned().unwrap_or(Value::Null),
+        ))
+    }
+
     async fn state_now(&self, state: &str) -> Result<bool, Error> {
         match self.element().await? {
             Lookup::Missing(_) => Ok(state == "hidden"),

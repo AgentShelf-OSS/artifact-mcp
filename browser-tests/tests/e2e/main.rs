@@ -21,6 +21,15 @@ mod s06_categories;
 mod s07_tenancy;
 mod s08_settings;
 mod s09_csrf;
+mod s10_collections;
+mod s11_collection_dialogs;
+mod s12_artifact_popovers;
+mod s13_inline_folders;
+mod s14_collection_gestures;
+mod s15_mcp_collections;
+mod s16_folder_create_preview;
+mod s17_shared_confirmations;
+mod s18_web_performance;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -36,6 +45,15 @@ fn main() -> ExitCode {
         s07_tenancy::cases(),
         s08_settings::cases(),
         s09_csrf::cases(),
+        s10_collections::cases(),
+        s11_collection_dialogs::cases(),
+        s12_artifact_popovers::cases(),
+        s13_inline_folders::cases(),
+        s14_collection_gestures::cases(),
+        s15_mcp_collections::cases(),
+        s16_folder_create_preview::cases(),
+        s17_shared_confirmations::cases(),
+        s18_web_performance::cases(),
     ]
     .concat();
     browser_tests::e2e::main(

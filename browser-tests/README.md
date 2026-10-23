@@ -1,9 +1,14 @@
 # browser-tests
 
 Tests for the JavaScript in `../assets` (viewer shell brokers, reader, cast bridge, portal,
-anchor bridge, gallery layout, and so on), and end-to-end browser journeys against the
-artifact-mcp release binary, run in real Chrome for Testing `chrome-headless-shell` and driven
-from Rust. Nothing here starts Node.
+anchor bridge, gallery layout, and so on), end-to-end browser journeys against the artifact-mcp
+release binary, and the reader regression suite, run in real Chrome for Testing
+`chrome-headless-shell` and driven from Rust. Nothing here starts Node.
+
+`cargo test` and the conformance oracle (`../conformance`) prove that the server emits the
+expected bytes. They do not run page JavaScript. This crate does: a truncated `shell.js` was once
+served byte for byte, passed every conformance case, and still broke every button because the
+browser could not parse it. Add a journey here for every interactive flow before you trust it.
 
 The crate is its own Cargo workspace, like `../preview-renderer`. Root `cargo test --workspace`
 does not build it and never needs a browser. It shares the DevTools pipe transport and the
@@ -32,12 +37,14 @@ cargo test --manifest-path browser-tests/Cargo.toml --test js -- "portal :: shel
 cargo test --manifest-path browser-tests/Cargo.toml --test js -- --list
 cargo test --manifest-path browser-tests/Cargo.toml --test e2e -- 02-viewer
 cargo test --manifest-path browser-tests/Cargo.toml --test e2e -- --list
+cargo test --manifest-path browser-tests/Cargo.toml --test reader -- reader-wav
+cargo test --manifest-path browser-tests/Cargo.toml --test reader -- --list
 ```
 
 | Variable | Meaning |
 |---|---|
 | `CHROME_HEADLESS_SHELL` | The browser. Without it the browser tests are skipped with a message. |
-| `ARTIFACT_MCP_BIN` | The server binary for `--test e2e`. Without it the e2e target is skipped with a message. |
+| `ARTIFACT_MCP_BIN` | The server binary for `--test e2e` and `--test reader`. Without it those targets are skipped with a message. |
 | `CI` | When set, a missing `CHROME_HEADLESS_SHELL` or `ARTIFACT_MCP_BIN` fails the run instead of skipping it. |
 | `E2E_RUN_ID` | The e2e run id (organization `pwtest-<id>`); default: the last six digits of the start time. |
 | `E2E_TEST_TIMEOUT_MS` | Per-case timeout of the e2e target (default 30000, Playwright's `timeout`). |
@@ -57,7 +64,8 @@ Do not run them at the same time as these tests with the same browser path.
 | `tests/harness.rs` | Tests of the harness itself: evaluation, console and exception capture, compile checks, routes, network policies, process cleanup, and the Node semantics of `js/harness.js`. |
 | `tests/locators.rs` | Tests of the locator, action and expectation layer on routed pages (no server). |
 | `tests/e2e/` | `cargo test --test e2e`: browser journeys against the server, one module per former Playwright spec (`s01_gallery.rs` ...). |
-| `src/` | The Rust harness API (below), the suite runner (`src/suite.rs`), and the e2e fixtures and runner (`src/e2e.rs`, `src/server.rs`, `src/http.rs`). |
+| `tests/reader/` | `cargo test --test reader`: the reader regression suite, one module per former `reader-*.cjs` program. |
+| `src/` | The Rust harness API (below), the suite runner (`src/suite.rs`), the e2e fixtures and runner (`src/e2e.rs`, `src/server.rs`, `src/http.rs`), and the reader fixture, stub speech worker and runner (`src/reader.rs`). |
 | `src/injected.js` | The in-page locator engine (roles, accessible names, text, labels, states, matchers). |
 
 ## How a suite runs
@@ -189,7 +197,9 @@ expect(&page.locator(".filter-rail")).to_have_count(0).await?;
 * **Reads** (waiting for the element): `evaluate(function, arg)` (as `function(element, arg)`),
   `text_content`, `inner_text`, `input_value`, `get_attribute`, `bounding_box` (main-viewport CSS
   pixels, frames included), `accessible_name`. No waiting: `count`, `all_text_contents`,
-  `is_visible`, `is_hidden`, `is_enabled`, `is_checked`. `wait_for(WaitState)`.
+  `evaluate_all(function, arg)` (as `function(elements, arg)`, Playwright's `evaluateAll`; `[]`
+  when nothing matches), `is_visible`, `is_hidden`, `is_enabled`, `is_checked`.
+  `wait_for(WaitState)`.
 * **Expectations** (`expect(&locator)`, `.not()`, `.timeout(..)`) retry with Playwright's
   intervals until the expect timeout (5 s; `set_expect_timeout`): `to_be_visible`, `to_be_hidden`,
   `to_be_attached`, `to_be_enabled`, `to_be_disabled`, `to_be_editable`, `to_be_checked`,
@@ -197,15 +207,36 @@ expect(&page.locator(".filter-rail")).to_have_count(0).await?;
   `to_contain_texts`, `to_have_count`, `to_have_attribute`, `to_have_attribute_present`,
   `to_have_value`, `to_have_class`, `to_have_css`. A failure is an `Error::Assertion` with the
   locator, the expected and last received values and a screenshot path. `poll(what, probe,
-  accept)` is `expect.poll`. Plain values use `assert!`.
+  accept)` is `expect.poll`; `poll_with_timeout(what, timeout, probe, accept)` is
+  `expect.poll(fn, { timeout })`. Plain values use `assert!`.
 * **Input.** `page.keyboard()` (`press("Shift+Tab")`, `down`, `up`, `type_text`,
   `insert_text`), `page.mouse()` (`move_to(x, y, steps)`, `down`, `up`, `click`, `dblclick`,
   `wheel`), `page.touchscreen().tap(x, y)` after `page.set_has_touch(true)`.
+* **Drag and drop.** `chrome-headless-shell` has no system drag loop, so a native drag
+  (`draggable`, `dragstart`) started with `page.mouse()` never drops. `page.drag_mouse()` is the
+  same mouse with Playwright's Chromium drag handling: on a move with the left button down it
+  turns on `Input.setInterceptDrags`, asks every frame whether a `dragstart` ran and was not
+  cancelled, and then sends `dragEnter`, `dragOver` and, on `up()`, `drop` with the intercepted
+  data (`Input.dispatchDragEvent`). Without a drag it sends plain mouse events.
+
+  ```rust
+  let mut mouse = page.drag_mouse();
+  mouse.move_to(from.0, from.1, 1).await?;
+  mouse.down().await?;
+  mouse.move_to(to.0, to.1, 12).await?;
+  mouse.up().await?; // drop
+  ```
 * **Pages.** `goto` (returns the main document's `NetworkResponse`), `reload`, `go_back`,
   `go_forward`, `set_base_url`, `set_extra_http_headers` and `add_init_script` (for the page and
   every iframe), `enable_browser_log` (resource errors and CSP reports become console entries, as
-  Playwright reports them), `wait_for_function`, `url`, `frames`, `frame_url`, `screenshot`,
-  `page_errors`, `set_evaluate_user_gesture` (Playwright evaluates with a user gesture).
+  Playwright reports them), `wait_for_function` and `wait_for_function_with_timeout`, `url`,
+  `frames`, `frame_url`, `screenshot`, `page_errors`, `set_evaluate_user_gesture` (Playwright
+  evaluates with a user gesture).
+* **Exposed functions.** `page.expose_function(name, |args| Ok(value))` defines `window[name]`
+  in the page (Playwright's `exposeFunction`): a call sends its JSON arguments to the Rust
+  handler and returns a promise of its result (`Err(message)` rejects). It works in the current
+  documents and every later one (navigations, `set_content`), through `Runtime.addBinding` and
+  `Runtime.bindingCalled`. Out-of-process iframes that attach later do not get it.
 * **Network.** `wait_for_request` and `wait_for_response` return waiters to create before the
   action and `.await` after it; they see every frame, out-of-process iframes included.
   `requests()` lists every request so far (a `page.on("request")` collector). `response_text`,
@@ -219,12 +250,17 @@ expect(&page.locator(".filter-rail")).to_have_count(0).await?;
   first request carries no extra headers and is not routed.
 * **Frames.** Each page auto-attaches its out-of-process iframes (`Target.setAutoAttach`, flat
   sessions, paused until set up): their console output, exceptions, dialogs, traffic, routes,
-  extra headers and init scripts belong to the page.
+  extra headers and init scripts belong to the page. A `FrameLocator` is also Playwright's
+  `Frame`: `frame.evaluate(function, arg)` calls `function(arg)` in the frame's document,
+  `frame.wait_for_function(function, arg)` (and `_with_timeout`) polls it until it is truthy,
+  and `frame.set_content(html)` replaces the document (`document.open/write/close`) and waits
+  for `load`. Each waits, like a locator, for the frame and its document.
 
 ## End-to-end tests (`tests/e2e`)
 
-`cargo test --test e2e` replaces the Playwright suite in `../playwright/tests`, spec by spec. The
-runner (`browser_tests::e2e::main`) does what `playwright.config.mjs`, `global-setup.mjs`,
+`cargo test --test e2e` replaces the Playwright suite in `playwright/tests`, spec by spec: each
+`tests/e2e/sNN_*.rs` is the former `NN-*.spec.mjs`, with the same test titles. The runner
+(`browser_tests::e2e::main`) does what `playwright.config.mjs`, `global-setup.mjs`,
 `global-teardown.mjs` and `fixtures.mjs` did:
 
 1. **Global setup.** Start `ARTIFACT_MCP_BIN` on a free loopback port with a temporary
@@ -265,3 +301,132 @@ async fn renders(t: Ctx) -> Result<(), Error> {
 ```
 
 Failure screenshots go to `$CARGO_TARGET_TMPDIR/e2e-failures/`.
+
+### Safety and lessons from the Playwright suite
+
+* Every mutation happens inside the throwaway `pwtest-<run id>` organization (and the companion
+  organizations a case creates), on a server with a temporary `DATA_DIR`. Teardown removes the
+  artifacts first, then the organizations. Never point these tests at production or at a
+  database with real organizations.
+* Regression guards found by manual testing, each verified non-vacuous by putting the bug back:
+  reaction, vote, share and comment wiring (a click must send its request *and* change the UI;
+  this catches the truncated-`shell.js` class of bug), and a category assigned in the web UI must
+  reach the Settings picker (it registers on the organization, not only on the artifact).
+* A signed-out case must send no identity header at all: use `Identity::Anonymous`. Playwright's
+  `browser.newContext()` inherited the default `extraHTTPHeaders`, so a "signed-out" test once
+  kept sending the admin header and got 200.
+* Ids that must be unique per run come from `unique_suffix()` or the run id, never from a counter
+  that restarts per file (every file once asked for `-1` and got "already exists").
+* A server behind an identity-injecting proxy can never fail a signed-out assertion. Test the
+  application directly when you check authentication boundaries.
+* Chrome 156 fails the requests a page makes itself (for example `fetch`) with
+  `net::ERR_INVALID_ARGUMENT` when DevTools adds a forbidden header such as `Sec-Fetch-Site`
+  through `Network.setExtraHTTPHeaders`. Navigations still work. Give pages identity and
+  `X-Artifact-Mutation` headers only; the browser sends an accurate `Sec-Fetch-Site` itself.
+* HTML5 drag and drop needs `page.drag_mouse()` (see above). Spec 14 fails with `page.mouse()`:
+  the drag starts but nothing is ever dropped.
+
+## Reader regressions (`tests/reader`)
+
+`cargo test --test reader` replaces `playwright/reader-runner.mjs` and its 14 standalone
+`reader-*.cjs` programs, one module per program with the same name and assertions. The runner
+(`browser_tests::reader::main`) runs the cases one at a time, each with a fresh browser launched
+with `--autoplay-policy=no-user-gesture-required` and `Network::LoopbackOnly`, 90 s per case and
+10 minutes per run. A case returns its old report line (`PASS: ...` or a JSON summary), which is
+printed under its result:
+
+```text
+test reader-pacing [rust] ... ok (15696 ms)
+    PASS: pacing 0.95/0.62/1.82 s, media session, concurrent request, pauses off
+```
+
+The binary is required even for a focused run of a `chromium` case, as before: a missing build
+fails in CI and is never a pass.
+
+* **`chromium` cases** load `assets/reader-bridge.js` (and `reader-ereader.js`) from the working
+  tree into plain pages and talk to the bridge with `postMessage`.
+* **`rust` cases** call `ReaderCtx::fixture(Audio::seconds(..).latency(..))`
+  (`createReaderFixture`): a stub speech worker in the test process and the release binary with
+  text to speech on and every provider (`TTS`, `POCKET_TTS`, `QWEN_TTS`, `RAVEN_TTS`,
+  `MOSS_TTS`) pointed at it, `ADMIN_EMAILS=reader-fixture@example.test`, `REQUIRE_ACCESS_JWT=0`,
+  a random `ARTIFACT_API_KEYS` publisher key and the old fixture's ingress limits. Only the
+  worker's HTTP boundary is a stub; the application's speech routes are real.
+  `assert_speech_routes(id)` probes the voices, `/speech` (WAV), `/speech/stream` (PCM) and
+  `/speech/stream-timed` (timed PCM) routes and the reader injection in the viewer and the raw
+  document, then resets the worker's log.
+* **The stub worker** (`Worker`) answers `POST /speech` with a 24 kHz mono 16-bit WAV of a sine,
+  `/speech/stream` with length-prefixed silent PCM frames (at most 96 000 bytes each) and
+  `/speech/stream-timed` with a JSON word-timing frame per word (0.3 s each) and silent audio
+  frames, after the configured latency (`set_latency`, or `set_latency_for(|body| ..)` per
+  request). It needs the bearer token from `*_TOKEN_FILE`, logs every request with its body and
+  arrival time (`requests()`, `reset()`), and counts the most requests it served at once
+  (`max_load()`). A handler whose client disconnects is dropped, so an aborted fetch ends the
+  request at the worker too.
+* `StubServer` is the small HTTP/1.1 server behind the worker; cases also use it to serve a page.
+
+Pages from `ReaderCtx::page_with(viewport, headers)` leave out `Sec-Fetch-*` headers (see the
+Chrome 156 note above); the old fixture sent `sec-fetch-site: same-origin`, which the browser
+now sends by itself. There are no response replacements, model downloads, paid API calls or
+homelab dependencies: temporary data, random keys, loopback addresses and free ports only.
+
+| Case | Runtime | Assertions |
+| --- | --- | --- |
+| `reader-mixed-content` | chromium | Document order; excluded controls, navigation, timers and hidden details; details invalidation; nested regions without duplication; visual and chart descriptions; grouped statistics and lists; small table rows and captions; large table and code summaries; literal code selection; chart ordering within lists. |
+| `reader-scopes` | chromium | View, section and detail scopes; fingerprints and scoped resume; mutations inside and outside scope; hidden views and active tabs; table, code and visual detail selection; target ordinals. |
+| `reader-sections` | chromium | Chapter seek and fingerprint validation; changed-document resume rejection; chapter, nested-section and heading-delimited boundaries. Messages reach Rust through `expose_function`. |
+| `reader-word-highlights` | chromium | Long and multiline selections; nested markup; chunk offsets (UTF-16) and accented words; passage-to-word highlighting; native selection clearing; persistent playback maps; mismatched timing fallback; highlight clearing; page scope; mutation invalidation. The page comes from a `StubServer`. |
+| `reader-controls` | rust | Section scope and chapter-control visibility; section-end prefetch boundary; checkpointed sleep; background sleep deadline; paused rewind without new synthesis; preview checkpoint isolation; completed-chunk resume to Finished. |
+| `reader-player-scopes` | rust | Viewer injection and current-view scope; outside and inside mutations; literal code detail playback; scoped checkpoints and detail resume; keyboard chart navigation; desktop and mobile overflow. |
+| `reader-prefetch` | rust | Prefetch before playback ends; read-ahead of a later block during the first; at most 2 concurrent worker requests; actual scheduled audio buffers; transition gap below 100 ms; Stop aborts current and prefetched requests. |
+| `reader-pronunciation` | rust | Enabled real voices; spoken replacements without changing source DOM; source-word highlights; first-audio diagnostics; sentence replay; pronunciation mutation invalidation; partial literal and whole-word overridden selections. |
+| `reader-pacing` | rust | Scheduled silences after a heading (0.9 s), between paragraphs (0.6 s) and at an `<hr>` scene break (1.8 s), each within 0.25 s; Pauses Off; Media Session metadata and artwork while reading; an overlapping speech request accepted under worker concurrency. |
+| `reader-wav` | rust | First-click WAV playback through `<audio>` and Reading state; pause offset; rewind and checkpoint offset; reload resume; paused state; completion and checkpoint deletion. |
+| `reader-voice-cast` | rust | Cast-declared Voices section; per-role voice on tagged blocks; inline dialogue split into role segments; ereader heading summary and intro read once in the narrator voice; segment-bounded highlights; untagged artifacts show no Voices section. |
+| `reader-place-sync` | rust | Full speed list; a new speed kept in the checkpoint; paused place uploaded to viewer state (the server copy must equal, `savedAt` and place, the place saved at Pause or the copy the 2 s save tick stores while the audio clock settles); a second browser with empty storage shows and plays the synced place at the synced speed; Finished clears local and server copies. |
+| `reader-forward` | rust | Forward 30 s button label and disabled state; paused seek inside the current block without a state change; remainder carried into the next block. |
+| `reader-read-ahead` | rust | At least 3 and at most 8 blocks read ahead during the first block; no block synthesized twice; at most 2 concurrent worker requests. |
+
+Every case also asserts that the page reports no uncaught errors. The audio cases measure the
+scheduled `AudioBufferSourceNode` starts and the `<audio>` element's clock in
+`chrome-headless-shell`, which runs muted (`--mute-audio`).
+
+## Feature coverage
+
+Every user-reachable feature and whether a browser journey exercises it, inherited from the
+Playwright harness inventory (originally derived from the 40 HTTP routes of the retired Node
+server and the 19 frozen MCP tools; the Rust server serves the same routes). Status: **✅
+covered**, **🔸 partial**, **⬜ not covered**.
+
+| Area | Feature | Status | Notes |
+|---|---|---|---|
+| Gallery | Renders artifacts for the viewer's org; card title and description | ✅ | |
+| Gallery | Category grouping and filter chips; favorites filter | ✅ | |
+| Gallery | Thumbnails (`GET /thumbnails/:id`) | 🔸 | renderer disabled in the tests; placeholder path only |
+| Gallery | View counts and analytics surface | 🔸 | asserted present, not value-checked |
+| Gallery | Notification badge and `POST /notifications/seen` | ✅ | |
+| Gallery | Organization switcher (an admin sees all orgs) | ✅ | |
+| Viewer | Shell with sandboxed iframe | ✅ | `sandbox` present, no `allow-same-origin` |
+| Viewer | Previous and next; download; open raw (`/raw/:id`, CSP sandbox header) | ✅ | |
+| Viewer | Bundle artifact and subpath (`/raw/:id/*`) | ✅ | |
+| Viewer | Revision history (`/:id/history`); restore (`POST /:id/restore`); historical revision (`/raw/:id/rev/:n`) | ✅ | 17 confirms the restore dialog |
+| Reactions | Favorite (heart), upvote and downvote, persistence across reload | ✅ | a click must send its request and flip `aria-pressed` |
+| Feedback | Add, list, threaded reply, resolve and reopen, delete | ✅ | |
+| Feedback | Anchored feedback | 🔸 | composer and anchor painting (02, 18); coordinates on a bundle page are not covered |
+| Sharing | Create (`never`, `24h`, date), list, revoke; public page without auth (`/s/:token`) | ✅ | |
+| Sharing | Revoked or invalid token gives an indistinguishable 404 | ✅ | |
+| Categories | Assign, appears in Settings, create and delete in Settings | ✅ | regression guard for the registration bug |
+| Tenancy | Hide and unhide (`POST /:id/visibility`); move between orgs (admin) | ✅ | |
+| Tenancy | Cross-org artifact concealed as 404; signed-out sign-in page; non-admin cannot reach Settings | ✅ | invariant 3 |
+| Settings | Organizations, domains, explicit email members, org colour | ✅ | 17 covers the deletion confirmation |
+| Settings | Publisher keys (secret shown once, revoke with in-app confirmation and CSRF header) | ✅ | |
+| Settings | Add and delete webhook | ✅ | |
+| Settings | Send test webhook | ⬜ | would post to a real Discord endpoint |
+| Collections | Folders in every library view, dialogs, popovers, inline folders, gestures, MCP folders, create preview | ✅ | specs 10 to 16 |
+| Performance | No separate asset requests, no needless re-sort, deferred discussion fetch, voice capability states, late inline shell | ✅ | spec 18 |
+| Reader | Extraction scopes, highlights, playback controls, pacing, WAV, cast voices, place sync, read-ahead | ✅ | `tests/reader` |
+
+The MCP surface (19 tools) is covered byte for byte by `../conformance` (the recorded goldens,
+including the frozen `tools/list` golden), not here; the journeys use `publish_artifact` and the
+collection tools as setup and through spec 15. Out of scope: the live production instance (the
+tests run the release binary against throwaway data; a separate read-only smoke checks
+production) and sending a test webhook to a real endpoint.
