@@ -23,9 +23,6 @@
     "tunnel:status": "node scripts/anthropic-tunnel.mjs status",
     "tunnel:validate": "node scripts/anthropic-tunnel.mjs validate",
     "tunnel:rollback": "node scripts/anthropic-tunnel.mjs rollback",
-    "release:manifest": "node scripts/release/generate-manifest.mjs",
-    "release:verify-manifest": "node scripts/release/verify-manifest.mjs",
-    "release:source-sbom": "node scripts/release/generate-source-sbom.mjs",
     "test": "node --test --test-concurrency=1"
   }
 }
