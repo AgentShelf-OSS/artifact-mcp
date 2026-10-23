@@ -188,6 +188,10 @@ curl -s -o /tmp/ct222.png -w '%{http_code} %{content_type}\n' \
   http://192.168.0.222:3000/render                       # 200 image/png
 ```
 
+When the renderer has the shared token ([Shared token](#shared-token)), this `curl` gets `401`,
+and the `smoke` commands above need `RENDER_TOKEN_FILE=/etc/artifact-preview/render-token` in
+front of them. Use the `regenerate_artifact_preview` check from CT220 instead.
+
 After a few renders, back in CT222:
 
 ```sh
@@ -327,6 +331,80 @@ If every render fails after the change, the journal shows
 `render failed: browser closed the devtools pipe`: Chromium could not start its sandbox. Roll
 back: remove the `Environment=CHROME_SANDBOX=1` line, then run `systemctl daemon-reload` and
 `systemctl restart artifact-preview`, and repeat step 6.
+
+## Shared token
+
+The server on CT220 and the renderer on CT222 can share a bearer token. It is defence in depth:
+nftables, which accepts port 3000 only from CT220, stays the main control. With the token, a
+process that reaches port 3000 in another way still cannot render.
+
+| Side | Setting | Value comes from |
+|---|---|---|
+| CT220, `artifact-mcp` | `PREVIEW_RENDERER_TOKEN` | Infisical secret `/ARTIFACT_PREVIEW_RENDERER_TOKEN`, bound by the launcher at each start |
+| CT222, `artifact-preview` | `RENDER_TOKEN_FILE` | the same value in the root-only file `/etc/artifact-preview/render-token`, given to the unit with `LoadCredential=` |
+
+The token is 32 to 4096 printable ASCII characters without spaces; use 64 hexadecimal
+characters. The file holds the token and at most one trailing newline. Both services check the
+value at startup, refuse an invalid one, and never log it.
+
+The token needs artifact-mcp 1.28.0 or later on CT220 and the `artifact-preview` binary from the
+same release on CT222 (steps 1 to 6). CT222 has no network, so it cannot fetch the secret itself.
+A renderer without a token ignores the `authorization` header (the Node renderer did too), so set
+CT220 first and CT222 second. Then no render fails during the rollout.
+
+1. On pve1, create the token with `openssl rand -hex 32` and store it in Infisical as
+   `/ARTIFACT_PREVIEW_RENDERER_TOKEN` with `homelab-secrets add` and the operator profile, which
+   reads the value from a private prompt. Do not put the value on a command line or in chat.
+   Give the CT220 reader identity read access to it.
+2. CT220: add the binding `/ARTIFACT_PREVIEW_RENDERER_TOKEN` → `PREVIEW_RENDERER_TOKEN` to the
+   launcher, next to the one for `/ARTIFACT_AUDIT_LEDGER_HMAC_KEY`, and restart `artifact-mcp`.
+   The server now sends the header, and the renderer ignores it. Check that
+   `regenerate_artifact_preview` still gives a thumbnail.
+3. CT222: write the file. On pve1, the value goes through a pipe into the container; it is not
+   printed or stored on pve1 (`printf` is a shell built-in, so the value is not in any process's
+   arguments):
+
+   ```sh
+   homelab-secrets --config <reader profile> run \
+     --secret /ARTIFACT_PREVIEW_RENDERER_TOKEN=PREVIEW_RENDERER_TOKEN -- \
+     sh -c 'printf "%s\n" "$PREVIEW_RENDERER_TOKEN" | pct exec 222 -- sh -c \
+       "umask 077 && mkdir -p /etc/artifact-preview && cat > /etc/artifact-preview/render-token"'
+   pct exec 222 -- stat -c '%U:%G %a %s' /etc/artifact-preview/render-token   # root:root 600 65
+   ```
+
+4. CT222: add two lines to the `[Service]` section of the drop-in (or of the unit, after step 8).
+   `LoadCredential=` lets systemd read the root-only file and give the service a private copy;
+   `%d` is that credentials directory.
+
+   ```ini
+   LoadCredential=render-token:/etc/artifact-preview/render-token
+   Environment=RENDER_TOKEN_FILE=%d/render-token
+   ```
+
+   Then:
+
+   ```sh
+   systemctl daemon-reload
+   systemctl restart artifact-preview
+   systemctl is-active artifact-preview                                        # active
+   RENDER_TOKEN_FILE=/etc/artifact-preview/render-token \
+     PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke   # passed
+   PREVIEW_RENDERER_URL=http://127.0.0.1:3000 /usr/local/bin/artifact-preview smoke     # fails: HTTP 401
+   curl -fsS http://127.0.0.1:3000/health                                     # {"status":"ok"}
+   ```
+
+   `LoadCredential=` has not been tested in this unprivileged container. If the restart fails
+   with a credentials error, use a file that the service user can read instead
+   (`chown root:artifact-preview` and `chmod 0640`), and set
+   `Environment=RENDER_TOKEN_FILE=/etc/artifact-preview/render-token` without `LoadCredential=`.
+5. From CT220, run `regenerate_artifact_preview` once more. The journal on CT222 must not show
+   `rejected a render request without a valid token`.
+
+Roll back in the reverse order: remove the two lines on CT222, run `systemctl daemon-reload` and
+`systemctl restart artifact-preview` (the renderer is open again), and then remove the binding on
+CT220 if needed. To rotate the token, store the new value, then repeat steps 3 and 4 and restart
+`artifact-mcp` on CT220 right away. Renders between the two restarts fail and keep their
+placeholders; the restart of `artifact-mcp` backfills missing previews.
 
 ## Later browser upgrades
 

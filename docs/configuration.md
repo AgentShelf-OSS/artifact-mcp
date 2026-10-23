@@ -234,6 +234,8 @@ URLs back to SQLite. A no-outage rotation would require a future dual-key migrat
 | `PREVIEW_RENDER_TIMEOUT_MS` | Renderer timeout. Defaults to `8000`. |
 | `PREVIEW_VIEWPORT` | Social-card crop. Defaults to `1200x630`. |
 | `PREVIEW_MAX_PNG_BYTES` | Largest accepted and persisted renderer response. Defaults to `7500000`. |
+| `PREVIEW_RENDERER_TOKEN` | Optional shared bearer token, sent as `authorization: Bearer <token>` with every render request. 32 to 4096 printable ASCII characters without spaces. Unset sends no header. |
+| `PREVIEW_RENDERER_TOKEN_FILE` | Path of a file that holds the token instead, read once at startup; one trailing newline is removed. Setting both is a startup error. |
 
 Enable the Compose profile after setting `PREVIEW_RENDERER_URL=http://artifact-preview:3000`:
 
@@ -249,6 +251,24 @@ The sidecar is the Rust `artifact-preview` binary driving a pinned Chrome for Te
 [`preview-renderer/README.md`](../preview-renderer/README.md) for the full list, the isolation design,
 and the browser upgrade procedure.
 
+### Shared renderer token
+
+The token is defence in depth: the internal-only network stays the main control. When the
+renderer has the same value as `RENDER_TOKEN` (or `RENDER_TOKEN_FILE`), it answers
+`401 {"error":"unauthorized"}` to a render request without the token. Compose passes the one
+`PREVIEW_RENDERER_TOKEN` value from `.env` to both services, so set it there and recreate both
+containers:
+
+```bash
+echo "PREVIEW_RENDERER_TOKEN=$(openssl rand -hex 32)" >> .env
+docker compose --profile preview up -d
+```
+
+The server never logs the token, and `Debug` output redacts it. A renderer without a token ignores
+the header, so for separate hosts, set the token on the server first and then on the renderer. A
+render that fails (including a `401`) leaves the placeholder in place, as any renderer failure
+does.
+
 ### Preview isolation
 
 The sidecar renders untrusted HTML. Keep its container boundary intact:
@@ -256,7 +276,8 @@ The sidecar renders untrusted HTML. Keep its container boundary intact:
 - Run it as a non-root user with a read-only root filesystem.
 - Drop Linux capabilities and retain `no-new-privileges` and the supplied seccomp profile.
 - Keep it on the internal-only network with resource limits and browser request blocking.
-- Do not publish its port, attach it to the tunnel, mount application data, or provide secrets.
+- Do not publish its port, attach it to the tunnel, mount application data, or provide secrets
+  other than the shared renderer token.
 
 Compose leaves the renderer's `CHROME_SANDBOX` setting unset, so Chromium runs without its own
 sandbox (`--no-sandbox`) and the container restrictions above are the boundary. Chromium's

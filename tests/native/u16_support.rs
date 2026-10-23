@@ -10,7 +10,8 @@
 //!   with no length at all, redirects, and accept-then-never-answer;
 //! * a gate that holds each request until the test releases it, which is what makes queue
 //!   ordering and coalescing assertions deterministic rather than timing-dependent;
-//! * a record of every request the client actually sent, in arrival order.
+//! * a record of every request the client actually sent, in arrival order, including its
+//!   `authorization` header (the shared renderer token) or the absence of one.
 //!
 //! `std::net` on a dedicated thread rather than tokio: the crate's tokio feature set has no
 //! `io-util`, and blocking sockets keep the stub's own behaviour trivially predictable.
@@ -98,6 +99,8 @@ pub struct StubRequest {
     pub html: String,
     pub width: u64,
     pub height: u64,
+    /// The `authorization` header, or `None` when the client sent none.
+    pub authorization: Option<String>,
 }
 
 /// A counting gate: handlers block until the test grants permits.
@@ -364,6 +367,7 @@ fn parse_request(head: &str, body: &[u8]) -> StubRequest {
             .get("height")
             .and_then(serde_json::Value::as_u64)
             .unwrap_or_default(),
+        authorization: header_value(head, "authorization"),
     }
 }
 

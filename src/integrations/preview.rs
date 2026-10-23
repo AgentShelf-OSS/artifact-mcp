@@ -13,6 +13,7 @@
 //! |---|---|---|
 //! | Endpoint | `POST <PREVIEW_RENDERER_URL>/render` | [preview-renderer/src/server.rs `handle`] |
 //! | Request | `content-type: application/json`, body `{"html":…,"width":…,"height":…}` | [lib/preview.js:57-63], [preview-renderer/src/server.rs `render_route`] |
+//! | Token | `authorization: Bearer <PREVIEW_RENDERER_TOKEN>` when configured; a renderer with `RENDER_TOKEN` answers `401 {"error":"unauthorized"}` without it, and a renderer without one ignores it | [preview-renderer/src/server.rs `authorized`] |
 //! | Health | `GET /health` → `{"status":"ok"}` (not used by the client) | [preview-renderer/src/server.rs `handle`] |
 //! | Success | `200` + `content-type: image/png` + `content-length` + the PNG body | [preview-renderer/src/server.rs `respond`, `render_route`] |
 //! | Busy | `503 {"error":"renderer busy"}` — one render at a time, server side | [preview-renderer/src/server.rs `BusySlot`] |
@@ -59,7 +60,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tokio::sync::OnceCell;
 
-use crate::config::PreviewConfig;
+use crate::config::{PreviewConfig, Secret};
 
 use super::thumbnails::valid_png;
 
@@ -100,6 +101,8 @@ pub struct PreviewRenderer {
     max_png_bytes: u64,
     cache_entries: usize,
     cache: Mutex<RenderCache>,
+    /// `PREVIEW_RENDERER_TOKEN`, sent as `authorization: Bearer <token>`. `Debug` redacts it.
+    token: Option<Secret>,
 }
 
 impl PreviewRenderer {
@@ -141,6 +144,7 @@ impl PreviewRenderer {
                 .unwrap_or(usize::MAX)
                 .max(1),
             cache: Mutex::new(RenderCache::default()),
+            token: config.renderer_token.clone(),
         }
     }
 
@@ -182,7 +186,7 @@ impl PreviewRenderer {
         let client = self.client.as_ref()?;
         let endpoint = self.endpoint.as_ref()?;
 
-        let mut response = client
+        let mut request = client
             .post(endpoint)
             // `setTimeout(() => controller.abort(…), timeout)` — [lib/preview.js:55]. reqwest's
             // request timeout also spans the body read, matching the abort signal's reach.
@@ -191,10 +195,13 @@ impl PreviewRenderer {
                 html,
                 width: self.width,
                 height: self.height,
-            })
-            .send()
-            .await
-            .ok()?;
+            });
+        if let Some(token) = &self.token {
+            // `bearer_auth` marks the header value sensitive. Any failure below discards the
+            // error without logging, so the token cannot leak through it.
+            request = request.bearer_auth(token.expose());
+        }
+        let mut response = request.send().await.ok()?;
 
         // `if (!response?.ok) return null` — [lib/preview.js:64]
         if !response.status().is_success() {
@@ -348,6 +355,18 @@ mod tests {
         let renderer = PreviewRenderer::new(&config(None));
         assert!(!renderer.enabled());
         assert!(PreviewRenderer::disabled().cache_keys().is_empty());
+    }
+
+    #[test]
+    fn the_token_is_redacted_from_debug_output() {
+        let secret = "preview-renderer-token-0123456789-abcdef";
+        let renderer = PreviewRenderer::new(&PreviewConfig {
+            renderer_token: Some(Secret::new(secret)),
+            ..config(Some("http://renderer:3000/render"))
+        });
+        let rendered = format!("{renderer:?}");
+        assert!(!rendered.contains(secret), "{rendered}");
+        assert!(rendered.contains("Secret(<redacted>)"), "{rendered}");
     }
 
     #[test]
