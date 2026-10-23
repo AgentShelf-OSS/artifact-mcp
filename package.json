@@ -18,11 +18,6 @@
     "node": ">=22.16"
   },
   "scripts": {
-    "cf-access:setup": "node scripts/cf-access-setup.mjs",
-    "tunnel:start": "node scripts/anthropic-tunnel.mjs start",
-    "tunnel:status": "node scripts/anthropic-tunnel.mjs status",
-    "tunnel:validate": "node scripts/anthropic-tunnel.mjs validate",
-    "tunnel:rollback": "node scripts/anthropic-tunnel.mjs rollback",
     "test": "node --test --test-concurrency=1"
   }
 }

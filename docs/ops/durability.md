@@ -21,14 +21,17 @@ differs in the filesystem step: publish stages then atomically records metadata/
 final install; update commits metadata before replacing the body; delete moves the body to trash
 before its SQL delete. `updated_at` advances at every phase for operator recovery evidence.
 
-Run `node scripts/benchmark-durability-oci.mjs IMAGE_OR_LOCAL_TAG OUT.json` with
+Run `cargo xtask benchmark-durability IMAGE_OR_LOCAL_TAG OUT.json` with
 `BENCH_DATA_DIR` set to an empty dedicated directory on the target storage and
 `BENCH_REQUIRE_PERSISTENT=1` before making a latency claim. It drives the production Rust OCI
 image through authenticated `/mcp`, with 20
 warmups and 200 measured publish/update operations for 64 KiB single bodies and ten-file 640 KiB
 bundles, reporting p50/p95/max plus inspected image ID, OCI labels, host, and mount identity. A
 local image tag is valid for before/after comparison; release evidence must name an immutable OCI
-digest.
+digest. The server needs an audit key and higher admission limits for this load, so the benchmark
+supplies a throwaway key and raises the limits; the report lists them under `serverOverrides`.
+`cargo xtask benchmark-durability --binary PATH OUT.json` runs the same workload against a local
+build for development.
 
 ## Backups
 

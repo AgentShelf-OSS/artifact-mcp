@@ -2848,10 +2848,13 @@ dependencies = [
  "artifact-mcp",
  "base64",
  "hex",
+ "reqwest",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2",
+ "tokio",
+ "url",
 ]
 
 [[package]]

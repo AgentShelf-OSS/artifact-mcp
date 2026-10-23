@@ -21,8 +21,8 @@ application exists, while artifact-mcp reads `CF_ACCESS_AUD` once at startup.
    export PUBLIC_BASE_URL=https://artifact.example.com
    export CF_ACCESS_IDP_ID=REPLACE_WITH_IDP_ID
 
-   node scripts/cf-access-setup.mjs
-   node scripts/cf-access-setup.mjs --apply
+   cargo xtask cf-access-setup
+   cargo xtask cf-access-setup --apply
    ```
 
    Dry-run is the default. `--apply` creates or finds the catch-all Access app, configures exactly

@@ -87,11 +87,11 @@ directly from operator-owned files.
 Start the profile without changing the existing public route:
 
 ```bash
-npm run tunnel:start
-npm run tunnel:status
+cargo xtask tunnel start
+cargo xtask tunnel status
 ```
 
-`tunnel:status` reports three independent signals:
+`cargo xtask tunnel status` reports three independent signals:
 
 1. Artifact MCP's database and storage health check.
 2. The Anthropic proxy process.
@@ -106,7 +106,7 @@ export ANTHROPIC_TUNNEL_MCP_URL=https://artifacts.YOUR_TUNNEL_DOMAIN/mcp
 export ANTHROPIC_TUNNEL_TEST_MODEL=YOUR_APPROVED_MODEL
 export ANTHROPIC_API_KEY_FILE=/run/secrets/anthropic-api-key
 export ANTHROPIC_TUNNEL_UPSTREAM_TOKEN_FILE=/run/secrets/artifact-mcp-reader-token
-npm run tunnel:validate
+cargo xtask tunnel validate
 ```
 
 A pass proves that the tunnel is registered in the correct Anthropic workspace, inner TLS works,
@@ -121,7 +121,7 @@ still use the web UI. That external policy change is intentionally not automated
 
 ## Monitoring
 
-- Run `npm run tunnel:status` after deploys and host restarts.
+- Run `cargo xtask tunnel status` after deploys and host restarts.
 - Alert separately on Artifact MCP's existing `/health` and Prometheus rules, the tunnel
   container's Docker health, and a low-frequency Anthropic-side validation.
 - Watch bounded logs with
@@ -143,8 +143,8 @@ component, atomically replace `tunnel-token`, restore ownership/mode, then recre
 
 ```bash
 docker compose --profile anthropic-tunnel up -d --force-recreate anthropic-mcp-cloudflared
-npm run tunnel:status
-npm run tunnel:validate
+cargo xtask tunnel status
+cargo xtask tunnel validate
 ```
 
 For certificate rotation, register the replacement CA first, atomically replace `tls.crt` and
@@ -170,7 +170,7 @@ The tunnel is transport, not upstream authorization.
 While the original public MCP path remains enabled, rollback is one command:
 
 ```bash
-npm run tunnel:rollback
+cargo xtask tunnel rollback
 ```
 
 It confirms the default Artifact MCP service is healthy, then stops only the Anthropic proxy and

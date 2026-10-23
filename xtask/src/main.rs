@@ -34,7 +34,7 @@ commands:
   cf-access-setup        bootstrap the Cloudflare Access application
   tunnel                 manage the Anthropic MCP tunnel profile
   publish-data-artifact  publish an HTML artifact with live-data bindings
-  benchmark-durability   measure publish/update latency against an OCI image
+  benchmark-durability   measure publish/update latency against an OCI image or local binary
 
 Run `cargo xtask <command> --help` for the options of one command.";
 
