@@ -98,6 +98,20 @@ the Rust tests:
 
 The Rust suite lost 52 test functions and gained 43. Most of the new ones hold the frozen values.
 
+With no Node in the repository, on 2026-10-23, with the same `node` stub on `PATH`:
+
+| Check | Result |
+| --- | --- |
+| `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features --locked -- -D warnings` | clean |
+| `cargo test --workspace --all-targets --locked` (includes conformance, MCP surface, backup, xtask) | 1117 passed, 0 failed |
+| `cargo test --doc --locked` | 5 passed |
+| `cargo xtask historical-fixture --verify-against-committed` | 42 of 42 cases match |
+| `preview-renderer`: fmt, clippy, `cargo test` with `CI=1` | 48 passed |
+| `browser-tests`: fmt, clippy, `cargo test` with `CI=1` | 324 passed: 158 asset cases, 110 journeys, 14 reader cases, and harness tests |
+
+Every former `npm test` case, Playwright title, and reader case maps to exactly one passing Rust
+case. The stub logged no call.
+
 ## Consequences
 
 - Each server feature is written once, in Rust.
