@@ -1578,6 +1578,8 @@ mod tests {
             bucket: String,
             until: i64,
         },
+        /// A discussion-store transition, journaled only when a test opts into the shared ledger.
+        Discussion(&'static str),
     }
     struct FakeOutbox {
         record: Mutex<Option<DeliveryRecord>>,
@@ -1737,15 +1739,17 @@ mod tests {
     struct FakeDiscussionProvider {
         result: Mutex<DiscussionResult>,
         calls: AtomicUsize,
+        requests: Mutex<Vec<DiscussionRequest>>,
     }
     impl WorkerDiscussionProvider for FakeDiscussionProvider {
         fn deliver<'a>(
             &'a self,
             _: &'a OrgId,
-            _: DiscussionRequest,
+            request: DiscussionRequest,
         ) -> BoxFuture<'a, DiscussionResult> {
             Box::pin(async move {
                 self.calls.fetch_add(1, Ordering::SeqCst);
+                self.requests.lock().expect("lock").push(request);
                 self.result.lock().expect("lock").clone()
             })
         }
@@ -1759,6 +1763,21 @@ mod tests {
         tombstones: Mutex<Vec<AcceptedDiscussionDelivery>>,
         markers: Mutex<Vec<AcceptedDiscussionMarker>>,
         terminals: Mutex<Vec<TerminalDiscussionDelivery>>,
+        anchor: Mutex<Option<String>>,
+        anchor_calls: Mutex<Vec<String>>,
+        accept_guard: Mutex<bool>,
+        ledger: Mutex<Option<Arc<FakeOutbox>>>,
+    }
+    impl FakeDiscussions {
+        fn journal(&self, transition: &'static str) {
+            if let Some(outbox) = self.ledger.lock().expect("lock").as_ref() {
+                outbox
+                    .actions
+                    .lock()
+                    .expect("lock")
+                    .push(Action::Discussion(transition));
+            }
+        }
     }
     impl WorkerDiscussions for FakeDiscussions {
         fn connection<'a>(
@@ -1786,21 +1805,28 @@ mod tests {
         }
         fn notification_anchor<'a>(
             &'a self,
-            _: &'a str,
+            outbox_id: &'a str,
             _: &'a ArtifactId,
             _: &'a OrgId,
             _: &'a str,
             _: u64,
         ) -> BoxFuture<'a, Result<Option<String>, AppError>> {
-            Box::pin(async { Ok(None) })
+            Box::pin(async move {
+                self.anchor_calls
+                    .lock()
+                    .expect("lock")
+                    .push(outbox_id.to_owned());
+                Ok(self.anchor.lock().expect("lock").clone())
+            })
         }
         fn accept_post<'a>(
             &'a self,
             input: AcceptedDiscussionDelivery,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             Box::pin(async move {
+                self.journal("accept_post");
                 self.posts.lock().expect("lock").push(input);
-                Ok(true)
+                Ok(*self.accept_guard.lock().expect("lock"))
             })
         }
         fn accept_tombstone<'a>(
@@ -1808,8 +1834,9 @@ mod tests {
             input: AcceptedDiscussionDelivery,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             Box::pin(async move {
+                self.journal("accept_tombstone");
                 self.tombstones.lock().expect("lock").push(input);
-                Ok(true)
+                Ok(*self.accept_guard.lock().expect("lock"))
             })
         }
         fn accept_marker<'a>(
@@ -1817,8 +1844,9 @@ mod tests {
             input: AcceptedDiscussionMarker,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             Box::pin(async move {
+                self.journal("accept_marker");
                 self.markers.lock().expect("lock").push(input);
-                Ok(true)
+                Ok(*self.accept_guard.lock().expect("lock"))
             })
         }
         fn terminal<'a>(
@@ -1826,6 +1854,7 @@ mod tests {
             input: TerminalDiscussionDelivery,
         ) -> BoxFuture<'a, Result<bool, AppError>> {
             Box::pin(async move {
+                self.journal("terminal");
                 self.terminals.lock().expect("lock").push(input);
                 Ok(true)
             })
@@ -2097,6 +2126,10 @@ mod tests {
             tombstones: Mutex::new(Vec::new()),
             markers: Mutex::new(Vec::new()),
             terminals: Mutex::new(Vec::new()),
+            anchor: Mutex::new(None),
+            anchor_calls: Mutex::new(Vec::new()),
+            accept_guard: Mutex::new(true),
+            ledger: Mutex::new(None),
         })
     }
 
@@ -2108,6 +2141,7 @@ mod tests {
         let provider = Arc::new(FakeDiscussionProvider {
             result: Mutex::new(result),
             calls: AtomicUsize::new(0),
+            requests: Mutex::new(Vec::new()),
         });
         let worker = DeliveryWorker::with_adapters(
             outbox,
@@ -2755,6 +2789,800 @@ mod tests {
         assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
         assert!(
             matches!(outbox.actions().as_slice(), [Action::Retry(update)] if update.classification == "network")
+        );
+    }
+
+    // --- Characterization of `process_discussion` branch outcomes -----------------------------
+    //
+    // These lock the persistence call, classification, feedback correlation, and provider-call
+    // count for every early exit and outcome so the pipeline can be restructured safely.
+
+    const THREAD: &str = "123456789012345678";
+    const ANCHOR: &str = "523456789012345678";
+    const CHANNEL: &str = "623456789012345678";
+
+    fn reply_record() -> DeliveryRecord {
+        discussion_record(
+            DiscordDiscussionOperationV1::reply("feedback-a".into(), "Body".into()).expect("reply"),
+            DELIVERY_KIND_DISCUSSION_MESSAGE,
+        )
+    }
+
+    fn thread_record() -> DeliveryRecord {
+        discussion_record(
+            DiscordDiscussionOperationV1::thread(
+                "feedback-a".into(),
+                "Thread".into(),
+                "Body".into(),
+            )
+            .expect("thread"),
+            DELIVERY_KIND_DISCUSSION_THREAD,
+        )
+    }
+
+    fn accepted(message: &str, thread: Option<&str>) -> DiscussionResult {
+        DiscussionResult::Accepted {
+            receipt: DiscussionReceipt {
+                message_id: message.into(),
+                thread_id: thread.map(str::to_owned),
+            },
+            rate_limit: rate(),
+        }
+    }
+
+    fn client_error() -> DiscussionResult {
+        DiscussionResult::Terminal {
+            reason: TerminalReason::ClientError,
+        }
+    }
+
+    /// `(classification, feedback_id, duplicate_risk)` for each guarded terminal update.
+    fn terminal_summary(discussions: &FakeDiscussions) -> Vec<(String, Option<String>, bool)> {
+        discussions
+            .terminals
+            .lock()
+            .expect("lock")
+            .iter()
+            .map(|row| {
+                (
+                    row.classification.clone(),
+                    row.feedback_id.as_ref().map(|id| id.0.clone()),
+                    row.duplicate_risk,
+                )
+            })
+            .collect()
+    }
+
+    fn terminal(class: &str, feedback: Option<&str>, risk: bool) -> (String, Option<String>, bool) {
+        (class.to_owned(), feedback.map(str::to_owned), risk)
+    }
+
+    fn notification_thread(discussions: &FakeDiscussions) {
+        if let Ok(Some(connection)) = discussions.connection.lock().expect("lock").as_mut() {
+            connection.strategy = DiscussionConnectionStrategy::NotificationThread;
+            connection.channel_id = Some(CHANNEL.into());
+        }
+        *discussions.anchor.lock().expect("lock") = Some(ANCHOR.into());
+    }
+
+    #[tokio::test]
+    async fn discussion_rows_without_discussion_adapters_dead_letter_as_validation_failed() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record));
+        let (worker, provider) = make_worker(
+            outbox.clone(),
+            Ok(Some(webhook())),
+            DeliveryClassification::Terminal {
+                reason: TerminalReason::ClientError,
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            outbox.actions(),
+            vec![Action::Dead("validation_failed".into())]
+        );
+    }
+
+    #[tokio::test]
+    async fn discussion_hash_mismatch_dead_letters_before_discussion_state_is_read() {
+        let mut record = reply_record();
+        record.payload_sha256 = "0".repeat(64);
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, provider) =
+            make_discussion_worker(outbox.clone(), discussions.clone(), client_error());
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            outbox.actions(),
+            vec![Action::Dead("payload_hash_mismatch".into())]
+        );
+        assert!(terminal_summary(&discussions).is_empty());
+    }
+
+    #[tokio::test]
+    async fn non_canonical_or_cross_tenant_envelopes_dead_letter_without_discussion_state() {
+        let mut non_canonical = reply_record();
+        let value: serde_json::Value =
+            serde_json::from_slice(&non_canonical.payload).expect("canonical JSON");
+        non_canonical.payload = serde_json::to_vec_pretty(&value).expect("pretty JSON");
+        non_canonical.payload_sha256 = hex::encode(Sha256::digest(&non_canonical.payload));
+        let mut cross_tenant = reply_record();
+        cross_tenant.tenant = "other".into();
+
+        for record in [non_canonical, cross_tenant] {
+            let outbox = Arc::new(FakeOutbox::one(record.clone()));
+            let discussions = fake_discussions(&record, Some(THREAD));
+            let (worker, provider) =
+                make_discussion_worker(outbox.clone(), discussions.clone(), client_error());
+            assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+            assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+            assert_eq!(
+                outbox.actions(),
+                vec![Action::Dead("validation_failed".into())]
+            );
+            assert!(terminal_summary(&discussions).is_empty());
+        }
+    }
+
+    #[tokio::test]
+    async fn discussion_binding_and_authority_failures_are_terminal_before_provider_io() {
+        type RecordEdit = fn(&mut DeliveryRecord);
+        type StateEdit = fn(&FakeDiscussions);
+        let keep_record: RecordEdit = |_| {};
+        let keep_state: StateEdit = |_| {};
+        let cases: &[(&str, RecordEdit, StateEdit, &str)] = &[
+            (
+                "target",
+                |record| record.target_key = "connection-b".into(),
+                keep_state,
+                "validation_failed",
+            ),
+            (
+                "secret",
+                |record| record.secret_ref = "discussion:connection-b".into(),
+                keep_state,
+                "validation_failed",
+            ),
+            (
+                "ordering",
+                |record| record.ordering_key = "discussion:artifact-b:1".into(),
+                keep_state,
+                "validation_failed",
+            ),
+            (
+                "kind",
+                |record| record.delivery_kind = DELIVERY_KIND_DISCUSSION_TOMBSTONE.into(),
+                keep_state,
+                "validation_failed",
+            ),
+            (
+                "discussion missing",
+                keep_record,
+                |state| *state.discussion.lock().expect("lock") = None,
+                "validation_failed",
+            ),
+            (
+                "foreign connection",
+                keep_record,
+                |state| {
+                    state
+                        .discussion
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("discussion")
+                        .connection_id = Some("connection-b".into());
+                },
+                "validation_failed",
+            ),
+            (
+                "disconnected",
+                keep_record,
+                |state| {
+                    state
+                        .discussion
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("discussion")
+                        .connection_id = None;
+                },
+                "validation_failed",
+            ),
+            (
+                "stale generation",
+                keep_record,
+                |state| {
+                    state
+                        .discussion
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("discussion")
+                        .generation = 2;
+                },
+                "validation_failed",
+            ),
+            (
+                "link missing",
+                keep_record,
+                |state| *state.link.lock().expect("lock") = None,
+                "validation_failed",
+            ),
+            (
+                "link generation",
+                keep_record,
+                |state| {
+                    state
+                        .link
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("link")
+                        .generation = 2;
+                },
+                "validation_failed",
+            ),
+            (
+                "reply without thread",
+                keep_record,
+                |state| {
+                    state
+                        .discussion
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("discussion")
+                        .thread_id = None;
+                },
+                "validation_failed",
+            ),
+            (
+                "connection missing",
+                keep_record,
+                |state| *state.connection.lock().expect("lock") = Ok(None),
+                "validation_failed",
+            ),
+            (
+                "connection cross-tenant",
+                keep_record,
+                |state| {
+                    if let Ok(Some(connection)) = state.connection.lock().expect("lock").as_mut() {
+                        connection.org = OrgId("other".into());
+                    }
+                },
+                "validation_failed",
+            ),
+            (
+                "connection invalid reference",
+                keep_record,
+                |state| {
+                    *state.connection.lock().expect("lock") =
+                        Err(DiscussionResolutionFailure::InvalidReference);
+                },
+                "validation_failed",
+            ),
+            (
+                "connection decrypt",
+                keep_record,
+                |state| {
+                    *state.connection.lock().expect("lock") =
+                        Err(DiscussionResolutionFailure::DecryptFailed);
+                },
+                "decrypt_failed",
+            ),
+            (
+                "persisted thread is not a snowflake",
+                keep_record,
+                |state| {
+                    state
+                        .discussion
+                        .lock()
+                        .expect("lock")
+                        .as_mut()
+                        .expect("discussion")
+                        .thread_id = Some("not-a-snowflake".into());
+                },
+                "validation_failed",
+            ),
+            (
+                "connection url outside allowlist",
+                keep_record,
+                |state| {
+                    if let Ok(Some(connection)) = state.connection.lock().expect("lock").as_mut() {
+                        connection.url = "https://example.test/api/webhooks/123/token".into();
+                    }
+                },
+                "allowlist_rejected",
+            ),
+        ];
+
+        for &(name, edit_record, edit_state, class) in cases {
+            let mut record = reply_record();
+            edit_record(&mut record);
+            let outbox = Arc::new(FakeOutbox::one(record.clone()));
+            let discussions = fake_discussions(&record, Some(THREAD));
+            edit_state(&discussions);
+            let (worker, provider) =
+                make_discussion_worker(outbox.clone(), discussions.clone(), client_error());
+            assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed), "{name}");
+            assert_eq!(provider.calls.load(Ordering::SeqCst), 0, "{name}");
+            assert!(outbox.actions().is_empty(), "{name}");
+            assert_eq!(
+                terminal_summary(&discussions),
+                vec![terminal(class, Some("feedback-a"), false)],
+                "{name}"
+            );
+            let terminals = discussions.terminals.lock().expect("lock");
+            let row = &terminals[0];
+            assert_eq!(
+                (
+                    row.outbox_id.as_str(),
+                    row.worker.as_str(),
+                    row.lease_token.as_str(),
+                    row.lease_version,
+                    row.artifact_id.0.as_str(),
+                    row.org.0.as_str(),
+                    row.connection_id.as_str(),
+                    row.generation,
+                    row.delivery_kind.as_str(),
+                    row.now_millis,
+                ),
+                (
+                    "discussion-row",
+                    "test",
+                    "lease",
+                    1,
+                    "artifact-a",
+                    "acme",
+                    "connection-a",
+                    1,
+                    record.delivery_kind.as_str(),
+                    10_000,
+                ),
+                "{name}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn paused_discussion_in_the_current_generation_still_delivers() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        discussions
+            .discussion
+            .lock()
+            .expect("lock")
+            .as_mut()
+            .expect("discussion")
+            .state = DiscussionState::Paused;
+        let (worker, provider) = make_discussion_worker(
+            outbox,
+            discussions.clone(),
+            accepted("323456789012345678", None),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(discussions.posts.lock().expect("lock").len(), 1);
+        assert!(terminal_summary(&discussions).is_empty());
+    }
+
+    #[tokio::test]
+    async fn tombstone_without_retained_external_ids_is_terminal_before_provider_io() {
+        for missing in ["link", "thread", "message"] {
+            let record = discussion_record(
+                DiscordDiscussionOperationV1::tombstone("feedback-a".into()).expect("tombstone"),
+                DELIVERY_KIND_DISCUSSION_TOMBSTONE,
+            );
+            let outbox = Arc::new(FakeOutbox::one(record.clone()));
+            let discussions = fake_discussions(&record, Some(THREAD));
+            let mut link = discussion_link(&record, true);
+            match missing {
+                "thread" => link.external_thread_id = None,
+                "message" => link.external_message_id = None,
+                _ => {}
+            }
+            *discussions.link.lock().expect("lock") = (missing != "link").then_some(link);
+            let (worker, provider) =
+                make_discussion_worker(outbox.clone(), discussions.clone(), client_error());
+            assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed), "{missing}");
+            assert_eq!(provider.calls.load(Ordering::SeqCst), 0, "{missing}");
+            assert!(outbox.actions().is_empty(), "{missing}");
+            assert_eq!(
+                terminal_summary(&discussions),
+                vec![terminal("validation_failed", Some("feedback-a"), false)],
+                "{missing}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn marker_failures_clear_the_feedback_correlation() {
+        // Early validation exit: a marker needs a persisted thread.
+        let record = discussion_record(
+            DiscordDiscussionOperationV1::resolved("feedback-a".into()).expect("resolved"),
+            DELIVERY_KIND_DISCUSSION_MESSAGE,
+        );
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, None);
+        let (worker, provider) =
+            make_discussion_worker(outbox, discussions.clone(), client_error());
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 0);
+        assert_eq!(
+            terminal_summary(&discussions),
+            vec![terminal("validation_failed", None, false)]
+        );
+
+        // Provider terminal outcome for a reopened marker.
+        let record = discussion_record(
+            DiscordDiscussionOperationV1::reopened("feedback-a".into()).expect("reopened"),
+            DELIVERY_KIND_DISCUSSION_MESSAGE,
+        );
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, provider) = make_discussion_worker(
+            outbox,
+            discussions.clone(),
+            DiscussionResult::Terminal {
+                reason: TerminalReason::NotFound,
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        assert_eq!(
+            terminal_summary(&discussions),
+            vec![terminal("not_found", None, false)]
+        );
+        assert!(discussions.markers.lock().expect("lock").is_empty());
+    }
+
+    #[tokio::test]
+    async fn notification_thread_creates_the_thread_from_the_anchor_message() {
+        let mut record = thread_record();
+        record.depends_on_outbox_id = Some("anchor-row".into());
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, None);
+        notification_thread(&discussions);
+        let (worker, provider) = make_discussion_worker(
+            outbox,
+            discussions.clone(),
+            accepted("223456789012345678", Some(THREAD)),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            *discussions.anchor_calls.lock().expect("lock"),
+            vec!["anchor-row".to_owned()]
+        );
+        let expected = discussion_request(
+            "https://discord.com/api/webhooks/123/token",
+            "discussion:connection-a".into(),
+            DiscussionOperation::create_thread_from_message(
+                CHANNEL.into(),
+                ANCHOR.into(),
+                "Thread".into(),
+                "Body".into(),
+            )
+            .expect("anchored thread"),
+        )
+        .expect("anchored request");
+        assert_eq!(*provider.requests.lock().expect("lock"), vec![expected]);
+        assert_eq!(
+            discussions.posts.lock().expect("lock")[0].external_thread_id,
+            THREAD
+        );
+    }
+
+    #[tokio::test]
+    async fn notification_thread_without_anchor_or_channel_is_terminal_before_provider_io() {
+        type StateEdit = fn(&FakeDiscussions);
+        let cases: &[(&str, StateEdit, &str)] = &[
+            (
+                "anchor missing",
+                |state| *state.anchor.lock().expect("lock") = None,
+                "validation_failed",
+            ),
+            (
+                "channel missing",
+                |state| {
+                    if let Ok(Some(connection)) = state.connection.lock().expect("lock").as_mut() {
+                        connection.channel_id = None;
+                    }
+                },
+                "validation_failed",
+            ),
+            (
+                "channel invalid",
+                |state| {
+                    if let Ok(Some(connection)) = state.connection.lock().expect("lock").as_mut() {
+                        connection.channel_id = Some("channel".into());
+                    }
+                },
+                "bad_request",
+            ),
+        ];
+        for &(name, edit, class) in cases {
+            let record = thread_record();
+            let outbox = Arc::new(FakeOutbox::one(record.clone()));
+            let discussions = fake_discussions(&record, None);
+            notification_thread(&discussions);
+            edit(&discussions);
+            let (worker, provider) =
+                make_discussion_worker(outbox.clone(), discussions.clone(), client_error());
+            assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed), "{name}");
+            assert_eq!(provider.calls.load(Ordering::SeqCst), 0, "{name}");
+            assert!(outbox.actions().is_empty(), "{name}");
+            assert_eq!(
+                terminal_summary(&discussions),
+                vec![terminal(class, Some("feedback-a"), false)],
+                "{name}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn notification_thread_replies_use_the_persisted_thread_without_an_anchor() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        notification_thread(&discussions);
+        let (worker, provider) = make_discussion_worker(
+            outbox,
+            discussions.clone(),
+            accepted("323456789012345678", None),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert!(discussions.anchor_calls.lock().expect("lock").is_empty());
+        let expected = discussion_request(
+            "https://discord.com/api/webhooks/123/token",
+            "discussion:connection-a".into(),
+            DiscussionOperation::reply(THREAD.into(), "Body".into()).expect("reply"),
+        )
+        .expect("reply request");
+        assert_eq!(*provider.requests.lock().expect("lock"), vec![expected]);
+    }
+
+    #[tokio::test]
+    async fn thread_acceptance_without_a_thread_receipt_retries_as_ambiguous() {
+        let record = thread_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, None);
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions.clone(),
+            accepted("223456789012345678", None),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            outbox.actions(),
+            vec![
+                Action::Rate {
+                    scope: "bucket".into(),
+                    bucket: "bucket".into(),
+                    until: 10_000,
+                },
+                Action::Retry(RetryTransition {
+                    next_attempt_at: 11_000,
+                    classification: "ambiguous".into(),
+                    duplicate_risk: true,
+                }),
+            ]
+        );
+        assert!(discussions.posts.lock().expect("lock").is_empty());
+    }
+
+    #[tokio::test]
+    async fn discussion_rate_limit_is_persisted_before_the_exact_retry() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions,
+            DiscussionResult::Retry {
+                reason: RetryReason::RateLimited,
+                duplicate_risk: DuplicateRisk::None,
+                rate_limit: Some(RateLimitMetadata {
+                    retry_after_ms: Some(2_500),
+                    ..rate()
+                }),
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            outbox.actions(),
+            vec![
+                Action::Rate {
+                    scope: "bucket".into(),
+                    bucket: "bucket".into(),
+                    until: 12_500,
+                },
+                Action::Retry(RetryTransition {
+                    next_attempt_at: 12_500,
+                    classification: "rate_limited".into(),
+                    duplicate_risk: false,
+                }),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn discussion_rate_limit_without_retry_after_is_an_error_without_transition() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions.clone(),
+            DiscussionResult::Retry {
+                reason: RetryReason::RateLimited,
+                duplicate_risk: DuplicateRisk::None,
+                rate_limit: None,
+            },
+        );
+        assert_eq!(
+            turn(&worker).await,
+            Err(AppError::Validation(
+                "rate_limited outcome missing retry_after".into()
+            ))
+        );
+        assert!(outbox.actions().is_empty());
+        assert!(terminal_summary(&discussions).is_empty());
+    }
+
+    #[tokio::test]
+    async fn discussion_retry_backs_off_by_attempt_and_carries_duplicate_risk() {
+        let mut record = reply_record();
+        record.attempts = 3;
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions,
+            DiscussionResult::Retry {
+                reason: RetryReason::Timeout,
+                duplicate_risk: DuplicateRisk::Possible,
+                rate_limit: None,
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            outbox.actions(),
+            vec![Action::Retry(RetryTransition {
+                next_attempt_at: 40_000,
+                classification: "timeout".into(),
+                duplicate_risk: true,
+            })]
+        );
+    }
+
+    #[tokio::test]
+    async fn exhausted_discussion_retry_is_terminal_with_its_duplicate_risk() {
+        let mut record = reply_record();
+        record.attempts = MAX_ATTEMPTS;
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions.clone(),
+            DiscussionResult::Retry {
+                reason: RetryReason::ServerError,
+                duplicate_risk: DuplicateRisk::Possible,
+                rate_limit: None,
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert!(outbox.actions().is_empty());
+        assert_eq!(
+            terminal_summary(&discussions),
+            vec![terminal("attempts_exhausted", Some("feedback-a"), true)]
+        );
+    }
+
+    #[tokio::test]
+    async fn discussion_provider_terminal_maps_its_reason_code() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, provider) = make_discussion_worker(
+            outbox.clone(),
+            discussions.clone(),
+            DiscussionResult::Terminal {
+                reason: TerminalReason::Forbidden,
+            },
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(provider.calls.load(Ordering::SeqCst), 1);
+        assert!(outbox.actions().is_empty());
+        assert_eq!(
+            terminal_summary(&discussions),
+            vec![terminal("forbidden", Some("feedback-a"), false)]
+        );
+    }
+
+    #[tokio::test]
+    async fn discussion_acceptance_follows_rate_persistence_and_binds_the_lease() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        *discussions.ledger.lock().expect("lock") = Some(outbox.clone());
+        let (worker, _) = make_discussion_worker(
+            outbox.clone(),
+            discussions.clone(),
+            accepted("323456789012345678", None),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            outbox.actions(),
+            vec![
+                Action::Rate {
+                    scope: "bucket".into(),
+                    bucket: "bucket".into(),
+                    until: 10_000,
+                },
+                Action::Discussion("accept_post"),
+            ]
+        );
+        assert_eq!(
+            *discussions.posts.lock().expect("lock"),
+            vec![AcceptedDiscussionDelivery {
+                outbox_id: "discussion-row".into(),
+                worker: "test".into(),
+                lease_token: "lease".into(),
+                lease_version: 1,
+                external_thread_id: THREAD.into(),
+                external_message_id: "323456789012345678".into(),
+                now_millis: 10_000,
+            }]
+        );
+        *discussions.ledger.lock().expect("lock") = None;
+
+        // Marker acceptance carries the full generation-scoped identity instead of a link.
+        let record = discussion_record(
+            DiscordDiscussionOperationV1::resolved("feedback-a".into()).expect("resolved"),
+            DELIVERY_KIND_DISCUSSION_MESSAGE,
+        );
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        let (worker, _) = make_discussion_worker(
+            outbox,
+            discussions.clone(),
+            accepted("423456789012345678", None),
+        );
+        assert_eq!(turn(&worker).await, Ok(WorkerTurn::Processed));
+        assert_eq!(
+            *discussions.markers.lock().expect("lock"),
+            vec![AcceptedDiscussionMarker {
+                outbox_id: "discussion-row".into(),
+                worker: "test".into(),
+                lease_token: "lease".into(),
+                lease_version: 1,
+                artifact_id: ArtifactId("artifact-a".into()),
+                org: OrgId("acme".into()),
+                connection_id: "connection-a".into(),
+                generation: 1,
+                message_id: "423456789012345678".into(),
+                now_millis: 10_000,
+            }]
+        );
+    }
+
+    #[tokio::test]
+    async fn lost_discussion_acceptance_guard_is_surfaced() {
+        let record = reply_record();
+        let outbox = Arc::new(FakeOutbox::one(record.clone()));
+        let discussions = fake_discussions(&record, Some(THREAD));
+        *discussions.accept_guard.lock().expect("lock") = false;
+        let (worker, _) =
+            make_discussion_worker(outbox, discussions, accepted("323456789012345678", None));
+        assert_eq!(
+            turn(&worker).await,
+            Err(AppError::Conflict(
+                "outbox guarded discussion accepted lost lease".into()
+            ))
         );
     }
 }
