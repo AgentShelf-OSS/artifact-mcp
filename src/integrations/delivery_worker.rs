@@ -765,402 +765,59 @@ impl DeliveryWorker {
             }
         }
     }
+    /// One discussion turn: decode → authorize → resolve → build → send → settle. Every stage
+    /// before the send is free of provider I/O, and every early exit performs exactly one guarded
+    /// transition (or returns a storage error with none).
     async fn process_discussion(&self, record: DeliveryRecord) -> Result<(), AppError> {
-        let Some(discussions) = &self.discussions else {
+        let (Some(discussions), Some(provider)) = (&self.discussions, &self.discussion_provider)
+        else {
             return self.dead_letter(&record, "validation_failed", false).await;
         };
-        let Some(provider) = &self.discussion_provider else {
-            return self.dead_letter(&record, "validation_failed", false).await;
+        let (envelope, binding) = match decode_discussion(&record) {
+            Ok(decoded) => decoded,
+            Err(class) => return self.dead_letter(&record, class, false).await,
         };
-        if !verify_payload_hash(&record) {
-            return self
-                .dead_letter(&record, "payload_hash_mismatch", false)
-                .await;
-        }
-        let tenant = OrgId(record.tenant.clone());
-        // The artifact/connection/generation values are first recovered from the canonical
-        // envelope. Only then can failures update operation-specific state.
-        let parsed: DiscordDiscussionEnvelopeV1 = match serde_json::from_slice(&record.payload) {
-            Ok(value) => value,
-            Err(_) => return self.dead_letter(&record, "validation_failed", false).await,
-        };
-        let artifact = ArtifactId(parsed.artifact_id().to_owned());
-        let connection = parsed.connection_id().to_owned();
-        let generation = parsed.generation();
-        let envelope = match DiscordDiscussionEnvelopeV1::decode_canonical(
-            &record.payload,
-            &tenant,
-            &record.event_id,
-            parsed.artifact_id(),
-            &connection,
-            generation,
-            Some(&record.payload_sha256),
-        ) {
-            Ok(value) => value,
-            Err(_) => return self.dead_letter(&record, "validation_failed", false).await,
-        };
-        let feedback = crate::model::FeedbackId(envelope.operation().feedback_id().to_owned());
-        if !discussion_kind_matches(&record.delivery_kind, envelope.operation())
-            || record.target_key != connection
-            || record.secret_ref != format!("discussion:{connection}")
-            || record.ordering_key != discussion_ordering_key(&artifact, generation)?
-        {
-            return self
-                .discussion_terminal(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    "validation_failed",
-                    false,
-                )
-                .await;
-        }
-        let Some(discussion) = discussions.discussion(&artifact, &tenant).await? else {
-            return self
-                .discussion_terminal(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    "validation_failed",
-                    false,
-                )
-                .await;
-        };
-        // Paused is intentionally accepted here: disabling only stops new producer work. Any
-        // re-enable increments generation and is rejected by this exact authority check.
-        if discussion.connection_id.as_deref() != Some(&connection)
-            || discussion.generation != generation
-        {
-            return self
-                .discussion_terminal(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    "validation_failed",
-                    false,
-                )
-                .await;
-        }
-        let link = discussions
-            .feedback_link(&artifact, &tenant, &feedback)
-            .await?;
-        if !valid_discussion_link(&record, &envelope, link.as_ref()) {
-            return self
-                .discussion_terminal(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    "validation_failed",
-                    false,
-                )
-                .await;
-        }
-        let (thread_id, message_id) = match envelope.operation() {
-            DiscordDiscussionOperationV1::Thread { .. } => (None, None),
-            DiscordDiscussionOperationV1::Reply { .. }
-            | DiscordDiscussionOperationV1::Resolved { .. }
-            | DiscordDiscussionOperationV1::Reopened { .. } => {
-                let Some(thread) = discussion.thread_id.as_deref() else {
-                    return self
-                        .discussion_terminal(
-                            &record,
-                            &artifact,
-                            &connection,
-                            generation,
-                            Some(feedback),
-                            "validation_failed",
-                            false,
-                        )
-                        .await;
-                };
-                (Some(thread), None)
-            }
-            DiscordDiscussionOperationV1::Tombstone { .. } => {
-                let Some(link) = link.as_ref() else {
-                    return self
-                        .discussion_terminal(
-                            &record,
-                            &artifact,
-                            &connection,
-                            generation,
-                            Some(feedback),
-                            "validation_failed",
-                            false,
-                        )
-                        .await;
-                };
-                let (Some(thread), Some(message)) = (
-                    link.external_thread_id.as_deref(),
-                    link.external_message_id.as_deref(),
-                ) else {
-                    return self
-                        .discussion_terminal(
-                            &record,
-                            &artifact,
-                            &connection,
-                            generation,
-                            Some(feedback),
-                            "validation_failed",
-                            false,
-                        )
-                        .await;
-                };
-                (Some(thread), Some(message))
-            }
-        };
-        let delivery = match discussions.connection(&connection, &tenant).await {
-            Ok(Some(value)) if value.org == tenant => value,
-            Ok(Some(_)) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            }
-            Ok(None) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            }
-            Err(DiscussionResolutionFailure::Retryable) => {
-                return self
-                    .retry_or_exhaust_discussion(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "network",
-                        false,
-                        backoff(record.attempts),
-                    )
-                    .await;
-            }
-            Err(DiscussionResolutionFailure::DecryptFailed) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "decrypt_failed",
-                        false,
-                    )
-                    .await;
-            }
-            Err(DiscussionResolutionFailure::InvalidReference) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            }
-        };
-        let base_operation = match envelope.to_transport_operation(thread_id, message_id) {
-            Ok(operation) => operation,
-            Err(_) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            }
-        };
-        let operation = if matches!(
-            envelope.operation(),
-            DiscordDiscussionOperationV1::Thread { .. }
-        ) && delivery.strategy
-            == DiscussionConnectionStrategy::NotificationThread
-        {
-            let Some(anchor_message_id) = discussions
-                .notification_anchor(
-                    record.depends_on_outbox_id.as_deref().unwrap_or_default(),
-                    &artifact,
-                    &tenant,
-                    &connection,
-                    generation,
-                )
-                .await?
-            else {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
+        let kind = DiscussionKind::of(envelope.operation());
+        let (request, targets) =
+            match prepare_discussion(discussions.as_ref(), &envelope, kind, &binding).await {
+                Ok(prepared) => prepared,
+                Err(exit) => return self.settle_discussion(&binding, exit).await,
             };
-            let Some(channel_id) = delivery.channel_id.clone() else {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            };
-            let DiscussionOperation::CreateThread {
-                thread_name,
-                content,
-            } = base_operation
-            else {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        "validation_failed",
-                        false,
-                    )
-                    .await;
-            };
-            match DiscussionOperation::create_thread_from_message(
-                channel_id,
-                anchor_message_id,
-                thread_name,
-                content,
-            ) {
-                Ok(operation) => operation,
-                Err(reason) => {
-                    return self
-                        .discussion_terminal(
-                            &record,
-                            &artifact,
-                            &connection,
-                            generation,
-                            Some(feedback),
-                            terminal_code(reason),
-                            false,
-                        )
-                        .await;
-                }
-            }
-        } else {
-            base_operation
-        };
-        let request = match discussion_request(&delivery.url, record.secret_ref.clone(), operation)
-        {
-            Ok(request) => request,
-            Err(reason) => {
-                return self
-                    .discussion_terminal(
-                        &record,
-                        &artifact,
-                        &connection,
-                        generation,
-                        Some(feedback),
-                        terminal_code(reason),
-                        false,
-                    )
-                    .await;
-            }
-        };
-        let outcome = provider.deliver(&tenant, request).await;
+        let outcome = provider.deliver(&binding.tenant, request).await;
         self.persist_discussion_rate_limit(&record, &outcome)
             .await?;
+        self.apply_discussion_outcome(discussions.as_ref(), kind, &binding, targets, outcome)
+            .await
+    }
+
+    /// Classify the provider outcome and persist it: accepted (with the thread recorded), retry,
+    /// or terminal.
+    async fn apply_discussion_outcome(
+        &self,
+        discussions: &dyn WorkerDiscussions,
+        kind: DiscussionKind,
+        binding: &DiscussionBinding<'_>,
+        targets: DiscussionTargets,
+        outcome: DiscussionResult,
+    ) -> Result<(), AppError> {
         match outcome {
             DiscussionResult::Accepted { receipt, .. } => {
-                let thread = match envelope.operation() {
-                    DiscordDiscussionOperationV1::Thread { .. } => match receipt.thread_id {
+                let thread = match kind {
+                    DiscussionKind::Thread => match receipt.thread_id {
                         Some(value) => value,
                         None => {
-                            return self
-                                .retry_or_exhaust_discussion(
-                                    &record,
-                                    &artifact,
-                                    &connection,
-                                    generation,
-                                    Some(feedback),
-                                    "ambiguous",
-                                    true,
-                                    backoff(record.attempts),
-                                )
-                                .await;
+                            let exit = DiscussionExit::Retry {
+                                class: "ambiguous",
+                                duplicate_risk: true,
+                                delay: backoff(binding.record.attempts),
+                            };
+                            return self.settle_discussion(binding, exit).await;
                         }
                     },
-                    _ => thread_id.unwrap_or_default().to_owned(),
+                    _ => targets.thread_id.unwrap_or_default(),
                 };
-                let input = AcceptedDiscussionDelivery {
-                    outbox_id: record.id.clone(),
-                    worker: self.worker_id.clone(),
-                    lease_token: record.lease_token.clone().unwrap_or_default(),
-                    lease_version: record.lease_version,
-                    external_thread_id: thread,
-                    external_message_id: receipt.message_id,
-                    now_millis: self.clock.now_millis(),
-                };
-                let accepted = match envelope.operation() {
-                    DiscordDiscussionOperationV1::Thread { .. }
-                    | DiscordDiscussionOperationV1::Reply { .. } => {
-                        discussions.accept_post(input).await?
-                    }
-                    DiscordDiscussionOperationV1::Tombstone { .. } => {
-                        discussions.accept_tombstone(input).await?
-                    }
-                    DiscordDiscussionOperationV1::Resolved { .. }
-                    | DiscordDiscussionOperationV1::Reopened { .. } => {
-                        discussions
-                            .accept_marker(AcceptedDiscussionMarker {
-                                outbox_id: input.outbox_id,
-                                worker: input.worker,
-                                lease_token: input.lease_token,
-                                lease_version: input.lease_version,
-                                artifact_id: artifact.clone(),
-                                org: tenant,
-                                connection_id: connection,
-                                generation,
-                                message_id: input.external_message_id,
-                                now_millis: input.now_millis,
-                            })
-                            .await?
-                    }
-                };
-                guarded(Ok(accepted), "discussion accepted")
+                self.accept_discussion(discussions, kind, binding, thread, receipt.message_id)
+                    .await
             }
             DiscussionResult::Retry {
                 reason,
@@ -1175,58 +832,99 @@ impl DeliveryWorker {
                             AppError::Validation("rate_limited outcome missing retry_after".into())
                         })?
                 } else {
-                    backoff(record.attempts)
+                    backoff(binding.record.attempts)
                 };
-                self.retry_or_exhaust_discussion(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    retry_code(reason),
-                    duplicate_risk == DuplicateRisk::Possible,
+                let exit = DiscussionExit::Retry {
+                    class: retry_code(reason),
+                    duplicate_risk: duplicate_risk == DuplicateRisk::Possible,
                     delay,
-                )
-                .await
+                };
+                self.settle_discussion(binding, exit).await
             }
             DiscussionResult::Terminal { reason } => {
-                self.discussion_terminal(
-                    &record,
-                    &artifact,
-                    &connection,
-                    generation,
-                    Some(feedback),
-                    terminal_code(reason),
-                    false,
-                )
-                .await
+                self.settle_discussion(binding, DiscussionExit::Terminal(terminal_code(reason)))
+                    .await
             }
         }
     }
 
-    #[allow(clippy::too_many_arguments)] // Bound worker context plus retry semantics stays explicit at call sites.
+    /// Record an accepted send through the acceptor that owns this operation's durable state.
+    async fn accept_discussion(
+        &self,
+        discussions: &dyn WorkerDiscussions,
+        kind: DiscussionKind,
+        binding: &DiscussionBinding<'_>,
+        thread: String,
+        message: String,
+    ) -> Result<(), AppError> {
+        let record = binding.record;
+        let input = AcceptedDiscussionDelivery {
+            outbox_id: record.id.clone(),
+            worker: self.worker_id.clone(),
+            lease_token: record.lease_token.clone().unwrap_or_default(),
+            lease_version: record.lease_version,
+            external_thread_id: thread,
+            external_message_id: message,
+            now_millis: self.clock.now_millis(),
+        };
+        let accepted = match kind {
+            DiscussionKind::Thread | DiscussionKind::Reply => {
+                discussions.accept_post(input).await?
+            }
+            DiscussionKind::Tombstone => discussions.accept_tombstone(input).await?,
+            DiscussionKind::Marker => {
+                discussions
+                    .accept_marker(AcceptedDiscussionMarker {
+                        outbox_id: input.outbox_id,
+                        worker: input.worker,
+                        lease_token: input.lease_token,
+                        lease_version: input.lease_version,
+                        artifact_id: binding.artifact.clone(),
+                        org: binding.tenant.clone(),
+                        connection_id: binding.connection.clone(),
+                        generation: binding.generation,
+                        message_id: input.external_message_id,
+                        now_millis: input.now_millis,
+                    })
+                    .await?
+            }
+        };
+        guarded(Ok(accepted), "discussion accepted")
+    }
+
+    /// Perform the single transition an early exit asks for.
+    async fn settle_discussion(
+        &self,
+        binding: &DiscussionBinding<'_>,
+        exit: DiscussionExit,
+    ) -> Result<(), AppError> {
+        match exit {
+            DiscussionExit::Terminal(class) => {
+                self.discussion_terminal(binding, class, false).await
+            }
+            DiscussionExit::Retry {
+                class,
+                duplicate_risk,
+                delay,
+            } => {
+                self.retry_or_exhaust_discussion(binding, class, duplicate_risk, delay)
+                    .await
+            }
+            DiscussionExit::Failed(error) => Err(error),
+        }
+    }
+
     async fn retry_or_exhaust_discussion(
         &self,
-        record: &DeliveryRecord,
-        artifact: &ArtifactId,
-        connection: &str,
-        generation: u64,
-        feedback: Option<crate::model::FeedbackId>,
+        binding: &DiscussionBinding<'_>,
         class: &str,
         duplicate_risk: bool,
         delay: Duration,
     ) -> Result<(), AppError> {
+        let record = binding.record;
         if record.attempts >= MAX_ATTEMPTS {
             return self
-                .discussion_terminal(
-                    record,
-                    artifact,
-                    connection,
-                    generation,
-                    feedback,
-                    "attempts_exhausted",
-                    duplicate_risk,
-                )
+                .discussion_terminal(binding, "attempts_exhausted", duplicate_risk)
                 .await;
         }
         let next_attempt_at = self
@@ -1249,17 +947,13 @@ impl DeliveryWorker {
         )
     }
 
-    #[allow(clippy::too_many_arguments)] // Terminal context is deliberately complete for atomic state updates.
     async fn discussion_terminal(
         &self,
-        record: &DeliveryRecord,
-        artifact: &ArtifactId,
-        connection: &str,
-        generation: u64,
-        feedback: Option<crate::model::FeedbackId>,
+        binding: &DiscussionBinding<'_>,
         class: &str,
         duplicate_risk: bool,
     ) -> Result<(), AppError> {
+        let record = binding.record;
         let Some(discussions) = &self.discussions else {
             return self.dead_letter(record, class, duplicate_risk).await;
         };
@@ -1278,7 +972,7 @@ impl DeliveryWorker {
                 }) {
             None
         } else {
-            feedback
+            Some(binding.feedback.clone())
         };
         guarded(
             discussions
@@ -1287,10 +981,10 @@ impl DeliveryWorker {
                     worker: self.worker_id.clone(),
                     lease_token: record.lease_token.clone().unwrap_or_default(),
                     lease_version: record.lease_version,
-                    artifact_id: artifact.clone(),
+                    artifact_id: binding.artifact.clone(),
                     org: OrgId(record.tenant.clone()),
-                    connection_id: connection.to_owned(),
-                    generation,
+                    connection_id: binding.connection.clone(),
+                    generation: binding.generation,
                     delivery_kind: record.delivery_kind.clone(),
                     feedback_id: feedback,
                     classification: class.to_owned(),
@@ -1499,6 +1193,298 @@ fn rate_metadata(outcome: &DeliveryClassification) -> Option<&RateLimitMetadata>
         DeliveryClassification::Retry { rate_limit, .. } => rate_limit.as_ref(),
         DeliveryClassification::Terminal { .. } => None,
     }
+}
+
+/// Discussion identity recovered from the canonical envelope. Every operation-scoped terminal or
+/// retry update after decoding is bound to exactly these values.
+struct DiscussionBinding<'r> {
+    record: &'r DeliveryRecord,
+    tenant: OrgId,
+    artifact: ArtifactId,
+    connection: String,
+    generation: u64,
+    feedback: crate::model::FeedbackId,
+}
+
+/// Why a discussion turn stops before the provider is called. Each variant maps to exactly one
+/// outcome in `DeliveryWorker::settle_discussion`.
+enum DiscussionExit {
+    /// Guarded operation-scoped terminal update.
+    Terminal(&'static str),
+    /// Guarded retry, or terminal exhaustion once the attempt budget is spent.
+    Retry {
+        class: &'static str,
+        duplicate_risk: bool,
+        delay: Duration,
+    },
+    /// Storage failure, returned unchanged without a transition.
+    Failed(AppError),
+}
+
+impl DiscussionExit {
+    const INVALID: Self = Self::Terminal("validation_failed");
+}
+
+impl From<AppError> for DiscussionExit {
+    fn from(error: AppError) -> Self {
+        Self::Failed(error)
+    }
+}
+
+/// The per-operation behaviour the worker needs: which external ids to resolve and which
+/// acceptor records a successful send.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum DiscussionKind {
+    /// Creates the external thread; accepted through the post acceptor.
+    Thread,
+    /// Posts into the persisted thread; accepted through the post acceptor.
+    Reply,
+    /// Resolved/reopened marker in the persisted thread; accepted through the marker acceptor.
+    Marker,
+    /// Edits the retained message; accepted through the tombstone acceptor.
+    Tombstone,
+}
+
+impl DiscussionKind {
+    const fn of(operation: &DiscordDiscussionOperationV1) -> Self {
+        match operation {
+            DiscordDiscussionOperationV1::Thread { .. } => Self::Thread,
+            DiscordDiscussionOperationV1::Reply { .. } => Self::Reply,
+            DiscordDiscussionOperationV1::Resolved { .. }
+            | DiscordDiscussionOperationV1::Reopened { .. } => Self::Marker,
+            DiscordDiscussionOperationV1::Tombstone { .. } => Self::Tombstone,
+        }
+    }
+}
+
+/// Authoritative external ids for the transport operation.
+struct DiscussionTargets {
+    thread_id: Option<String>,
+    message_id: Option<String>,
+}
+
+/// Stage 1: verify the payload hash and strictly decode the canonical envelope. Failures here
+/// cannot yet be bound to operation state, so they are plain outbox dead-letter classes.
+fn decode_discussion(
+    record: &DeliveryRecord,
+) -> Result<(DiscordDiscussionEnvelopeV1, DiscussionBinding<'_>), &'static str> {
+    if !verify_payload_hash(record) {
+        return Err("payload_hash_mismatch");
+    }
+    let tenant = OrgId(record.tenant.clone());
+    // The artifact/connection/generation values are first recovered from the canonical
+    // envelope. Only then can failures update operation-specific state.
+    let parsed: DiscordDiscussionEnvelopeV1 =
+        serde_json::from_slice(&record.payload).map_err(|_| "validation_failed")?;
+    let artifact = ArtifactId(parsed.artifact_id().to_owned());
+    let connection = parsed.connection_id().to_owned();
+    let generation = parsed.generation();
+    let envelope = DiscordDiscussionEnvelopeV1::decode_canonical(
+        &record.payload,
+        &tenant,
+        &record.event_id,
+        parsed.artifact_id(),
+        &connection,
+        generation,
+        Some(&record.payload_sha256),
+    )
+    .map_err(|_| "validation_failed")?;
+    let feedback = crate::model::FeedbackId(envelope.operation().feedback_id().to_owned());
+    Ok((
+        envelope,
+        DiscussionBinding {
+            record,
+            tenant,
+            artifact,
+            connection,
+            generation,
+            feedback,
+        },
+    ))
+}
+
+/// Stages 2-6: everything between a trusted envelope and an executable provider request. No
+/// stage performs provider I/O.
+async fn prepare_discussion(
+    discussions: &dyn WorkerDiscussions,
+    envelope: &DiscordDiscussionEnvelopeV1,
+    kind: DiscussionKind,
+    binding: &DiscussionBinding<'_>,
+) -> Result<(DiscussionRequest, DiscussionTargets), DiscussionExit> {
+    authorize_claim(envelope, binding)?;
+    let discussion = authorize_generation(discussions, binding).await?;
+    let link = verified_link(discussions, envelope, binding).await?;
+    let targets = resolve_targets(kind, &discussion, &link)?;
+    let delivery = resolve_connection(discussions, binding).await?;
+    let operation =
+        build_operation(discussions, envelope, kind, binding, &delivery, &targets).await?;
+    let request = discussion_request(&delivery.url, binding.record.secret_ref.clone(), operation)
+        .map_err(|reason| DiscussionExit::Terminal(terminal_code(reason)))?;
+    Ok((request, targets))
+}
+
+/// Stage 2: the claimed row's kind, target, secret reference, and ordering key must all match
+/// the envelope.
+fn authorize_claim(
+    envelope: &DiscordDiscussionEnvelopeV1,
+    binding: &DiscussionBinding<'_>,
+) -> Result<(), DiscussionExit> {
+    let record = binding.record;
+    if !discussion_kind_matches(&record.delivery_kind, envelope.operation())
+        || record.target_key != binding.connection
+        || record.secret_ref != format!("discussion:{}", binding.connection)
+        || record.ordering_key != discussion_ordering_key(&binding.artifact, binding.generation)?
+    {
+        return Err(DiscussionExit::INVALID);
+    }
+    Ok(())
+}
+
+/// Stage 3: the artifact's current discussion must still be bound to this connection and
+/// generation.
+async fn authorize_generation(
+    discussions: &dyn WorkerDiscussions,
+    binding: &DiscussionBinding<'_>,
+) -> Result<ArtifactDiscussion, DiscussionExit> {
+    let Some(discussion) = discussions
+        .discussion(&binding.artifact, &binding.tenant)
+        .await?
+    else {
+        return Err(DiscussionExit::INVALID);
+    };
+    // Paused is intentionally accepted here: disabling only stops new producer work. Any
+    // re-enable increments generation and is rejected by this exact authority check.
+    if discussion.connection_id.as_deref() != Some(binding.connection.as_str())
+        || discussion.generation != binding.generation
+    {
+        return Err(DiscussionExit::INVALID);
+    }
+    Ok(discussion)
+}
+
+/// Stage 3b: the feedback mapping must exist and correlate with this exact row.
+async fn verified_link(
+    discussions: &dyn WorkerDiscussions,
+    envelope: &DiscordDiscussionEnvelopeV1,
+    binding: &DiscussionBinding<'_>,
+) -> Result<DiscussionMessageLink, DiscussionExit> {
+    let link = discussions
+        .feedback_link(&binding.artifact, &binding.tenant, &binding.feedback)
+        .await?;
+    match link {
+        Some(link) if valid_discussion_link(binding.record, envelope, Some(&link)) => Ok(link),
+        _ => Err(DiscussionExit::INVALID),
+    }
+}
+
+/// Stage 4: resolve the external thread/message ids each operation kind needs.
+fn resolve_targets(
+    kind: DiscussionKind,
+    discussion: &ArtifactDiscussion,
+    link: &DiscussionMessageLink,
+) -> Result<DiscussionTargets, DiscussionExit> {
+    match kind {
+        DiscussionKind::Thread => Ok(DiscussionTargets {
+            thread_id: None,
+            message_id: None,
+        }),
+        DiscussionKind::Reply | DiscussionKind::Marker => {
+            let thread = discussion
+                .thread_id
+                .clone()
+                .ok_or(DiscussionExit::INVALID)?;
+            Ok(DiscussionTargets {
+                thread_id: Some(thread),
+                message_id: None,
+            })
+        }
+        DiscussionKind::Tombstone => {
+            let (Some(thread), Some(message)) = (
+                link.external_thread_id.clone(),
+                link.external_message_id.clone(),
+            ) else {
+                return Err(DiscussionExit::INVALID);
+            };
+            Ok(DiscussionTargets {
+                thread_id: Some(thread),
+                message_id: Some(message),
+            })
+        }
+    }
+}
+
+/// Stage 5: resolve the tenant-bound connection credential. Only an operational lookup failure
+/// is retryable; it happens before provider I/O, so it carries no duplicate risk.
+async fn resolve_connection(
+    discussions: &dyn WorkerDiscussions,
+    binding: &DiscussionBinding<'_>,
+) -> Result<DiscussionConnectionDelivery, DiscussionExit> {
+    match discussions
+        .connection(&binding.connection, &binding.tenant)
+        .await
+    {
+        Ok(Some(value)) if value.org == binding.tenant => Ok(value),
+        Ok(Some(_) | None) | Err(DiscussionResolutionFailure::InvalidReference) => {
+            Err(DiscussionExit::INVALID)
+        }
+        Err(DiscussionResolutionFailure::Retryable) => Err(DiscussionExit::Retry {
+            class: "network",
+            duplicate_risk: false,
+            delay: backoff(binding.record.attempts),
+        }),
+        Err(DiscussionResolutionFailure::DecryptFailed) => {
+            Err(DiscussionExit::Terminal("decrypt_failed"))
+        }
+    }
+}
+
+/// Stage 6: build the transport operation. A notification-thread connection creates the first
+/// thread from the already delivered anchor message instead of a forum post.
+async fn build_operation(
+    discussions: &dyn WorkerDiscussions,
+    envelope: &DiscordDiscussionEnvelopeV1,
+    kind: DiscussionKind,
+    binding: &DiscussionBinding<'_>,
+    delivery: &DiscussionConnectionDelivery,
+    targets: &DiscussionTargets,
+) -> Result<DiscussionOperation, DiscussionExit> {
+    let base_operation = envelope
+        .to_transport_operation(targets.thread_id.as_deref(), targets.message_id.as_deref())
+        .map_err(|_| DiscussionExit::INVALID)?;
+    if kind != DiscussionKind::Thread
+        || delivery.strategy != DiscussionConnectionStrategy::NotificationThread
+    {
+        return Ok(base_operation);
+    }
+    let anchor_message_id = discussions
+        .notification_anchor(
+            binding
+                .record
+                .depends_on_outbox_id
+                .as_deref()
+                .unwrap_or_default(),
+            &binding.artifact,
+            &binding.tenant,
+            &binding.connection,
+            binding.generation,
+        )
+        .await?
+        .ok_or(DiscussionExit::INVALID)?;
+    let channel_id = delivery.channel_id.clone().ok_or(DiscussionExit::INVALID)?;
+    let DiscussionOperation::CreateThread {
+        thread_name,
+        content,
+    } = base_operation
+    else {
+        return Err(DiscussionExit::INVALID);
+    };
+    DiscussionOperation::create_thread_from_message(
+        channel_id,
+        anchor_message_id,
+        thread_name,
+        content,
+    )
+    .map_err(|reason| DiscussionExit::Terminal(terminal_code(reason)))
 }
 
 fn discussion_kind_matches(kind: &str, operation: &DiscordDiscussionOperationV1) -> bool {
