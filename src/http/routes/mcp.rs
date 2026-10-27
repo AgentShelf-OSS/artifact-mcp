@@ -161,7 +161,10 @@ async fn mcp(State(deps): State<AppDeps>, request: Request) -> Response {
     let mut observation = deps.mcp_telemetry.begin();
     let request_id = observation.request_id().to_owned();
     let (mut response, labels, outcome) =
-        with_mcp_request_id(request_id.clone(), mcp_inner(&deps, request)).await;
+        match with_mcp_request_id(request_id.clone(), mcp_inner(&deps, request)).await {
+            Ok(observed) => observed,
+            Err(rejected) => *rejected,
+        };
     observation.set_labels(labels);
     let result_bytes = response
         .body()
@@ -176,7 +179,25 @@ async fn mcp(State(deps): State<AppDeps>, request: Request) -> Response {
     response
 }
 
-async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabels, McpOutcome) {
+/// A response together with its metric labels and outcome.
+type Observed = (Response, McpMetricLabels, McpOutcome);
+
+/// An admission step's rejection. Boxed so every step's `Result` stays small; rejections are off
+/// the success path.
+type Rejected = Box<Observed>;
+
+fn rejected(response: Response, labels: McpMetricLabels, outcome: McpOutcome) -> Rejected {
+    Box::new((response, labels, outcome))
+}
+
+/// The `/mcp` admission pipeline. Every step returns its successor's input or the observed
+/// rejection, and the order is a security contract: nothing reads the body before publisher
+/// authentication, and nothing dispatches before every admission check has passed.
+///
+/// Guard lifetimes: `request_permit` lives in this frame until it moves into a read task, so a
+/// rejected or mutating request holds it until this function returns. `_mutation_permit` is a
+/// named binding (not `_`), so it is held across the mutation dispatch.
+async fn mcp_inner(deps: &AppDeps, request: Request) -> Result<Observed, Rejected> {
     // `admit` transfers this guard for MCP because only the parsed operation can distinguish a
     // cancellable read from a durable mutation. Retaining it in the spawned read task means a
     // client-facing 408 never turns into hidden concurrent work.
@@ -187,8 +208,53 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
     let transport_headers = request.headers().clone();
     let peer = peer_addr(&request);
     let initial_labels = labels_for(protocol_dimension(&transport_headers), None, None);
-    // This await happens before the body is read or bounded. `/mcp` is Access-bypassed, so the
-    // publisher key is the only gate protecting the multi-megabyte JSON parser.
+    let (auth, request) = authenticate_publisher(deps, request, initial_labels).await?;
+    admit_verified_publisher(deps, &request, &auth, initial_labels)?;
+    require_json_media_type(&request, initial_labels)?;
+    let bytes = read_mcp_body(deps, request, initial_labels).await?;
+    let payload = parse_mcp_json(&bytes, initial_labels)?;
+    enforce_json_limits(deps, &payload, initial_labels)?;
+    let era = validate_era(&payload, &transport_headers)?;
+    let method = payload
+        .get("method")
+        .and_then(OrderedJson::as_str)
+        .unwrap_or_default();
+    let name = request_name(&payload);
+    let labels = era_labels(era, method, name);
+    if let Some(batch) = payload.as_array() {
+        admit_legacy_batch(deps, batch, era, &auth, &transport_headers, peer, labels)?;
+        return Ok(
+            dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await,
+        );
+    }
+    reject_invalid_request(&payload, era, labels)?;
+    require_scope(deps, &auth, &payload, method, name, labels)?;
+    let operation_cost = mcp_cost(method, name);
+    admit_operation(
+        deps,
+        &transport_headers,
+        peer,
+        &auth,
+        operation_cost,
+        labels,
+    )?;
+    if operation_cost == McpCost::Read {
+        return Ok(
+            dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await,
+        );
+    }
+    let _mutation_permit = acquire_mutation_permit(deps, labels)?;
+    let response = protocol::handle_mcp_for_era(payload, &auth, deps, era).await;
+    Ok(dispatch_response(response, era, labels))
+}
+
+/// Authenticate the publisher before the body is read or bounded. `/mcp` is Access-bypassed,
+/// so the publisher key is the only gate protecting the multi-megabyte JSON parser.
+async fn authenticate_publisher(
+    deps: &AppDeps,
+    request: Request,
+    labels: McpMetricLabels,
+) -> Result<(crate::model::PublisherIdentity, Request), Rejected> {
     let auth = match deps.publisher_auth.authenticate(request.headers()).await {
         Ok(auth) => auth,
         Err(_) => {
@@ -205,30 +271,41 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
             .await;
             if rate_limited {
                 deps.mcp_telemetry.record_security_signal("rate_limit");
-                return observed(
+                return Err(rejected(
                     deps.ingress.mcp_rate_limited_response(),
-                    initial_labels,
+                    labels,
                     McpOutcome::AuthenticationFailure,
-                );
+                ));
             }
-            return observed(
+            return Err(rejected(
                 unauthorized_response(&deps.config),
-                initial_labels,
+                labels,
                 McpOutcome::AuthenticationFailure,
-            );
+            ));
         }
     };
-    if !deps
-        .ingress
-        .allow_verified_publisher_request(&request, &auth)
-    {
+    Ok((auth, request))
+}
+
+/// Spend the verified publisher's request budget before any body work.
+fn admit_verified_publisher(
+    deps: &AppDeps,
+    request: &Request,
+    auth: &crate::model::PublisherIdentity,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    if !deps.ingress.allow_verified_publisher_request(request, auth) {
         deps.mcp_telemetry.record_security_signal("rate_limit");
-        return observed(
+        return Err(rejected(
             deps.ingress.mcp_rate_limited_response(),
-            initial_labels,
+            labels,
             McpOutcome::AuthenticationFailure,
-        );
+        ));
     }
+    Ok(())
+}
+
+fn require_json_media_type(request: &Request, labels: McpMetricLabels) -> Result<(), Rejected> {
     let json_content_type = request
         .headers()
         .get(header::CONTENT_TYPE)
@@ -240,232 +317,244 @@ async fn mcp_inner(deps: &AppDeps, request: Request) -> (Response, McpMetricLabe
                 .is_some_and(|mime| mime.trim().eq_ignore_ascii_case("application/json"))
         });
     if !json_content_type {
-        return observed(
+        return Err(rejected(
             crate::http::ingress::mcp_admission_response(StatusCode::UNSUPPORTED_MEDIA_TYPE, None),
-            initial_labels,
+            labels,
             McpOutcome::ValidationFailure,
-        );
+        ));
     }
+    Ok(())
+}
+
+/// Read the body under the configured MCP JSON limit and the ingress read deadline.
+async fn read_mcp_body(
+    deps: &AppDeps,
+    request: Request,
+    labels: McpMetricLabels,
+) -> Result<Vec<u8>, Rejected> {
     let limit = usize::try_from(deps.config.body.mcp_json).unwrap_or(usize::MAX);
-    let bytes = match read_body_limited(
+    read_body_limited(
         request.into_body(),
         limit,
         Duration::from_millis(deps.config.ingress.read_timeout_ms),
     )
     .await
-    {
-        Ok(bytes) => bytes,
-        Err(BodyReadError::Timeout) => {
-            return observed(
-                crate::http::ingress::mcp_admission_response(StatusCode::REQUEST_TIMEOUT, None),
-                initial_labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-        Err(BodyReadError::TooLarge) => {
-            return observed(
-                crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
-                initial_labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-        Err(BodyReadError::Invalid) => {
-            return observed(
-                crate::http::ingress::mcp_admission_response(StatusCode::BAD_REQUEST, None),
-                initial_labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-    };
-    let payload = match serde_json::from_slice::<protocol::OrderedJson>(&bytes) {
-        Ok(payload) => payload,
-        Err(_) => {
-            return observed(
-                crate::http::ingress::mcp_admission_response(StatusCode::BAD_REQUEST, None),
-                initial_labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-    };
-    if validate_json_complexity(&payload, &deps.config.ingress).is_err() {
-        return observed(
-            crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
-            initial_labels,
+    .map_err(|error| {
+        let status = match error {
+            BodyReadError::Timeout => StatusCode::REQUEST_TIMEOUT,
+            BodyReadError::TooLarge => StatusCode::PAYLOAD_TOO_LARGE,
+            BodyReadError::Invalid => StatusCode::BAD_REQUEST,
+        };
+        rejected(
+            crate::http::ingress::mcp_admission_response(status, None),
+            labels,
             McpOutcome::ValidationFailure,
-        );
+        )
+    })
+}
+
+fn parse_mcp_json(bytes: &[u8], labels: McpMetricLabels) -> Result<OrderedJson, Rejected> {
+    serde_json::from_slice::<OrderedJson>(bytes).map_err(|_| {
+        rejected(
+            crate::http::ingress::mcp_admission_response(StatusCode::BAD_REQUEST, None),
+            labels,
+            McpOutcome::ValidationFailure,
+        )
+    })
+}
+
+/// Bound the parsed document's complexity, then the JSON-RPC batch length.
+fn enforce_json_limits(
+    deps: &AppDeps,
+    payload: &OrderedJson,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    let too_large = || {
+        rejected(
+            crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
+            labels,
+            McpOutcome::ValidationFailure,
+        )
+    };
+    if validate_json_complexity(payload, &deps.config.ingress).is_err() {
+        return Err(too_large());
     }
     if payload.as_array().is_some_and(|batch| {
         batch.len() > usize::try_from(deps.config.ingress.json_max_batch).unwrap_or(usize::MAX)
     }) {
-        return observed(
-            crate::http::ingress::mcp_admission_response(StatusCode::PAYLOAD_TOO_LARGE, None),
-            initial_labels,
-            McpOutcome::ValidationFailure,
-        );
+        return Err(too_large());
     }
-    let era = match validate_transport(&payload, &transport_headers) {
-        Ok(era) => era,
-        Err(error) => {
-            let labels = labels_for(
-                protocol_dimension(&transport_headers),
-                payload.get("method").and_then(OrderedJson::as_str),
-                request_name(&payload),
-            );
-            return observed(
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(protocol::rpc_error_with_data_for_era(
-                        request_id(&payload),
-                        error.code,
-                        &error.message,
-                        error.data,
-                        if modern_transport(&payload, &transport_headers) {
-                            ProtocolEra::Modern
-                        } else {
-                            ProtocolEra::Legacy
-                        },
-                    )),
-                )
-                    .into_response(),
-                labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-    };
-    let method = payload
-        .get("method")
-        .and_then(OrderedJson::as_str)
-        .unwrap_or_default();
-    let name = request_name(&payload);
-    let labels = labels_for(
+    Ok(())
+}
+
+/// Validate the transport headers and request metadata, and select the protocol era.
+fn validate_era(payload: &OrderedJson, headers: &HeaderMap) -> Result<ProtocolEra, Rejected> {
+    validate_transport(payload, headers).map_err(|error| {
+        let labels = labels_for(
+            protocol_dimension(headers),
+            payload.get("method").and_then(OrderedJson::as_str),
+            request_name(payload),
+        );
+        rejected(
+            (
+                StatusCode::BAD_REQUEST,
+                Json(protocol::rpc_error_with_data_for_era(
+                    request_id(payload),
+                    error.code,
+                    &error.message,
+                    error.data,
+                    if modern_transport(payload, headers) {
+                        ProtocolEra::Modern
+                    } else {
+                        ProtocolEra::Legacy
+                    },
+                )),
+            )
+                .into_response(),
+            labels,
+            McpOutcome::ValidationFailure,
+        )
+    })
+}
+
+fn era_labels(era: ProtocolEra, method: &str, name: Option<&str>) -> McpMetricLabels {
+    labels_for(
         match era {
             ProtocolEra::Legacy => PROTOCOL_VERSION,
             ProtocolEra::Modern => MODERN_PROTOCOL_VERSION,
         },
         Some(method),
         name,
-    );
-    if let Some(batch) = payload.as_array() {
-        // Legacy JSON-RPC retains read-only batches. Mixed or state-changing batches are
-        // rejected atomically before dispatch so one cheap outer admission cannot buy writes.
-        for message in batch {
-            if protocol::invalid_request(message, era).is_some() {
-                continue;
-            }
-            let method = message
-                .get("method")
-                .and_then(OrderedJson::as_str)
-                .unwrap_or_default();
-            let name = request_name(message);
-            if mcp_cost(method, name) != McpCost::Read {
-                return observed(
-                    (
-                        StatusCode::BAD_REQUEST,
-                        Json(protocol::rpc_error(
-                            Value::Null,
-                            -32_600,
-                            "Legacy batches may contain read-only requests only",
-                        )),
-                    )
-                        .into_response(),
-                    labels,
-                    McpOutcome::ValidationFailure,
-                );
-            }
-            if let Some(scope) = required_scope(method, name)
-                && !auth.has_scope(scope)
-            {
-                return observed(
-                    insufficient_scope_response(&deps.config, request_id(message), scope),
-                    labels,
-                    McpOutcome::AuthorizationFailure,
-                );
-            }
+    )
+}
+
+/// Legacy JSON-RPC retains read-only batches. Mixed or state-changing batches are rejected
+/// atomically before dispatch so one cheap outer admission cannot buy writes. The whole batch
+/// then spends one weighted read budget.
+fn admit_legacy_batch(
+    deps: &AppDeps,
+    batch: &[OrderedJson],
+    era: ProtocolEra,
+    auth: &crate::model::PublisherIdentity,
+    headers: &HeaderMap,
+    peer: Option<std::net::SocketAddr>,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    for message in batch {
+        if protocol::invalid_request(message, era).is_some() {
+            continue;
         }
-        if !deps.ingress.allow_verified_publisher_operation_weight(
-            &transport_headers,
-            peer,
-            &auth,
-            McpCost::Read,
-            batch.len() as u64,
-        ) {
-            deps.mcp_telemetry.record_security_signal("rate_limit");
-            return observed(
-                deps.ingress.mcp_operation_rate_limited_response(),
+        let method = message
+            .get("method")
+            .and_then(OrderedJson::as_str)
+            .unwrap_or_default();
+        let name = request_name(message);
+        if mcp_cost(method, name) != McpCost::Read {
+            return Err(rejected(
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(protocol::rpc_error(
+                        Value::Null,
+                        -32_600,
+                        "Legacy batches may contain read-only requests only",
+                    )),
+                )
+                    .into_response(),
                 labels,
-                McpOutcome::AuthenticationFailure,
-            );
+                McpOutcome::ValidationFailure,
+            ));
         }
-        return dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await;
+        require_scope(deps, auth, message, method, name, labels)?;
     }
-    if let Some(error) = protocol::invalid_request(&payload, era) {
-        return observed(
-            (StatusCode::OK, Json(error)).into_response(),
-            labels,
-            McpOutcome::ValidationFailure,
-        );
-    }
-    if let Some(scope) = required_scope(method, name)
-        && !auth.has_scope(scope)
-    {
-        return observed(
-            insufficient_scope_response(&deps.config, request_id(&payload), scope),
-            labels,
-            McpOutcome::AuthorizationFailure,
-        );
-    }
-    let operation_cost = mcp_cost(method, name);
-    if !deps.ingress.allow_verified_publisher_operation(
-        &transport_headers,
+    if !deps.ingress.allow_verified_publisher_operation_weight(
+        headers,
         peer,
-        &auth,
-        operation_cost,
+        auth,
+        McpCost::Read,
+        batch.len() as u64,
     ) {
         deps.mcp_telemetry.record_security_signal("rate_limit");
-        return observed(
+        return Err(rejected(
             deps.ingress.mcp_operation_rate_limited_response(),
             labels,
             McpOutcome::AuthenticationFailure,
-        );
+        ));
     }
-    if operation_cost == McpCost::Read {
-        return dispatch_read_with_deadline(deps, payload, auth, era, request_permit, labels).await;
-    }
-    let _mutation_permit = match deps.ingress.try_acquire_mutation() {
-        Some(permit) => permit,
-        None => {
-            return observed(
-                crate::http::ingress::mcp_admission_response(
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    Some(1),
-                ),
-                labels,
-                McpOutcome::ValidationFailure,
-            );
-        }
-    };
-    match protocol::handle_mcp_for_era(payload, &auth, deps, era).await {
-        Some(response) => {
-            let outcome = response_outcome(&response);
-            let status = if era == ProtocolEra::Modern
-                && response
-                    .get("error")
-                    .and_then(|error| error.get("code"))
-                    .and_then(Value::as_i64)
-                    == Some(-32_601)
-            {
-                StatusCode::NOT_FOUND
-            } else {
-                StatusCode::OK
-            };
-            observed((status, Json(response)).into_response(), labels, outcome)
-        }
-        None => observed(
-            StatusCode::ACCEPTED.into_response(),
+    Ok(())
+}
+
+fn reject_invalid_request(
+    payload: &OrderedJson,
+    era: ProtocolEra,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    if let Some(error) = protocol::invalid_request(payload, era) {
+        return Err(rejected(
+            (StatusCode::OK, Json(error)).into_response(),
             labels,
-            McpOutcome::Success,
-        ),
+            McpOutcome::ValidationFailure,
+        ));
     }
+    Ok(())
+}
+
+/// Require the scope this method needs; the rejection echoes `message`'s JSON-RPC id.
+fn require_scope(
+    deps: &AppDeps,
+    auth: &crate::model::PublisherIdentity,
+    message: &OrderedJson,
+    method: &str,
+    name: Option<&str>,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    if let Some(scope) = required_scope(method, name)
+        && !auth.has_scope(scope)
+    {
+        return Err(rejected(
+            insufficient_scope_response(&deps.config, request_id(message), scope),
+            labels,
+            McpOutcome::AuthorizationFailure,
+        ));
+    }
+    Ok(())
+}
+
+/// Spend the verified publisher's budget for this operation class.
+fn admit_operation(
+    deps: &AppDeps,
+    headers: &HeaderMap,
+    peer: Option<std::net::SocketAddr>,
+    auth: &crate::model::PublisherIdentity,
+    cost: McpCost,
+    labels: McpMetricLabels,
+) -> Result<(), Rejected> {
+    if !deps
+        .ingress
+        .allow_verified_publisher_operation(headers, peer, auth, cost)
+    {
+        deps.mcp_telemetry.record_security_signal("rate_limit");
+        return Err(rejected(
+            deps.ingress.mcp_operation_rate_limited_response(),
+            labels,
+            McpOutcome::AuthenticationFailure,
+        ));
+    }
+    Ok(())
+}
+
+/// A durable mutation needs one of the bounded mutation permits; the caller must hold the
+/// returned permit until dispatch completes.
+fn acquire_mutation_permit(
+    deps: &AppDeps,
+    labels: McpMetricLabels,
+) -> Result<tokio::sync::OwnedSemaphorePermit, Rejected> {
+    deps.ingress.try_acquire_mutation().ok_or_else(|| {
+        rejected(
+            crate::http::ingress::mcp_admission_response(StatusCode::SERVICE_UNAVAILABLE, Some(1)),
+            labels,
+            McpOutcome::ValidationFailure,
+        )
+    })
 }
 
 /// Run a parsed MCP read behind a client-facing deadline without cancelling the underlying
