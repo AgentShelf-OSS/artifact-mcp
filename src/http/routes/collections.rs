@@ -141,8 +141,7 @@ async fn viewer(deps: &AppDeps, headers: &HeaderMap) -> Result<Viewer, AppError>
 fn store(deps: &AppDeps) -> Result<CollectionStore, AppError> {
     let pool = deps
         .data
-        .pool
-        .clone()
+        .pool()
         .ok_or_else(|| AppError::Unavailable("database unavailable".into()))?;
     Ok(match deps.audit_access.as_ref() {
         Some(audit) => CollectionStore::with_audit(pool, audit.mutation_key()),

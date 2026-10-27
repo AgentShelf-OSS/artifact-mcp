@@ -1,6 +1,7 @@
 node_modules/
 node_modules
 data/
+!/src/data/
 ops/anthropic-tunnel/data/
 ops/anthropic-tunnel/mcp-proxy.yaml
 .env
