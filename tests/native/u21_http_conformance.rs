@@ -11,13 +11,15 @@ use artifact_mcp::{
 };
 use axum::{
     Json, Router,
-    body::{Body, to_bytes},
+    body::{Body, Bytes, to_bytes},
     http::{Method, Request, StatusCode, header},
     middleware,
     response::{IntoResponse, Response},
     routing::get,
 };
+use futures_util::StreamExt;
 use serde_json::json;
+use std::time::Duration;
 use tower::ServiceExt;
 
 #[test]
@@ -174,6 +176,56 @@ async fn etag_middleware_preserves_head_and_express_conditional_get_semantics() 
         .await
         .expect("reload body");
     assert_eq!(body, "<!doctype html><p>hi</p>");
+}
+
+#[tokio::test]
+async fn etag_middleware_passes_streamed_bodies_through_without_buffering() {
+    // A streamed body (NDJSON data, PCM speech) has no exact size. Express never ETags a stream,
+    // and buffering one would hold every byte until the upstream finishes.
+    async fn first_chunk_then_wait(content_type: &'static str) -> Response {
+        let chunks = futures_util::stream::once(async {
+            Ok::<_, std::convert::Infallible>(Bytes::from_static(b"{\"n\":1}\n"))
+        })
+        .chain(futures_util::stream::pending());
+        (
+            [(header::CONTENT_TYPE, content_type)],
+            Body::from_stream(chunks),
+        )
+            .into_response()
+    }
+
+    for content_type in [
+        "application/x-ndjson; charset=utf-8",
+        "application/vnd.artifact.pcm",
+        "text/event-stream",
+    ] {
+        let app = Router::new()
+            .route("/stream", get(move || first_chunk_then_wait(content_type)))
+            .layer(middleware::from_fn(express_etag));
+        let response = tokio::time::timeout(
+            Duration::from_secs(2),
+            app.oneshot(
+                Request::get("/stream")
+                    .body(Body::empty())
+                    .expect("request"),
+            ),
+        )
+        .await
+        .unwrap_or_else(|_| panic!("{content_type}: headers were held until the stream ended"))
+        .expect("response");
+        assert!(
+            !response.headers().contains_key(header::ETAG),
+            "{content_type}: a stream is not ETagged"
+        );
+
+        let mut body = response.into_body().into_data_stream();
+        let first = tokio::time::timeout(Duration::from_secs(2), body.next())
+            .await
+            .unwrap_or_else(|_| panic!("{content_type}: the first chunk was buffered"))
+            .expect("first chunk")
+            .expect("chunk bytes");
+        assert_eq!(first, "{\"n\":1}\n");
+    }
 }
 
 #[tokio::test]
