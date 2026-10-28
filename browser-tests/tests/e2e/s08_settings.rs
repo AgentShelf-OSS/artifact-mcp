@@ -498,7 +498,15 @@ async fn connection_credential_picker(t: Ctx) -> Result<(), Error> {
         )
         .await?;
     assert_eq!(created.status, 201, "{}", created.text());
-    let version = created.json()["version"].clone();
+
+    // The API lists only the prefixed variable the server has; its environment is otherwise
+    // PATH, DATA_DIR, and other settings that must never appear here.
+    let listed = t.api("GET", "/settings/data-sources", None).await?;
+    assert_eq!(listed.status, 200, "{}", listed.text());
+    assert_eq!(
+        listed.json()["credential_variables"],
+        json!([CREDENTIAL_VARIABLE])
+    );
 
     let page = t.page().await?;
     page.goto("/settings").await?;
@@ -523,6 +531,28 @@ async fn connection_credential_picker(t: Ctx) -> Result<(), Error> {
         "saved connection"
     );
 
+    // Saving it unchanged keeps the reference.
+    page.get_by_role(Role::new("button").name("Save connection"))
+        .click()
+        .await?;
+    expect(&page.locator("#conn-status"))
+        .to_have_text("Connection saved.")
+        .await?;
+    let stored = t
+        .api(
+            "GET",
+            &format!("/settings/data-sources/{}", encode_component(&id)),
+            None,
+        )
+        .await?;
+    assert_eq!(stored.status, 200, "{}", stored.text());
+    let stored = stored.json();
+    assert_eq!(
+        stored["definition"]["headers_env"],
+        json!({"Authorization": unset})
+    );
+    let version = stored["version"].clone();
+
     // A new reference offers only the managed variables, never other process variables.
     page.get_by_role(Role::new("button").name("New connection"))
         .click()
@@ -540,6 +570,13 @@ async fn connection_credential_picker(t: Ctx) -> Result<(), Error> {
         "new connection"
     );
     let picked = page.locator(r#"#conn-headers select[data-field="env"]"#);
+    // Until a variable is picked, the form cannot be submitted.
+    assert_eq!(
+        picked
+            .evaluate("select => select.checkValidity()", json!(null))
+            .await?,
+        json!(false)
+    );
     picked.select_option(&[CREDENTIAL_VARIABLE]).await?;
     expect(&picked).to_have_value(CREDENTIAL_VARIABLE).await?;
 

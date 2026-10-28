@@ -82,7 +82,7 @@
     const missing = selected?.missing_references || [];
     const names = !env || credentials.includes(env) ? credentials : [...credentials, env];
     const select = choice(parent, "Environment variable", "env", env, names.map(name => ({
-      label: missing.includes(name) ? name + " (unavailable)" : name, value: name
+      label: !credentials.includes(name) && missing.includes(name) ? name + " (unavailable)" : name, value: name
     })));
     select.add(new Option(credentials.length ? "Choose a variable" : "No ARTIFACT_DATA_CREDENTIAL_ variables are set", ""), 0);
     select.value = env; select.required = true;

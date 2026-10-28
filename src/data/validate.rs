@@ -384,7 +384,7 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
-    fn managed_credential_names_skips_names_that_are_not_utf8() {
+    fn managed_credential_names_skips_non_utf8_names_without_panicking() {
         use std::os::unix::ffi::OsStringExt;
         let names = [
             OsString::from_vec(b"ARTIFACT_DATA_CREDENTIAL_\xff".to_vec()),
@@ -393,16 +393,6 @@ mod tests {
         assert_eq!(
             managed_credential_names(names),
             ["ARTIFACT_DATA_CREDENTIAL_OK"]
-        );
-    }
-
-    #[test]
-    fn every_listed_name_is_accepted_when_saved() {
-        let listed = managed_credential_names([OsString::from("ARTIFACT_DATA_CREDENTIAL_A1")]);
-        assert!(
-            listed
-                .iter()
-                .all(|env| managed_credential_allowed("Authorization", env))
         );
     }
 }
