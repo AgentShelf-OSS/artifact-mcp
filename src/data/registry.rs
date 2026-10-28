@@ -1,6 +1,10 @@
 //! Source registry loading, lookup, and the public source catalog.
 use super::{
-    DataBroker, MAX_SOURCES, ParamConfig, PublicSource, SourceConfig, validate::validate_source,
+    DataBroker, MAX_SOURCES, ParamConfig, PublicSource, SourceConfig,
+    validate::{
+        RESERVED_CREDENTIAL_HEADERS, managed_credential_allowed, validate_managed_credentials,
+        validate_source,
+    },
 };
 use crate::{error::AppError, persistence::db::interact};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -43,10 +47,7 @@ impl DataBroker {
             for (name, env) in &source.headers_env {
                 let name =
                     HeaderName::from_bytes(name.as_bytes()).map_err(|_| "invalid_data_sources")?;
-                if matches!(
-                    name.as_str(),
-                    "host" | "cookie" | "connection" | "content-length" | "transfer-encoding"
-                ) {
+                if RESERVED_CREDENTIAL_HEADERS.contains(&name.as_str()) {
                     return Err("invalid_data_sources".into());
                 }
                 let value = std::env::var(env).map_err(|_| "invalid_data_sources")?;
@@ -124,17 +125,34 @@ impl DataBroker {
         .map_err(|_| "data_unavailable".to_owned())?
         .ok_or_else(|| "not_found".into())
     }
-    pub(super) fn missing_references(source: &SourceConfig) -> Vec<String> {
+    /// Whether `source` comes from the operator's `ARTIFACT_DATA_SOURCES_FILE`. Source ids are
+    /// unique across that file and the database (`validate_registry`), so the id decides.
+    fn is_operator_source(&self, source: &SourceConfig) -> bool {
+        self.sources.contains_key(&source.id)
+    }
+    /// Whether this connection may read `env` into `header`. See `managed_credential_allowed`.
+    fn reference_allowed(&self, source: &SourceConfig, header: &str, env: &str) -> bool {
+        self.is_operator_source(source) || managed_credential_allowed(header, env)
+    }
+    /// Credential references the connection cannot use: the variable is unset, or the reference
+    /// is not allowed for a managed connection. A disallowed reference is listed whether or not
+    /// its variable is set, so the list never reveals which process variables exist.
+    pub(super) fn missing_references(&self, source: &SourceConfig) -> Vec<String> {
         source
             .headers_env
-            .values()
-            .filter(|name| std::env::var_os(name).is_none())
-            .cloned()
+            .iter()
+            .filter(|(header, env)| {
+                !self.reference_allowed(source, header, env) || std::env::var_os(env).is_none()
+            })
+            .map(|(_, env)| env.clone())
             .collect()
     }
-    pub(super) fn resolved_headers(source: &SourceConfig) -> Result<HeaderMap, String> {
+    pub(super) fn resolved_headers(&self, source: &SourceConfig) -> Result<HeaderMap, String> {
         let mut headers = HeaderMap::new();
         for (name, env) in &source.headers_env {
+            if !self.reference_allowed(source, name, env) {
+                return Err("config_error".into());
+            }
             let name = HeaderName::from_bytes(name.as_bytes()).map_err(|_| "config_error")?;
             let raw = std::env::var(env).map_err(|_| "config_error")?;
             let mut value = HeaderValue::from_str(&raw).map_err(|_| "config_error")?;
@@ -155,7 +173,7 @@ impl DataBroker {
                 rows.into_iter()
                     .filter(|(s, enabled, _)| {
                         *enabled
-                            && Self::missing_references(s).is_empty()
+                            && self.missing_references(s).is_empty()
                             && org.is_none_or(|o| o == s.org)
                     })
                     .map(|(s, _, _)| s),
@@ -196,6 +214,18 @@ impl DataBroker {
             map.insert(source.id.clone(), source);
         }
         Ok(map)
+    }
+    /// Ids of managed connections whose credential references break the managed-credential
+    /// rule. Such a connection was saved before the rule; it loads and reports `config_error`
+    /// until an administrator renames its references.
+    pub async fn managed_credential_violations(&self) -> Result<Vec<String>, String> {
+        Ok(self
+            .managed_rows()
+            .await?
+            .into_iter()
+            .filter(|(source, _, _)| validate_managed_credentials(source).is_err())
+            .map(|(source, _, _)| source.id)
+            .collect())
     }
     pub async fn validate_registry(&self) -> Result<(), String> {
         let mut ids = HashSet::new();

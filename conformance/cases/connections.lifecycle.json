@@ -988,6 +988,49 @@
       }
     },
     {
+      "name": "managed references outside the credential prefix are rejected",
+      "request": {
+        "method": "POST",
+        "path": "/settings/data-sources",
+        "headers": {
+          "cf-access-authenticated-user-email": "${admin_email}",
+          "x-artifact-mutation": "1",
+          "sec-fetch-site": "same-origin"
+        },
+        "json": {
+          "definition": {
+            "id": "process-secret",
+            "org": "connections-test",
+            "kind": "http",
+            "base_url": "http://127.0.0.1:1",
+            "headers_env": {
+              "Authorization": "PATH"
+            },
+            "operations": {
+              "status": {
+                "path": "/status"
+              }
+            },
+            "subscriptions": {}
+          },
+          "enabled": true
+        }
+      },
+      "expect": {
+        "status": 400,
+        "body": {
+          "mode": "canonical-json",
+          "volatileFields": [
+            "definition",
+            "last_success_at",
+            "last_query_at",
+            "last_event_at",
+            "elapsed_ms"
+          ]
+        }
+      }
+    },
+    {
       "name": "missing references can be persisted",
       "request": {
         "method": "POST",
@@ -1004,7 +1047,7 @@
             "kind": "http",
             "base_url": "http://127.0.0.1:1",
             "headers_env": {
-              "Authorization": "CONFORMANCE_MISSING_CREDENTIAL"
+              "Authorization": "ARTIFACT_DATA_CREDENTIAL_CONFORMANCE_MISSING"
             },
             "operations": {
               "status": {

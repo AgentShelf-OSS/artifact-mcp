@@ -332,6 +332,10 @@ fn data_error(error: &str) -> Response {
         "bad_params" => "Request parameters are invalid.",
         "invalid_source" => "The connection definition is invalid.",
         "missing_reference" => "A referenced credential is unavailable.",
+        "credential_reference_not_allowed" => {
+            "Credential variables must be named ARTIFACT_DATA_CREDENTIAL_<NAME>, and cannot set \
+             Host, Cookie, Connection, Content-Length, or Transfer-Encoding."
+        }
         "unknown_org" => "The selected organization does not exist.",
         "source_conflict" => "A connection with this id already exists.",
         "stale_version" => "Connection changed; reload before saving.",

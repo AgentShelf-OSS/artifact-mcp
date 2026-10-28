@@ -57,7 +57,7 @@ impl DataBroker {
             None => self.client.get(url),
         };
         let response = request
-            .headers(Self::resolved_headers(s)?)
+            .headers(self.resolved_headers(s)?)
             .timeout(Duration::from_millis(o.timeout_ms))
             .send()
             .await

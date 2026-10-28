@@ -423,6 +423,16 @@
       }
     },
     {
+      "status": 400,
+      "body": {
+        "mode": "canonical-json",
+        "json": {
+          "error": "credential_reference_not_allowed",
+          "message": "Credential variables must be named ARTIFACT_DATA_CREDENTIAL_<NAME>, and cannot set Host, Cookie, Connection, Content-Length, or Transfer-Encoding."
+        }
+      }
+    },
+    {
       "status": 201,
       "body": {
         "mode": "canonical-json",
@@ -440,7 +450,7 @@
           },
           "id": "missing-credential",
           "missing_references": [
-            "CONFORMANCE_MISSING_CREDENTIAL"
+            "ARTIFACT_DATA_CREDENTIAL_CONFORMANCE_MISSING"
           ],
           "org": "connections-test",
           "origin": "managed",

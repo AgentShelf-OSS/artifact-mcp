@@ -73,7 +73,7 @@
   function mapHeader(name = "", env = "") {
     const row = node("div", undefined, "conn-map-row");
     field(row, "Header name", "header", name, "text", "Authorization").required = true;
-    field(row, "Environment variable", "env", env, "text", "METRICS_AUTHORIZATION").required = true;
+    field(row, "Environment variable", "env", env, "text", "ARTIFACT_DATA_CREDENTIAL_METRICS").required = true;
     removeButton(row, row); $("conn-headers").append(row);
   }
   function parameter(parent, name = "", spec = {}) {

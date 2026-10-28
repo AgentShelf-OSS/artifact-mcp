@@ -342,5 +342,6 @@ Administrators can manage additional sources at `/settings/connections`. These d
 are stored in SQLite and load on startup. `ARTIFACT_DATA_SOURCES_FILE` still defines
 operator-owned sources, which appear read-only. Source IDs must be unique across both
 origins. Credential values remain environment configuration; administration stores only
-`headers_env` reference names. See [connection management](live-data.md#manage-connections-in-administration)
+`headers_env` reference names, and those names must start with `ARTIFACT_DATA_CREDENTIAL_`.
+Operator-owned sources may reference any variable. See [connection management](live-data.md#manage-connections-in-administration)
 for edits, health checks, binding impact, and API contracts.
