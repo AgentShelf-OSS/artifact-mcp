@@ -10,6 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
+use http_body::Body as _;
 
 use crate::{
     config::{AccessIdentityMode, AppConfig},
@@ -246,6 +247,10 @@ pub async fn access_session_retry(
 /// the redirects carrying `Location` and responses without a `Content-Type`, so they remain
 /// untagged. All normal HTML, JSON, raw artifact, public-share, thumbnail, and rendered error
 /// responses pass through this middleware.
+///
+/// Express tags only a body that `res.send` holds in memory. In Axum that is a body with an exact
+/// size. A streamed body (NDJSON data operations, Listen PCM, SSE) passes through untouched:
+/// buffering it to hash would hold every byte until the upstream finishes.
 pub async fn express_etag(request: Request, next: Next) -> Response {
     let method = request.method().clone();
     let request_headers = request.headers().clone();
@@ -257,6 +262,10 @@ pub async fn express_etag(request: Request, next: Next) -> Response {
 
     if let Some(etag) = response.headers().get(header::ETAG).cloned() {
         return apply_conditional_request(response, &method, &request_headers, &etag);
+    }
+
+    if response.body().size_hint().exact().is_none() {
+        return response;
     }
 
     let (mut parts, body) = response.into_parts();
