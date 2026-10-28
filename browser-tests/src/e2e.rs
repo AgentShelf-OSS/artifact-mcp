@@ -129,7 +129,12 @@ pub struct Fixture {
 impl Fixture {
     /// Global setup: start the server, create the run's organization, launch the browser.
     pub async fn setup(chrome: PathBuf, binary: PathBuf) -> Result<Self, Error> {
-        let server = Server::start(&ServerOptions::new(binary)).await?;
+        let mut options = ServerOptions::new(binary);
+        // The one managed credential variable the Connections page may offer.
+        options
+            .env
+            .push((CREDENTIAL_VARIABLE.into(), "Bearer e2e-credential".into()));
+        let server = Server::start(&options).await?;
         let run_id = std::env::var("E2E_RUN_ID")
             .ok()
             .filter(|id| !id.is_empty())
@@ -461,6 +466,9 @@ fn owned_card_ids(html: &str, orgs: &HashSet<String>) -> Vec<String> {
     }
     ids
 }
+
+/// The `ARTIFACT_DATA_CREDENTIAL_*` variable set on the server under test.
+pub const CREDENTIAL_VARIABLE: &str = "ARTIFACT_DATA_CREDENTIAL_E2E";
 
 /// One test's view of the run: the shared [`Fixture`] (through `Deref`).
 #[derive(Clone)]

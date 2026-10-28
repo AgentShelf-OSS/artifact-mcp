@@ -2,7 +2,7 @@
 // Copyright 2026 Neil Blackman
 //! `settings administration`, from `playwright/tests/08-settings.spec.mjs`.
 
-use browser_tests::e2e::{Case, Ctx, Identity, encode_component};
+use browser_tests::e2e::{CREDENTIAL_VARIABLE, Case, Ctx, Identity, encode_component};
 use browser_tests::{Error, Role, e2e_case, expect, regex};
 use serde_json::{Value, json};
 
@@ -46,6 +46,11 @@ pub fn cases() -> Vec<Case> {
             SPEC,
             "a non-admin viewer cannot reach settings",
             non_admin_settings
+        ),
+        e2e_case!(
+            SPEC,
+            "connection credentials are chosen from the server's managed variables",
+            connection_credential_picker
         ),
     ]
 }
@@ -471,5 +476,80 @@ async fn non_admin_settings(t: Ctx) -> Result<(), Error> {
         .get(&format!("{}/settings", t.base_url()))
         .await?;
     assert_eq!(response.status, 403);
+    Ok(())
+}
+
+/// The values and labels of the credential dropdown in each credential row, in order.
+const CREDENTIAL_OPTIONS: &str = r#"(() => [...document.querySelectorAll('#conn-headers select[data-field="env"]')]
+  .map(select => [...select.options].map(option => [option.value, option.textContent])))()"#;
+
+async fn connection_credential_picker(t: Ctx) -> Result<(), Error> {
+    let id = format!("pwcred-{}", t.run_id);
+    let unset = format!("{CREDENTIAL_VARIABLE}_UNSET");
+    let created = t
+        .api(
+            "POST",
+            "/settings/data-sources",
+            Some(json!({"enabled": false, "definition": {
+                "id": id, "org": t.org, "kind": "http", "base_url": "http://127.0.0.1:9",
+                "headers_env": {"Authorization": unset},
+                "operations": {"status": {"path": "/status"}}
+            }})),
+        )
+        .await?;
+    assert_eq!(created.status, 201, "{}", created.text());
+    let version = created.json()["version"].clone();
+
+    let page = t.page().await?;
+    page.goto("/settings").await?;
+    page.locator(r#"[data-admin-tab="connections"]"#)
+        .click()
+        .await?;
+    page.locator(&format!(r#"[data-connection-id="{id}"]"#))
+        .click()
+        .await?;
+
+    // A saved name the server lacks stays selected and is marked.
+    let saved = page.locator(r#"#conn-headers select[data-field="env"]"#);
+    expect(&saved).to_have_value(unset.as_str()).await?;
+    let options = page.evaluate(CREDENTIAL_OPTIONS).await?;
+    assert_eq!(
+        options,
+        json!([[
+            ["", "Choose a variable"],
+            [CREDENTIAL_VARIABLE, CREDENTIAL_VARIABLE],
+            [unset, format!("{unset} (unavailable)")]
+        ]]),
+        "saved connection"
+    );
+
+    // A new reference offers only the managed variables, never other process variables.
+    page.get_by_role(Role::new("button").name("New connection"))
+        .click()
+        .await?;
+    page.get_by_role(Role::new("button").name("Add reference"))
+        .click()
+        .await?;
+    let options = page.evaluate(CREDENTIAL_OPTIONS).await?;
+    assert_eq!(
+        options,
+        json!([[
+            ["", "Choose a variable"],
+            [CREDENTIAL_VARIABLE, CREDENTIAL_VARIABLE]
+        ]]),
+        "new connection"
+    );
+    let picked = page.locator(r#"#conn-headers select[data-field="env"]"#);
+    picked.select_option(&[CREDENTIAL_VARIABLE]).await?;
+    expect(&picked).to_have_value(CREDENTIAL_VARIABLE).await?;
+
+    let deleted = t
+        .api(
+            "DELETE",
+            &format!("/settings/data-sources/{}", encode_component(&id)),
+            Some(json!({"expected_version": version})),
+        )
+        .await?;
+    assert!([200, 204].contains(&deleted.status), "{}", deleted.text());
     Ok(())
 }

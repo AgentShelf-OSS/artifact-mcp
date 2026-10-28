@@ -111,7 +111,12 @@ async fn list_data_sources(
         .find(|(k, _)| k == "org")
         .map(|(_, v)| v.into_owned());
     match deps.data.source_views(org.as_deref()).await {
-        Ok(connections) => Json(serde_json::json!({"connections":connections,"orgs":deps.admin.org_names().await.unwrap_or_default()})).into_response(),
+        Ok(connections) => Json(serde_json::json!({
+            "connections": connections,
+            "orgs": deps.admin.org_names().await.unwrap_or_default(),
+            "credential_variables": crate::data::DataBroker::managed_credential_variables(),
+        }))
+        .into_response(),
         Err(error) => data_error(&error),
     }
 }

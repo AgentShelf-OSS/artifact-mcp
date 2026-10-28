@@ -6,6 +6,7 @@ use super::{
 use reqwest::{Url, header::HeaderName};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
+use std::ffi::OsString;
 
 pub(super) fn valid_event_text(s: &str) -> bool {
     !s.is_empty() && s.len() <= 128 && !s.chars().any(char::is_control)
@@ -44,19 +45,37 @@ pub(super) const RESERVED_CREDENTIAL_HEADERS: [&str; 5] = [
     "transfer-encoding",
 ];
 
-/// Whether an administration-managed connection may send `header` with the value of `env`.
-pub(super) fn managed_credential_allowed(header: &str, env: &str) -> bool {
-    let env_allowed = env
-        .strip_prefix(MANAGED_CREDENTIAL_ENV_PREFIX)
+/// Whether an administration-managed connection may read the variable `env`: the
+/// [`MANAGED_CREDENTIAL_ENV_PREFIX`] followed by one or more of `A-Z`, `0-9`, and `_`.
+pub(super) fn managed_credential_name_allowed(env: &str) -> bool {
+    env.strip_prefix(MANAGED_CREDENTIAL_ENV_PREFIX)
         .is_some_and(|rest| {
             !rest.is_empty()
                 && rest
                     .bytes()
                     .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
-        });
-    env_allowed
+        })
+}
+
+/// Whether an administration-managed connection may send `header` with the value of `env`.
+pub(super) fn managed_credential_allowed(header: &str, env: &str) -> bool {
+    managed_credential_name_allowed(env)
         && HeaderName::from_bytes(header.as_bytes())
             .is_ok_and(|name| !RESERVED_CREDENTIAL_HEADERS.contains(&name.as_str()))
+}
+
+/// The names in `names` that a managed connection may reference, sorted and without duplicates.
+/// The administration page offers them as choices. It takes names only, so no value can reach
+/// the page.
+pub(super) fn managed_credential_names(names: impl IntoIterator<Item = OsString>) -> Vec<String> {
+    let mut allowed: Vec<String> = names
+        .into_iter()
+        .filter_map(|name| name.into_string().ok())
+        .filter(|name| managed_credential_name_allowed(name))
+        .collect();
+    allowed.sort_unstable();
+    allowed.dedup();
+    allowed
 }
 
 /// Rejects a managed connection definition whose credential references break
@@ -335,4 +354,55 @@ pub(super) fn build_request(
         return Err("too_large".into());
     }
     Ok((url, Some(body)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn managed_credential_names_lists_only_referenceable_names_in_order() {
+        let names = [
+            "PATH",
+            "DISCORD_BOT_TOKEN",
+            "ARTIFACT_DATA_CREDENTIAL_ZED",
+            "ARTIFACT_DATA_CREDENTIAL_",
+            "ARTIFACT_DATA_CREDENTIAL_lower",
+            "artifact_data_credential_LOWER",
+            "ARTIFACT_DATA_CREDENTIAL_METRICS_2",
+            "ARTIFACT_DATA_CREDENTIAL_ZED",
+        ]
+        .map(OsString::from);
+        assert_eq!(
+            managed_credential_names(names),
+            [
+                "ARTIFACT_DATA_CREDENTIAL_METRICS_2",
+                "ARTIFACT_DATA_CREDENTIAL_ZED"
+            ]
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn managed_credential_names_skips_names_that_are_not_utf8() {
+        use std::os::unix::ffi::OsStringExt;
+        let names = [
+            OsString::from_vec(b"ARTIFACT_DATA_CREDENTIAL_\xff".to_vec()),
+            OsString::from("ARTIFACT_DATA_CREDENTIAL_OK"),
+        ];
+        assert_eq!(
+            managed_credential_names(names),
+            ["ARTIFACT_DATA_CREDENTIAL_OK"]
+        );
+    }
+
+    #[test]
+    fn every_listed_name_is_accepted_when_saved() {
+        let listed = managed_credential_names([OsString::from("ARTIFACT_DATA_CREDENTIAL_A1")]);
+        assert!(
+            listed
+                .iter()
+                .all(|env| managed_credential_allowed("Authorization", env))
+        );
+    }
 }
