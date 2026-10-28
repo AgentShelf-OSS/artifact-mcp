@@ -283,3 +283,206 @@ async fn source_edit_disable_reenable_restarts_only_affected_long_sse() {
     drop(data);
     server.abort();
 }
+
+fn admin_audit() -> MutationAudit {
+    MutationAudit::publisher(&PublisherIdentity {
+        client_id: ClientId("admin".into()),
+        org: OrgId("acme".into()),
+        label: "test".into(),
+        role: "admin".into(),
+        scopes: None,
+    })
+    .unwrap()
+}
+
+fn metrics_source(base_url: &str, header: &str, env: &str) -> artifact_mcp::data::SourceConfig {
+    serde_json::from_value(json!({
+        "id": "metrics",
+        "org": "acme",
+        "kind": "http",
+        "base_url": base_url,
+        "headers_env": { (header): env },
+        "operations": { "status": { "path": "/status" } }
+    }))
+    .unwrap()
+}
+
+#[tokio::test]
+async fn managed_sources_reference_only_managed_credential_variables() {
+    let dir = support::TempDir::new("connections-credential-prefix");
+    let pool = support::open_pool(dir.path());
+    support::seed_org(&pool, "acme").await;
+    let broker = DataBroker::from_json(r#"{"sources":[]}"#)
+        .unwrap()
+        .with_pool(pool)
+        .with_audit_key([5; 32]);
+    let base = "http://127.0.0.1:9";
+
+    // An administrator must not be able to send an arbitrary process secret to a host they
+    // choose, or set a header that changes how the request is routed.
+    for (header, env) in [
+        ("Authorization", "DISCORD_BOT_TOKEN"),
+        ("Authorization", "PATH"),
+        ("Authorization", "ARTIFACT_DATA_CREDENTIAL_"),
+        ("Authorization", "artifact_data_credential_metrics"),
+        ("Host", "ARTIFACT_DATA_CREDENTIAL_METRICS"),
+        ("Cookie", "ARTIFACT_DATA_CREDENTIAL_METRICS"),
+    ] {
+        let error = broker
+            .create_managed_source(metrics_source(base, header, env), true, admin_audit())
+            .await
+            .expect_err("reference must be rejected");
+        assert_eq!(
+            error, "credential_reference_not_allowed",
+            "{header} -> {env}"
+        );
+    }
+
+    let view = broker
+        .create_managed_source(
+            metrics_source(base, "Authorization", "ARTIFACT_DATA_CREDENTIAL_METRICS"),
+            true,
+            admin_audit(),
+        )
+        .await
+        .expect("prefixed reference is accepted");
+    // The variable is unset in tests, so the saved connection reports it as missing.
+    assert_eq!(
+        view.missing_references,
+        ["ARTIFACT_DATA_CREDENTIAL_METRICS"]
+    );
+
+    let error = broker
+        .set_managed_source(
+            "metrics",
+            metrics_source(base, "Authorization", "DISCORD_BOT_TOKEN"),
+            true,
+            view.version,
+            admin_audit(),
+        )
+        .await
+        .expect_err("an edit cannot widen the reference");
+    assert_eq!(error, "credential_reference_not_allowed");
+}
+
+async fn count_request(State(requests): State<Arc<AtomicUsize>>) -> Response<Body> {
+    requests.fetch_add(1, Ordering::SeqCst);
+    Response::builder()
+        .header(CONTENT_TYPE, "application/json")
+        .body(Body::from(r#"{"ok":true}"#))
+        .unwrap()
+}
+
+#[tokio::test]
+async fn stored_reference_outside_the_managed_prefix_is_never_sent() {
+    // A connection saved before the prefix rule can name any variable. It must report a
+    // configuration error and never send the value, even though the variable is set.
+    assert!(
+        std::env::var_os("PATH").is_some(),
+        "the test needs a set variable"
+    );
+    let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+        .await
+        .unwrap();
+    let address = listener.local_addr().unwrap();
+    let requests = Arc::new(AtomicUsize::new(0));
+    let server_requests = requests.clone();
+    let server = tokio::spawn(async move {
+        axum::serve(
+            listener,
+            Router::new()
+                .fallback(any(count_request))
+                .with_state(server_requests),
+        )
+        .await
+        .unwrap();
+    });
+
+    let dir = support::TempDir::new("connections-legacy-reference");
+    let pool = support::open_pool(dir.path());
+    support::seed_org(&pool, "acme").await;
+    artifact_mcp::persistence::db::interact(&pool, |conn| {
+        conn.execute("INSERT INTO artifacts (id, client_id, org, title) VALUES ('dash', 'publisher', 'acme', 'Data')", []).map_err(|_| artifact_mcp::error::AppError::Internal)?;
+        Ok(())
+    }).await.unwrap();
+    let broker = DataBroker::from_json(r#"{"sources":[]}"#)
+        .unwrap()
+        .with_pool(pool.clone())
+        .with_audit_key([6; 32]);
+    broker
+        .create_managed_source(
+            metrics_source(
+                &format!("http://{address}"),
+                "Authorization",
+                "ARTIFACT_DATA_CREDENTIAL_METRICS",
+            ),
+            true,
+            admin_audit(),
+        )
+        .await
+        .unwrap();
+    assert!(
+        broker
+            .managed_credential_violations()
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    artifact_mcp::persistence::db::interact(&pool, |conn| {
+        conn.execute(
+            "UPDATE data_sources SET definition = replace(definition, 'ARTIFACT_DATA_CREDENTIAL_METRICS', 'PATH') WHERE id = 'metrics'",
+            [],
+        )
+        .map_err(|_| artifact_mcp::error::AppError::Internal)?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    broker
+        .set_bindings(
+            "dash",
+            BindingManifest {
+                bindings: BTreeMap::from([(
+                    "metrics".into(),
+                    Binding {
+                        source: "metrics".into(),
+                        operations: vec!["status".into()],
+                        subscriptions: vec![],
+                    },
+                )]),
+            },
+            "acme",
+        )
+        .await
+        .unwrap();
+
+    // Startup validation still accepts the stored row, so an upgrade cannot stop the server, and
+    // startup names the row so the operator can fix it.
+    broker.validate_registry().await.unwrap();
+    assert_eq!(
+        broker.managed_credential_violations().await.unwrap(),
+        ["metrics"]
+    );
+    let view = broker.source_view_by_id("metrics").await.unwrap();
+    assert_eq!(view.missing_references, ["PATH"]);
+    assert_eq!(view.health.state, "config_error");
+    assert_eq!(
+        broker
+            .test_source("metrics", "status", json!({}))
+            .await
+            .unwrap_err(),
+        "test_unavailable"
+    );
+    assert!(
+        broker
+            .query("dash", "metrics", "status", json!({}))
+            .await
+            .is_err()
+    );
+    assert_eq!(
+        requests.load(Ordering::SeqCst),
+        0,
+        "no request may carry the variable upstream"
+    );
+    server.abort();
+}

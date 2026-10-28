@@ -3,7 +3,7 @@ use super::{
     BindingManifest, MAX_BINDINGS, MAX_BYTES, MAX_POST_BODY, OperationConfig, ParamConfig,
     SourceConfig,
 };
-use reqwest::Url;
+use reqwest::{Url, header::HeaderName};
 use serde_json::Value;
 use std::collections::{BTreeMap, HashSet};
 
@@ -28,6 +28,51 @@ pub(super) fn valid_path(s: &str) -> bool {
         && !s.to_ascii_lowercase().contains("%2f")
         && !s.to_ascii_lowercase().contains("%5c")
 }
+/// Prefix of every environment variable that an administration-managed connection may read.
+///
+/// Operator connections in `ARTIFACT_DATA_SOURCES_FILE` may name any variable. An administrator
+/// may not: the connection also chooses the upstream host, so an unrestricted name would let an
+/// administrator send any process secret to a host they control.
+pub(super) const MANAGED_CREDENTIAL_ENV_PREFIX: &str = "ARTIFACT_DATA_CREDENTIAL_";
+
+/// Headers that a credential reference may never set, for operator and managed connections alike.
+pub(super) const RESERVED_CREDENTIAL_HEADERS: [&str; 5] = [
+    "host",
+    "cookie",
+    "connection",
+    "content-length",
+    "transfer-encoding",
+];
+
+/// Whether an administration-managed connection may send `header` with the value of `env`.
+pub(super) fn managed_credential_allowed(header: &str, env: &str) -> bool {
+    let env_allowed = env
+        .strip_prefix(MANAGED_CREDENTIAL_ENV_PREFIX)
+        .is_some_and(|rest| {
+            !rest.is_empty()
+                && rest
+                    .bytes()
+                    .all(|b| b.is_ascii_uppercase() || b.is_ascii_digit() || b == b'_')
+        });
+    env_allowed
+        && HeaderName::from_bytes(header.as_bytes())
+            .is_ok_and(|name| !RESERVED_CREDENTIAL_HEADERS.contains(&name.as_str()))
+}
+
+/// Rejects a managed connection definition whose credential references break
+/// [`managed_credential_allowed`]. Runs when an administrator saves, not at startup, so a
+/// connection saved before the rule loads and reports `config_error` instead.
+pub(super) fn validate_managed_credentials(s: &SourceConfig) -> Result<(), String> {
+    if s.headers_env
+        .iter()
+        .all(|(header, env)| managed_credential_allowed(header, env))
+    {
+        Ok(())
+    } else {
+        Err("credential_reference_not_allowed".into())
+    }
+}
+
 pub(super) fn validate_source(s: &SourceConfig) -> Result<(), String> {
     let error = || "invalid_data_sources".to_owned();
     if !valid_name(&s.id)

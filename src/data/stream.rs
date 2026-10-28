@@ -292,7 +292,7 @@ impl DataBroker {
         let mut request = self
             .client
             .get(url)
-            .headers(Self::resolved_headers(source)?)
+            .headers(self.resolved_headers(source)?)
             .header("accept", "text/event-stream");
         if let Some(previous) = cursor.as_ref() {
             request = request.header("last-event-id", previous);

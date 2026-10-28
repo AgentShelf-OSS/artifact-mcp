@@ -101,6 +101,19 @@ async fn bootstrap(
     data.validate_registry()
         .await
         .map_err(AppError::Validation)?;
+    match data.managed_credential_violations().await {
+        Ok(ids) => {
+            for id in ids {
+                tracing::warn!(
+                    source_id = %id,
+                    "managed data source references a credential outside ARTIFACT_DATA_CREDENTIAL_; it reports config_error until its references are renamed"
+                );
+            }
+        }
+        Err(error) => {
+            tracing::warn!(error = %error, "could not check managed data source credential references");
+        }
+    }
     let key_store = startup::seed_publisher_keys(&pool, &config, audit_key).await?;
 
     // Stage 2: artifact storage reconciliation and the preview cache.

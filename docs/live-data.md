@@ -271,11 +271,26 @@ operation. Producer channels use snapshot keys and push subscriptions. Save the 
 before granting its operations to an artifact.
 
 Credential references map a header name to an environment variable name, for example
-`Authorization` → `METRICS_AUTHORIZATION`. Supply the value in protected deployment
-configuration. The workspace never accepts or returns the value. A saved connection with
-missing references reports `config_error` and cannot make requests until those variables
-are available. File-defined operator connections remain read-only. Their startup validation
-remains strict.
+`Authorization` → `ARTIFACT_DATA_CREDENTIAL_METRICS`. A managed connection may reference
+only variables named `ARTIFACT_DATA_CREDENTIAL_<NAME>`, where `<NAME>` uses uppercase
+letters, digits, and underscores. It cannot set `Host`, `Cookie`, `Connection`,
+`Content-Length`, or `Transfer-Encoding`. A connection also chooses its upstream host, so
+without this rule an administrator could send any process secret, such as a bot token, to a
+host they control. Saving a connection that breaks the rule returns
+`credential_reference_not_allowed`.
+
+Supply the value in protected deployment configuration. The workspace never accepts or
+returns the value. A saved connection with missing references reports `config_error` and
+cannot make requests until those variables are available. A connection saved before the
+prefix rule, with a reference outside it, also reports `config_error` and lists that
+reference as missing, even when the variable is set. Startup logs a warning with the id of
+each such connection. Rename the variable in deployment configuration, then update the
+reference.
+
+Every administrator can send the value of any `ARTIFACT_DATA_CREDENTIAL_` variable to a
+connection they create, and therefore to any host. Give that prefix only to credentials
+that administrators may use, and give operator-source credentials other names. File-defined operator connections remain
+read-only and may reference any variable. Their startup validation remains strict.
 
 **Test connection** performs one bounded GET for a selected HTTP operation, or checks a
 producer channel's configuration. The result shows timing and response metadata. It does

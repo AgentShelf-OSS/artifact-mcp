@@ -2,7 +2,7 @@
 use super::{
     BindingManifest, DataBroker, ImpactArtifact, SourceConfig, SourceHealth, SourceView,
     TestResult,
-    validate::{build_url, validate_source},
+    validate::{build_url, validate_managed_credentials, validate_source},
 };
 use crate::{
     error::AppError,
@@ -72,14 +72,14 @@ impl DataBroker {
                 let mut h = SourceHealth::default();
                 if !enabled {
                     h.state = "disabled".into();
-                } else if !Self::missing_references(&source).is_empty() {
+                } else if !self.missing_references(&source).is_empty() {
                     h.state = "config_error".into();
                 }
                 h
             });
         if !enabled {
             health.state = "disabled".into();
-        } else if !Self::missing_references(&source).is_empty() {
+        } else if !self.missing_references(&source).is_empty() {
             health.state = "config_error".into();
         }
         let artifact_count = self
@@ -93,7 +93,7 @@ impl DataBroker {
             origin: origin.into(),
             enabled,
             version,
-            missing_references: Self::missing_references(&source),
+            missing_references: self.missing_references(&source),
             health,
             artifact_count,
             definition: source,
@@ -132,6 +132,7 @@ impl DataBroker {
     ) -> Result<SourceView, String> {
         let _guard = self.writes.lock().await;
         validate_source(&source)?;
+        validate_managed_credentials(&source)?;
         if self.sources.contains_key(&source.id) {
             return Err("source_conflict".into());
         }
@@ -205,6 +206,7 @@ impl DataBroker {
     ) -> Result<SourceView, String> {
         let _guard = self.writes.lock().await;
         validate_source(&source)?;
+        validate_managed_credentials(&source)?;
         if id != source.id {
             return Err("invalid_source".into());
         }
@@ -360,7 +362,7 @@ impl DataBroker {
         if !enabled {
             return Err("test_unavailable".into());
         }
-        if !Self::missing_references(&source).is_empty() {
+        if !self.missing_references(&source).is_empty() {
             return Err("test_unavailable".into());
         }
         if source.kind == "push" {
