@@ -6,7 +6,7 @@
   if (!panel) return;
   const $ = id => document.getElementById(id);
   const api = "/settings/data-sources";
-  let records = [], orgs = [], selected = null, loaded = false, loading = false, sequence = 0;
+  let records = [], orgs = [], credentials = [], selected = null, loaded = false, loading = false, sequence = 0;
   let bindingArtifact = null, canDelete = false, selectionRequest = 0, stale = false;
   const node = (tag, text, className) => {
     const el = document.createElement(tag);
@@ -73,8 +73,20 @@
   function mapHeader(name = "", env = "") {
     const row = node("div", undefined, "conn-map-row");
     field(row, "Header name", "header", name, "text", "Authorization").required = true;
-    field(row, "Environment variable", "env", env, "text", "ARTIFACT_DATA_CREDENTIAL_METRICS").required = true;
+    credentialChoice(row, env);
     removeButton(row, row); $("conn-headers").append(row);
+  }
+  // Lists the ARTIFACT_DATA_CREDENTIAL_* names the server has. A saved name it lacks stays
+  // selected and is marked, so editing an older connection never drops a reference silently.
+  function credentialChoice(parent, env) {
+    const missing = selected?.missing_references || [];
+    const names = !env || credentials.includes(env) ? credentials : [...credentials, env];
+    const select = choice(parent, "Environment variable", "env", env, names.map(name => ({
+      label: !credentials.includes(name) && missing.includes(name) ? name + " (unavailable)" : name, value: name
+    })));
+    select.add(new Option(credentials.length ? "Choose a variable" : "No ARTIFACT_DATA_CREDENTIAL_ variables are set", ""), 0);
+    select.value = env; select.required = true;
+    return select;
   }
   function parameter(parent, name = "", spec = {}) {
     const row = node("div", undefined, "conn-param"), grid = node("div", undefined, "field-grid");
@@ -207,7 +219,7 @@
   async function load(choose = false) {
     if (loading) return; loading = true;
     try {
-      const result = await request(api); records = result.connections; orgs = result.orgs; loaded = true;
+      const result = await request(api); records = result.connections; orgs = result.orgs; credentials = result.credential_variables || []; loaded = true;
       const org = $("conn-org-filter").value; options($("conn-org-filter"), orgs, "All organizations"); $("conn-org-filter").value = org;
       list(); const current = selected && records.find(row => row.id === selected.id);
       if (selected && (!current || current.version !== selected.version)) { stale = true; $("conn-stale").hidden = false; $("conn-save").disabled = $("conn-toggle").disabled = true; } if (current) { health(current); selected.artifact_count = current.artifact_count; $("conn-description").textContent = current.artifact_count + " connected artifacts"; $("conn-save-impact").textContent = current.artifact_count ? "Saving restarts this source for " + current.artifact_count + " artifacts. Other sources continue." : "Changes take effect without restarting the application."; }

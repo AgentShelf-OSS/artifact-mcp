@@ -2,8 +2,8 @@
 use super::{
     DataBroker, MAX_SOURCES, ParamConfig, PublicSource, SourceConfig,
     validate::{
-        RESERVED_CREDENTIAL_HEADERS, managed_credential_allowed, validate_managed_credentials,
-        validate_source,
+        RESERVED_CREDENTIAL_HEADERS, managed_credential_allowed, managed_credential_names,
+        validate_managed_credentials, validate_source,
     },
 };
 use crate::{error::AppError, persistence::db::interact};
@@ -214,6 +214,11 @@ impl DataBroker {
             map.insert(source.id.clone(), source);
         }
         Ok(map)
+    }
+    /// Names of the `ARTIFACT_DATA_CREDENTIAL_*` variables in this process's environment, sorted,
+    /// for the credential picker on the administration page. Only names leave this function.
+    pub fn managed_credential_variables() -> Vec<String> {
+        managed_credential_names(std::env::vars_os().map(|(name, _)| name))
     }
     /// Ids of managed connections whose credential references break the managed-credential
     /// rule. Such a connection was saved before the rule; it loads and reports `config_error`

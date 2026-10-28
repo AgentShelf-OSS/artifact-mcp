@@ -279,6 +279,14 @@ without this rule an administrator could send any process secret, such as a bot 
 host they control. Saving a connection that breaks the rule returns
 `credential_reference_not_allowed`.
 
+The **Environment variable** list offers each `ARTIFACT_DATA_CREDENTIAL_` variable that the
+server process has. The server sends names only. To add a choice, set the variable wherever
+the deployment supplies its environment, such as a Docker `.env` file, a systemd
+`EnvironmentFile`, or a secret manager, then restart the server. A saved reference that the
+server lacks stays selected and is marked unavailable. The editor offers only variables the
+server has; to stage a connection before its variable is deployed, create it through the
+administration API, which accepts any name that follows the prefix rule.
+
 Supply the value in protected deployment configuration. The workspace never accepts or
 returns the value. A saved connection with missing references reports `config_error` and
 cannot make requests until those variables are available. A connection saved before the
@@ -329,7 +337,7 @@ The frontend uses the same source and binding validation as MCP.
 
 | Route | Purpose |
 | --- | --- |
-| `GET /settings/data-sources?org=acme` | List connection views and organization names |
+| `GET /settings/data-sources?org=acme` | List connection views, organization names, and the names of the managed credential variables the server has |
 | `GET /settings/data-sources/:id` | Inspect configuration, health and version |
 | `POST /settings/data-sources` | Create `{definition, enabled}` |
 | `PATCH /settings/data-sources/:id` | Replace `{definition, enabled, expected_version}` |
