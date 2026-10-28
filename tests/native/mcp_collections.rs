@@ -10,7 +10,7 @@ use artifact_mcp::{
     error::{AppError, McpError},
     mcp::{dispatch::dispatch, protocol::OrderedJson},
     model::{ClientId, OrgId, PublisherIdentity},
-    persistence::db::Database,
+    persistence::db::{Database, DbPool},
 };
 use serde_json::{Value, json};
 
@@ -21,7 +21,7 @@ impl Drop for TempDir {
     }
 }
 
-fn fixture() -> (TempDir, AppDeps) {
+fn fixture() -> (TempDir, AppDeps, DbPool) {
     let dir = TempDir(std::env::temp_dir().join(format!("mcp-folders-86-{}", nanoid::nanoid!(12))));
     std::fs::create_dir_all(&dir.0).unwrap();
     let pool = Database::open_at(&dir.0).unwrap();
@@ -33,8 +33,8 @@ fn fixture() -> (TempDir, AppDeps) {
     config.data_dir = dir.0.clone();
     config.oauth.issuer = "https://issuer.example.test".into();
     let mut deps = super::u18_admin_routes::collection_test_deps(config);
-    deps.data = Arc::new(artifact_mcp::data::DataBroker::empty().with_pool(pool));
-    (dir, deps)
+    deps.data = Arc::new(artifact_mcp::data::DataBroker::empty().with_pool(pool.clone()));
+    (dir, deps, pool)
 }
 
 fn oauth(scopes: &[&str]) -> PublisherIdentity {
@@ -68,7 +68,7 @@ async fn call(
 
 #[tokio::test]
 async fn every_registered_folder_tool_requires_its_exact_oauth_scope() {
-    let (_dir, deps) = fixture();
+    let (_dir, deps, _pool) = fixture();
     let owner = oauth(&["artifacts:publish"]);
     let created = call(
         &deps,
@@ -167,7 +167,7 @@ async fn every_registered_folder_tool_requires_its_exact_oauth_scope() {
 
 #[tokio::test]
 async fn folder_principals_separate_issuer_and_auth_kind_and_survive_secret_rotation() {
-    let (_dir, deps) = fixture();
+    let (_dir, deps, pool) = fixture();
     let owner = oauth(&["artifacts:publish"]);
     let folder = call(
         &deps,
@@ -215,7 +215,7 @@ async fn folder_principals_separate_issuer_and_auth_kind_and_survive_secret_rota
         updated["structuredContent"]["collection"]["description"],
         "retained owner"
     );
-    let conn = deps.data.pool.as_ref().unwrap().get().unwrap();
+    let conn = pool.get().unwrap();
     let principal: (String, String) = conn
         .query_row(
             "SELECT created_by_kind,created_by FROM collections WHERE id=?1",
@@ -240,10 +240,10 @@ async fn folder_principals_separate_issuer_and_auth_kind_and_survive_secret_rota
 
 #[tokio::test]
 async fn metadata_outputs_redact_members_and_cover_when_read_access_narrows() {
-    let (_dir, deps) = fixture();
+    let (_dir, deps, pool) = fixture();
     let mut owner = oauth(&["artifacts:publish", "artifacts:read"]);
     {
-        let conn = deps.data.pool.as_ref().unwrap().get().unwrap();
+        let conn = pool.get().unwrap();
         conn.execute("INSERT INTO artifacts(id,client_id,org,title,hidden) VALUES ('hidden-member','other-client','acme','Hidden',1)", []).unwrap();
     }
     let folder = call(&deps, &owner, "create_collection", json!({"name":"Redacted","artifact_ids":["hidden-member"],"cover_artifact_id":"hidden-member"})).await.unwrap();

@@ -620,7 +620,7 @@ async fn production_health_checks_sqlite_and_directory_and_keeps_node_shape() {
     let config = config_for(temp.path());
     let pool = Database::open_with(&config.data_dir, &MigrationContext::empty(), None)
         .expect("database bootstrap");
-    let probe = runtime::ProductionHealth::new(pool, config.artifact_dir());
+    let probe = artifact_mcp::adapters::ProductionHealth::new(pool, config.artifact_dir());
 
     let report = probe
         .check()

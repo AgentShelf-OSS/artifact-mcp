@@ -19,7 +19,9 @@ pub mod discord_history_recovery;
 /// PBI-080 inbound contracts, fake provider, and processor.
 pub mod discord_inbound;
 pub mod discord_recovery_runtime;
+pub mod discussion_connections;
 pub mod discussion_envelope;
+pub mod discussion_two_way;
 pub mod notify;
 pub mod preview;
 pub mod preview_notifier;

@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 pub mod actions;
+pub mod adapters;
 pub mod app;
 pub mod artifacts;
 pub mod config;
@@ -19,5 +20,6 @@ pub mod persistence;
 pub mod ports;
 pub mod render;
 pub mod security;
+pub mod startup;
 
 pub use app::{AppDeps, build_router};

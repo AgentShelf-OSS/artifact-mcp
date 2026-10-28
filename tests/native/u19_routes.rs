@@ -828,6 +828,10 @@ fn feedback_row(meta: &ArtifactMeta) -> Feedback {
 }
 
 fn deps(harness: Arc<RouteHarness>) -> AppDeps {
+    deps_with_config(harness, AppConfig::default())
+}
+
+fn deps_with_config(harness: Arc<RouteHarness>, config: AppConfig) -> AppDeps {
     AppDeps {
         data: Arc::new(artifact_mcp::data::DataBroker::empty()),
         publisher_auth: harness.clone(),
@@ -843,7 +847,7 @@ fn deps(harness: Arc<RouteHarness>) -> AppDeps {
         notifications: harness.clone(),
         health: harness,
         ingress: Arc::new(artifact_mcp::http::ingress::IngressState::from_config(
-            &AppConfig::default(),
+            &config,
         )),
         preview_tasks: artifact_mcp::mcp::tasks::PreviewTaskStore::new(
             std::env::temp_dir().join(format!("artifact-mcp-u19-tasks-{}", std::process::id())),
@@ -854,7 +858,7 @@ fn deps(harness: Arc<RouteHarness>) -> AppDeps {
         delivery_wake: artifact_mcp::integrations::delivery_runtime::DeliveryWakeSignal::default(),
         audit_access: None,
         push: None,
-        config: Arc::new(AppConfig::default()),
+        config: Arc::new(config),
     }
 }
 
@@ -1830,4 +1834,338 @@ async fn bodyless_category_and_move_requests_cannot_clear_an_artifact_category()
         br#"{"error":"org or category is required"}"#
     );
     assert_eq!(move_artifact.calls(), ["resolve_viewer", "find_meta"]);
+}
+
+// --- `/mcp` admission order -------------------------------------------------------------------
+//
+// Each test feeds a request that fails two admission steps at once and pins which one answers.
+// Together they lock the order: publisher auth, verified-publisher budget, media type, bounded
+// body, parse, complexity and batch size, transport era, batch policy, invalid request, scope,
+// operation budget, mutation permit, dispatch.
+
+fn mcp_publisher(scopes: Option<&[&str]>) -> PublisherIdentity {
+    PublisherIdentity {
+        client_id: ClientId::from("publisher"),
+        org: OrgId::from("acme"),
+        label: "Publisher".to_owned(),
+        role: "author".to_owned(),
+        scopes: scopes.map(|scopes| scopes.iter().map(|scope| (*scope).to_owned()).collect()),
+    }
+}
+
+fn mcp_harness(publisher: Option<PublisherIdentity>) -> Arc<RouteHarness> {
+    let harness = RouteHarness::new(viewer("acme", false), Some(meta("acme")));
+    Arc::new(match publisher {
+        Some(publisher) => harness.with_publisher(publisher),
+        None => harness,
+    })
+}
+
+async fn mcp_call(
+    router: &axum::Router,
+    content_type: &str,
+    headers: &[(&str, &str)],
+    payload: impl Into<Body>,
+) -> (StatusCode, HeaderMap, serde_json::Value) {
+    let mut request = Request::builder()
+        .method("POST")
+        .uri("/mcp")
+        .header("authorization", "Bearer key")
+        .header("content-type", content_type);
+    for (name, value) in headers {
+        request = request.header(*name, *value);
+    }
+    let response = router
+        .clone()
+        .oneshot(request.body(payload.into()).expect("MCP request"))
+        .await
+        .expect("MCP response");
+    let status = response.status();
+    let headers = response.headers().clone();
+    let bytes = to_bytes(response.into_body(), 1024 * 1024)
+        .await
+        .expect("MCP response body");
+    (
+        status,
+        headers,
+        serde_json::from_slice(&bytes).expect("JSON MCP response"),
+    )
+}
+
+fn tool_call(id: &str, name: &str, arguments: serde_json::Value) -> serde_json::Value {
+    serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": id,
+        "method": "tools/call",
+        "params": { "name": name, "arguments": arguments }
+    })
+}
+
+#[tokio::test]
+async fn mcp_authentication_precedes_media_type_body_limit_and_parse() {
+    let mut config = AppConfig::default();
+    config.body.mcp_json = 64;
+    let harness = mcp_harness(None);
+    let router = build_router(deps_with_config(harness.clone(), config));
+    let oversized = format!(
+        r#"{{"jsonrpc":"2.0","id":1,"method":"{}"}}"#,
+        "x".repeat(4_096)
+    );
+    let length = oversized.len().to_string();
+    type Case<'a> = (&'a str, &'a str, Vec<(&'a str, &'a str)>, String);
+    let cases: [Case<'_>; 3] = [
+        ("media type", "text/plain", vec![], "{}".to_owned()),
+        (
+            "oversized",
+            "application/json",
+            vec![("content-length", length.as_str())],
+            oversized.clone(),
+        ),
+        ("malformed", "application/json", vec![], "{".to_owned()),
+    ];
+    for (name, content_type, headers, payload) in cases {
+        let (status, _, payload) = mcp_call(&router, content_type, &headers, payload).await;
+        assert_eq!(status, StatusCode::UNAUTHORIZED, "{name}");
+        assert_eq!(payload["error"]["code"], -32_001, "{name}");
+    }
+    assert!(harness.calls().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_verified_publisher_budget_precedes_media_type() {
+    let mut config = AppConfig::default();
+    config.ingress.mutations_per_window = 1;
+    let router = build_router(deps_with_config(
+        mcp_harness(Some(mcp_publisher(None))),
+        config,
+    ));
+    let list = serde_json::json!({ "jsonrpc": "2.0", "id": "list", "method": "tools/list" });
+    let (status, _, _) = mcp_call(&router, "application/json", &[], list.to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    let (status, _, payload) = mcp_call(&router, "text/plain", &[], list.to_string()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(payload["error"]["data"]["reason"], "rate_limited");
+}
+
+#[tokio::test]
+async fn mcp_media_type_precedes_body_limit_and_body_limit_precedes_parse() {
+    let mut config = AppConfig::default();
+    config.body.mcp_json = 64;
+    let harness = mcp_harness(Some(mcp_publisher(None)));
+    let router = build_router(deps_with_config(harness.clone(), config));
+    let oversized = format!("{{{}", "x".repeat(4_096));
+
+    let (status, _, payload) = mcp_call(&router, "text/plain", &[], oversized.clone()).await;
+    assert_eq!(status, StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    assert_eq!(payload["error"]["data"]["reason"], "unsupported_media_type");
+
+    let (status, _, payload) = mcp_call(&router, "application/json", &[], oversized).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(payload, serde_json::json!({ "error": "payload too large" }));
+
+    let (status, _, payload) = mcp_call(&router, "application/json", &[], "{").await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(payload, serde_json::json!({ "error": "invalid JSON" }));
+    assert!(harness.calls().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_complexity_and_batch_size_precede_transport_and_batch_policy() {
+    let mut config = AppConfig::default();
+    config.ingress.json_max_batch = 2;
+    let router = build_router(deps_with_config(
+        mcp_harness(Some(mcp_publisher(None))),
+        config,
+    ));
+    let modern = [("mcp-protocol-version", "2026-07-28")];
+
+    // Too deep and also missing the modern metadata the transport check would reject.
+    let mut nested = serde_json::json!(0);
+    for _ in 0..40 {
+        nested = serde_json::json!([nested]);
+    }
+    let deep = serde_json::json!({
+        "jsonrpc": "2.0", "id": "deep", "method": "tools/list", "params": { "nested": nested }
+    });
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &modern, deep.to_string()).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(payload, serde_json::json!({ "error": "payload too large" }));
+
+    // Over the batch cap, modern (unsupported batch) and containing a write.
+    let batch = serde_json::json!([
+        { "jsonrpc": "2.0", "id": "a", "method": "tools/list" },
+        { "jsonrpc": "2.0", "id": "b", "method": "ping" },
+        tool_call("c", "submit_feedback", serde_json::json!({})),
+    ]);
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &modern, batch.to_string()).await;
+    assert_eq!(status, StatusCode::PAYLOAD_TOO_LARGE);
+    assert_eq!(payload, serde_json::json!({ "error": "payload too large" }));
+}
+
+#[tokio::test]
+async fn mcp_transport_validation_precedes_batch_policy_and_scope() {
+    let harness = mcp_harness(Some(mcp_publisher(Some(&[]))));
+    let router = build_router(deps(harness.clone()));
+    let modern = [("mcp-protocol-version", "2026-07-28")];
+
+    let batch = serde_json::json!([tool_call("w", "submit_feedback", serde_json::json!({}))]);
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &modern, batch.to_string()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(payload["error"]["code"], -32_600);
+    assert_eq!(
+        payload["error"]["message"],
+        "Batch requests are not supported by MCP 2026-07-28"
+    );
+
+    // Scoped method, scope-less token, and a missing Mcp-Method header: transport answers.
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": "list",
+        "method": "resources/list",
+        "params": { "_meta": {
+            "io.modelcontextprotocol/protocolVersion": "2026-07-28",
+            "io.modelcontextprotocol/clientCapabilities": {}
+        } }
+    });
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &modern, request.to_string()).await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    assert_eq!(payload["error"]["code"], -32_020);
+    assert!(harness.calls().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_legacy_batches_reject_writes_and_scope_failures_before_any_dispatch() {
+    let read = tool_call(
+        "read",
+        "read_artifact",
+        serde_json::json!({ "id": "abc123def456" }),
+    );
+    let write = tool_call("write", "submit_feedback", serde_json::json!({}));
+
+    for batch in [
+        serde_json::json!([read.clone(), write.clone()]),
+        serde_json::json!([write.clone(), read.clone()]),
+    ] {
+        let harness = mcp_harness(Some(mcp_publisher(None)));
+        let router = build_router(deps(harness.clone()));
+        let (status, _, payload) =
+            mcp_call(&router, "application/json", &[], batch.to_string()).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(
+            payload["error"]["message"],
+            "Legacy batches may contain read-only requests only"
+        );
+        assert!(harness.calls().is_empty(), "no batch member may dispatch");
+    }
+
+    // A malformed member is skipped by the write check; the read-only remainder dispatches.
+    let harness = mcp_harness(Some(mcp_publisher(None)));
+    let router = build_router(deps(harness.clone()));
+    let batch = serde_json::json!([
+        read.clone(),
+        { "jsonrpc": "1.0", "id": "bad", "method": "x" }
+    ]);
+    let (status, _, payload) = mcp_call(&router, "application/json", &[], batch.to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(payload.is_array());
+    assert!(harness.calls().contains(&"find_meta".to_owned()));
+
+    // A read-only batch member without its scope fails before any member dispatches.
+    let harness = mcp_harness(Some(mcp_publisher(Some(&[]))));
+    let router = build_router(deps(harness.clone()));
+    let batch = serde_json::json!([read]);
+    let (status, _, payload) = mcp_call(&router, "application/json", &[], batch.to_string()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(payload["error"]["data"]["requiredScope"], "artifacts:read");
+    assert!(harness.calls().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_invalid_request_precedes_the_scope_check() {
+    let harness = mcp_harness(Some(mcp_publisher(Some(&[]))));
+    let router = build_router(deps(harness.clone()));
+    let request = serde_json::json!({ "jsonrpc": "1.0", "id": "bad", "method": "resources/list" });
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &[], request.to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(payload["error"]["code"], -32_600);
+    assert!(harness.calls().is_empty());
+}
+
+#[tokio::test]
+async fn mcp_scope_and_operation_budget_precede_the_mutation_permit() {
+    let mut config = AppConfig::default();
+    config.ingress.max_concurrent_mutations = 1;
+    config.ingress.uploads_per_window = 1;
+    let patch = tool_call(
+        "patch",
+        "patch_artifact",
+        serde_json::json!({ "id": "abc123def456" }),
+    );
+
+    // Scope failure answers even while every mutation permit is held.
+    let harness = mcp_harness(Some(mcp_publisher(Some(&[]))));
+    let dependencies = deps_with_config(harness.clone(), config.clone());
+    let held = dependencies
+        .ingress
+        .try_acquire_mutation()
+        .expect("hold the only mutation permit");
+    let router = build_router(dependencies);
+    let (status, _, payload) = mcp_call(&router, "application/json", &[], patch.to_string()).await;
+    assert_eq!(status, StatusCode::FORBIDDEN);
+    assert_eq!(
+        payload["error"]["data"]["requiredScope"],
+        "artifacts:publish"
+    );
+    drop(held);
+
+    // The upload budget is spent before the permit is tried: the first upload is busy, the
+    // second is rate limited, and neither dispatches. Reads do not need a mutation permit.
+    let harness = mcp_harness(Some(mcp_publisher(None)));
+    let dependencies = deps_with_config(harness.clone(), config);
+    let held = dependencies
+        .ingress
+        .try_acquire_mutation()
+        .expect("hold the only mutation permit");
+    let router = build_router(dependencies);
+    let publish = tool_call("publish", "publish_artifact", serde_json::json!({}));
+    let (status, headers, payload) =
+        mcp_call(&router, "application/json", &[], publish.to_string()).await;
+    assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE);
+    assert_eq!(headers.get("retry-after").expect("retry-after"), "1");
+    assert_eq!(payload["error"]["data"]["reason"], "busy");
+    let (status, _, payload) =
+        mcp_call(&router, "application/json", &[], publish.to_string()).await;
+    assert_eq!(status, StatusCode::TOO_MANY_REQUESTS);
+    assert_eq!(payload["error"]["data"]["reason"], "rate_limited");
+    assert!(
+        harness.calls().is_empty(),
+        "no rejected upload may dispatch"
+    );
+    let read = tool_call(
+        "read",
+        "read_artifact",
+        serde_json::json!({ "id": "abc123def456" }),
+    );
+    let (status, _, _) = mcp_call(&router, "application/json", &[], read.to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(harness.calls().contains(&"find_meta".to_owned()));
+
+    // Releasing the permit lets the next mutation reach dispatch.
+    drop(held);
+    let resolve = tool_call(
+        "resolve",
+        "resolve_feedback",
+        serde_json::json!({ "feedback_id": "feedback-id" }),
+    );
+    let (status, _, _) = mcp_call(&router, "application/json", &[], resolve.to_string()).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        harness.calls().last().map(String::as_str),
+        Some("resolve_feedback_as_publisher")
+    );
 }
