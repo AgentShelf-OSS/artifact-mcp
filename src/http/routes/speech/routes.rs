@@ -462,24 +462,104 @@ fn bad_speech(code: &'static str) -> Response {
 }
 #[cfg(test)]
 mod tests {
+    use super::super::clients::TtsClient;
     use super::*;
     use futures_util::StreamExt;
-    use std::time::Duration;
+    use std::{
+        net::SocketAddr,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        },
+        time::Duration,
+    };
+    use tokio::{
+        io::{AsyncReadExt, AsyncWriteExt},
+        net::TcpListener,
+        sync::oneshot,
+    };
 
     #[tokio::test]
-    async fn stream_body_yields_the_first_chunk_before_the_upstream_closes() {
-        let (tx, rx) = mpsc::channel(1);
-        let mut stream = StreamBody { rx, task: None };
+    async fn stream_response_forwards_first_upstream_chunk_before_upstream_finishes() {
+        let upstream = first_chunk_then_waiting_upstream().await;
+        let client = Box::leak(Box::new(TtsClient {
+            endpoint: format!("http://{}/speech", upstream.address),
+            stream_endpoint: format!("http://{}/speech/stream", upstream.address),
+            timed_stream_endpoint: format!("http://{}/speech/stream-timed", upstream.address),
+            token: "test-token".to_owned(),
+            http: reqwest::Client::builder()
+                .build()
+                .expect("test HTTP client builds"),
+            permits: tokio::sync::Semaphore::new(1),
+        }));
 
-        tx.send(Ok(vec![1, 2, 3]))
+        let (response, permit) =
+            request_stream_response(client, "hello", "pocket_alba", None, false)
+                .await
+                .expect("the controlled upstream accepts the streaming request");
+        let response = validate_stream_response(response, false)
+            .expect("the controlled upstream has the stream content type");
+        let mut body = stream_response_body(response, permit, false)
+            .into_body()
+            .into_data_stream();
+        let first = tokio::time::timeout(Duration::from_millis(100), body.next())
             .await
-            .expect("stream receiver remains connected");
-        let first = tokio::time::timeout(Duration::from_millis(100), stream.next())
-            .await
-            .expect("the first stream chunk is not buffered")
-            .expect("first stream chunk");
+            .expect("the first upstream chunk reaches the response without buffering")
+            .expect("first response chunk")
+            .expect("stream response is infallible");
 
-        assert_eq!(first, Ok(vec![1, 2, 3]));
-        assert!(!tx.is_closed());
+        assert_eq!(first.as_ref(), b"pcm");
+        assert!(!upstream.finished.load(Ordering::SeqCst));
+        upstream
+            .release
+            .send(())
+            .expect("upstream waits for this test");
+        upstream
+            .task
+            .await
+            .expect("controlled upstream task completes");
+    }
+
+    struct ControlledUpstream {
+        address: SocketAddr,
+        release: oneshot::Sender<()>,
+        finished: Arc<AtomicBool>,
+        task: JoinHandle<()>,
+    }
+
+    async fn first_chunk_then_waiting_upstream() -> ControlledUpstream {
+        let listener = TcpListener::bind("127.0.0.1:0")
+            .await
+            .expect("bind controlled upstream");
+        let address = listener.local_addr().expect("controlled upstream address");
+        let (finish_tx, finish_rx) = oneshot::channel();
+        let finished = Arc::new(AtomicBool::new(false));
+        let server_finished = Arc::clone(&finished);
+        let task = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.expect("accept streaming request");
+            let mut request_start = [0; 1];
+            socket
+                .read_exact(&mut request_start)
+                .await
+                .expect("read streaming request");
+            socket
+                .write_all(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: application/vnd.artifact.pcm\r\nTransfer-Encoding: chunked\r\n\r\n3\r\npcm\r\n",
+                )
+                .await
+                .expect("write first upstream chunk");
+            finish_rx.await.expect("test releases controlled upstream");
+            socket
+                .write_all(b"0\r\n\r\n")
+                .await
+                .expect("finish controlled upstream response");
+            server_finished.store(true, Ordering::SeqCst);
+        });
+        ControlledUpstream {
+            address,
+            release: finish_tx,
+            finished,
+            task,
+        }
     }
 }
