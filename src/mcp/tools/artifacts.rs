@@ -20,6 +20,59 @@ use crate::{
     security::audit::MutationAudit,
 };
 
+struct ReadArtifactInput<'a> {
+    id: &'a str,
+    requested_revision: Option<u64>,
+    requested_offset: u64,
+    limit: u64,
+}
+
+struct ReadSingleArtifactInput<'a> {
+    arguments: &'a OrderedJson,
+    id: &'a str,
+    org: &'a str,
+    artifact: &'a crate::security::access::AuthorizedArtifact,
+    artifact_key: Option<&'a str>,
+    historical: Option<u64>,
+    revision: u64,
+    requested_offset: u64,
+    limit: u64,
+}
+
+struct ReadBundleArtifactInput<'a> {
+    arguments: &'a OrderedJson,
+    id: &'a str,
+    org: &'a str,
+    artifact: &'a crate::security::access::AuthorizedArtifact,
+    artifact_key: Option<&'a str>,
+    historical: Option<u64>,
+    revision: u64,
+    entry: String,
+    aggregate_bytes: u64,
+    requested_offset: u64,
+    limit: u64,
+}
+
+fn parse_read_artifact_input(arguments: &OrderedJson) -> Result<ReadArtifactInput<'_>, McpError> {
+    Ok(ReadArtifactInput {
+        id: nonempty_protocol_string(arguments, "id")?,
+        requested_revision: arguments
+            .get("revision")
+            .map(|value| safe_positive_integer(value, "revision"))
+            .transpose()?,
+        requested_offset: arguments
+            .get("offset")
+            .map(|value| non_negative_integer(value, "offset"))
+            .transpose()?
+            .unwrap_or(0),
+        limit: arguments
+            .get("limit")
+            .map(|value| safe_positive_integer(value, "limit"))
+            .transpose()?
+            .unwrap_or(65_536),
+    })
+}
+
 pub(crate) async fn list_artifacts(
     auth: &PublisherIdentity,
     deps: &AppDeps,
@@ -64,21 +117,8 @@ pub(crate) async fn read_artifact(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
-    let id = nonempty_protocol_string(arguments, "id")?;
-    let requested_revision = arguments
-        .get("revision")
-        .map(|value| safe_positive_integer(value, "revision"))
-        .transpose()?;
-    let requested_offset = arguments
-        .get("offset")
-        .map(|value| non_negative_integer(value, "offset"))
-        .transpose()?
-        .unwrap_or(0);
-    let limit = arguments
-        .get("limit")
-        .map(|value| safe_positive_integer(value, "limit"))
-        .transpose()?
-        .unwrap_or(65_536);
+    let input = parse_read_artifact_input(arguments)?;
+    let id = input.id;
 
     // Invariant 3: authorize the metadata before any body, history, or bundle-directory read.
     let owned = publisher_read(id, auth, deps).await?;
@@ -86,9 +126,193 @@ pub(crate) async fn read_artifact(
     let artifact_key = current.artifact_key.clone();
     let artifact = owned.into_authorized();
 
+    let (historical, revision, is_bundle, entry, aggregate_bytes) =
+        resolve_read_artifact_version(input.requested_revision, &artifact, &current, deps).await?;
+
+    if is_bundle {
+        return read_bundle_artifact(
+            ReadBundleArtifactInput {
+                arguments,
+                id,
+                org: &current.org.0,
+                artifact: &artifact,
+                artifact_key: artifact_key.as_deref(),
+                historical,
+                revision,
+                entry,
+                aggregate_bytes,
+                requested_offset: input.requested_offset,
+                limit: input.limit,
+            },
+            deps,
+        )
+        .await;
+    }
+
+    read_single_artifact_body(
+        ReadSingleArtifactInput {
+            arguments,
+            id,
+            org: &current.org.0,
+            artifact: &artifact,
+            artifact_key: artifact_key.as_deref(),
+            historical,
+            revision,
+            requested_offset: input.requested_offset,
+            limit: input.limit,
+        },
+        deps,
+    )
+    .await
+}
+
+async fn read_bundle_artifact(
+    input: ReadBundleArtifactInput<'_>,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let ReadBundleArtifactInput {
+        arguments,
+        id,
+        org,
+        artifact,
+        artifact_key,
+        historical,
+        revision,
+        entry,
+        aggregate_bytes,
+        requested_offset,
+        limit,
+    } = input;
+    if arguments.get("path").is_none() {
+        let files = deps
+            .artifacts
+            .list_bundle_files(artifact, historical)
+            .await?
+            .ok_or_else(|| {
+                if historical.is_some() {
+                    AppError::Gone(format!("Revision {revision} is no longer retained"))
+                } else {
+                    AppError::Gone(format!("Artifact body is unavailable: {id}"))
+                }
+            })?;
+        let files = files
+            .into_iter()
+            .map(|(path, bytes)| {
+                let is_entry = path == entry;
+                object! {
+                    "path" => OrderedJson::string(path),
+                    "bytes" => OrderedJson::number_u64(bytes),
+                    "entry" => OrderedJson::Bool(is_entry),
+                }
+            })
+            .collect();
+        return tool_result(with_artifact_key(
+            object! {
+                "id" => OrderedJson::string(id),
+                "org" => OrderedJson::string(org),
+                "is_bundle" => OrderedJson::Bool(true),
+                "entry" => OrderedJson::string(entry),
+                "revision" => OrderedJson::number_u64(revision),
+                "content_type" => OrderedJson::string("application/json"),
+                "bytes_total" => OrderedJson::number_u64(aggregate_bytes),
+                "offset" => OrderedJson::number_u64(0),
+                "bytes_returned" => OrderedJson::number_u64(0),
+                "truncated" => OrderedJson::Bool(false),
+                "files" => OrderedJson::Array(files),
+            },
+            artifact_key,
+        ));
+    }
+
+    let path = required_string(arguments, "path")?;
+    let file = if let Some(historical_revision) = historical {
+        deps.artifacts
+            .read_revision_body(artifact, historical_revision, Some(path))
+            .await?
+    } else {
+        deps.artifacts.read_bundle_file(artifact, path).await?
+    }
+    .ok_or_else(|| AppError::NotFound(format!("Unknown bundle file: {path}")))?;
+    let page = page_utf8(&file.content, requested_offset, limit);
+    tool_result(with_artifact_key(
+        object! {
+            "id" => OrderedJson::string(id),
+            "org" => OrderedJson::string(org),
+            "is_bundle" => OrderedJson::Bool(true),
+            "entry" => OrderedJson::string(entry),
+            "revision" => OrderedJson::number_u64(revision),
+            "content_type" => OrderedJson::string(file.content_type),
+            "bytes_total" => OrderedJson::number_u64(page.bytes_total),
+            "offset" => OrderedJson::number_u64(page.offset),
+            "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
+            "truncated" => OrderedJson::Bool(page.truncated),
+            "content" => OrderedJson::string(page.content),
+        },
+        artifact_key,
+    ))
+}
+
+async fn read_single_artifact_body(
+    input: ReadSingleArtifactInput<'_>,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    let ReadSingleArtifactInput {
+        arguments,
+        id,
+        org,
+        artifact,
+        artifact_key,
+        historical,
+        revision,
+        requested_offset,
+        limit,
+    } = input;
+    if arguments.get("path").is_some() {
+        return Err(
+            AppError::Validation("path only applies to bundle artifacts".to_owned()).into(),
+        );
+    }
+    let file = if let Some(historical_revision) = historical {
+        deps.artifacts
+            .read_revision_body(artifact, historical_revision, None)
+            .await?
+    } else {
+        deps.artifacts.read_body(artifact).await?
+    }
+    .ok_or_else(|| {
+        if historical.is_some() {
+            AppError::Gone(format!("Revision {revision} is no longer retained"))
+        } else {
+            AppError::Gone(format!("Artifact body is unavailable: {id}"))
+        }
+    })?;
+    let page = page_utf8(&file.content, requested_offset, limit);
+    tool_result(with_artifact_key(
+        object! {
+            "id" => OrderedJson::string(id),
+            "org" => OrderedJson::string(org),
+            "is_bundle" => OrderedJson::Bool(false),
+            "revision" => OrderedJson::number_u64(revision),
+            "content_type" => OrderedJson::string(file.content_type),
+            "bytes_total" => OrderedJson::number_u64(page.bytes_total),
+            "offset" => OrderedJson::number_u64(page.offset),
+            "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
+            "truncated" => OrderedJson::Bool(page.truncated),
+            "content" => OrderedJson::string(page.content),
+        },
+        artifact_key,
+    ))
+}
+
+async fn resolve_read_artifact_version(
+    requested_revision: Option<u64>,
+    artifact: &crate::security::access::AuthorizedArtifact,
+    current: &crate::model::ArtifactMeta,
+    deps: &AppDeps,
+) -> Result<(Option<u64>, u64, bool, String, u64), McpError> {
     let historical = requested_revision.filter(|revision| *revision != current.revision);
-    let (revision, is_bundle, entry, aggregate_bytes) = if let Some(wanted) = historical {
-        let history = deps.artifacts.list_revisions(&artifact).await?;
+    let (revision, is_bundle, entry, bytes) = if let Some(wanted) = historical {
+        let history = deps.artifacts.list_revisions(artifact).await?;
         let selected = history
             .revisions
             .into_iter()
@@ -108,112 +332,7 @@ pub(crate) async fn read_artifact(
             current.bytes,
         )
     };
-
-    if is_bundle {
-        if arguments.get("path").is_none() {
-            let files = deps
-                .artifacts
-                .list_bundle_files(&artifact, historical)
-                .await?
-                .ok_or_else(|| {
-                    if historical.is_some() {
-                        AppError::Gone(format!("Revision {revision} is no longer retained"))
-                    } else {
-                        AppError::Gone(format!("Artifact body is unavailable: {id}"))
-                    }
-                })?;
-            let files = files
-                .into_iter()
-                .map(|(path, bytes)| {
-                    let is_entry = path == entry;
-                    object! {
-                        "path" => OrderedJson::string(path),
-                        "bytes" => OrderedJson::number_u64(bytes),
-                        "entry" => OrderedJson::Bool(is_entry),
-                    }
-                })
-                .collect();
-            return tool_result(with_artifact_key(
-                object! {
-                    "id" => OrderedJson::string(id),
-                    "org" => OrderedJson::string(current.org.0),
-                    "is_bundle" => OrderedJson::Bool(true),
-                    "entry" => OrderedJson::string(entry),
-                    "revision" => OrderedJson::number_u64(revision),
-                    "content_type" => OrderedJson::string("application/json"),
-                    "bytes_total" => OrderedJson::number_u64(aggregate_bytes),
-                    "offset" => OrderedJson::number_u64(0),
-                    "bytes_returned" => OrderedJson::number_u64(0),
-                    "truncated" => OrderedJson::Bool(false),
-                    "files" => OrderedJson::Array(files),
-                },
-                artifact_key.as_deref(),
-            ));
-        }
-
-        let path = required_string(arguments, "path")?;
-        let file = if let Some(historical_revision) = historical {
-            deps.artifacts
-                .read_revision_body(&artifact, historical_revision, Some(path))
-                .await?
-        } else {
-            deps.artifacts.read_bundle_file(&artifact, path).await?
-        }
-        .ok_or_else(|| AppError::NotFound(format!("Unknown bundle file: {path}")))?;
-        let page = page_utf8(&file.content, requested_offset, limit);
-        return tool_result(with_artifact_key(
-            object! {
-                "id" => OrderedJson::string(id),
-                "org" => OrderedJson::string(current.org.0),
-                "is_bundle" => OrderedJson::Bool(true),
-                "entry" => OrderedJson::string(entry),
-                "revision" => OrderedJson::number_u64(revision),
-                "content_type" => OrderedJson::string(file.content_type),
-                "bytes_total" => OrderedJson::number_u64(page.bytes_total),
-                "offset" => OrderedJson::number_u64(page.offset),
-                "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
-                "truncated" => OrderedJson::Bool(page.truncated),
-                "content" => OrderedJson::string(page.content),
-            },
-            artifact_key.as_deref(),
-        ));
-    }
-
-    if arguments.get("path").is_some() {
-        return Err(
-            AppError::Validation("path only applies to bundle artifacts".to_owned()).into(),
-        );
-    }
-    let file = if let Some(historical_revision) = historical {
-        deps.artifacts
-            .read_revision_body(&artifact, historical_revision, None)
-            .await?
-    } else {
-        deps.artifacts.read_body(&artifact).await?
-    }
-    .ok_or_else(|| {
-        if historical.is_some() {
-            AppError::Gone(format!("Revision {revision} is no longer retained"))
-        } else {
-            AppError::Gone(format!("Artifact body is unavailable: {id}"))
-        }
-    })?;
-    let page = page_utf8(&file.content, requested_offset, limit);
-    tool_result(with_artifact_key(
-        object! {
-            "id" => OrderedJson::string(id),
-            "org" => OrderedJson::string(current.org.0),
-            "is_bundle" => OrderedJson::Bool(false),
-            "revision" => OrderedJson::number_u64(revision),
-            "content_type" => OrderedJson::string(file.content_type),
-            "bytes_total" => OrderedJson::number_u64(page.bytes_total),
-            "offset" => OrderedJson::number_u64(page.offset),
-            "bytes_returned" => OrderedJson::number_u64(page.bytes_returned),
-            "truncated" => OrderedJson::Bool(page.truncated),
-            "content" => OrderedJson::string(page.content),
-        },
-        artifact_key.as_deref(),
-    ))
+    Ok((historical, revision, is_bundle, entry, bytes))
 }
 
 pub(crate) async fn delete_artifact(

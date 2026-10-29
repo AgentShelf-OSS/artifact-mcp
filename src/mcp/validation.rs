@@ -147,83 +147,21 @@ pub fn apply_utf8_edits(content: &[u8], edits: &OrderedJson) -> Result<Vec<u8>, 
     let values = edits
         .as_array()
         .ok_or_else(|| AppError::Validation("edits must be an array".to_owned()))?;
+    let mut resolved = resolve_edits(content, values)?;
+    resolved.sort_by_key(|edit| (edit.start, edit.number));
+    reject_overlapping_edits(&resolved)?;
+    apply_resolved_edits(content, resolved)
+}
+
+fn resolve_edits(content: &[u8], values: &[OrderedJson]) -> Result<Vec<ResolvedEdit>, AppError> {
     let mut resolved = Vec::with_capacity(values.len());
     for (index, edit) in values.iter().enumerate() {
-        let number = index + 1;
-        let has_find = edit.contains_key("find");
-        let has_range = edit.contains_key("offset") || edit.contains_key("length");
-        if has_find == has_range {
-            return Err(AppError::Validation(format!(
-                "edit {number} must use either find/replace or offset/length/replace"
-            )));
-        }
-        let replacement = edit
-            .get("replace")
-            .and_then(OrderedJson::as_str)
-            .ok_or_else(|| AppError::Validation(format!("edit {number} replace is required")))?
-            .as_bytes()
-            .to_vec();
-
-        if has_find {
-            let needle = edit
-                .get("find")
-                .and_then(OrderedJson::as_str)
-                .ok_or_else(|| AppError::Validation(format!("edit {number} find is required")))?
-                .as_bytes();
-            if needle.is_empty() {
-                return Err(AppError::Validation(format!(
-                    "edit {number} find must not be empty"
-                )));
-            }
-            let matches = content
-                .windows(needle.len())
-                .enumerate()
-                .filter_map(|(offset, window)| (window == needle).then_some(offset))
-                .collect::<Vec<_>>();
-            if matches.len() != 1 {
-                return Err(AppError::Validation(format!(
-                    "edit {number} find matched {} times; expected exactly once",
-                    matches.len()
-                )));
-            }
-            let start = matches[0];
-            resolved.push(ResolvedEdit {
-                number,
-                start,
-                end: start + needle.len(),
-                replacement,
-            });
-            continue;
-        }
-
-        let offset = edit_non_negative_integer(edit, number, "offset")?;
-        let length = edit_non_negative_integer(edit, number, "length")?;
-        if offset > content.len() || length > content.len() - offset {
-            return Err(AppError::Validation(format!(
-                "edit {number} range exceeds content length of {} bytes",
-                content.len()
-            )));
-        }
-        let end = offset + length;
-        if offset < content.len() && content[offset] & 0xc0 == 0x80 {
-            return Err(AppError::Validation(format!(
-                "edit {number} offset {offset} is not a UTF-8 boundary"
-            )));
-        }
-        if end < content.len() && content[end] & 0xc0 == 0x80 {
-            return Err(AppError::Validation(format!(
-                "edit {number} range end {end} is not a UTF-8 boundary"
-            )));
-        }
-        resolved.push(ResolvedEdit {
-            number,
-            start: offset,
-            end,
-            replacement,
-        });
+        resolved.push(resolve_edit(content, edit, index + 1)?);
     }
+    Ok(resolved)
+}
 
-    resolved.sort_by_key(|edit| (edit.start, edit.number));
+fn reject_overlapping_edits(resolved: &[ResolvedEdit]) -> Result<(), AppError> {
     for pair in resolved.windows(2) {
         let previous = &pair[0];
         let current = &pair[1];
@@ -234,7 +172,10 @@ pub fn apply_utf8_edits(content: &[u8], edits: &OrderedJson) -> Result<Vec<u8>, 
             )));
         }
     }
+    Ok(())
+}
 
+fn apply_resolved_edits(content: &[u8], resolved: Vec<ResolvedEdit>) -> Result<Vec<u8>, AppError> {
     let replacement_bytes = resolved.iter().fold(0usize, |total, edit| {
         total.saturating_add(edit.replacement.len())
     });
@@ -260,6 +201,99 @@ pub fn apply_utf8_edits(content: &[u8], edits: &OrderedJson) -> Result<Vec<u8>, 
         ));
     }
     Ok(output)
+}
+
+fn resolve_edit(
+    content: &[u8],
+    edit: &OrderedJson,
+    number: usize,
+) -> Result<ResolvedEdit, AppError> {
+    let has_find = edit.contains_key("find");
+    let has_range = edit.contains_key("offset") || edit.contains_key("length");
+    if has_find == has_range {
+        return Err(AppError::Validation(format!(
+            "edit {number} must use either find/replace or offset/length/replace"
+        )));
+    }
+    let replacement = edit
+        .get("replace")
+        .and_then(OrderedJson::as_str)
+        .ok_or_else(|| AppError::Validation(format!("edit {number} replace is required")))?
+        .as_bytes()
+        .to_vec();
+    if has_find {
+        return resolve_find_edit(content, edit, number, replacement);
+    }
+    resolve_range_edit(content, edit, number, replacement)
+}
+
+fn resolve_find_edit(
+    content: &[u8],
+    edit: &OrderedJson,
+    number: usize,
+    replacement: Vec<u8>,
+) -> Result<ResolvedEdit, AppError> {
+    let needle = edit
+        .get("find")
+        .and_then(OrderedJson::as_str)
+        .ok_or_else(|| AppError::Validation(format!("edit {number} find is required")))?
+        .as_bytes();
+    if needle.is_empty() {
+        return Err(AppError::Validation(format!(
+            "edit {number} find must not be empty"
+        )));
+    }
+    let matches = content
+        .windows(needle.len())
+        .enumerate()
+        .filter_map(|(offset, window)| (window == needle).then_some(offset))
+        .collect::<Vec<_>>();
+    if matches.len() != 1 {
+        return Err(AppError::Validation(format!(
+            "edit {number} find matched {} times; expected exactly once",
+            matches.len()
+        )));
+    }
+    let start = matches[0];
+    Ok(ResolvedEdit {
+        number,
+        start,
+        end: start + needle.len(),
+        replacement,
+    })
+}
+
+fn resolve_range_edit(
+    content: &[u8],
+    edit: &OrderedJson,
+    number: usize,
+    replacement: Vec<u8>,
+) -> Result<ResolvedEdit, AppError> {
+    let offset = edit_non_negative_integer(edit, number, "offset")?;
+    let length = edit_non_negative_integer(edit, number, "length")?;
+    if offset > content.len() || length > content.len() - offset {
+        return Err(AppError::Validation(format!(
+            "edit {number} range exceeds content length of {} bytes",
+            content.len()
+        )));
+    }
+    let end = offset + length;
+    if offset < content.len() && content[offset] & 0xc0 == 0x80 {
+        return Err(AppError::Validation(format!(
+            "edit {number} offset {offset} is not a UTF-8 boundary"
+        )));
+    }
+    if end < content.len() && content[end] & 0xc0 == 0x80 {
+        return Err(AppError::Validation(format!(
+            "edit {number} range end {end} is not a UTF-8 boundary"
+        )));
+    }
+    Ok(ResolvedEdit {
+        number,
+        start: offset,
+        end,
+        replacement,
+    })
 }
 
 fn edit_non_negative_integer(
@@ -384,6 +418,19 @@ mod tests {
             apply_utf8_edits("A🎉B".as_bytes(), &split),
             Err(AppError::Validation(
                 "edit 1 offset 2 is not a UTF-8 boundary".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn patch_edits_report_shape_before_missing_replacement() {
+        let invalid: OrderedJson =
+            serde_json::from_str(r#"[{"find":"x","offset":0,"length":1}]"#).expect("valid edits");
+
+        assert_eq!(
+            apply_utf8_edits(b"x", &invalid),
+            Err(AppError::Validation(
+                "edit 1 must use either find/replace or offset/length/replace".to_owned()
             ))
         );
     }

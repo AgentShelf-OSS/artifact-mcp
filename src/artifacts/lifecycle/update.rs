@@ -67,48 +67,7 @@ impl StoreContext {
         // no restore point, and a content update could overwrite the last good body.
         self.require_current_body(&safe_id, &meta)?;
 
-        // Stage the replacement before touching the database. [lib/store.js:374-384]
-        let mut staged: Option<PathBuf> = None;
-        let intent_id = format!("update:{id}:{}", meta.revision.saturating_add(1));
-        // Even a metadata-only revision snapshots the current body into immutable history. It is
-        // therefore a cross-resource mutation too: conceal it until that snapshot is durable.
-        let intent_path = self.transient_path(&safe_id, TransientKind::Staging)?;
-        if plan.content_changed {
-            self.bare_fault(FaultPoint::UpdateStageWrite)?;
-        }
-        start_durability_intent(
-            conn,
-            &intent_id,
-            id,
-            "update",
-            &plan.body_sha256,
-            &meta.body_sha256,
-            &intent_path,
-        )?;
-        if plan.content_changed {
-            let path = intent_path;
-            let staging_result = match &plan.body {
-                StagedBody::Single(html) => self.stage_single_body(
-                    &path,
-                    html,
-                    FaultPoint::UpdateStageFileSync,
-                    FaultPoint::UpdateStageDirectorySync,
-                ),
-                StagedBody::Bundle(files) => self.stage_bundle_files(
-                    &path,
-                    files,
-                    FaultPoint::UpdateStageFileSync,
-                    FaultPoint::UpdateStageDirectorySync,
-                ),
-                StagedBody::None => Ok(()),
-            };
-            if let Err(error) = staging_result {
-                safe_remove(&path);
-                let _ = finish_durability_intent(conn, &intent_id);
-                return Err(error);
-            }
-            staged = Some(path);
-        }
+        let (intent_id, staged) = self.stage_update_body(conn, id, &meta, &safe_id, &plan)?;
 
         let before = MetaBefore {
             title: meta.title.clone(),
@@ -173,21 +132,98 @@ impl StoreContext {
             let _ = finish_durability_intent(conn, &intent_id);
             return Err(AppError::Conflict("conflict".to_owned()));
         }
-        let mut snapshot: Option<BodySnapshot> = None;
-        if let Err(interrupt) = self.swap_body(&safe_id, &meta, staged.as_deref(), &mut snapshot) {
+        self.finish_update_body(
+            conn,
+            UpdateBodyFinish {
+                id,
+                meta: &meta,
+                safe_id: &safe_id,
+                staged,
+                before: &before,
+                audit,
+                intent_id: &intent_id,
+                operation,
+            },
+        )
+    }
+
+    fn stage_update_body(
+        &self,
+        conn: &mut Connection,
+        id: &str,
+        meta: &ArtifactMeta,
+        safe_id: &SafeArtifactId,
+        plan: &UpdatePlan,
+    ) -> Result<(String, Option<PathBuf>), AppError> {
+        let intent_id = format!("update:{id}:{}", meta.revision.saturating_add(1));
+        let intent_path = self.transient_path(safe_id, TransientKind::Staging)?;
+        if plan.content_changed {
+            self.bare_fault(FaultPoint::UpdateStageWrite)?;
+        }
+        start_durability_intent(
+            conn,
+            &intent_id,
+            id,
+            "update",
+            &plan.body_sha256,
+            &meta.body_sha256,
+            &intent_path,
+        )?;
+        if !plan.content_changed {
+            return Ok((intent_id, None));
+        }
+        let path = intent_path;
+        let result = match &plan.body {
+            StagedBody::Single(html) => self.stage_single_body(
+                &path,
+                html,
+                FaultPoint::UpdateStageFileSync,
+                FaultPoint::UpdateStageDirectorySync,
+            ),
+            StagedBody::Bundle(files) => self.stage_bundle_files(
+                &path,
+                files,
+                FaultPoint::UpdateStageFileSync,
+                FaultPoint::UpdateStageDirectorySync,
+            ),
+            StagedBody::None => Ok(()),
+        };
+        if let Err(error) = result {
+            safe_remove(&path);
+            let _ = finish_durability_intent(conn, &intent_id);
+            return Err(error);
+        }
+        Ok((intent_id, Some(path)))
+    }
+
+    fn finish_update_body(
+        &self,
+        conn: &mut Connection,
+        finish: UpdateBodyFinish<'_>,
+    ) -> Result<UpdateArtifactResult, AppError> {
+        let UpdateBodyFinish {
+            id,
+            meta,
+            safe_id,
+            staged,
+            before,
+            audit,
+            intent_id,
+            operation,
+        } = finish;
+        let mut snapshot = None;
+        if let Err(interrupt) = self.swap_body(safe_id, meta, staged.as_deref(), &mut snapshot) {
             if interrupt.compensate {
-                // Node's catch, in order: restore the snapshot, drop the staged body, revert the
-                // committed metadata and its revision row. [lib/store.js:429-437]
                 self.restore_snapshot_body(snapshot.as_ref())?;
                 if let Some(path) = &staged {
                     safe_remove(path);
                 }
-                self.revert_update(conn, &meta, &before)?;
-                self.remove_snapshot_temporary(&safe_id, meta.revision, meta.is_bundle)?;
+                self.revert_update(conn, meta, before)?;
+                self.remove_snapshot_temporary(safe_id, meta.revision, meta.is_bundle)?;
                 self.cancel_compensated_audit_intent(
                     conn,
                     audit,
-                    &intent_id,
+                    intent_id,
                     operation,
                     id,
                     Some(meta.revision.saturating_add(1)),
@@ -195,25 +231,19 @@ impl StoreContext {
             }
             return Err(interrupt.error);
         }
-
-        advance_durability_intent(conn, &intent_id, "body_durable")?;
-
-        // Pruning is best-effort in Node too; a fault here leaves a fully committed update.
+        advance_durability_intent(conn, intent_id, "body_durable")?;
         self.bare_fault(FaultPoint::UpdatePrune)?;
-        self.prune_history(conn, &safe_id);
-
+        self.prune_history(conn, safe_id);
         self.finalize_audit_and_intent(
             conn,
             audit,
-            &intent_id,
+            intent_id,
             operation,
             id,
             Some(meta.revision.saturating_add(1)),
         )?;
-
-        let meta = load_meta(conn, id)?.ok_or(AppError::Internal)?;
         Ok(UpdateArtifactResult {
-            meta,
+            meta: load_meta(conn, id)?.ok_or(AppError::Internal)?,
             changed: true,
         })
     }
@@ -427,4 +457,15 @@ impl StoreContext {
             .map_err(|error| sql_error("commit update transaction", &error))?;
         Ok(true)
     }
+}
+
+struct UpdateBodyFinish<'a> {
+    id: &'a str,
+    meta: &'a ArtifactMeta,
+    safe_id: &'a SafeArtifactId,
+    staged: Option<PathBuf>,
+    before: &'a MetaBefore,
+    audit: &'a MutationAudit,
+    intent_id: &'a str,
+    operation: &'a str,
 }

@@ -19,11 +19,34 @@ pub(crate) async fn add_review_app_data(
     if !client_supports_apps(message) {
         return result;
     }
+    let Some(tool_name) = review_tool_name(message) else {
+        return result;
+    };
+
+    if tool_name == "delete_artifact" {
+        add_delete_audit(&mut result, auth);
+        return result;
+    }
+
+    let reviews = collect_reviews(tool_name, &result, auth, deps).await;
+    if reviews.is_empty() {
+        return result;
+    }
+
+    insert_result_meta(
+        &mut result,
+        "com.agentshelf.artifact-mcp/review",
+        json!({ "artifacts": reviews }),
+    );
+    result
+}
+
+fn review_tool_name(message: &OrderedJson) -> Option<&str> {
     let tool_name = message
         .get("params")
         .and_then(|params| params.get("name"))
         .and_then(OrderedJson::as_str);
-    if !matches!(
+    matches!(
         tool_name,
         Some(
             "publish_artifact"
@@ -36,36 +59,41 @@ pub(crate) async fn add_review_app_data(
                 | "create_share"
                 | "submit_feedback"
         )
-    ) {
-        return result;
-    }
+    )
+    .then_some(tool_name?)
+}
 
-    if tool_name == Some("delete_artifact") {
-        let id = result
-            .get("structuredContent")
-            .and_then(|content| content.get("id"))
-            .and_then(Value::as_str)
-            .unwrap_or_default()
-            .to_owned();
-        let deleted = result
-            .get("structuredContent")
-            .and_then(|content| content.get("deleted"))
-            .and_then(Value::as_bool)
-            .unwrap_or(false);
-        insert_result_meta(
-            &mut result,
-            "com.agentshelf.artifact-mcp/audit",
-            json!({
-                "action": "delete",
-                "artifactId": id,
-                "actor": format!("agent:{}", auth.client_id),
-                "outcome": if deleted { "deleted" } else { "unchanged" }
-            }),
-        );
-        return result;
-    }
+fn add_delete_audit(result: &mut Value, auth: &PublisherIdentity) {
+    let id = result
+        .get("structuredContent")
+        .and_then(|content| content.get("id"))
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let deleted = result
+        .get("structuredContent")
+        .and_then(|content| content.get("deleted"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    insert_result_meta(
+        result,
+        "com.agentshelf.artifact-mcp/audit",
+        json!({
+            "action": "delete",
+            "artifactId": id,
+            "actor": format!("agent:{}", auth.client_id),
+            "outcome": if deleted { "deleted" } else { "unchanged" }
+        }),
+    );
+}
 
-    let reviews = if tool_name == Some("list_artifacts") {
+async fn collect_reviews(
+    tool_name: &str,
+    result: &Value,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+) -> Vec<Value> {
+    if tool_name == "list_artifacts" {
         let ids = result
             .get("structuredContent")
             .and_then(|content| content.get("artifacts"))
@@ -108,17 +136,7 @@ pub(crate) async fn add_review_app_data(
         } else {
             Vec::new()
         }
-    };
-    if reviews.is_empty() {
-        return result;
     }
-
-    insert_result_meta(
-        &mut result,
-        "com.agentshelf.artifact-mcp/review",
-        json!({ "artifacts": reviews }),
-    );
-    result
 }
 
 fn insert_result_meta(result: &mut Value, key: &str, value: Value) {
