@@ -1556,4 +1556,35 @@ mod tests {
         assert!(!is_valid_color("#abcd"));
         assert!(!is_valid_color("#gggggg"));
     }
+
+    #[test]
+    fn add_category_reports_unknown_org_before_empty_category() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute_batch(
+            "CREATE TABLE orgs (name TEXT PRIMARY KEY);
+             CREATE TABLE org_categories (org TEXT NOT NULL, name TEXT NOT NULL);",
+        )
+        .expect("create organization tables");
+
+        assert_eq!(
+            add_category(&conn, "missing", " \t "),
+            Err(AppError::Validation(
+                "Unknown organization \"missing\".".to_owned()
+            ))
+        );
+    }
+
+    #[test]
+    fn add_domain_reports_unknown_org_before_invalid_domain() {
+        let conn = Connection::open_in_memory().expect("open in-memory database");
+        conn.execute_batch("CREATE TABLE orgs (name TEXT PRIMARY KEY);")
+            .expect("create organizations table");
+
+        assert_eq!(
+            add_domain(&conn, "missing", "not a domain"),
+            Err(AppError::Validation(
+                "Unknown organization \"missing\".".to_owned()
+            ))
+        );
+    }
 }
