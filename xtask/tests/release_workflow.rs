@@ -354,6 +354,37 @@ fn every_release_workflow_action_is_pinned_to_a_commit() {
 }
 
 #[test]
+fn every_workflow_action_is_pinned_to_a_commit() {
+    let root = repo_root().join(".github/workflows");
+    let mut files = std::fs::read_dir(&root)
+        .expect("read .github/workflows")
+        .map(|entry| entry.expect("workflow entry").path())
+        .filter(|path| path.extension().is_some_and(|ext| ext == "yml"))
+        .collect::<Vec<_>>();
+    files.sort();
+    assert!(files.len() >= 4, "{files:?}");
+    for file in files {
+        let text = std::fs::read_to_string(&file).expect("read workflow");
+        for action in text.lines().filter_map(|line| {
+            line.trim_start()
+                .trim_start_matches("- ")
+                .strip_prefix("uses: ")
+        }) {
+            let (name, rest) = action.split_once('@').expect("uses: owner/action@ref");
+            let reference = rest.split(" #").next().unwrap();
+            assert!(
+                reference.len() == 40
+                    && reference
+                        .bytes()
+                        .all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')),
+                "{}: {name} is pinned to {reference:?}, not a commit SHA",
+                file.display()
+            );
+        }
+    }
+}
+
+#[test]
 fn github_workflows_use_pinned_node_24_action_runtimes() {
     let combined = [
         ".github/workflows/ci.yml",
