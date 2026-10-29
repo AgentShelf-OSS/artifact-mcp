@@ -1110,6 +1110,10 @@ fn result_from_delivery(
 }
 
 #[cfg(test)]
+#[path = "discord_discussion/characterization.rs"]
+mod characterization;
+
+#[cfg(test)]
 mod tests {
     use std::{net::SocketAddr, sync::Arc};
 
