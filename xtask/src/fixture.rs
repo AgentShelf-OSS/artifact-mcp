@@ -5,7 +5,8 @@
 //! `fixture.json`, which records every byte that was written. The rows, bodies, constants, and
 //! manifest fields match the Node generator so that the corpus stays uniform. Only the provenance
 //! changes: `generation` names this command, and `migrationLedgerSha256` is the SHA-256 of
-//! `src/persistence/migrations.rs` (the Node generator hashed `lib/migrations.js`).
+//! `src/persistence/migrations.rs` and the migration modules under `src/persistence/migrations/`
+//! (the Node generator hashed `lib/migrations.js`).
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -31,6 +32,9 @@ pub const FIXTURE_API_TOKEN: &str = "fixture-public-token-v1";
 pub const GENERATION: &str = "cargo xtask historical-fixture";
 /// The migration ledger whose digest `fixture.json` records, relative to the repository root.
 pub const LEDGER_SOURCE: &str = "src/persistence/migrations.rs";
+/// The directory of migration modules that [`LEDGER_SOURCE`] declares. Its `.rs` files are part of
+/// the ledger digest.
+pub const LEDGER_MODULE_DIR: &str = "src/persistence/migrations";
 const LEDGER_REF: &str = "current append-only migration ledger";
 const FIXTURE_OWNER: &str = "fixture-owner@example.test";
 const FIXTURE_DESCRIPTION: &str = "Synthetic historical fixture";
@@ -679,9 +683,32 @@ fn build_case(
     Ok((manifest, explicit))
 }
 
-/// SHA-256 of the migration ledger source the compiled generator embeds.
+/// SHA-256 of the migration ledger source the compiled generator embeds: [`LEDGER_SOURCE`], then
+/// each `.rs` file in [`LEDGER_MODULE_DIR`] in path order. Each file contributes its relative path,
+/// a NUL byte, its length as a little-endian `u64`, and its bytes.
 pub fn ledger_digest(repo: &Path) -> Result<String> {
-    Ok(sha256_hex(fs::read(repo.join(LEDGER_SOURCE))?))
+    let mut sources = vec![PathBuf::from(LEDGER_SOURCE)];
+    let mut modules = Vec::new();
+    for entry in fs::read_dir(repo.join(LEDGER_MODULE_DIR))? {
+        let name = entry?.file_name();
+        if Path::new(&name)
+            .extension()
+            .is_some_and(|extension| extension == "rs")
+        {
+            modules.push(Path::new(LEDGER_MODULE_DIR).join(name));
+        }
+    }
+    modules.sort();
+    sources.extend(modules);
+    let mut hasher = Sha256::new();
+    for source in &sources {
+        let bytes = fs::read(repo.join(source))?;
+        hasher.update(source.to_string_lossy().as_bytes());
+        hasher.update([0]);
+        hasher.update(u64::try_from(bytes.len())?.to_le_bytes());
+        hasher.update(&bytes);
+    }
+    Ok(hex::encode(hasher.finalize()))
 }
 
 fn strings(values: &[&str]) -> Vec<String> {

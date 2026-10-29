@@ -83,7 +83,7 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 - `src/mcp/dispatch.rs` / `src/mcp/tool_defs.rs` / `src/mcp/validation.rs` — MCP method dispatch, declared tool schemas, and request validation.
 - `src/config.rs` — runtime configuration, including the upload and HTTP-envelope limits.
 - `src/artifacts/` — artifact lifecycle module: publication, reads, deletion, and storage reconciliation.
-- `src/persistence/db.rs` / `src/persistence/migrations.rs` — SQLite opening, the connection pool, and ordered schema evolution. Some migrations load shared SQL from `migrations/`.
+- `src/persistence/db.rs` / `src/persistence/migrations.rs` — SQLite opening, the connection pool, and ordered schema evolution. The migration bodies live in `src/persistence/migrations/`, grouped by schema range. Some migrations load shared SQL from the top-level `migrations/` directory.
 - `src/persistence/keys.rs` / `src/persistence/reactions.rs` — publisher-key and reaction persistence.
 - `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
 - `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. `assets/shell.js` brokers state messages, caches reads, and debounces writes.
