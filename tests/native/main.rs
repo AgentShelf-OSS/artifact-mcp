@@ -67,6 +67,7 @@ mod u56_outbox;
 mod u58_admin_audit;
 mod u79_discussion_app;
 mod u79_discussion_persistence;
+mod u79_discussion_store_order;
 mod u79_outbox_bridge;
 mod u80_discord_inbound;
 mod u81_organization_discord;
