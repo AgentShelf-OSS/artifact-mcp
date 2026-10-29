@@ -152,6 +152,10 @@ impl OAuthAuthenticator {
             return Err(OAuthTokenRejection::BadSignature);
         }
 
+        self.verify_claims(payload)
+    }
+
+    fn verify_claims(&self, payload: &str) -> Result<PublisherIdentity, OAuthTokenRejection> {
         let claims = decode_json_object(payload).ok_or(OAuthTokenRejection::Malformed)?;
         if required_string_claim(&claims, "iss")? != self.config.issuer {
             return Err(OAuthTokenRejection::WrongIssuer);

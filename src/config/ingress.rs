@@ -110,32 +110,9 @@ impl Default for IngressConfig {
 
 impl IngressConfig {
     pub(super) fn from_source(env: &dyn EnvSource) -> Result<Self, AppError> {
-        let trusted_proxy_cidrs = present(env, "TRUSTED_PROXY_CIDRS")
-            .map(|raw| {
-                raw.split(',')
-                    .map(str::trim)
-                    .filter(|value| !value.is_empty())
-                    .map(|value| {
-                        value.parse::<IpNet>().map_err(|_| {
-                            invalid("TRUSTED_PROXY_CIDRS", value, "a comma-separated CIDR list")
-                        })
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-            })
-            .transpose()?
-            .unwrap_or_default();
-        let max_header_bytes = positive_integer(
-            env,
-            "INGRESS_MAX_HEADER_BYTES",
-            DEFAULT_INGRESS_MAX_HEADER_BYTES,
-        )?;
-        if max_header_bytes < 8 * 1024 {
-            return Err(invalid(
-                "INGRESS_MAX_HEADER_BYTES",
-                &max_header_bytes.to_string(),
-                "at least 8192 bytes for Hyper HTTP/1 parsing",
-            ));
-        }
+        let trusted_proxy_cidrs = trusted_proxy_cidrs(env)?;
+        let max_header_bytes = max_header_bytes(env)?;
+        let rates = std::cell::Cell::new(None);
         Ok(Self {
             max_headers: positive_integer(env, "INGRESS_MAX_HEADERS", DEFAULT_INGRESS_MAX_HEADERS)?,
             max_header_bytes,
@@ -204,6 +181,82 @@ impl IngressConfig {
                 "INGRESS_JSON_MAX_BATCH",
                 DEFAULT_INGRESS_JSON_MAX_BATCH,
             )?,
+            rate_window_seconds: {
+                rates.set(Some(RateLimits::from_source(env)?));
+                rates.get().ok_or(AppError::Internal)?.rate_window_seconds
+            },
+            reads_per_window: rates.get().ok_or(AppError::Internal)?.reads_per_window,
+            mutations_per_window: rates.get().ok_or(AppError::Internal)?.mutations_per_window,
+            mcp_per_window: rates.get().ok_or(AppError::Internal)?.mcp_per_window,
+            uploads_per_window: rates.get().ok_or(AppError::Internal)?.uploads_per_window,
+            feedback_per_window: rates.get().ok_or(AppError::Internal)?.feedback_per_window,
+            state_per_window: rates.get().ok_or(AppError::Internal)?.state_per_window,
+            admin_per_window: rates.get().ok_or(AppError::Internal)?.admin_per_window,
+            verified_viewers_per_window: rates
+                .get()
+                .ok_or(AppError::Internal)?
+                .verified_viewers_per_window,
+            shares_per_window: rates.get().ok_or(AppError::Internal)?.shares_per_window,
+            auth_failures_per_window: rates
+                .get()
+                .ok_or(AppError::Internal)?
+                .auth_failures_per_window,
+            trusted_proxy_cidrs,
+        })
+    }
+}
+
+fn trusted_proxy_cidrs(env: &dyn EnvSource) -> Result<Vec<IpNet>, AppError> {
+    present(env, "TRUSTED_PROXY_CIDRS")
+        .map(|raw| {
+            raw.split(',')
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(|value| {
+                    value.parse::<IpNet>().map_err(|_| {
+                        invalid("TRUSTED_PROXY_CIDRS", value, "a comma-separated CIDR list")
+                    })
+                })
+                .collect()
+        })
+        .transpose()
+        .map(|cidrs| cidrs.unwrap_or_default())
+}
+
+fn max_header_bytes(env: &dyn EnvSource) -> Result<u64, AppError> {
+    let value = positive_integer(
+        env,
+        "INGRESS_MAX_HEADER_BYTES",
+        DEFAULT_INGRESS_MAX_HEADER_BYTES,
+    )?;
+    if value < 8 * 1024 {
+        return Err(invalid(
+            "INGRESS_MAX_HEADER_BYTES",
+            &value.to_string(),
+            "at least 8192 bytes for Hyper HTTP/1 parsing",
+        ));
+    }
+    Ok(value)
+}
+
+#[derive(Clone, Copy)]
+struct RateLimits {
+    rate_window_seconds: u64,
+    reads_per_window: u64,
+    mutations_per_window: u64,
+    mcp_per_window: u64,
+    uploads_per_window: u64,
+    feedback_per_window: u64,
+    state_per_window: u64,
+    admin_per_window: u64,
+    verified_viewers_per_window: u64,
+    shares_per_window: u64,
+    auth_failures_per_window: u64,
+}
+
+impl RateLimits {
+    fn from_source(env: &dyn EnvSource) -> Result<Self, AppError> {
+        Ok(Self {
             rate_window_seconds: positive_integer(
                 env,
                 "INGRESS_RATE_WINDOW_SECONDS",
@@ -259,7 +312,6 @@ impl IngressConfig {
                 "INGRESS_AUTH_FAILURES_PER_WINDOW",
                 DEFAULT_INGRESS_AUTH_FAILURES_PER_WINDOW,
             )?,
-            trusted_proxy_cidrs,
         })
     }
 }

@@ -106,8 +106,29 @@ pub(super) fn render_settings(
     app_brand: &str,
     view: &SettingsView,
 ) -> Result<String, AppError> {
-    let colors: BTreeMap<OrgId, Option<String>> = view
-        .organizations
+    let colors = settings_colors(view);
+    let active_count = view
+        .keys
+        .iter()
+        .filter(|key| key.revoked_at.is_none())
+        .count();
+    let keys = settings_keys(view, &colors);
+    let organizations = settings_organizations(view);
+    settings_template(
+        site_host,
+        app_name,
+        app_brand,
+        view,
+        active_count,
+        keys,
+        organizations,
+    )
+    .render()
+    .map_err(|_| AppError::Internal)
+}
+
+fn settings_colors(view: &SettingsView) -> BTreeMap<OrgId, Option<String>> {
+    view.organizations
         .iter()
         .map(|organization| {
             (
@@ -115,14 +136,14 @@ pub(super) fn render_settings(
                 organization.organization.color.clone(),
             )
         })
-        .collect();
-    let active_count = view
-        .keys
-        .iter()
-        .filter(|key| key.revoked_at.is_none())
-        .count();
-    let keys = view
-        .keys
+        .collect()
+}
+
+fn settings_keys(
+    view: &SettingsView,
+    colors: &BTreeMap<OrgId, Option<String>>,
+) -> Vec<KeyTemplate> {
+    view.keys
         .iter()
         .map(|key| KeyTemplate {
             client_id: key.client_id.0.clone(),
@@ -144,9 +165,11 @@ pub(super) fn render_settings(
             created_at: format_settings_date(&key.created_at.0),
             revoked: key.revoked_at.is_some(),
         })
-        .collect();
-    let organizations = view
-        .organizations
+        .collect()
+}
+
+fn settings_organizations(view: &SettingsView) -> Vec<OrganizationTemplate> {
+    view.organizations
         .iter()
         .map(|entry| {
             let organization = &entry.organization;
@@ -199,7 +222,18 @@ pub(super) fn render_settings(
                     .collect(),
             }
         })
-        .collect();
+        .collect()
+}
+
+fn settings_template<'a>(
+    site_host: &'a str,
+    app_name: &'a str,
+    app_brand: &'a str,
+    view: &SettingsView,
+    active_count: usize,
+    keys: Vec<KeyTemplate>,
+    organizations: Vec<OrganizationTemplate>,
+) -> SettingsTemplate<'a> {
     let organization_count = view.organizations.len();
     let webhook_count = view
         .organizations
@@ -207,7 +241,7 @@ pub(super) fn render_settings(
         .map(|organization| organization.webhooks.len())
         .sum();
     let revoked_count = view.keys.len().saturating_sub(active_count);
-    let template = SettingsTemplate {
+    SettingsTemplate {
         favicon: FAVICON,
         theme_boot: THEME_BOOT,
         portal_css: PORTAL_CSS,
@@ -236,8 +270,7 @@ pub(super) fn render_settings(
             .iter()
             .map(|entry| entry.organization.name.0.clone())
             .collect(),
-    };
-    template.render().map_err(|_| AppError::Internal)
+    }
 }
 
 fn is_domain_shaped_org(value: &str) -> bool {

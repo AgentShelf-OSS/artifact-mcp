@@ -146,22 +146,7 @@ impl StoreContext {
         plan: PublishPlan<'_>,
         state: &mut PublishState,
     ) -> Result<ArtifactMeta, Interrupt> {
-        self.fault(FaultPoint::PublishStageWrite)?;
-        if let Some(html) = plan.single {
-            self.stage_single_body(
-                plan.staging,
-                html,
-                FaultPoint::PublishStageFileSync,
-                FaultPoint::PublishStageDirectorySync,
-            )?;
-        } else if let Some(bundle) = plan.bundle {
-            self.stage_bundle_files(
-                plan.staging,
-                &bundle.files,
-                FaultPoint::PublishStageFileSync,
-                FaultPoint::PublishStageDirectorySync,
-            )?;
-        }
+        self.stage_publish_body(&plan)?;
 
         self.fault(FaultPoint::PublishInsert)?;
         let org = if request.target_org.0.is_empty() {
@@ -239,6 +224,37 @@ impl StoreContext {
             "metadata_committed",
         )?;
 
+        self.finish_publish_body(conn, audit, &plan, state)?;
+        Ok(meta)
+    }
+
+    fn stage_publish_body(&self, plan: &PublishPlan<'_>) -> Result<(), Interrupt> {
+        self.fault(FaultPoint::PublishStageWrite)?;
+        if let Some(html) = plan.single {
+            self.stage_single_body(
+                plan.staging,
+                html,
+                FaultPoint::PublishStageFileSync,
+                FaultPoint::PublishStageDirectorySync,
+            )?;
+        } else if let Some(bundle) = plan.bundle {
+            self.stage_bundle_files(
+                plan.staging,
+                &bundle.files,
+                FaultPoint::PublishStageFileSync,
+                FaultPoint::PublishStageDirectorySync,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn finish_publish_body(
+        &self,
+        conn: &mut Connection,
+        audit: &MutationAudit,
+        plan: &PublishPlan<'_>,
+        state: &mut PublishState,
+    ) -> Result<(), Interrupt> {
         self.fault(FaultPoint::PublishRename)?;
         if let Err(error) = self.rename_with_barrier(
             plan.staging,
@@ -260,8 +276,6 @@ impl StoreContext {
             &format!("publish:{}", plan.id.as_str()),
             "body_durable",
         )?;
-        // Keep the terminal receipt after the final lifecycle fault boundary so an in-process
-        // failure can still prove compensation and append a single terminal failure record.
         self.fault(FaultPoint::PublishComplete)?;
         self.finalize_audit_and_intent(
             conn,
@@ -271,7 +285,7 @@ impl StoreContext {
             plan.id.as_str(),
             Some(1),
         )?;
-        Ok(meta)
+        Ok(())
     }
 }
 

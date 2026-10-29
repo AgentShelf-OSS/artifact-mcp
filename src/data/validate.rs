@@ -116,6 +116,11 @@ pub(super) fn validate_source(s: &SourceConfig) -> Result<(), String> {
     } else if s.base_url.is_some() || !s.headers_env.is_empty() {
         return Err(error());
     }
+    validate_operations(s, &error)?;
+    validate_subscriptions(s, &error)
+}
+
+fn validate_operations(s: &SourceConfig, error: &dyn Fn() -> String) -> Result<(), String> {
     for (n, o) in &s.operations {
         let post = o.method == "POST";
         let max_timeout = if o.stream { 120000 } else { 30000 };
@@ -183,6 +188,10 @@ pub(super) fn validate_source(s: &SourceConfig) -> Result<(), String> {
             return Err(error());
         }
     }
+    Ok(())
+}
+
+fn validate_subscriptions(s: &SourceConfig, error: &dyn Fn() -> String) -> Result<(), String> {
     for (n, sub) in &s.subscriptions {
         if !valid_name(n)
             || sub.events.len() > 16
