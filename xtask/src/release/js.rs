@@ -7,7 +7,7 @@
 //!
 //! - [`Js`] keeps object keys in insertion order. `JSON.parse` keeps the first position and the
 //!   last value of a duplicated key.
-//! - [`stringify`] and [`stringify_pretty`] follow the ECMAScript `JSON.stringify` algorithm,
+//! - [`stringify()`] and [`stringify_pretty`] follow the ECMAScript `JSON.stringify` algorithm,
 //!   including number formatting, string escapes and the integer-key-first property order.
 //! - [`string_to_number`] is `Number(string)`; [`to_js_string`] is `String(value)`.
 

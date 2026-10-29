@@ -265,7 +265,7 @@ const fn is_js_whitespace(value: char) -> bool {
     )
 }
 
-/// `String.prototype.trim` — see [`is_js_whitespace`].
+/// `String.prototype.trim` — see `is_js_whitespace`.
 #[must_use]
 pub fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)

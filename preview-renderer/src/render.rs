@@ -16,7 +16,7 @@
 //! * Workers, service workers and shared workers stay paused before their first statement and
 //!   never run (Playwright resumed dedicated workers).
 //! * Launch flags route all browser traffic to an unreachable proxy and disable DNS
-//!   (see [`crate::browser`] and `artifact_cdp::LOCKDOWN_SWITCHES`).
+//!   (see `crate::browser` and `artifact_cdp::LOCKDOWN_SWITCHES`).
 
 use std::collections::HashMap;
 use std::fmt;

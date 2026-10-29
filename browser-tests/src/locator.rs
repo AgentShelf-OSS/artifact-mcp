@@ -850,7 +850,7 @@ impl<'p> Locator<'p> {
         &self.description
     }
 
-    /// Descendants that match the CSS `selector` (see [`css_steps`] for `:visible`).
+    /// Descendants that match the CSS `selector` (see `css_steps` for `:visible`).
     pub fn locator(&self, selector: &str) -> Self {
         self.then(css_steps(selector), format!("locator({selector:?})"))
     }

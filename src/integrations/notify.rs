@@ -8,7 +8,7 @@
 //!    (alphabetical). `tests/native/u12_notify.rs` pins the bytes the retired Node runtime sent.
 //! 2. **The SSRF guard.** Delivery targets are restricted to `https://discord.com/api/webhooks/`
 //!    and `https://discordapp.com/api/webhooks/` by
-//!    [`is_discord_webhook_url`](crate::persistence::webhooks::is_discord_webhook_url), redirects
+//!    [`is_discord_webhook_url`], redirects
 //!    are refused rather than followed, and every request is bounded by [`DELIVERY_TIMEOUT`].
 //!    A prior audit cleared the Node predicate; it is ported literally, not "improved".
 //! 3. **Detached delivery.** [`DiscordNotifier::emit`] resolves before any request completes and

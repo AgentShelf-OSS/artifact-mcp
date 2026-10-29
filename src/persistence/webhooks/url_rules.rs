@@ -56,7 +56,7 @@ pub fn utf16_len(value: &str) -> usize {
 
 /// Equivalent of JavaScript `value.slice(0, max)` over UTF-16 code units.
 ///
-/// As with [`last_four_utf16`], a cut that would land inside a surrogate pair keeps the whole
+/// As with `last_four_utf16`, a cut that would land inside a surrogate pair keeps the whole
 /// character rather than producing an unrepresentable lone surrogate.
 #[must_use]
 pub fn truncate_utf16(value: &str, max: usize) -> String {

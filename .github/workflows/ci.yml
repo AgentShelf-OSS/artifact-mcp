@@ -26,6 +26,12 @@ jobs:
       # If cargo-nextest is ever adopted as the runner it does NOT execute doctests, and the
       # security::access compile_fail proofs live there — keep an explicit doc-test step.
       - run: cargo test --doc --locked
+      # Rustdoc lints (broken or private intra-doc links, invalid HTML) only warn by default, so
+      # a module split can break a link without failing any other step.
+      - name: Build the docs with rustdoc warnings denied
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --no-deps --locked
       - name: Regenerate the reproducible historical fixtures and compare them with the committed ones
         run: cargo xtask historical-fixture --verify-against-committed
       - name: Report MCP surface paths changed since the change base
@@ -76,6 +82,10 @@ jobs:
       - run: cargo fmt --manifest-path preview-renderer/Cargo.toml --check
       - run: cargo clippy --manifest-path preview-renderer/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path preview-renderer/Cargo.toml --locked
+      - name: Build the docs with rustdoc warnings denied
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --manifest-path preview-renderer/Cargo.toml --no-deps --locked
 
   browser:
     # Browser tests run in the pinned chrome-headless-shell, driven from Rust: the browser-asset
@@ -112,3 +122,7 @@ jobs:
       - run: cargo fmt --manifest-path browser-tests/Cargo.toml --check
       - run: cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path browser-tests/Cargo.toml --locked
+      - name: Build the docs with rustdoc warnings denied
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --manifest-path browser-tests/Cargo.toml --no-deps --locked

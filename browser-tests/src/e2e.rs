@@ -7,9 +7,9 @@
 //! * **Global setup** ([`Fixture::setup`]) starts the server ([`crate::server`]), creates the
 //!   throwaway organization `pwtest-<run id>` and launches one browser ([`Network::LoopbackOnly`]:
 //!   pages reach the server and nothing else).
-//! * **Each test** gets a [`Ctx`]: pages with an identity ([`Ctx::page`] is Playwright's `page`
-//!   fixture, signed in as the admin; [`Ctx::page_as`] is `browser.newContext({ extraHTTPHeaders
-//!   })`), API clients ([`Ctx::request`], [`Ctx::api`]) and the publishing helpers. Every page has
+//! * **Each test** gets a [`Ctx`]: pages with an identity ([`Fixture::page`] is Playwright's `page`
+//!   fixture, signed in as the admin; [`Fixture::page_as`] is `browser.newContext({ extraHTTPHeaders
+//!   })`), API clients ([`Fixture::request`], [`Fixture::api`]) and the publishing helpers. Every page has
 //!   its own browser context; the runner disposes of all of them after the test.
 //! * **Global teardown** ([`Fixture::teardown`]) deletes the artifacts of the run's organizations
 //!   and the organizations, and fails the run if it cannot.

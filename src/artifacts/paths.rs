@@ -76,7 +76,7 @@ impl TransientKind {
 // Live bodies
 // ---------------------------------------------------------------------------
 
-/// `filePath(id) = path.join(artifactDir, `<id>.html`)` — [lib/store.js:170-172]
+/// ``filePath(id) = path.join(artifactDir, `<id>.html`)`` — [lib/store.js:170-172]
 #[must_use]
 pub fn single_body_path(artifact_dir: &Path, id: &SafeArtifactId) -> PathBuf {
     artifact_dir.join(format!("{}.{SINGLE_BODY_EXTENSION}", id.as_str()))

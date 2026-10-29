@@ -31,7 +31,7 @@ pub struct Request {
     /// The query string without `?`, if any.
     pub query: Option<String>,
     /// Request headers as the page sent them, names in lower case. Empty for requests built by
-    /// [`Request::parse`].
+    /// `Request::parse`.
     pub headers: Vec<(String, String)>,
     /// The body, when the browser reported one.
     pub post_data: Option<String>,
