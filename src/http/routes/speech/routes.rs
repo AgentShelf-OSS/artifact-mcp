@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use tokio::sync::mpsc;
+use tokio::sync::{SemaphorePermit, mpsc};
 use tokio::task::JoinHandle;
 
 use crate::{
@@ -289,22 +289,41 @@ async fn stream_synthesize_impl(
     let Some(tts) = stream_client_for_voice(voice) else {
         return AppError::Unavailable("speech unavailable".to_owned()).into_response();
     };
+    let (response, permit) =
+        match request_stream_response(tts, text, voice, instructions, timed).await {
+            Ok(value) => value,
+            Err(response) => return response,
+        };
+    let response = match validate_stream_response(response, timed) {
+        Ok(response) => response,
+        Err(response) => return *response,
+    };
+    stream_response_body(response, permit, timed)
+}
+
+async fn request_stream_response(
+    tts: &'static super::clients::TtsClient,
+    text: &str,
+    voice: &str,
+    instructions: Option<String>,
+    timed: bool,
+) -> Result<(reqwest::Response, SemaphorePermit<'static>), Response> {
     let permit = match tts.permits.try_acquire() {
         Ok(permit) => permit,
         Err(_) => {
-            return (
+            return Err((
                 StatusCode::TOO_MANY_REQUESTS,
                 [(header::RETRY_AFTER, "2")],
                 Json(serde_json::json!({"error":"busy"})),
             )
-                .into_response();
+                .into_response());
         }
     };
     let mut payload = serde_json::json!({"text":text,"voice":voice});
     if let Some(instructions) = instructions {
         payload["instructions"] = serde_json::Value::String(instructions);
     }
-    let response = match tts
+    match tts
         .http
         .post(if timed {
             &tts.timed_stream_endpoint
@@ -316,16 +335,24 @@ async fn stream_synthesize_impl(
         .send()
         .await
     {
-        Ok(response) => response,
-        Err(_) => return AppError::Unavailable("speech unavailable".to_owned()).into_response(),
-    };
+        Ok(response) => Ok((response, permit)),
+        Err(_) => Err(AppError::Unavailable("speech unavailable".to_owned()).into_response()),
+    }
+}
+
+fn validate_stream_response(
+    response: reqwest::Response,
+    timed: bool,
+) -> Result<reqwest::Response, Box<Response>> {
     if response.status() == StatusCode::TOO_MANY_REQUESTS {
-        return (
-            StatusCode::TOO_MANY_REQUESTS,
-            [(header::RETRY_AFTER, "2")],
-            Json(serde_json::json!({"error":"busy"})),
-        )
-            .into_response();
+        return Err(Box::new(
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                [(header::RETRY_AFTER, "2")],
+                Json(serde_json::json!({"error":"busy"})),
+            )
+                .into_response(),
+        ));
     }
     if timed
         && matches!(
@@ -333,11 +360,13 @@ async fn stream_synthesize_impl(
             StatusCode::NOT_FOUND | StatusCode::UNSUPPORTED_MEDIA_TYPE
         )
     {
-        return (
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            Json(serde_json::json!({"error":"speech timed unavailable"})),
-        )
-            .into_response();
+        return Err(Box::new(
+            (
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                Json(serde_json::json!({"error":"speech timed unavailable"})),
+            )
+                .into_response(),
+        ));
     }
     if !response.status().is_success()
         || !response
@@ -357,8 +386,18 @@ async fn stream_synthesize_impl(
             .content_length()
             .is_some_and(|n| n > MAX_STREAM_BYTES)
     {
-        return AppError::Unavailable("speech unavailable".to_owned()).into_response();
+        return Err(Box::new(
+            AppError::Unavailable("speech unavailable".to_owned()).into_response(),
+        ));
     }
+    Ok(response)
+}
+
+fn stream_response_body(
+    response: reqwest::Response,
+    permit: SemaphorePermit<'static>,
+    timed: bool,
+) -> Response {
     let (tx, rx) = mpsc::channel::<Result<Vec<u8>, std::convert::Infallible>>(8);
     let task = tokio::spawn(async move {
         let _permit = permit;

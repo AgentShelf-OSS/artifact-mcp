@@ -189,83 +189,6 @@ pub(crate) fn parse_pocket_catalog(raw: &str) -> Result<Vec<CatalogVoice>, &'sta
     }
     Ok(voices)
 }
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn extra_pocket_voices_follow_the_configuration_contract() {
-        let parsed = parse_extra_pocket_voices(Some("estelle:Estelle:2.5,lola:Lola"))
-            .expect("valid configured voices");
-        assert_eq!(parsed[0].id, "pocket_estelle");
-        assert_eq!(parsed[0].name, "Estelle · Pocket");
-        assert_eq!(parsed[0].gain_db, Some(2.5));
-        assert_eq!(parsed[1].gain_db, None);
-        for invalid in [
-            "Bad:Voice",
-            "alba:Built in",
-            "lola:Lola,lola:Again",
-            "lola:Lola:12.1",
-            "lola:Lola:1e2",
-            "lola:Lola:+1",
-            "lola:Lola:.5",
-            "lola:Lola:1.",
-            ",lola:Lola",
-            "lola:Lola,",
-            "lola:Lola,,estelle:Estelle",
-            "lola:",
-        ] {
-            assert!(
-                parse_extra_pocket_voices(Some(invalid)).is_err(),
-                "{invalid}"
-            );
-        }
-        let too_many = (0..33)
-            .map(|index| format!("extra_{index}:Voice"))
-            .collect::<Vec<_>>()
-            .join(",");
-        assert!(parse_extra_pocket_voices(Some(&too_many)).is_err());
-        assert!(parse_extra_pocket_voices(Some("  ")).unwrap().is_empty());
-    }
-
-    #[test]
-    fn catalog_parses_tags_and_prefixes_ids() {
-        let voices = parse_pocket_catalog(r#"{"version":1,"voices":[
-            {"id":"andrea","label":"Andrea","gainDb":6,"gender":"female","accent":"American","style":"warm","source":"kyutai-donation"},
-            {"id":"alba","label":"Alba","gainDb":0,"gender":null,"accent":null,"style":null,"source":"pocket-preset"}
-        ]}"#)
-        .unwrap();
-        assert_eq!(voices[0].id, "pocket_andrea");
-        assert_eq!(voices[0].name, "Andrea · Pocket");
-        assert_eq!(voices[0].gain_db, Some(6.0));
-        assert_eq!(voices[0].tags.gender.as_deref(), Some("female"));
-        assert_eq!(voices[0].tags.accent.as_deref(), Some("American"));
-        assert_eq!(voices[1].tags.gender, None);
-        assert_eq!(voices[1].tags.source, "pocket-preset");
-    }
-
-    #[test]
-    fn catalog_rejects_bad_entries() {
-        let one =
-            |entry: &str| parse_pocket_catalog(&format!(r#"{{"version":1,"voices":[{entry}]}}"#));
-        assert!(one(r#"{"id":"Bad-Id","label":"x","source":"custom"}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"a,b","source":"custom"}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","gainDb":13,"source":"custom"}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","gender":"robot","source":"custom"}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","source":"elsewhere"}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","source":"custom","extra":1}"#).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","accent":"waaaaaaaaaaaaaaaaaaaaaaaaay too long","source":"custom"}"#).is_err());
-        assert!(parse_pocket_catalog(r#"{"version":2,"voices":[]}"#).is_err());
-        assert!(parse_pocket_catalog(r#"{"version":1,"voices":[{"id":"a","label":"A","source":"custom"},{"id":"a","label":"B","source":"custom"}]}"#).is_err());
-        let many = (0..401)
-            .map(|i| format!(r#"{{"id":"v{i}","label":"V","source":"custom"}}"#))
-            .collect::<Vec<_>>()
-            .join(",");
-        assert!(parse_pocket_catalog(&format!(r#"{{"version":1,"voices":[{many}]}}"#)).is_err());
-        assert!(one(r#"{"id":"ok","label":"x","source":"custom"}"#).is_ok());
-    }
-}
-
 /// The catalog named by `POCKET_TTS_VOICE_CATALOG`, re-read when the file changes. A missing
 /// or invalid catalog is logged and ignored so a bad file cannot take narration down.
 pub(crate) fn pocket_catalog() -> Vec<CatalogVoice> {
@@ -391,4 +314,81 @@ pub(crate) fn parse_extra_pocket_voices(
         });
     }
     Ok(voices)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn extra_pocket_voices_follow_the_configuration_contract() {
+        let parsed = parse_extra_pocket_voices(Some("estelle:Estelle:2.5,lola:Lola"))
+            .expect("valid configured voices");
+        assert_eq!(parsed[0].id, "pocket_estelle");
+        assert_eq!(parsed[0].name, "Estelle · Pocket");
+        assert_eq!(parsed[0].gain_db, Some(2.5));
+        assert_eq!(parsed[1].gain_db, None);
+        for invalid in [
+            "Bad:Voice",
+            "alba:Built in",
+            "lola:Lola,lola:Again",
+            "lola:Lola:12.1",
+            "lola:Lola:1e2",
+            "lola:Lola:+1",
+            "lola:Lola:.5",
+            "lola:Lola:1.",
+            ",lola:Lola",
+            "lola:Lola,",
+            "lola:Lola,,estelle:Estelle",
+            "lola:",
+        ] {
+            assert!(
+                parse_extra_pocket_voices(Some(invalid)).is_err(),
+                "{invalid}"
+            );
+        }
+        let too_many = (0..33)
+            .map(|index| format!("extra_{index}:Voice"))
+            .collect::<Vec<_>>()
+            .join(",");
+        assert!(parse_extra_pocket_voices(Some(&too_many)).is_err());
+        assert!(parse_extra_pocket_voices(Some("  ")).unwrap().is_empty());
+    }
+
+    #[test]
+    fn catalog_parses_tags_and_prefixes_ids() {
+        let voices = parse_pocket_catalog(r#"{"version":1,"voices":[
+            {"id":"andrea","label":"Andrea","gainDb":6,"gender":"female","accent":"American","style":"warm","source":"kyutai-donation"},
+            {"id":"alba","label":"Alba","gainDb":0,"gender":null,"accent":null,"style":null,"source":"pocket-preset"}
+        ]}"#)
+        .unwrap();
+        assert_eq!(voices[0].id, "pocket_andrea");
+        assert_eq!(voices[0].name, "Andrea · Pocket");
+        assert_eq!(voices[0].gain_db, Some(6.0));
+        assert_eq!(voices[0].tags.gender.as_deref(), Some("female"));
+        assert_eq!(voices[0].tags.accent.as_deref(), Some("American"));
+        assert_eq!(voices[1].tags.gender, None);
+        assert_eq!(voices[1].tags.source, "pocket-preset");
+    }
+
+    #[test]
+    fn catalog_rejects_bad_entries() {
+        let one =
+            |entry: &str| parse_pocket_catalog(&format!(r#"{{"version":1,"voices":[{entry}]}}"#));
+        assert!(one(r#"{"id":"Bad-Id","label":"x","source":"custom"}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"a,b","source":"custom"}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","gainDb":13,"source":"custom"}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","gender":"robot","source":"custom"}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","source":"elsewhere"}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","source":"custom","extra":1}"#).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","accent":"waaaaaaaaaaaaaaaaaaaaaaaaay too long","source":"custom"}"#).is_err());
+        assert!(parse_pocket_catalog(r#"{"version":2,"voices":[]}"#).is_err());
+        assert!(parse_pocket_catalog(r#"{"version":1,"voices":[{"id":"a","label":"A","source":"custom"},{"id":"a","label":"B","source":"custom"}]}"#).is_err());
+        let many = (0..401)
+            .map(|i| format!(r#"{{"id":"v{i}","label":"V","source":"custom"}}"#))
+            .collect::<Vec<_>>()
+            .join(",");
+        assert!(parse_pocket_catalog(&format!(r#"{{"version":1,"voices":[{many}]}}"#)).is_err());
+        assert!(one(r#"{"id":"ok","label":"x","source":"custom"}"#).is_ok());
+    }
 }
