@@ -1,0 +1,29 @@
+version: 2
+updates:
+  # Routine version updates wait 7 days after a release (30 for a new major version), so a
+  # hijacked release is usually found and yanked before it is proposed here. Security updates
+  # ignore the cooldown.
+  - package-ecosystem: cargo
+    directories:
+      - "/"
+      - "/preview-renderer"
+      - "/browser-tests"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+      semver-major-days: 30
+    groups:
+      cargo-minor-and-patch:
+        update-types: [minor, patch]
+
+  # Keeps the commit-SHA pins in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]

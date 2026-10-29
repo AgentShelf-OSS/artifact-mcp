@@ -1,0 +1,54 @@
+# cargo-deny policy for the server, preview-renderer and browser-tests workspaces.
+# CI runs `cargo deny check --config deny.toml advisories sources` against each one
+# (.github/workflows/dependencies.yml).
+
+[graph]
+# The targets we build and ship: CI and local builds (gnu) and the release binaries (musl).
+targets = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
+all-features = true
+
+[advisories]
+# Every exception names the advisory, the crate that pulls it in, and why the server is not
+# exposed or why it cannot be fixed yet. Remove an entry as soon as a usable fix exists;
+# cargo-deny warns about entries that no longer match anything.
+ignore = [
+    # basic-toml is unmaintained. Only askama_derive uses it, at compile time, to read askama's
+    # optional config file. It never sees runtime input.
+    { id = "RUSTSEC-2026-0374", reason = "build-time only: askama_derive config parsing" },
+
+    # Marvin attack: timing side channel in RSA private-key operations. rsa comes in through
+    # jsonwebtoken, and src/security/jwks.rs only builds DecodingKeys from public JWKS
+    # components, so no RSA private key exists in the process. No fixed release exists.
+    { id = "RUSTSEC-2023-0071", reason = "jsonwebtoken only verifies with public keys; no RSA private key in the process" },
+
+    # Timing variability in crypto-bigint 0.5 operations meant to be constant time. It reaches
+    # the server through p256/elliptic-curve 0.13, used for Web Push (VAPID signing and ECDH).
+    # The fix is crypto-bigint 0.7, which needs the p256 0.14 line. Accepted until that upgrade:
+    # exploiting it needs precise remote timing of push signing.
+    { id = "RUSTSEC-2026-0387", reason = "needs p256 0.14 upgrade; remote timing of Web Push signing only" },
+
+    # zstd-safe 7.x memory-safety advisories, fixed in zstd-safe 8.2, which twilight-gateway
+    # 0.17 does not accept. twilight-gateway enables zstd-safe with default features off, so
+    # the `legacy` and `seekable` features are not compiled, and it only calls
+    # DCtx::create/reset and DCtx::decompress_stream with InBuffer::around/OutBuffer::around.
+    # None of the affected functions below are reachable:
+    { id = "RUSTSEC-2026-0395", reason = "CCtx::set_parameter: compression is never used" },
+    { id = "RUSTSEC-2026-0396", reason = "seekable feature is off" },
+    { id = "RUSTSEC-2026-0397", reason = "OutBuffer::around_pos is never called" },
+    { id = "RUSTSEC-2026-0398", reason = "seekable feature is off" },
+    { id = "RUSTSEC-2026-0399", reason = "dictionary init is never used" },
+    { id = "RUSTSEC-2026-0400", reason = "one-shot DCtx::decompress* is never called" },
+    { id = "RUSTSEC-2026-0401", reason = "train_from_buffer is never called" },
+    { id = "RUSTSEC-2026-0402", reason = "CCtx::try_clone: compression is never used" },
+    { id = "RUSTSEC-2026-0403", reason = "legacy feature is off, so legacy frames are rejected" },
+    { id = "RUSTSEC-2026-0404", reason = "DCtx::try_clone is never called" },
+    { id = "RUSTSEC-2026-0405", reason = "seekable feature is off" },
+    { id = "RUSTSEC-2026-0406", reason = "multithreaded compression is never used" },
+]
+# Not in the RustSec database, so not listed above: GHSA-qwgh-2vcv-g2f7 (block-buffer 0.10.4,
+# via digest/sha2). It needs a caught panic, and release builds use panic = "abort".
+
+[sources]
+# Only crates.io. A dependency from another registry or a git URL fails the check.
+unknown-registry = "deny"
+unknown-git = "deny"

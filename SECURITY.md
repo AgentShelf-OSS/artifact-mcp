@@ -38,6 +38,16 @@ and a fix or mitigation will be coordinated before public disclosure.
 - **Not included:** content scanning, rate limiting, and a physically separate
   raw-content origin. Run the service on a dedicated hostname.
 
+## Dependencies
+
+- Every push, pull request and a daily scheduled run check all three Cargo workspaces with
+  `cargo deny` ([`deny.toml`](deny.toml)). The check fails on a RustSec advisory or on a
+  dependency from anywhere other than crates.io. Each accepted advisory is listed in
+  `deny.toml` with the reason the server is not exposed, or why no fix is usable yet.
+- Dependabot proposes routine updates only after a release is 7 days old (30 days for a new
+  major version), so a hijacked release has time to be found and yanked first.
+- Every GitHub Action is pinned to a commit SHA, and a test enforces it.
+
 ## Supported versions
 
 This is a young project; security fixes target the `main` branch. Pin a commit if
