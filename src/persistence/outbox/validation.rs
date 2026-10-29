@@ -8,7 +8,7 @@ use super::{
     MAX_TARGET_KEY_BYTES, internal,
 };
 
-pub(crate) fn validate(input: &EnqueueDelivery) -> Result<(), AppError> {
+pub(super) fn validate(input: &EnqueueDelivery) -> Result<(), AppError> {
     if input.payload.len() > MAX_PAYLOAD_BYTES {
         return Err(AppError::PayloadTooLarge);
     }
@@ -69,7 +69,7 @@ fn discussion_delivery_identity(input: &EnqueueDelivery) -> bool {
 /// connection. Replies and tombstones may wait only on their exact generation's root-create job.
 /// These two shapes prevent cross-tenant dependencies, arbitrary chains, and threads racing ahead
 /// of the notification message they attach to.
-pub(crate) fn validate_dependency_contract(
+pub(super) fn validate_dependency_contract(
     conn: &Connection,
     input: &EnqueueDelivery,
 ) -> Result<(), AppError> {
@@ -144,11 +144,11 @@ fn opaque_discussion_ref(value: &str) -> bool {
 /// Rate-limit state is keyed by a non-secret provider reference. Event enqueue remains stricter:
 /// it accepts only `webhook:` references, while a PBI-079 discussion delivery uses its immutable
 /// `discussion:<connection-id>` reference to retain bucket throttling across attempts.
-pub(crate) fn opaque_provider_secret_ref(value: &str) -> bool {
+pub(super) fn opaque_provider_secret_ref(value: &str) -> bool {
     opaque_secret_ref(value) || opaque_discussion_ref(value)
 }
 
-pub(crate) fn opaque_target_key(value: &str) -> bool {
+pub(super) fn opaque_target_key(value: &str) -> bool {
     value.len() <= MAX_TARGET_KEY_BYTES
         && !value.is_empty()
         && value
@@ -165,7 +165,7 @@ fn opaque_secret_ref(value: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
 }
-pub(crate) fn opaque_bucket_key(value: &str) -> bool {
+pub(super) fn opaque_bucket_key(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= MAX_BUCKET_KEY_BYTES
         && !value.contains(['\0', '\r', '\n'])
