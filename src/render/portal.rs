@@ -488,81 +488,14 @@ fn shell_template<'a>(
         .email
         .as_ref()
         .map_or("", |email| email.0.as_str());
-    let viewer_id = renderer.audit_key.map_or_else(String::new, |key| {
-        if viewer_email.is_empty() {
-            String::new()
-        } else {
-            viewer_handle(viewer_email, &key)
-        }
-    });
-    let viewer_name = view.viewer_display_name.clone().unwrap_or_else(|| {
-        if viewer_email.is_empty() {
-            String::new()
-        } else {
-            viewer_display_name(viewer_email)
-        }
-    });
+    let (viewer_id, viewer_name) = shell_viewer_identity(renderer, view, viewer_email);
     let who = if meta.uploader_label.is_empty() {
         meta.client_id.0.clone()
     } else {
         meta.uploader_label.clone()
     };
-    let threads = view
-        .feedback
-        .iter()
-        .filter(|feedback| feedback.parent_id.is_none())
-        .map(|parent| FeedbackThreadTemplate {
-            parent: feedback_template(parent, meta.revision, viewer_email, view.viewer.is_admin),
-            replies: view
-                .feedback
-                .iter()
-                .filter(|reply| reply.parent_id.as_ref() == Some(&parent.id))
-                .map(|reply| {
-                    feedback_template(reply, meta.revision, viewer_email, view.viewer.is_admin)
-                })
-                .collect(),
-        })
-        .collect();
-    let feedback_json = serde_json::to_string(
-        &view
-            .feedback
-            .iter()
-            .map(|feedback| {
-                let (author_source, external_author_display) = match &feedback.author {
-                    crate::model::FeedbackAuthor::Artifact { .. } => (None, None),
-                    crate::model::FeedbackAuthor::Discord {
-                        external_author_display,
-                        ..
-                    } => (Some("discord"), Some(external_author_display.as_str())),
-                };
-                FeedbackScriptRow {
-                    id: &feedback.id.0,
-                    parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
-                    viewer_email: feedback_author_label(&feedback.author),
-                    author_source,
-                    external_author_display,
-                    body: &feedback.body,
-                    created_at: &feedback.created_at.0,
-                    resolved_at: feedback.resolved_at.as_ref().map(|value| value.0.as_str()),
-                    anchor_path: feedback.anchor_path.as_deref(),
-                    anchor_x: feedback.anchor_x,
-                    anchor_y: feedback.anchor_y,
-                    anchor_w: feedback.anchor_w,
-                    anchor_h: feedback.anchor_h,
-                    anchor_approx: feedback.anchor_approx,
-                    anchor_page: feedback.anchor_page.as_deref(),
-                    // The frozen Feedback model does not expose Node's projection-only stale flag.
-                    anchor_page_stale: false,
-                    anchor_kind: feedback.anchor_kind.as_deref(),
-                    anchor_node_id: feedback.anchor_node_id.as_deref(),
-                    anchor_quote: feedback.anchor_quote.as_deref(),
-                    anchor_version: feedback.anchor_version,
-                    artifact_revision: feedback.artifact_revision,
-                }
-            })
-            .collect::<Vec<_>>(),
-    )
-    .map_err(|_| AppError::Internal)?;
+    let threads = shell_feedback_threads(view, meta.revision, viewer_email);
+    let feedback_json = shell_feedback_json(view)?;
     let raw_src = if meta.is_bundle {
         format!("/raw/{}/", meta.id.0)
     } else {
@@ -574,28 +507,8 @@ fn shell_template<'a>(
     } else {
         format!("&v={version}")
     };
-    let previous_id = view
-        .navigation
-        .previous_id
-        .as_ref()
-        .map_or_else(String::new, |id| id.0.clone());
-    let next_id = view
-        .navigation
-        .next_id
-        .as_ref()
-        .map_or_else(String::new, |id| id.0.clone());
-    let viewers = view
-        .viewers
-        .as_ref()
-        .into_iter()
-        .flatten()
-        .map(|viewer| ViewerTemplate {
-            email: viewer.email.0.clone(),
-            count: viewer.count,
-            count_plural: viewer.count != 1,
-            last_seen: format_date(&viewer.last_viewed_at.0),
-        })
-        .collect();
+    let (previous_id, next_id) = shell_navigation(view);
+    let viewers = shell_viewers(view);
     Ok(ShellTemplate {
         viewer_boot: TrustedStatic::new(include_str!("../../assets/viewer-boot.js")),
         favicon: FAVICON,
@@ -661,6 +574,119 @@ fn shell_template<'a>(
     })
 }
 
+fn shell_viewer_identity(
+    renderer: &AskamaPageRenderer,
+    view: &ShellView,
+    viewer_email: &str,
+) -> (String, String) {
+    let viewer_id = renderer.audit_key.map_or_else(String::new, |key| {
+        if viewer_email.is_empty() {
+            String::new()
+        } else {
+            viewer_handle(viewer_email, &key)
+        }
+    });
+    let viewer_name = view.viewer_display_name.clone().unwrap_or_else(|| {
+        if viewer_email.is_empty() {
+            String::new()
+        } else {
+            viewer_display_name(viewer_email)
+        }
+    });
+    (viewer_id, viewer_name)
+}
+
+fn shell_feedback_threads(
+    view: &ShellView,
+    revision: u64,
+    viewer_email: &str,
+) -> Vec<FeedbackThreadTemplate> {
+    view.feedback
+        .iter()
+        .filter(|feedback| feedback.parent_id.is_none())
+        .map(|parent| FeedbackThreadTemplate {
+            parent: feedback_template(parent, revision, viewer_email, view.viewer.is_admin),
+            replies: view
+                .feedback
+                .iter()
+                .filter(|reply| reply.parent_id.as_ref() == Some(&parent.id))
+                .map(|reply| feedback_template(reply, revision, viewer_email, view.viewer.is_admin))
+                .collect(),
+        })
+        .collect()
+}
+
+fn shell_feedback_json(view: &ShellView) -> Result<String, AppError> {
+    serde_json::to_string(
+        &view
+            .feedback
+            .iter()
+            .map(|feedback| {
+                let (author_source, external_author_display) = match &feedback.author {
+                    crate::model::FeedbackAuthor::Artifact { .. } => (None, None),
+                    crate::model::FeedbackAuthor::Discord {
+                        external_author_display,
+                        ..
+                    } => (Some("discord"), Some(external_author_display.as_str())),
+                };
+                FeedbackScriptRow {
+                    id: &feedback.id.0,
+                    parent_id: feedback.parent_id.as_ref().map(|id| id.0.as_str()),
+                    viewer_email: feedback_author_label(&feedback.author),
+                    author_source,
+                    external_author_display,
+                    body: &feedback.body,
+                    created_at: &feedback.created_at.0,
+                    resolved_at: feedback.resolved_at.as_ref().map(|value| value.0.as_str()),
+                    anchor_path: feedback.anchor_path.as_deref(),
+                    anchor_x: feedback.anchor_x,
+                    anchor_y: feedback.anchor_y,
+                    anchor_w: feedback.anchor_w,
+                    anchor_h: feedback.anchor_h,
+                    anchor_approx: feedback.anchor_approx,
+                    anchor_page: feedback.anchor_page.as_deref(),
+                    // The frozen Feedback model does not expose Node's projection-only stale flag.
+                    anchor_page_stale: false,
+                    anchor_kind: feedback.anchor_kind.as_deref(),
+                    anchor_node_id: feedback.anchor_node_id.as_deref(),
+                    anchor_quote: feedback.anchor_quote.as_deref(),
+                    anchor_version: feedback.anchor_version,
+                    artifact_revision: feedback.artifact_revision,
+                }
+            })
+            .collect::<Vec<_>>(),
+    )
+    .map_err(|_| AppError::Internal)
+}
+
+fn shell_navigation(view: &ShellView) -> (String, String) {
+    let previous_id = view
+        .navigation
+        .previous_id
+        .as_ref()
+        .map_or_else(String::new, |id| id.0.clone());
+    let next_id = view
+        .navigation
+        .next_id
+        .as_ref()
+        .map_or_else(String::new, |id| id.0.clone());
+    (previous_id, next_id)
+}
+
+fn shell_viewers(view: &ShellView) -> Vec<ViewerTemplate> {
+    view.viewers
+        .as_ref()
+        .into_iter()
+        .flatten()
+        .map(|viewer| ViewerTemplate {
+            email: viewer.email.0.clone(),
+            count: viewer.count,
+            count_plural: viewer.count != 1,
+            last_seen: format_date(&viewer.last_viewed_at.0),
+        })
+        .collect()
+}
+
 fn feedback_author_label(author: &crate::model::FeedbackAuthor) -> &str {
     match author {
         crate::model::FeedbackAuthor::Artifact { viewer_email } => &viewer_email.0,
@@ -719,8 +745,76 @@ fn gallery_template<'a>(
     renderer: &'a AskamaPageRenderer,
     view: &GalleryView,
 ) -> GalleryTemplate<'a> {
+    let collection = gallery_collection(view);
+    let (org_category_index, categories) = gallery_categories(view);
+    let now = (renderer.clock)();
+    let cards = gallery_cards(&collection, view, &org_category_index, now);
+    let has_delete_actions = cards.iter().any(|card| card.show_delete);
+    let notifications = gallery_notifications(view, now);
+    let (viewer_org, identity_color) = gallery_identity(view, collection.is_admin);
+    let org_category_json =
+        serde_json::to_string(&org_category_index).unwrap_or_else(|_| "{}".to_owned());
+    GalleryTemplate {
+        collection_toolbar_css: COLLECTION_TOOLBAR_CSS,
+        collection_toolbar_script: COLLECTION_TOOLBAR_SCRIPT,
+        collection_css: COLLECTION_CSS,
+        collection_script: COLLECTION_SCRIPT,
+        favicon: FAVICON,
+        theme_boot: THEME_BOOT,
+        css: PORTAL_CSS,
+        script: PORTAL_SCRIPT,
+        icons: ICONS,
+        app_name: &renderer.app_name,
+        app_brand: &renderer.app_brand,
+        site_host: &renderer.site_host,
+        viewer_email: view
+            .viewer
+            .email
+            .as_ref()
+            .map_or_else(String::new, |email| email.0.clone()),
+        viewer_is_admin: collection.is_admin,
+        viewer_org: if viewer_org.is_empty() {
+            "your organization".to_owned()
+        } else {
+            viewer_org.clone()
+        },
+        role: if collection.is_admin {
+            "All organizations".to_owned()
+        } else if viewer_org.is_empty() {
+            "Member".to_owned()
+        } else {
+            viewer_org.clone()
+        },
+        identity_color,
+        total: collection.artifacts.len(),
+        organization_total: collection.organization_total,
+        favorite_total: collection.favorite_total,
+        needs_review_total: collection.needs_review_total,
+        hidden_total: collection.hidden_total,
+        has_delete_actions,
+        cards,
+        chips: collection.chips,
+        categories,
+        org_category_json,
+        notifications,
+        unread_notifications: view.unread_notifications,
+    }
+}
+
+struct GalleryCollection<'a> {
+    is_admin: bool,
+    org_names: Vec<String>,
+    artifacts: Vec<&'a ArtifactMeta>,
+    organization_total: usize,
+    favorite_total: usize,
+    needs_review_total: usize,
+    hidden_total: usize,
+    chips: Vec<GalleryChipTemplate>,
+}
+
+fn gallery_collection(view: &GalleryView) -> GalleryCollection<'_> {
     let is_admin = view.viewer.is_admin;
-    let org_names: Vec<String> = view
+    let org_names = view
         .sections
         .iter()
         .map(|section| section.org.0.clone())
@@ -736,7 +830,6 @@ fn gallery_template<'a>(
             .cmp(modified(left).encode_utf16())
             .then_with(|| left.id.0.cmp(&right.id.0))
     });
-    let total = artifacts.len();
     let favorite_total = artifacts
         .iter()
         .filter(|artifact| {
@@ -745,8 +838,6 @@ fn gallery_template<'a>(
                 .is_some_and(|reaction| reaction.favorite != 0)
         })
         .count();
-    let hidden_total = artifacts.iter().filter(|artifact| artifact.hidden).count();
-    let organization_total = view.sections.len();
     let needs_review_total = artifacts
         .iter()
         .filter(|artifact| {
@@ -761,6 +852,7 @@ fn gallery_template<'a>(
             }
         })
         .count();
+    let hidden_total = artifacts.iter().filter(|artifact| artifact.hidden).count();
     let chips = view
         .sections
         .iter()
@@ -769,12 +861,31 @@ fn gallery_template<'a>(
             count: section.items.len(),
         })
         .collect();
-    let mut org_category_index = BTreeMap::<String, Vec<OrgCategoryTemplate>>::new();
+    GalleryCollection {
+        is_admin,
+        org_names,
+        artifacts,
+        organization_total: view.sections.len(),
+        favorite_total,
+        needs_review_total,
+        hidden_total,
+        chips,
+    }
+}
+
+fn gallery_categories(
+    view: &GalleryView,
+) -> (
+    BTreeMap<String, Vec<OrgCategoryTemplate>>,
+    Vec<CategoryFilterTemplate>,
+) {
+    let mut index = BTreeMap::<String, Vec<OrgCategoryTemplate>>::new();
     for section in &view.sections {
-        let mut counts = BTreeMap::<String, usize>::new();
+        let mut counts = BTreeMap::new();
         for artifact in &section.items {
-            let category = js_trim(&artifact.category).to_owned();
-            *counts.entry(category).or_default() += 1;
+            *counts
+                .entry(js_trim(&artifact.category).to_owned())
+                .or_default() += 1;
         }
         let mut names = view
             .org_categories
@@ -788,7 +899,7 @@ fn gallery_template<'a>(
         names.extend(counts.keys().cloned());
         names.sort_by(|left, right| category_cmp(left, right));
         names.dedup();
-        org_category_index.insert(
+        index.insert(
             section.org.0.clone(),
             names
                 .into_iter()
@@ -799,19 +910,16 @@ fn gallery_template<'a>(
                 .collect(),
         );
     }
-    let mut category_counts: Vec<(String, usize)> = Vec::new();
-    for category in org_category_index.values().flatten() {
-        if let Some((_, count)) = category_counts
-            .iter_mut()
-            .find(|(name, _)| name == &category.name)
-        {
+    let mut counts: Vec<(String, usize)> = Vec::new();
+    for category in index.values().flatten() {
+        if let Some((_, count)) = counts.iter_mut().find(|(name, _)| name == &category.name) {
             *count += category.count;
         } else {
-            category_counts.push((category.name.clone(), category.count));
+            counts.push((category.name.clone(), category.count));
         }
     }
-    category_counts.sort_by(|(left, _), (right, _)| category_cmp(left, right));
-    let categories = category_counts
+    counts.sort_by(|(left, _), (right, _)| category_cmp(left, right));
+    let categories = counts
         .into_iter()
         .map(|(key, count)| CategoryFilterTemplate {
             label: if key.is_empty() {
@@ -823,11 +931,20 @@ fn gallery_template<'a>(
             count,
         })
         .collect();
-    let now = (renderer.clock)();
-    let cards: Vec<CardTemplate> = artifacts
-        .into_iter()
+    (index, categories)
+}
+
+fn gallery_cards(
+    collection: &GalleryCollection<'_>,
+    view: &GalleryView,
+    index: &BTreeMap<String, Vec<OrgCategoryTemplate>>,
+    now: i64,
+) -> Vec<CardTemplate> {
+    collection
+        .artifacts
+        .iter()
         .map(|artifact| {
-            let category_names = org_category_index
+            let category_names = index
                 .get(&artifact.org.0)
                 .map(|categories| {
                     categories
@@ -836,12 +953,20 @@ fn gallery_template<'a>(
                         .collect::<Vec<_>>()
                 })
                 .unwrap_or_default();
-            card_template(artifact, view, &org_names, &category_names, is_admin, now)
+            card_template(
+                artifact,
+                view,
+                &collection.org_names,
+                &category_names,
+                collection.is_admin,
+                now,
+            )
         })
-        .collect();
-    let has_delete_actions = cards.iter().any(|card| card.show_delete);
-    let notifications = view
-        .notifications
+        .collect()
+}
+
+fn gallery_notifications(view: &GalleryView, now: i64) -> Vec<NotificationTemplate> {
+    view.notifications
         .iter()
         .map(|notification| {
             let author = match &notification.author {
@@ -864,7 +989,10 @@ fn gallery_template<'a>(
                 snippet: notification_snippet(&notification.body),
             }
         })
-        .collect();
+        .collect()
+}
+
+fn gallery_identity(view: &GalleryView, is_admin: bool) -> (String, String) {
     let viewer_org = view
         .viewer
         .org
@@ -875,53 +1003,8 @@ fn gallery_template<'a>(
         .org_colors
         .get(&OrgId::from(identity_org))
         .and_then(Option::as_deref);
-    let org_category_json =
-        serde_json::to_string(&org_category_index).unwrap_or_else(|_| "{}".to_owned());
-    GalleryTemplate {
-        collection_toolbar_css: COLLECTION_TOOLBAR_CSS,
-        collection_toolbar_script: COLLECTION_TOOLBAR_SCRIPT,
-        collection_css: COLLECTION_CSS,
-        collection_script: COLLECTION_SCRIPT,
-        favicon: FAVICON,
-        theme_boot: THEME_BOOT,
-        css: PORTAL_CSS,
-        script: PORTAL_SCRIPT,
-        icons: ICONS,
-        app_name: &renderer.app_name,
-        app_brand: &renderer.app_brand,
-        site_host: &renderer.site_host,
-        viewer_email: view
-            .viewer
-            .email
-            .as_ref()
-            .map_or_else(String::new, |email| email.0.clone()),
-        viewer_is_admin: is_admin,
-        viewer_org: if viewer_org.is_empty() {
-            "your organization".to_owned()
-        } else {
-            viewer_org.clone()
-        },
-        role: if is_admin {
-            "All organizations".to_owned()
-        } else if viewer_org.is_empty() {
-            "Member".to_owned()
-        } else {
-            viewer_org.clone()
-        },
-        identity_color: org_color(identity_org, identity_color),
-        total,
-        organization_total,
-        favorite_total,
-        needs_review_total,
-        hidden_total,
-        has_delete_actions,
-        cards,
-        chips,
-        categories,
-        org_category_json,
-        notifications,
-        unread_notifications: view.unread_notifications,
-    }
+    let identity_color = org_color(identity_org, identity_color);
+    (viewer_org, identity_color)
 }
 
 fn card_template(
