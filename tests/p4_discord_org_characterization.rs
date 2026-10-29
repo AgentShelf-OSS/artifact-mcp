@@ -4,7 +4,10 @@ use artifact_mcp::{
     config::Secret,
     error::AppError,
     model::{EmailAddress, OrgId, Viewer},
-    persistence::{db::Database, discord_organization::{OrganizationDiscordStore, RecoveryDestination}},
+    persistence::{
+        db::Database,
+        discord_organization::{OrganizationDiscordStore, RecoveryDestination},
+    },
     security::{audit::MutationAudit, crypto::WebhookUrlProtection},
 };
 
