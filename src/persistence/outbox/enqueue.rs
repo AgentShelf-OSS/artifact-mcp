@@ -6,6 +6,7 @@ use super::{
     internal, validate, validate_dependency_contract,
 };
 
+/// Atomically creates all new fan-out rows with a single global/tenant capacity decision.
 pub fn enqueue_many_in_transaction(
     tx: &Transaction<'_>,
     inputs: &[(EnqueueDelivery, String)],
