@@ -1,5 +1,8 @@
 use super::*;
 
+use reqwest::Method;
+use serde_json::{Value, json};
+
 #[test]
 fn discussion_request_preserves_operation_specific_routes_and_payloads() {
     let webhook_url = "https://discord.com/api/webhooks/123/token?discard=this";
@@ -40,8 +43,8 @@ fn discussion_request_preserves_operation_specific_routes_and_payloads() {
     ];
 
     for (operation, method, url, payload) in cases {
-        let request = discussion_request(webhook_url, webhook_ref.to_owned(), operation)
-            .expect("request");
+        let request =
+            discussion_request(webhook_url, webhook_ref.to_owned(), operation).expect("request");
         assert_eq!(request.method, method);
         assert_eq!(request.url, url);
         assert_eq!(
