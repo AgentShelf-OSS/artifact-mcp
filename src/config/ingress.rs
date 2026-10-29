@@ -263,3 +263,31 @@ impl IngressConfig {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::env::MapEnv;
+
+    #[test]
+    fn ingress_configuration_reports_trusted_proxy_cidrs_before_later_limits() {
+        let env = MapEnv::empty()
+            .with("TRUSTED_PROXY_CIDRS", "not-a-cidr")
+            .with("INGRESS_MAX_HEADER_BYTES", "1");
+
+        let error = IngressConfig::from_source(&env).expect_err("invalid configuration");
+
+        assert!(error.to_string().contains("TRUSTED_PROXY_CIDRS"));
+    }
+
+    #[test]
+    fn ingress_configuration_reports_header_floor_before_later_limits() {
+        let env = MapEnv::empty()
+            .with("INGRESS_MAX_HEADER_BYTES", "1")
+            .with("INGRESS_MAX_HEADERS", "not-a-number");
+
+        let error = IngressConfig::from_source(&env).expect_err("invalid configuration");
+
+        assert!(error.to_string().contains("INGRESS_MAX_HEADER_BYTES"));
+    }
+}
