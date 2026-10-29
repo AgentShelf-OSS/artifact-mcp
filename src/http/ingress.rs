@@ -1331,6 +1331,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn admission_headers_precede_multipart_and_declared_body_limits() {
+        let mut config = AppConfig::default();
+        config.ingress.max_headers = 1;
+        config.body.category_json = 1;
+        let response = router(Arc::new(IngressState::from_config(&config)))
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/ok")
+                    .header(header::CONTENT_TYPE, "multipart/form-data")
+                    .header(header::CONTENT_LENGTH, "2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::REQUEST_HEADER_FIELDS_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn admission_multipart_precedes_declared_body_limit() {
+        let mut config = AppConfig::default();
+        config.body.category_json = 1;
+        let response = router(Arc::new(IngressState::from_config(&config)))
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/ok")
+                    .header(header::CONTENT_TYPE, "multipart/form-data")
+                    .header(header::CONTENT_LENGTH, "2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::UNSUPPORTED_MEDIA_TYPE);
+    }
+
+    #[tokio::test]
+    async fn admission_declared_body_limit_precedes_rate_limit() {
+        let mut config = AppConfig::default();
+        config.body.category_json = 1;
+        config.body.feedback_json = 1;
+        config.body.reaction_json = 1;
+        config.ingress.mutations_per_window = 0;
+        let response = router(Arc::new(IngressState::from_config(&config)))
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/ok")
+                    .header(header::CONTENT_LENGTH, "2")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::PAYLOAD_TOO_LARGE);
+    }
+
+    #[tokio::test]
+    async fn admission_rate_limit_precedes_request_concurrency_limit() {
+        let mut config = AppConfig::default();
+        config.ingress.mutations_per_window = 0;
+        config.ingress.max_concurrent_requests = 0;
+        let response = router(Arc::new(IngressState::from_config(&config)))
+            .oneshot(
+                Request::builder()
+                    .method(Method::POST)
+                    .uri("/ok")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[tokio::test]
     async fn share_brute_force_and_bad_key_buckets_are_bounded_without_identity_labels() {
         let mut config = AppConfig::default();
         config.ingress.shares_per_window = 1;
