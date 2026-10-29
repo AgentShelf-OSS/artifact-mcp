@@ -24,5 +24,5 @@ pub use transition::{
     retry, verify_payload_hash,
 };
 
-pub(crate) use support::{find_event, get, hash, internal, row};
+pub(crate) use support::{find_event, get, hash, internal};
 pub(crate) use validation::{validate, validate_dependency_contract};

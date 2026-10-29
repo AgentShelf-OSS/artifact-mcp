@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use rusqlite::{Connection, Transaction, params};
+use rusqlite::{Transaction, params};
 
 use super::{
     DeliveryRecord, EnqueueDelivery, MAX_QUEUE_GLOBAL, MAX_QUEUE_TENANT, find_event, get, hash,

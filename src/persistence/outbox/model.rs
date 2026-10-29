@@ -4,8 +4,7 @@ use rusqlite::TransactionBehavior;
 use std::sync::Arc;
 
 use super::{
-    DeadLetterTransition, DeliveryRecord, EnqueueDelivery, QueueStatus, RetryTransition, accepted,
-    claim_next, dead_letter, enqueue_many_in_transaction, internal, persist_rate_limit,
+    accepted, claim_next, dead_letter, enqueue_many_in_transaction, internal, persist_rate_limit,
     queue_status, retry,
 };
 

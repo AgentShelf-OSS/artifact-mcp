@@ -1,7 +1,8 @@
 use crate::error::AppError;
 use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 
-use super::{DeadLetterTransition, DeliveryRecord, MAX_ATTEMPTS, RetryTransition, get, internal};
+use super::validation::{opaque_bucket_key, opaque_provider_secret_ref, opaque_target_key};
+use super::{DeadLetterTransition, DeliveryRecord, MAX_ATTEMPTS, RetryTransition, hash, internal};
 
 pub fn accepted(
     conn: &Connection,
@@ -221,6 +222,10 @@ fn transition(
         }
     };
     Ok(conn.execute("UPDATE provider_delivery_outbox SET state = ?1, lease_owner = NULL, lease_expires_at = NULL, lease_token = NULL, next_attempt_at = ?2, result_classification = ?3, duplicate_risk = ?4, discord_message_id = CASE WHEN ?1 = 'accepted' THEN ?5 ELSE discord_message_id END, terminal_error = ?6, updated_at = ?7, completed_at = CASE WHEN ?1 IN ('accepted', 'dead_letter') THEN ?7 ELSE NULL END WHERE id = ?8 AND state = 'leased' AND lease_owner = ?9 AND lease_token = ?10 AND lease_version = ?11 AND (?12 = 0 OR attempts >= ?13)", params![update.state, update.next_attempt_at, classification, i64::from(update.duplicate_risk), update.message, redact_error(update.error), update.now, id, worker, token, lease_version, i64::from(update.requires_exhaustion), MAX_ATTEMPTS]).map_err(internal)? == 1)
+}
+
+pub fn verify_payload_hash(record: &DeliveryRecord) -> bool {
+    hash(&record.payload) == record.payload_sha256
 }
 
 fn redact_error(error: &str) -> String {

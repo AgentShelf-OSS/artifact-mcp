@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use rusqlite::Connection;
 
-use super::QueueStatus;
+use super::{QueueStatus, internal};
 
 struct QueueStatusRow {
     active: i64,

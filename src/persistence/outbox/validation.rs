@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 
 use super::{
     DELIVERY_KIND_DISCUSSION_MESSAGE, DELIVERY_KIND_DISCUSSION_THREAD,
@@ -144,11 +144,11 @@ fn opaque_discussion_ref(value: &str) -> bool {
 /// Rate-limit state is keyed by a non-secret provider reference. Event enqueue remains stricter:
 /// it accepts only `webhook:` references, while a PBI-079 discussion delivery uses its immutable
 /// `discussion:<connection-id>` reference to retain bucket throttling across attempts.
-fn opaque_provider_secret_ref(value: &str) -> bool {
+pub(crate) fn opaque_provider_secret_ref(value: &str) -> bool {
     opaque_secret_ref(value) || opaque_discussion_ref(value)
 }
 
-fn opaque_target_key(value: &str) -> bool {
+pub(crate) fn opaque_target_key(value: &str) -> bool {
     value.len() <= MAX_TARGET_KEY_BYTES
         && !value.is_empty()
         && value
@@ -165,7 +165,7 @@ fn opaque_secret_ref(value: &str) -> bool {
             .bytes()
             .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
 }
-fn opaque_bucket_key(value: &str) -> bool {
+pub(crate) fn opaque_bucket_key(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= MAX_BUCKET_KEY_BYTES
         && !value.contains(['\0', '\r', '\n'])

@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 
 use super::{DeliveryRecord, LEASE_MILLIS, MAX_ATTEMPTS, get, internal};
 
