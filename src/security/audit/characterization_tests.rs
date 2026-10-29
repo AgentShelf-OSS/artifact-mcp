@@ -1126,3 +1126,73 @@ fn query_admission_checks_tenant_then_capability_then_cursor() {
     assert_eq!(page.events[0].event_hash, GOLDEN_EVENT_HASHES[0]);
     assert_eq!(page.next, None);
 }
+
+#[test]
+fn verify_mismatch_in_an_earlier_stage_answers_before_a_later_stage_error() {
+    // A forged checkpoint answers `Ok(false)` before the event stage can reject an
+    // inadmissible field.
+    let conn = golden_ledger();
+    conn.execute_batch(
+        "INSERT INTO security_audit_checkpoints (first_sequence,last_sequence,key_id,\
+         canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash) \
+         VALUES (1,1,'v1',1,'','','00');
+         UPDATE security_audit_events SET operation='Artifact.Publish' WHERE sequence=2;",
+    )
+    .expect("tamper");
+    assert_eq!(verify(&conn, &KEY), Ok(false));
+    // A missing head row alone is an error.
+    let conn = golden_ledger();
+    conn.execute("DELETE FROM security_audit_chain_head", [])
+        .expect("delete head");
+    assert_eq!(verify(&conn, &KEY), Err(AppError::Internal));
+    // An event mismatch answers `Ok(false)` before the head stage reads the missing head.
+    let conn = golden_ledger();
+    conn.execute_batch(
+        "UPDATE security_audit_events SET target_id='a2' WHERE sequence=1;
+         DELETE FROM security_audit_chain_head;",
+    )
+    .expect("tamper");
+    assert_eq!(verify(&conn, &KEY), Ok(false));
+}
+
+#[test]
+fn verify_rejects_a_checkpoint_from_another_canonical_version() {
+    // The golden checkpoint MAC does not cover the version, so only the version check
+    // rejects this row.
+    let conn = golden_ledger();
+    conn.execute(
+        "INSERT INTO security_audit_checkpoints (first_sequence,last_sequence,key_id,\
+         canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash) \
+         VALUES (1,1,'v1',2,?1,'',?2)",
+        params![GOLDEN_EVENT_HASHES[0], GOLDEN_CHECKPOINTS[0]],
+    )
+    .expect("insert checkpoint");
+    conn.execute("DELETE FROM security_audit_events WHERE sequence=1", [])
+        .expect("prune entry");
+    assert_eq!(verify(&conn, &KEY), Ok(false));
+}
+
+#[test]
+fn schema_refuses_a_checkpoint_with_an_inverted_range() {
+    // `verify` also rejects `last < first`; the schema keeps such a row from being stored.
+    let conn = golden_ledger();
+    let inserted = conn.execute(
+        "INSERT INTO security_audit_checkpoints (first_sequence,last_sequence,key_id,\
+         canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash) \
+         VALUES (1,0,'v1',1,?1,'',?2)",
+        params![GOLDEN_EVENT_HASHES[0], GOLDEN_CHECKPOINTS[0]],
+    );
+    assert!(
+        matches!(
+            &inserted,
+            Err(rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error {
+                    code: rusqlite::ErrorCode::ConstraintViolation,
+                    ..
+                },
+                Some(message)
+            )) if message == "CHECK constraint failed: first_sequence <= last_sequence"
+        ),
+        "{inserted:?}"
+    );
+}
