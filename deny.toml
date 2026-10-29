@@ -1,6 +1,6 @@
 # cargo-deny policy for the server, preview-renderer and browser-tests workspaces.
 # CI runs `cargo deny --manifest-path <workspace>/Cargo.toml --workspace --config deny.toml
-# check advisories sources` against each one
+# check advisories bans licenses sources` against each one
 # (.github/workflows/dependencies.yml).
 
 [graph]
@@ -40,6 +40,42 @@ ignore = [
 ]
 # Not in the RustSec database, so not listed above: GHSA-qwgh-2vcv-g2f7 (block-buffer 0.10.4,
 # via digest/sha2). It needs a caught panic, and release builds use panic = "abort".
+
+[licenses]
+# Permissive licences only. A crate whose licence expression does not resolve to one of these
+# fails the check, so a new copyleft or unlicensed dependency is a deliberate decision.
+confidence-threshold = 0.93
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-1-Clause",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "BSL-1.0",
+    "CC0-1.0",
+    "CDLA-Permissive-2.0",
+    "ISC",
+    "MIT",
+    "MIT-0",
+    "Unicode-3.0",
+    "Unlicense",
+    "Zlib",
+]
+# One allowlist serves three lockfiles, so a licence can be absent from one of them.
+unused-allowed-license = "allow"
+
+[licenses.private]
+# Workspace crates are `publish = false`; their licence is the repository's.
+ignore = true
+
+[bans]
+# Duplicate versions come from upstream (for example rand 0.8 through rsa next to rand 0.10);
+# report them without failing.
+multiple-versions = "warn"
+# A `*` version requirement fails. Path dependencies between private workspace crates (including
+# the server's `test-util` self dev-dependency) carry no version and are allowed.
+wildcards = "deny"
+allow-wildcard-paths = true
 
 [sources]
 # Only crates.io. A dependency from another registry or a git URL fails the check.
