@@ -323,17 +323,15 @@ mod tests {
     }
 
     #[test]
-    fn modern_metadata_selects_modern_transport_without_a_version_header() {
-        let payload = serde_json::json!({
+    fn modern_metadata_selects_modern_validation_without_a_version_header() {
+        let payload = serde_json::from_value(serde_json::json!({
             "method": "tools/list",
             "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2025-03-26"}}
-        });
+        }))
+        .expect("ordered MCP payload");
         let headers = axum::http::HeaderMap::new();
 
         assert!(modern_transport(&payload, &headers));
-        assert_eq!(
-            validate_transport(&payload, &headers),
-            Ok(crate::mcp::dispatch::ProtocolEra::Modern)
-        );
+        assert!(validate_transport(&payload, &headers).is_err());
     }
 }
