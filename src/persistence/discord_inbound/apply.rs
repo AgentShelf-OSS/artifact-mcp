@@ -4,15 +4,16 @@ use crate::{
     error::AppError,
     integrations::discord_inbound::{
         DiscordMessage, DiscordRestPort, IgnoreReason, InboundEvent, InboundEventInbox,
-        InboundFeedback, InboundIntegrationState, InboundProcessor, InboundResult, MemoryInbox,
-        RejectReason, RestError, ThreadDegradedReason, TwoWayThreadAuthorization,
+        InboundEventKind, InboundFeedback, InboundIntegrationState, InboundProcessor,
+        InboundResult, MemoryInbox, RejectReason, RestError, ThreadDegradedReason,
+        TwoWayThreadAuthorization,
     },
     model::{ArtifactId, FeedbackAuthor, FeedbackId, OrgId},
 };
 
 use super::common::internal;
 
-fn artifact_exists(
+pub(super) fn artifact_exists(
     conn: &Connection,
     artifact: &ArtifactId,
     org: &OrgId,
@@ -27,7 +28,7 @@ fn artifact_exists(
     .map_err(internal)
 }
 
-fn connected_inbound_destination(
+pub(super) fn connected_inbound_destination(
     conn: &Connection,
     artifact: &ArtifactId,
     org: &OrgId,
@@ -106,7 +107,7 @@ pub(super) fn apply_in_transaction(
     Ok(result)
 }
 
-fn exact_authorization(
+pub(super) fn exact_authorization(
     conn: &Connection,
     org: &OrgId,
     guild_id: &str,

@@ -3,7 +3,7 @@ use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use crate::{
     error::AppError,
     integrations::discord_inbound::{
-        InboundEvent, InboundEventKind, InboundResult, ThreadDegradedReason,
+        DiscordMessage, InboundEvent, InboundEventKind, InboundResult, TwoWayThreadAuthorization,
     },
     model::{ArtifactId, OrgId},
     persistence::db::{self, DbPool},
@@ -11,8 +11,10 @@ use crate::{
 };
 
 use super::{
-    apply::apply_in_transaction,
-    common::{MAX_FETCH_ATTEMPTS, MAX_PROVIDER_ID_BYTES, MAX_SESSION_ID_BYTES, internal},
+    apply::{
+        apply_in_transaction, artifact_exists, connected_inbound_destination, exact_authorization,
+    },
+    common::{MAX_FETCH_ATTEMPTS, internal},
     validation::validate_event_envelope,
 };
 
