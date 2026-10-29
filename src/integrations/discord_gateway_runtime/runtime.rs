@@ -7,33 +7,26 @@
 
 use std::{
     collections::BTreeMap,
-    sync::{Arc, LazyLock, Mutex},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
-use sha2::{Digest as _, Sha256};
 use tokio::{sync::watch, task::JoinHandle};
 use twilight_gateway::{
     ConfigBuilder, Event, EventTypeFlags, Intents, Session, Shard, ShardId, StreamExt as _,
 };
-use twilight_model::{
-    channel::{Message, message::MessageType},
-    gateway::payload::incoming::Ready,
-};
+use twilight_model::gateway::payload::incoming::Ready;
 
 use crate::{
     config::Secret,
-    integrations::discord_inbound::{
-        DiscordAuthor, DiscordMessage, InboundEvent, InboundEventKind, InboundResult,
-    },
+    integrations::discord_inbound::InboundResult,
     model::OrgId,
-    persistence::discord_inbound::{
-        DiscordInboundMetricsSnapshot, DiscordInboundStore, GatewayOrganizationTarget,
-        GatewayResume,
-    },
+    persistence::discord_inbound::{DiscordInboundStore, GatewayOrganizationTarget, GatewayResume},
     ports::discussions::OrganizationDiscordCredentialService,
 };
 
+use super::metrics::{increment_metric, refresh_metrics};
+use super::normalize::{message_version, normalize_event, normalize_message};
 use super::rest::{DiscordInboundReadinessRest, MessageFetch, readiness_error};
 
 const SUPERVISOR_POLL: Duration = Duration::from_secs(2);
@@ -43,95 +36,6 @@ const INBOX_CLEANUP_BATCH: u16 = 500;
 const PENDING_FETCH_BATCH: u16 = 25;
 const PENDING_FETCH_POLL: Duration = Duration::from_secs(5);
 const WORKER_SHUTDOWN_GRACE: Duration = Duration::from_secs(5);
-
-#[derive(Default)]
-struct DiscordInboundProcessMetrics {
-    snapshot: DiscordInboundMetricsSnapshot,
-    reconnects: u64,
-    duplicates: u64,
-    application_errors: u64,
-}
-
-static INBOUND_METRICS: LazyLock<Mutex<DiscordInboundProcessMetrics>> =
-    LazyLock::new(|| Mutex::new(DiscordInboundProcessMetrics::default()));
-
-pub fn render_prometheus() -> String {
-    let metrics = INBOUND_METRICS
-        .lock()
-        .unwrap_or_else(|error| error.into_inner());
-    let snapshot = &metrics.snapshot;
-    format!(
-        "# HELP artifact_mcp_discord_gateway_organizations Organization Gateway sessions by fixed health state.\n\
-         # TYPE artifact_mcp_discord_gateway_organizations gauge\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"disabled\"}} {}\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"connecting\"}} {}\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"ready\"}} {}\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"reconnecting\"}} {}\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"degraded\"}} {}\n\
-         artifact_mcp_discord_gateway_organizations{{state=\"failed\"}} {}\n\
-         # HELP artifact_mcp_discord_gateway_reconnects_total Gateway reconnect signals observed by this process.\n\
-         # TYPE artifact_mcp_discord_gateway_reconnects_total counter\n\
-         artifact_mcp_discord_gateway_reconnects_total {}\n\
-         # HELP artifact_mcp_discord_inbound_inbox_depth Retained body-free inbound event receipts.\n\
-         # TYPE artifact_mcp_discord_inbound_inbox_depth gauge\n\
-         artifact_mcp_discord_inbound_inbox_depth {}\n\
-         # HELP artifact_mcp_discord_inbound_pending_fetches Partial updates awaiting REST hydration.\n\
-         # TYPE artifact_mcp_discord_inbound_pending_fetches gauge\n\
-         artifact_mcp_discord_inbound_pending_fetches {}\n\
-         # HELP artifact_mcp_discord_inbound_last_event_age_seconds Age of the newest retained inbound receipt.\n\
-         # TYPE artifact_mcp_discord_inbound_last_event_age_seconds gauge\n\
-         artifact_mcp_discord_inbound_last_event_age_seconds {}\n\
-         # HELP artifact_mcp_discord_inbound_oldest_pending_age_seconds Age of the oldest deferred update.\n\
-         # TYPE artifact_mcp_discord_inbound_oldest_pending_age_seconds gauge\n\
-         artifact_mcp_discord_inbound_oldest_pending_age_seconds {}\n\
-         # HELP artifact_mcp_discord_inbound_ignored Retained ignored inbound events.\n\
-         # TYPE artifact_mcp_discord_inbound_ignored gauge\n\
-         artifact_mcp_discord_inbound_ignored {}\n\
-         # HELP artifact_mcp_discord_inbound_rejected_or_degraded Retained rejected, degraded, or failed inbound events.\n\
-         # TYPE artifact_mcp_discord_inbound_rejected_or_degraded gauge\n\
-         artifact_mcp_discord_inbound_rejected_or_degraded {}\n\
-         # HELP artifact_mcp_discord_inbound_tombstones Discord-origin feedback tombstones.\n\
-         # TYPE artifact_mcp_discord_inbound_tombstones gauge\n\
-         artifact_mcp_discord_inbound_tombstones {}\n\
-         # HELP artifact_mcp_discord_inbound_duplicates_total Replay duplicates observed by this process.\n\
-         # TYPE artifact_mcp_discord_inbound_duplicates_total counter\n\
-         artifact_mcp_discord_inbound_duplicates_total {}\n\
-         # HELP artifact_mcp_discord_inbound_application_errors_total Inbound events that failed before a durable result.\n\
-         # TYPE artifact_mcp_discord_inbound_application_errors_total counter\n\
-         artifact_mcp_discord_inbound_application_errors_total {}\n",
-        snapshot.gateway_disabled,
-        snapshot.gateway_connecting,
-        snapshot.gateway_ready,
-        snapshot.gateway_reconnecting,
-        snapshot.gateway_degraded,
-        snapshot.gateway_failed,
-        metrics.reconnects,
-        snapshot.inbox_depth,
-        snapshot.pending_fetches,
-        snapshot.last_event_age_seconds,
-        snapshot.oldest_pending_age_seconds,
-        snapshot.ignored_events,
-        snapshot.rejected_or_degraded_events,
-        snapshot.tombstones,
-        metrics.duplicates,
-        metrics.application_errors,
-    )
-}
-
-fn refresh_metrics(snapshot: DiscordInboundMetricsSnapshot) {
-    INBOUND_METRICS
-        .lock()
-        .unwrap_or_else(|error| error.into_inner())
-        .snapshot = snapshot;
-}
-
-fn increment_metric(select: fn(&mut DiscordInboundProcessMetrics) -> &mut u64) {
-    let mut metrics = INBOUND_METRICS
-        .lock()
-        .unwrap_or_else(|error| error.into_inner());
-    let value = select(&mut metrics);
-    *value = value.saturating_add(1);
-}
 
 pub struct DiscordInboundRuntime {
     stop: watch::Sender<bool>,
@@ -575,102 +479,6 @@ fn ready_has_guild(ready: &Ready, guild_id: &str) -> bool {
         .any(|guild| guild.id.to_string() == guild_id)
 }
 
-fn normalize_event(
-    org: &OrgId,
-    session_id: String,
-    sequence: u64,
-    event: Event,
-) -> Option<InboundEvent> {
-    let event_id = sequence.to_string();
-
-    let (kind, message, guild_id, thread_id) = match event {
-        Event::MessageCreate(message) => {
-            let guild_id = message.guild_id?.to_string();
-            let thread_id = message.channel_id.to_string();
-            let normalized = normalize_message(&message, message_version(&message));
-            (
-                InboundEventKind::MessageCreate,
-                Some(normalized),
-                guild_id,
-                thread_id,
-            )
-        }
-        Event::MessageUpdate(message) => {
-            let guild_id = message.guild_id?.to_string();
-            let thread_id = message.channel_id.to_string();
-            let mut normalized = normalize_message(&message, message_version(&message));
-            // Discord's update frame is not the canonical current message. Persist only the
-            // identifiers/fingerprint, then hydrate with the bounded REST reader outside SQLite.
-            normalized.content = None;
-            (
-                InboundEventKind::MessageUpdate,
-                Some(normalized),
-                guild_id,
-                thread_id,
-            )
-        }
-        Event::MessageDelete(message) => {
-            let guild_id = message.guild_id?.to_string();
-            let thread_id = message.channel_id.to_string();
-            let normalized = DiscordMessage {
-                id: message.id.to_string(),
-                guild_id: guild_id.clone(),
-                thread_id: thread_id.clone(),
-                author: DiscordAuthor {
-                    id: "deleted-author".to_owned(),
-                    display: "Deleted Discord user".to_owned(),
-                    is_bot: false,
-                    webhook_id: None,
-                },
-                content: None,
-                reply_to_message_id: None,
-                version: current_provider_version(),
-                created_at: None,
-                edited_at: Some(now_timestamp()),
-                supported_text: true,
-            };
-            (
-                InboundEventKind::MessageDelete,
-                Some(normalized),
-                guild_id,
-                thread_id,
-            )
-        }
-        Event::ThreadUpdate(thread) => {
-            let guild_id = thread.guild_id?.to_string();
-            let thread_id = thread.id.to_string();
-            let metadata = thread.thread_metadata.as_ref()?;
-            (
-                InboundEventKind::ThreadUpdate {
-                    archived: metadata.archived,
-                    locked: metadata.locked,
-                },
-                None,
-                guild_id,
-                thread_id,
-            )
-        }
-        Event::ThreadDelete(thread) => (
-            InboundEventKind::ThreadDelete,
-            None,
-            thread.guild_id.to_string(),
-            thread.id.to_string(),
-        ),
-        _ => return None,
-    };
-    let fingerprint = event_fingerprint(&kind, message.as_ref(), &guild_id, &thread_id);
-    Some(InboundEvent {
-        event_id,
-        gateway_session_id: session_id,
-        org: org.clone(),
-        kind,
-        message,
-        guild_id,
-        thread_id,
-        payload_fingerprint: fingerprint,
-    })
-}
-
 async fn drain_pending_updates(
     store: &DiscordInboundStore,
     target: &GatewayOrganizationTarget,
@@ -730,89 +538,6 @@ async fn drain_pending_updates(
     }
 }
 
-fn normalize_message(message: &Message, version: i64) -> DiscordMessage {
-    DiscordMessage {
-        id: message.id.to_string(),
-        guild_id: message
-            .guild_id
-            .map(|id| id.to_string())
-            .unwrap_or_default(),
-        thread_id: message.channel_id.to_string(),
-        author: DiscordAuthor {
-            id: message.author.id.to_string(),
-            display: message
-                .author
-                .global_name
-                .clone()
-                .unwrap_or_else(|| message.author.name.clone()),
-            is_bot: message.author.bot,
-            webhook_id: message.webhook_id.map(|id| id.to_string()),
-        },
-        content: Some(message.content.clone()),
-        reply_to_message_id: message
-            .reference
-            .as_ref()
-            .and_then(|reference| reference.message_id)
-            .map(|id| id.to_string()),
-        version,
-        created_at: Some(message.timestamp.iso_8601().to_string()),
-        edited_at: message
-            .edited_timestamp
-            .map(|timestamp| timestamp.iso_8601().to_string()),
-        supported_text: matches!(message.kind, MessageType::Regular | MessageType::Reply),
-    }
-}
-
-fn message_version(message: &Message) -> i64 {
-    message
-        .edited_timestamp
-        .unwrap_or(message.timestamp)
-        .as_micros()
-}
-
-fn current_provider_version() -> i64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .ok()
-        .and_then(|duration| i64::try_from(duration.as_micros()).ok())
-        .unwrap_or(i64::MAX)
-}
-
-fn now_timestamp() -> String {
-    time::OffsetDateTime::now_utc()
-        .format(&time::format_description::well_known::Rfc3339)
-        .unwrap_or_else(|_| "provider-delete".to_owned())
-}
-
-fn event_fingerprint(
-    kind: &InboundEventKind,
-    message: Option<&DiscordMessage>,
-    guild_id: &str,
-    thread_id: &str,
-) -> String {
-    let mut digest = Sha256::new();
-    digest.update(match kind {
-        InboundEventKind::MessageCreate => b"message_create".as_slice(),
-        InboundEventKind::MessageUpdate => b"message_update".as_slice(),
-        InboundEventKind::MessageDelete => b"message_delete".as_slice(),
-        InboundEventKind::ThreadUpdate { .. } => b"thread_update".as_slice(),
-        InboundEventKind::ThreadDelete => b"thread_delete".as_slice(),
-    });
-    digest.update([0]);
-    digest.update(guild_id.as_bytes());
-    digest.update([0]);
-    digest.update(thread_id.as_bytes());
-    if let Some(message) = message {
-        digest.update([0]);
-        digest.update(message.id.as_bytes());
-        digest.update(message.version.to_be_bytes());
-        if let Some(content) = message.content.as_deref() {
-            digest.update(Sha256::digest(content.as_bytes()));
-        }
-    }
-    hex::encode(digest.finalize())
-}
-
 #[cfg(test)]
 mod tests {
     use tokio::{
@@ -824,8 +549,7 @@ mod tests {
     use twilight_gateway::Intents;
 
     use super::super::rest::{DiscordInboundReadinessRest, MessageFetch, discord_resource_url};
-    use super::{configured_intents, event_fingerprint, join_worker_with_grace};
-    use crate::integrations::discord_inbound::{DiscordAuthor, DiscordMessage, InboundEventKind};
+    use super::{configured_intents, join_worker_with_grace};
     use crate::{config::Secret, error::AppError};
 
     async fn fake_rest(responses: Vec<&'static str>) -> (String, JoinHandle<()>) {
@@ -945,69 +669,5 @@ mod tests {
         });
         stop.send(true).expect("signal stop");
         join_worker_with_grace(join, std::time::Duration::from_millis(100)).await;
-    }
-
-    fn message(id: &str, version: i64, content: Option<&str>) -> DiscordMessage {
-        DiscordMessage {
-            id: id.to_owned(),
-            guild_id: String::new(),
-            thread_id: String::new(),
-            author: DiscordAuthor {
-                id: String::new(),
-                display: String::new(),
-                is_bot: false,
-                webhook_id: None,
-            },
-            content: content.map(str::to_owned),
-            reply_to_message_id: None,
-            version,
-            created_at: None,
-            edited_at: None,
-            supported_text: true,
-        }
-    }
-
-    /// The fingerprint is stored as `payload_fingerprint` and deduplicates gateway events across
-    /// releases, so its bytes are pinned. The expected values were computed independently
-    /// (Python `hashlib`) from the same field order.
-    #[test]
-    fn event_fingerprint_matches_the_pinned_digests() {
-        let (guild, thread) = ("223456789012345678", "323456789012345678");
-        assert_eq!(
-            event_fingerprint(
-                &InboundEventKind::MessageCreate,
-                Some(&message(
-                    "423456789012345678",
-                    1_767_225_600_000_000,
-                    Some("hello")
-                )),
-                guild,
-                thread,
-            ),
-            "13244d9a86ae491cad99c314cfdb45fd9dbf32622728709e9bf2f69fb732d448"
-        );
-        assert_eq!(
-            event_fingerprint(
-                &InboundEventKind::MessageUpdate,
-                Some(&message("423456789012345678", 1_767_225_600_000_001, None)),
-                guild,
-                thread,
-            ),
-            "2f6d6fbe424dfec01f2b2e77dc7f20644537e86b1b708f763ad89a63bc95081c"
-        );
-        assert_eq!(
-            event_fingerprint(&InboundEventKind::ThreadDelete, None, guild, thread),
-            "437e5a797c83a49c590b955a7ba4274d08f9b953a19291197c7c7f8a21c094b0"
-        );
-        // Empty content still hashes the content digest, unlike absent content.
-        assert_eq!(
-            event_fingerprint(
-                &InboundEventKind::MessageDelete,
-                Some(&message("m", -1, Some(""))),
-                "g",
-                "t",
-            ),
-            "28291d93ce0503b50ebb4bc1ddafe83d858156c06156451295f4f536cbe84f3e"
-        );
     }
 }
