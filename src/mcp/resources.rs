@@ -33,6 +33,17 @@ struct ResourceTarget {
     thumbnail: bool,
 }
 
+struct ResourceContentInput<'a> {
+    target: &'a ResourceTarget,
+    artifact: &'a crate::security::access::AuthorizedArtifact,
+    current: &'a ArtifactMeta,
+    revision: u64,
+    is_bundle: bool,
+    entry: String,
+    bytes: u64,
+    historical: Option<u64>,
+}
+
 pub async fn dispatch(
     message: &OrderedJson,
     auth: &PublisherIdentity,
@@ -160,23 +171,65 @@ async fn read_resource(
     let artifact = authorized.into_authorized();
 
     if target.thumbnail {
-        // Hold ArtifactStore's lifecycle read guard from readiness/digest recheck through the
-        // preview read, so a concurrent update/delete cannot return a stale PNG after auth.
-        let thumbnail = deps
-            .artifacts
-            .read_current_thumbnail(
-                &artifact,
-                &current.body_sha256,
-                std::sync::Arc::clone(&deps.previews),
-            )
-            .await
-            .map_err(resource_app_error)?;
-        let (mime_type, bytes) = thumbnail.map_or_else(
-            || ("image/svg+xml", deps.previews.placeholder(&current, None)),
-            |png| ("image/png", png),
-        );
-        let byte_count = bytes.len();
-        return Ok(json!({
+        return read_thumbnail_resource(uri, &artifact, current, deps).await;
+    }
+
+    let (revision, is_bundle, entry, bytes, historical) =
+        resolve_resource_version(&target, &artifact, &current, deps).await?;
+    let (mime_type, text, content_bytes) = read_resource_content(
+        ResourceContentInput {
+            target: &target,
+            artifact: &artifact,
+            current: &current,
+            revision,
+            is_bundle,
+            entry,
+            bytes,
+            historical,
+        },
+        deps,
+    )
+    .await?;
+
+    Ok(json!({
+        "contents": [{
+            "uri": uri,
+            "mimeType": mime_type,
+            "text": text,
+            "_meta": {
+                "com.agentshelf.artifact-mcp/org": current.org.0,
+                "com.agentshelf.artifact-mcp/revision": revision,
+                "com.agentshelf.artifact-mcp/bytes": content_bytes
+            }
+        }],
+        "ttlMs": RESOURCE_READ_TTL_MS,
+        "cacheScope": "private"
+    }))
+}
+
+async fn read_thumbnail_resource(
+    uri: &str,
+    artifact: &crate::security::access::AuthorizedArtifact,
+    current: ArtifactMeta,
+    deps: &AppDeps,
+) -> Result<Value, McpError> {
+    // Hold ArtifactStore's lifecycle read guard from readiness/digest recheck through the
+    // preview read, so a concurrent update/delete cannot return a stale PNG after auth.
+    let thumbnail = deps
+        .artifacts
+        .read_current_thumbnail(
+            artifact,
+            &current.body_sha256,
+            std::sync::Arc::clone(&deps.previews),
+        )
+        .await
+        .map_err(resource_app_error)?;
+    let (mime_type, bytes) = thumbnail.map_or_else(
+        || ("image/svg+xml", deps.previews.placeholder(&current, None)),
+        |png| ("image/png", png),
+    );
+    let byte_count = bytes.len();
+    Ok(json!({
             "contents": [{
                 "uri": uri,
                 "mimeType": mime_type,
@@ -190,16 +243,22 @@ async fn read_resource(
             }],
             "ttlMs": RESOURCE_READ_TTL_MS,
             "cacheScope": "private"
-        }));
-    }
+    }))
+}
 
+async fn resolve_resource_version(
+    target: &ResourceTarget,
+    artifact: &crate::security::access::AuthorizedArtifact,
+    current: &ArtifactMeta,
+    deps: &AppDeps,
+) -> Result<(u64, bool, String, u64, Option<u64>), McpError> {
     let historical = target
         .revision
         .filter(|revision| *revision != current.revision);
     let (revision, is_bundle, entry, bytes) = if let Some(revision) = historical {
         let history = deps
             .artifacts
-            .list_revisions(&artifact)
+            .list_revisions(artifact)
             .await
             .map_err(resource_app_error)?;
         let selected = history
@@ -223,28 +282,44 @@ async fn read_resource(
             current.bytes,
         )
     };
+    Ok((revision, is_bundle, entry, bytes, historical))
+}
 
-    let (mime_type, text, content_bytes) = if is_bundle {
+async fn read_resource_content(
+    input: ResourceContentInput<'_>,
+    deps: &AppDeps,
+) -> Result<(String, String, usize), McpError> {
+    let ResourceContentInput {
+        target,
+        artifact,
+        current,
+        revision,
+        is_bundle,
+        entry,
+        bytes,
+        historical,
+    } = input;
+    if is_bundle {
         if let Some(path) = target.path.as_deref() {
             let file = if let Some(revision) = historical {
                 deps.artifacts
-                    .read_revision_body(&artifact, revision, Some(path))
+                    .read_revision_body(artifact, revision, Some(path))
                     .await
                     .map_err(resource_app_error)?
             } else {
                 deps.artifacts
-                    .read_bundle_file(&artifact, path)
+                    .read_bundle_file(artifact, path)
                     .await
                     .map_err(resource_app_error)?
             }
             .ok_or_else(|| {
                 JsonRpcError::InvalidParams(format!("Unknown artifact bundle file: {path}"))
             })?;
-            bounded_text(file)?
+            bounded_text(file)
         } else {
             let files = deps
                 .artifacts
-                .list_bundle_files(&artifact, historical)
+                .list_bundle_files(artifact, historical)
                 .await
                 .map_err(resource_app_error)?
                 .ok_or_else(|| {
@@ -265,11 +340,11 @@ async fn read_resource(
             let text = serde_json::to_string(&listing).map_err(|error| {
                 JsonRpcError::Internal(format!("failed to serialize bundle resource: {error}"))
             })?;
-            (
+            Ok((
                 "application/vnd.artifact-mcp.bundle+json".to_owned(),
                 text.clone(),
                 text.len(),
-            )
+            ))
         }
     } else {
         if target.path.is_some() {
@@ -280,12 +355,12 @@ async fn read_resource(
         }
         let file = if let Some(revision) = historical {
             deps.artifacts
-                .read_revision_body(&artifact, revision, None)
+                .read_revision_body(artifact, revision, None)
                 .await
                 .map_err(resource_app_error)?
         } else {
             deps.artifacts
-                .read_body(&artifact)
+                .read_body(artifact)
                 .await
                 .map_err(resource_app_error)?
         }
@@ -294,23 +369,8 @@ async fn read_resource(
                 "Artifact revision content is unavailable: {revision}"
             ))
         })?;
-        bounded_text(file)?
-    };
-
-    Ok(json!({
-        "contents": [{
-            "uri": uri,
-            "mimeType": mime_type,
-            "text": text,
-            "_meta": {
-                "com.agentshelf.artifact-mcp/org": current.org.0,
-                "com.agentshelf.artifact-mcp/revision": revision,
-                "com.agentshelf.artifact-mcp/bytes": content_bytes
-            }
-        }],
-        "ttlMs": RESOURCE_READ_TTL_MS,
-        "cacheScope": "private"
-    }))
+        bounded_text(file)
+    }
 }
 
 fn resource_metadata(meta: &ArtifactMeta) -> Value {

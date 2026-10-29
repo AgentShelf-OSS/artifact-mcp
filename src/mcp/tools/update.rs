@@ -19,7 +19,7 @@ use crate::{
         shape::{artifact_url, object, tool_result},
         validation::apply_utf8_edits,
     },
-    model::{ArtifactContent, ArtifactUpdate, PublisherIdentity},
+    model::{ArtifactContent, ArtifactUpdate, PublisherIdentity, UpdateArtifactResult},
     security::{
         access::{AuthorizedArtifact, OwnedArtifact},
         audit::MutationAudit,
@@ -294,6 +294,32 @@ pub(crate) async fn patch_artifact(
         ArtifactContent::SingleHtml(String::from_utf8_lossy(&patched).into_owned())
     };
 
+    let result = apply_patch_update(
+        artifact,
+        content,
+        expected_revision,
+        auth,
+        deps,
+        unavailable,
+    )
+    .await?;
+    tool_result(object! {
+        "id" => OrderedJson::string(result.meta.id.0.clone()),
+        "revision" => OrderedJson::number_u64(result.meta.revision),
+        "bytes_before" => OrderedJson::number_u64(pre.bytes),
+        "bytes_after" => OrderedJson::number_u64(result.meta.bytes),
+        "edits_applied" => OrderedJson::number_u64(edit_count),
+    })
+}
+
+async fn apply_patch_update(
+    artifact: AuthorizedArtifact,
+    content: ArtifactContent,
+    expected_revision: u64,
+    auth: &PublisherIdentity,
+    deps: &AppDeps,
+    unavailable: &str,
+) -> Result<UpdateArtifactResult, McpError> {
     let result = match deps
         .artifacts
         .update(
@@ -325,13 +351,7 @@ pub(crate) async fn patch_artifact(
     if result.changed {
         deps.delivery_wake.wake();
     }
-    tool_result(object! {
-        "id" => OrderedJson::string(result.meta.id.0.clone()),
-        "revision" => OrderedJson::number_u64(result.meta.revision),
-        "bytes_before" => OrderedJson::number_u64(pre.bytes),
-        "bytes_after" => OrderedJson::number_u64(result.meta.bytes),
-        "edits_applied" => OrderedJson::number_u64(edit_count),
-    })
+    Ok(result)
 }
 
 pub(crate) async fn update_artifact(
