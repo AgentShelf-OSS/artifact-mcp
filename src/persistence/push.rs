@@ -1044,4 +1044,28 @@ mod tests {
         assert!(!host_allowed("evilpush.apple.com", &hosts));
         assert!(!host_allowed("x.fcm.googleapis.com", &hosts));
     }
+
+    #[test]
+    fn set_reminder_checks_key_before_viewer_owner() {
+        let mut conn = Connection::open_in_memory().expect("in-memory database");
+        let text = ReminderText {
+            title: "title".to_owned(),
+            body: String::new(),
+        };
+        let write = ReminderWrite {
+            artifact_id: "artifact",
+            org: "org",
+            scope: ReminderScope::Viewer,
+            owner: "",
+            key: "bad/key",
+            fire_at: 60_000,
+            text: &text,
+            created_by: "viewer",
+        };
+
+        assert_eq!(
+            set_reminder(&mut conn, &write, "now"),
+            Err(PushError::BadKey)
+        );
+    }
 }
