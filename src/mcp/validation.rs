@@ -387,4 +387,19 @@ mod tests {
             ))
         );
     }
+
+    #[test]
+    fn patch_edits_report_shape_before_missing_replacement() {
+        let invalid: OrderedJson = serde_json::from_str(
+            r#"[{"find":"x","offset":0,"length":1}]"#,
+        )
+        .expect("valid edits");
+
+        assert_eq!(
+            apply_utf8_edits(b"x", &invalid),
+            Err(AppError::Validation(
+                "edit 1 must use either find/replace or offset/length/replace".to_owned()
+            ))
+        );
+    }
 }
