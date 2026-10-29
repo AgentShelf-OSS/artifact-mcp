@@ -1,8 +1,9 @@
 //! Injected wall clocks.
 
+#[cfg(any(test, feature = "test-util"))]
+use std::sync::Mutex;
 use std::{
     fmt,
-    sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -62,10 +63,12 @@ impl Clock for SystemClock {
 
 /// Deterministic clock pinned to a fixed instant, advanceable on demand.
 #[derive(Debug)]
+#[cfg(any(test, feature = "test-util"))]
 pub struct FixedClock {
     millis: Mutex<i64>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl FixedClock {
     /// A clock pinned to `millis` since the Unix epoch.
     #[must_use]
@@ -91,6 +94,7 @@ impl FixedClock {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl Default for FixedClock {
     fn default() -> Self {
         // 2026-01-01T00:00:00Z — a stable, readable instant for golden output.
@@ -98,6 +102,7 @@ impl Default for FixedClock {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl Clock for FixedClock {
     fn now_unix_millis(&self) -> i64 {
         *self

@@ -1,6 +1,8 @@
 //! Injected sources of random bytes.
 
-use std::{fmt, sync::Mutex};
+use std::fmt;
+#[cfg(any(test, feature = "test-util"))]
+use std::sync::Mutex;
 
 use crate::error::AppError;
 
@@ -28,10 +30,12 @@ impl RandomSource for OsRandom {
 
 /// Deterministic randomness for tests: a seeded xorshift64 stream.
 #[derive(Debug)]
+#[cfg(any(test, feature = "test-util"))]
 pub struct SeededRandom {
     state: Mutex<u64>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl SeededRandom {
     /// Create a stream from `seed`. A zero seed is remapped because xorshift fixes zero.
     #[must_use]
@@ -46,12 +50,14 @@ impl SeededRandom {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl Default for SeededRandom {
     fn default() -> Self {
         Self::new(0x2026_0720_0000_0001)
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl RandomSource for SeededRandom {
     fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), AppError> {
         let mut state = self.state.lock().unwrap_or_else(|error| error.into_inner());
@@ -76,11 +82,13 @@ impl RandomSource for SeededRandom {
 ///
 /// Useful for pinning one exact generated identifier in a test.
 #[derive(Debug)]
+#[cfg(any(test, feature = "test-util"))]
 pub struct ScriptedRandom {
     script: Vec<u8>,
     cursor: Mutex<usize>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl ScriptedRandom {
     /// Create a source replaying `script`. An empty script yields zero bytes.
     #[must_use]
@@ -92,6 +100,7 @@ impl ScriptedRandom {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl RandomSource for ScriptedRandom {
     fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), AppError> {
         if self.script.is_empty() {

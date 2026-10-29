@@ -51,6 +51,7 @@ name = "artifact-mcp"
 version = "1.29.2"
 dependencies = [
  "aes-gcm",
+ "artifact-mcp",
  "askama",
  "axum",
  "base64",
