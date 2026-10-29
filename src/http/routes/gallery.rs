@@ -394,74 +394,9 @@ async fn shell_result(
     query: Option<&str>,
 ) -> Result<Response, AppError> {
     let (viewer, artifact) = resolve_page_artifact(deps, headers, id).await?;
-
-    if !viewer.is_admin
-        && viewer
-            .email
-            .as_ref()
-            .is_some_and(|email| !email.0.is_empty())
-        && let Err(error) = deps.engagement.record_view(&artifact, &viewer).await
-    {
-        tracing::warn!(
-            artifact_id = %artifact.meta().id,
-            error = %error,
-            "view analytics record failed (ignored)"
-        );
-    }
-
-    let mut view_counts = ViewCounts::default();
-    let mut viewers = None;
-    match deps.engagement.view_counts(&artifact).await {
-        Ok(counts) => {
-            view_counts = counts;
-            if viewer.is_admin {
-                match deps.engagement.viewers(&artifact).await {
-                    Ok(rows) => viewers = Some(rows),
-                    Err(error) => tracing::warn!(
-                        artifact_id = %artifact.meta().id,
-                        error = %error,
-                        "view analytics shell read failed (ignored)"
-                    ),
-                }
-            }
-        }
-        Err(error) => tracing::warn!(
-            artifact_id = %artifact.meta().id,
-            error = %error,
-            "view analytics shell read failed (ignored)"
-        ),
-    }
-
-    let ids = if viewer.is_admin {
-        deps.artifacts
-            .list_org_ids(&artifact.meta().org, true)
-            .await?
-    } else {
-        let owner = viewer.email.as_ref().map(|email| email.0.to_lowercase());
-        deps.artifacts
-            .list_org_artifacts(&artifact.meta().org, true)
-            .await?
-            .into_iter()
-            .filter(|item| {
-                !item.hidden || item.owner_email.as_ref().map(|email| email.to_lowercase()) == owner
-            })
-            .map(|item| item.id)
-            .collect()
-    };
-    let position = ids
-        .iter()
-        .position(|candidate| candidate == &artifact.meta().id);
-    let navigation = ArtifactNavigation {
-        previous_id: position
-            .filter(|index| *index > 0)
-            .map(|index| ids[index - 1].clone()),
-        next_id: position
-            .filter(|index| *index + 1 < ids.len())
-            .map(|index| ids[index + 1].clone()),
-        index: position.map_or(1, |index| index + 1),
-        total: ids.len().max(1),
-    };
-
+    record_shell_view(deps, &artifact, &viewer).await;
+    let (view_counts, viewers) = shell_analytics(deps, &artifact, &viewer).await;
+    let navigation = shell_navigation(deps, &artifact, &viewer).await?;
     let feedback = deps.engagement.list_feedback(&artifact).await?;
     let reaction = deps.engagement.reaction(&artifact, &viewer).await?;
     let org_accent = deps
@@ -507,6 +442,88 @@ async fn shell_result(
         cast_enabled,
     })?;
     Ok(html_response(StatusCode::OK, body, true))
+}
+
+async fn record_shell_view(deps: &AppDeps, artifact: &AuthorizedArtifact, viewer: &Viewer) {
+    if !viewer.is_admin
+        && viewer
+            .email
+            .as_ref()
+            .is_some_and(|email| !email.0.is_empty())
+        && let Err(error) = deps.engagement.record_view(&artifact, &viewer).await
+    {
+        tracing::warn!(
+            artifact_id = %artifact.meta().id,
+            error = %error,
+            "view analytics record failed (ignored)"
+        );
+    }
+}
+
+async fn shell_analytics(
+    deps: &AppDeps,
+    artifact: &AuthorizedArtifact,
+    viewer: &Viewer,
+) -> (ViewCounts, Option<Vec<crate::model::ViewerView>>) {
+    let mut view_counts = ViewCounts::default();
+    let mut viewers = None;
+    match deps.engagement.view_counts(&artifact).await {
+        Ok(counts) => {
+            view_counts = counts;
+            if viewer.is_admin {
+                match deps.engagement.viewers(&artifact).await {
+                    Ok(rows) => viewers = Some(rows),
+                    Err(error) => tracing::warn!(
+                        artifact_id = %artifact.meta().id,
+                        error = %error,
+                        "view analytics shell read failed (ignored)"
+                    ),
+                }
+            }
+        }
+        Err(error) => tracing::warn!(
+            artifact_id = %artifact.meta().id,
+            error = %error,
+            "view analytics shell read failed (ignored)"
+        ),
+    }
+    (view_counts, viewers)
+}
+
+async fn shell_navigation(
+    deps: &AppDeps,
+    artifact: &AuthorizedArtifact,
+    viewer: &Viewer,
+) -> Result<ArtifactNavigation, AppError> {
+    let ids = if viewer.is_admin {
+        deps.artifacts
+            .list_org_ids(&artifact.meta().org, true)
+            .await?
+    } else {
+        let owner = viewer.email.as_ref().map(|email| email.0.to_lowercase());
+        deps.artifacts
+            .list_org_artifacts(&artifact.meta().org, true)
+            .await?
+            .into_iter()
+            .filter(|item| {
+                !item.hidden || item.owner_email.as_ref().map(|email| email.to_lowercase()) == owner
+            })
+            .map(|item| item.id)
+            .collect()
+    };
+    let position = ids
+        .iter()
+        .position(|candidate| candidate == &artifact.meta().id);
+    Ok(ArtifactNavigation {
+        previous_id: position
+            .filter(|index| *index > 0)
+            .map(|index| ids[index - 1].clone()),
+        next_id: position
+            .filter(|index| *index + 1 < ids.len())
+            .map(|index| ids[index + 1].clone()),
+        index: position.map_or(1, |index| index + 1),
+        total: ids.len().max(1),
+    })
 }
 
 #[cfg(test)]
