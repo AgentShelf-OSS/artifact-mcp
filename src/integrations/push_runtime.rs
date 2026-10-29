@@ -290,6 +290,24 @@ pub fn retry_delay_ms(attempts_after_failure: i64, retry_after_ms: Option<i64>) 
     RETRY_BACKOFF_MS[index]
 }
 
+#[cfg(test)]
+mod characterization_tests {
+    use super::{MAX_RETRY_AFTER_MS, RETRY_BACKOFF_MS, parse_retry_after_ms, retry_delay_ms};
+
+    #[test]
+    fn retry_after_parses_delta_and_past_date_without_changing_retry_bounds() {
+        assert_eq!(parse_retry_after_ms(" 7 ", 0), Some(7_000));
+        assert_eq!(
+            parse_retry_after_ms("Thu, 01 Jan 1970 00:00:00 +0000", 1),
+            Some(0)
+        );
+        assert_eq!(retry_delay_ms(1, Some(1)), 1_000);
+        assert_eq!(retry_delay_ms(1, Some(i64::MAX)), MAX_RETRY_AFTER_MS);
+        assert_eq!(retry_delay_ms(1, None), RETRY_BACKOFF_MS[0]);
+        assert_eq!(retry_delay_ms(99, None), RETRY_BACKOFF_MS[3]);
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
