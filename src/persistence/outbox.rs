@@ -1249,4 +1249,23 @@ mod tests {
             "event failures remain outside the discussion total"
         );
     }
+
+    #[test]
+    fn enqueue_validation_checks_payload_size_before_identity_fields() {
+        let input = EnqueueDelivery {
+            event_id: String::new(),
+            tenant: String::new(),
+            event_type: String::new(),
+            target_key: String::new(),
+            secret_ref: String::new(),
+            payload: vec![0; MAX_PAYLOAD_BYTES + 1],
+            payload_sha256: None,
+            durability_intent_id: None,
+            delivery_kind: String::new(),
+            ordering_key: String::new(),
+            depends_on_outbox_id: None,
+        };
+
+        assert!(matches!(validate(&input), Err(AppError::PayloadTooLarge)));
+    }
 }
