@@ -1130,4 +1130,19 @@ mod tests {
         let body = read_body_limited(Body::from("12345"), 4, Duration::from_secs(1)).await;
         assert_eq!(body, Err(BodyReadError::TooLarge));
     }
+
+    #[test]
+    fn modern_metadata_selects_modern_transport_without_a_version_header() {
+        let payload = serde_json::json!({
+            "method": "tools/list",
+            "params": {"_meta": {"io.modelcontextprotocol/protocolVersion": "2025-03-26"}}
+        });
+        let headers = axum::http::HeaderMap::new();
+
+        assert!(super::modern_transport(&payload, &headers));
+        assert_eq!(
+            super::validate_transport(&payload, &headers),
+            Ok(crate::mcp::dispatch::ProtocolEra::Modern)
+        );
+    }
 }
