@@ -80,7 +80,7 @@ type PreparedIntent = (String, String, String, String, String, String);
 fn load_prepared_intents(conn: &Connection) -> Result<Vec<PreparedIntent>, AppError> {
     let mut statement = conn
         .prepare(
-            "SELECT id, artifact_id, operation, expected_sha256, prior_sha256, staging_path \\
+            "SELECT id, artifact_id, operation, expected_sha256, prior_sha256, staging_path \
                   FROM artifact_durability_intents",
         )
         .map_err(|error| sql_error("prepare prepared durability intents", &error))?;
