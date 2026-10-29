@@ -1011,6 +1011,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn readiness_failures_map_to_the_existing_safe_gateway_health_codes() {
+        assert_eq!(
+            super::readiness_error(&AppError::Validation("invalid".to_owned())),
+            "missing_credential"
+        );
+        assert_eq!(
+            super::readiness_error(&AppError::Conflict("denied".to_owned())),
+            "guild_access"
+        );
+        assert_eq!(
+            super::readiness_error(&AppError::Unavailable("offline".to_owned())),
+            "gateway_unavailable"
+        );
+    }
+
     #[tokio::test]
     async fn worker_shutdown_allows_the_stop_receiver_to_finish_before_abort() {
         let (stop, mut receive) = watch::channel(false);
