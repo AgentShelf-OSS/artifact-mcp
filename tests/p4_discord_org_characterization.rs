@@ -17,6 +17,12 @@ async fn batch_recovery_rejects_invalid_destination_before_audit_or_database_che
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).expect("create temp data directory");
     let pool = Database::open_at(&dir).expect("migrate database");
+    // The database check reports the same validation message as the preflight, so remove the
+    // table it reads: if the preflight did not answer first, the result would be `Internal`.
+    pool.get()
+        .expect("checkout setup connection")
+        .execute_batch("DROP TABLE org_discord_discussion_connections")
+        .expect("make the database destination check fail");
     let store = OrganizationDiscordStore::new(
         pool,
         Arc::new(WebhookUrlProtection::Plaintext),
