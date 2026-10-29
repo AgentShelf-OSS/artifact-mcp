@@ -1121,6 +1121,28 @@ fn validate_speech_body(body: &OrderedJson) -> Result<(&str, &str, Option<String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::StreamExt;
+
+    #[tokio::test]
+    async fn stream_body_yields_the_first_chunk_before_the_upstream_closes() {
+        let (tx, rx) = mpsc::channel(1);
+        let mut stream = StreamBody {
+            rx,
+            task: None,
+        };
+
+        tx.send(Ok(vec![1, 2, 3]))
+            .await
+            .expect("stream receiver remains connected");
+        let first = tokio::time::timeout(Duration::from_millis(100), stream.next())
+            .await
+            .expect("the first stream chunk is not buffered")
+            .expect("first stream chunk");
+
+        assert_eq!(first, Ok(vec![1, 2, 3]));
+        assert!(!tx.is_closed());
+    }
+
     #[test]
     fn fixed_voice_contract_is_unique() {
         assert_eq!(VOICES.len(), 3);
