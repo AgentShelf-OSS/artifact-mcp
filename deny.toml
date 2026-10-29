@@ -9,6 +9,9 @@ targets = ["x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]
 all-features = true
 
 [advisories]
+# A yanked crate fails the check too: chacha20 0.10.1 was yanked for using an SSE4.1
+# instruction in its SSE2 backend.
+yanked = "deny"
 # Every exception names the advisory, the crate that pulls it in, and why the server is not
 # exposed or why it cannot be fixed yet. Remove an entry as soon as a usable fix exists;
 # cargo-deny warns about entries that no longer match anything.
@@ -32,19 +35,8 @@ ignore = [
     # 0.17 does not accept. twilight-gateway enables zstd-safe with default features off, so
     # the `legacy` and `seekable` features are not compiled, and it only calls
     # DCtx::create/reset and DCtx::decompress_stream with InBuffer::around/OutBuffer::around.
-    # None of the affected functions below are reachable:
-    { id = "RUSTSEC-2026-0395", reason = "CCtx::set_parameter: compression is never used" },
-    { id = "RUSTSEC-2026-0396", reason = "seekable feature is off" },
-    { id = "RUSTSEC-2026-0397", reason = "OutBuffer::around_pos is never called" },
-    { id = "RUSTSEC-2026-0398", reason = "seekable feature is off" },
-    { id = "RUSTSEC-2026-0399", reason = "dictionary init is never used" },
-    { id = "RUSTSEC-2026-0400", reason = "one-shot DCtx::decompress* is never called" },
-    { id = "RUSTSEC-2026-0401", reason = "train_from_buffer is never called" },
-    { id = "RUSTSEC-2026-0402", reason = "CCtx::try_clone: compression is never used" },
+    { id = "RUSTSEC-2026-0398", reason = "Seekable::decompress: seekable feature is off" },
     { id = "RUSTSEC-2026-0403", reason = "legacy feature is off, so legacy frames are rejected" },
-    { id = "RUSTSEC-2026-0404", reason = "DCtx::try_clone is never called" },
-    { id = "RUSTSEC-2026-0405", reason = "seekable feature is off" },
-    { id = "RUSTSEC-2026-0406", reason = "multithreaded compression is never used" },
 ]
 # Not in the RustSec database, so not listed above: GHSA-qwgh-2vcv-g2f7 (block-buffer 0.10.4,
 # via digest/sha2). It needs a caught panic, and release builds use panic = "abort".
