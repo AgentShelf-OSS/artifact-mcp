@@ -226,8 +226,9 @@ mod tests {
 
     use axum::body::to_bytes;
 
-    use super::super::admission::{
-        insufficient_scope_response, mcp_cost, modern_transport, validate_transport,
+    use super::super::{
+        admission::mcp_cost,
+        transport::{insufficient_scope_response, modern_transport, validate_transport},
     };
     use crate::{
         config::AppConfig,

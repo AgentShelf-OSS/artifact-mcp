@@ -450,7 +450,7 @@ async fn record_shell_view(deps: &AppDeps, artifact: &AuthorizedArtifact, viewer
             .email
             .as_ref()
             .is_some_and(|email| !email.0.is_empty())
-        && let Err(error) = deps.engagement.record_view(&artifact, &viewer).await
+        && let Err(error) = deps.engagement.record_view(artifact, viewer).await
     {
         tracing::warn!(
             artifact_id = %artifact.meta().id,
@@ -467,11 +467,11 @@ async fn shell_analytics(
 ) -> (ViewCounts, Option<Vec<crate::model::ViewerView>>) {
     let mut view_counts = ViewCounts::default();
     let mut viewers = None;
-    match deps.engagement.view_counts(&artifact).await {
+    match deps.engagement.view_counts(artifact).await {
         Ok(counts) => {
             view_counts = counts;
             if viewer.is_admin {
-                match deps.engagement.viewers(&artifact).await {
+                match deps.engagement.viewers(artifact).await {
                     Ok(rows) => viewers = Some(rows),
                     Err(error) => tracing::warn!(
                         artifact_id = %artifact.meta().id,
