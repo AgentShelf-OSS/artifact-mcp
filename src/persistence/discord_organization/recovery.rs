@@ -300,7 +300,7 @@ impl OrganizationDiscordStore {
             let mut statement = conn
                 .prepare(
                     "SELECT a.id FROM artifacts a \
-                 WHERE a.org=?1 AND NOT EXISTS(\
+                 WHERE a.org=?1 AND NOT EXISTS (\
                    SELECT 1 FROM artifact_discussion_overrides x \
                     WHERE x.artifact_id=a.id AND x.org=a.org\
                  ) ORDER BY a.id",
