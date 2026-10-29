@@ -31,6 +31,7 @@ mod preview;
 mod random;
 mod seed_keys;
 mod stale_guard;
+#[cfg(any(test, feature = "test-util"))]
 mod testkit;
 mod web_push;
 
@@ -38,10 +39,10 @@ mod web_push;
 mod tests;
 
 pub use access::{AccessConfig, AccessIdentityMode};
-pub use clock::{Clock, FixedClock, SystemClock, format_sqlite_datetime};
+pub use clock::{Clock, SystemClock, format_sqlite_datetime};
 pub use defaults::*;
 pub use env::{EnvSource, MapEnv, Secret, SystemEnv};
-pub use id_source::{IdSource, NanoIdSource, SequentialIdSource, generate_id};
+pub use id_source::{IdSource, NanoIdSource, generate_id};
 pub use ids::{
     ARTIFACT_ID_ALPHABET, ARTIFACT_ID_LENGTH, FEEDBACK_ID_ALPHABET, FEEDBACK_ID_LENGTH,
     RESERVED_ARTIFACT_IDS, SHARE_TOKEN_ALPHABET, SHARE_TOKEN_LENGTH, WEBHOOK_ID_ALPHABET,
@@ -51,12 +52,21 @@ pub use ingress::IngressConfig;
 pub use limits::{BodyLimits, StorageLimits};
 pub use oauth::OAuthConfig;
 pub use preview::PreviewConfig;
-pub use random::{OsRandom, RandomSource, ScriptedRandom, SeededRandom};
+pub use random::{OsRandom, RandomSource};
 pub use seed_keys::{SeedKey, SeedKeys};
 pub use stale_guard::{
     DEFAULT_STALE_GUARD_MIN_SEGMENTS, DEFAULT_STALE_GUARD_MIN_SHARE, StaleGuardConfig,
     StaleGuardMode,
 };
+// Deterministic fakes for tests. The `test-util` feature exposes them to the integration tests in
+// `tests/`; release builds do not compile them.
+#[cfg(any(test, feature = "test-util"))]
+pub use clock::FixedClock;
+#[cfg(any(test, feature = "test-util"))]
+pub use id_source::SequentialIdSource;
+#[cfg(any(test, feature = "test-util"))]
+pub use random::{ScriptedRandom, SeededRandom};
+#[cfg(any(test, feature = "test-util"))]
 pub use testkit::Testkit;
 pub use web_push::{
     DEFAULT_WEB_PUSH_ENDPOINT_HOSTS, VapidIdentity, WebPushConfig, valid_web_push_subject,

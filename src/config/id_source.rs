@@ -1,6 +1,8 @@
 //! Generated identifier factories.
 
-use std::{fmt, sync::Mutex};
+use std::fmt;
+#[cfg(any(test, feature = "test-util"))]
+use std::sync::Mutex;
 
 use crate::{
     error::AppError,
@@ -115,10 +117,12 @@ impl<R: RandomSource> IdSource for NanoIdSource<R> {
 /// Output is unique, ordered, and always satisfies the real validators, so fixtures can
 /// pin exact identifiers without pinning a random byte stream.
 #[derive(Debug, Default)]
+#[cfg(any(test, feature = "test-util"))]
 pub struct SequentialIdSource {
     counter: Mutex<u64>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl SequentialIdSource {
     /// Start the counter at `start` so independent fixtures cannot collide.
     #[must_use]
@@ -160,6 +164,7 @@ impl SequentialIdSource {
     }
 }
 
+#[cfg(any(test, feature = "test-util"))]
 impl IdSource for SequentialIdSource {
     fn artifact_id(&self) -> Result<ArtifactId, AppError> {
         self.render(ARTIFACT_ID_ALPHABET, ARTIFACT_ID_LENGTH)

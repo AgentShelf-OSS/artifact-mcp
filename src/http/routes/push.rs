@@ -2,7 +2,7 @@
 //! worker, manifest, and icons.
 //!
 //! The artifact routes use viewer state's identity resolution, concealed `404`, and admin
-//! handling ([`authorize`]). The request-authenticity gate applies to every PUT/DELETE through
+//! handling (`routes::artifact::authorize`). The request-authenticity gate applies to every PUT/DELETE through
 //! the global middleware, and ingress classifies these paths into the state rate-limit budget.
 
 use std::sync::Arc;

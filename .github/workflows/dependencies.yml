@@ -11,8 +11,9 @@ on:
 
 jobs:
   cargo-deny:
-    # Fails on a RustSec advisory or a dependency from anywhere other than crates.io, in all three
-    # Cargo workspaces. Exceptions and their reasons live in deny.toml.
+    # Fails on a RustSec advisory, a licence outside the allowlist, a wildcard version, or a
+    # dependency from anywhere other than crates.io, in all three Cargo workspaces. Exceptions and
+    # their reasons live in deny.toml.
     runs-on: ubuntu-latest
     env:
       CARGO_DENY_VERSION: "0.20.2"
@@ -29,6 +30,6 @@ jobs:
           echo "${CARGO_DENY_SHA256}  $RUNNER_TEMP/cargo-deny.tar.gz" | sha256sum -c -
           tar -xzf "$RUNNER_TEMP/cargo-deny.tar.gz" -C "$RUNNER_TEMP"
           echo "$RUNNER_TEMP/${name}" >> "$GITHUB_PATH"
-      - run: cargo deny --manifest-path Cargo.toml --workspace --config deny.toml check advisories sources
-      - run: cargo deny --manifest-path preview-renderer/Cargo.toml --workspace --config deny.toml check advisories sources
-      - run: cargo deny --manifest-path browser-tests/Cargo.toml --workspace --config deny.toml check advisories sources
+      - run: cargo deny --manifest-path Cargo.toml --workspace --config deny.toml check advisories bans licenses sources
+      - run: cargo deny --manifest-path preview-renderer/Cargo.toml --workspace --config deny.toml check advisories bans licenses sources
+      - run: cargo deny --manifest-path browser-tests/Cargo.toml --workspace --config deny.toml check advisories bans licenses sources

@@ -4,7 +4,7 @@
 //! consume. To keep those bytes identical, this module models a parsed JSON value the way V8 does:
 //! object keys keep insertion order, except that array-index keys ("0", "1", ...) come first in
 //! ascending order; a duplicate key keeps its first position and takes the last value; every
-//! number is an IEEE double printed like `Number.prototype.toString`. [`stringify`] and
+//! number is an IEEE double printed like `Number.prototype.toString`. [`stringify()`] and
 //! [`stringify_pretty`] match `JSON.stringify(value)` and `JSON.stringify(value, null, 2)`.
 //!
 //! A missing property (JavaScript `undefined`) is `None` wherever an `Option<&Js>` appears.

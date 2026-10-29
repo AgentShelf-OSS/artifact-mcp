@@ -52,7 +52,7 @@
 //! 2. **A bundle path that sanitizes to a trailing separator is an I/O failure, not a validated
 //!    rejection.** `sanitizeRel("a/b/")` returns `"a/b/"` ([lib/store.js:50-55]) and Node then
 //!    fails inside `writeFileSync` with `EISDIR`; Rust's `Path::join` would silently drop the
-//!    separator and create a *file*. [`StoreContext::stage_bundle_files`] therefore refuses such
+//!    separator and create a *file*. `StoreContext::stage_bundle_files` therefore refuses such
 //!    a name so both runtimes fail the publish. Fixing it properly means rejecting the name in
 //!    `sanitizeRel` on both sides.
 //! 3. **Lifecycle failures carry Node's `reason` token as their message** (`not_found`,

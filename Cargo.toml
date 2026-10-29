@@ -13,6 +13,12 @@ path = "src/lib.rs"
 name = "artifact-mcp"
 path = "src/main.rs"
 
+[features]
+# Deterministic fakes (`FixedClock`, `SequentialIdSource`, `SeededRandom`, `ScriptedRandom`,
+# `Testkit`) for tests. The self dev-dependency below turns it on for every test target, so
+# release builds never compile them.
+test-util = []
+
 [dependencies]
 aes-gcm = "0.10"
 askama = "0.16"
@@ -50,6 +56,7 @@ twilight-model = "0.17.1"
 url = "2"
 
 [dev-dependencies]
+artifact-mcp = { path = ".", features = ["test-util"] }
 # In-process TLS fixture for the JWKS transport tests; pinned to the version reqwest already locks.
 tokio-rustls = { version = "0.26.4", default-features = false, features = ["aws-lc-rs"] }
 

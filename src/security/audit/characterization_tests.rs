@@ -576,6 +576,41 @@ fn verify_bridges_a_golden_checkpoint_and_rejects_a_forged_one() {
 }
 
 #[test]
+fn verify_rejects_a_tampered_bridge_that_only_the_checkpoint_mac_covers() {
+    // With two checkpoints, the events stage links to the second checkpoint's bridge, so the
+    // first checkpoint's bridge is protected by its MAC alone.
+    let insert = "INSERT INTO security_audit_checkpoints (first_sequence,last_sequence,key_id,\
+                  canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash) \
+                  VALUES (?1,?2,'v1',1,?3,?4,?5)";
+    let conn = golden_ledger();
+    conn.execute(
+        insert,
+        params![1, 1, GOLDEN_EVENT_HASHES[0], "", GOLDEN_CHECKPOINTS[0]],
+    )
+    .expect("insert first checkpoint");
+    conn.execute(
+        insert,
+        params![
+            2,
+            2,
+            GOLDEN_EVENT_HASHES[1],
+            GOLDEN_CHECKPOINTS[0],
+            GOLDEN_CHECKPOINTS[1]
+        ],
+    )
+    .expect("insert second checkpoint");
+    conn.execute("DELETE FROM security_audit_events WHERE sequence<=2", [])
+        .expect("prune entries");
+    assert_eq!(verify(&conn, &KEY), Ok(true));
+    conn.execute(
+        "UPDATE security_audit_checkpoints SET bridge_hash='00' WHERE first_sequence=1",
+        [],
+    )
+    .expect("tamper first bridge");
+    assert_eq!(verify(&conn, &KEY), Ok(false));
+}
+
+#[test]
 fn retention_refuses_to_prune_a_tampered_ledger() {
     let mut conn = golden_ledger();
     conn.execute(
@@ -760,8 +795,10 @@ fn a_tampered_receipt_answers_before_a_context_mismatch() {
         delete_pending_receipt_in_transaction(&tx, &KEY, "publish:abc:1"),
         Err(AppError::Internal)
     );
+    // Count inside the transaction: dropping it rolls back, so a count after the drop would be
+    // zero even if the failed finalize had appended an event.
+    assert_eq!(event_count(&tx), 0);
     drop(tx);
-    assert_eq!(event_count(&conn), 0);
 }
 
 #[test]
@@ -1037,9 +1074,9 @@ fn audit_access_debug_and_key_parsing_never_echo_key_material() {
         STANDARD.encode([7_u8; 33]),
         URL_SAFE_NO_PAD.encode([0xfb_u8; 32]),
     ] {
+        // The error equals a fixed message, so it cannot carry the rejected input.
         let error = parse_hmac_key(&value).expect_err("reject");
         assert_eq!(error, validation(message), "{value}");
-        assert!(value.is_empty() || !error.to_string().contains(&value));
     }
 }
 
