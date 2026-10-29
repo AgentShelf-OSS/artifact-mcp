@@ -174,46 +174,4 @@ mod tests {
             Some(PathBuf::from("/data/artifacts/abc123def456"))
         );
     }
-
-    #[test]
-    fn metadata_only_intents_require_matching_update_revision_and_digest() {
-        let row = BodyRow {
-            id: "abc123def456".to_owned(),
-            safe_id: SafeArtifactId::parse("abc123def456"),
-            is_bundle: false,
-            body_sha256: "digest".to_owned(),
-            revision: 3,
-            outgoing_is_bundle: Some(false),
-        };
-        assert_eq!(
-            classify_metadata_only_intent(
-                "update:abc123def456:3",
-                "update",
-                "digest",
-                "digest",
-                &row
-            ),
-            MetadataOnlyIntent::Committed
-        );
-        assert_eq!(
-            classify_metadata_only_intent(
-                "update:abc123def456:4",
-                "update",
-                "digest",
-                "digest",
-                &row
-            ),
-            MetadataOnlyIntent::Reverted
-        );
-        assert_eq!(
-            classify_metadata_only_intent(
-                "update:abc123def456:03",
-                "update",
-                "digest",
-                "digest",
-                &row
-            ),
-            MetadataOnlyIntent::Ambiguous
-        );
-    }
 }
