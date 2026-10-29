@@ -1423,3 +1423,38 @@ impl From<DeliveryResult> for DeliveryResultResponse {
         }
     }
 }
+
+#[cfg(test)]
+mod characterization {
+    use serde_json::json;
+
+    use super::{js_or_empty, object_keys_allowed, parse_webhook_events};
+
+    #[test]
+    fn javascript_coercion_preserves_nested_array_and_number_forms() {
+        assert_eq!(
+            js_or_empty(Some(&json!(["alpha", [null, true, 0.000001], {"x": 1}]))),
+            "alpha,,true,0.000001,[object Object]"
+        );
+        assert_eq!(js_or_empty(Some(&json!(1e21))), "1e+21");
+        assert_eq!(js_or_empty(Some(&json!(0))), "");
+    }
+
+    #[test]
+    fn webhook_events_reject_unknown_values_after_known_prefix() {
+        let error = parse_webhook_events(Some(&json!(["published", "unknown"])))
+            .expect_err("unknown event is rejected");
+
+        assert_eq!(error.to_string(), "Unknown webhook event: unknown");
+    }
+
+    #[test]
+    fn object_key_filter_requires_an_object_and_rejects_extra_keys() {
+        assert!(object_keys_allowed(&json!({"enabled": true}), &["enabled"]));
+        assert!(!object_keys_allowed(
+            &json!({"enabled": true, "extra": false}),
+            &["enabled"]
+        ));
+        assert!(!object_keys_allowed(&json!(["enabled"]), &["enabled"]));
+    }
+}
