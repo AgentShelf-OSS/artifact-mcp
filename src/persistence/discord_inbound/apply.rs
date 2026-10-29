@@ -10,7 +10,7 @@ use crate::{
     model::{ArtifactId, FeedbackAuthor, FeedbackId, OrgId},
 };
 
-use super::common::{MAX_PROVIDER_ID_BYTES, internal};
+use super::common::internal;
 
 fn artifact_exists(
     conn: &Connection,
@@ -341,100 +341,138 @@ fn persist_feedback(
     else {
         return Err(AppError::Internal);
     };
-    let revision: i64 = tx
-        .query_row(
-            "SELECT revision FROM artifacts WHERE id=?1 AND org=?2",
-            params![feedback.artifact_id.0, feedback.org.0],
-            |row| row.get(0),
-        )
-        .map_err(internal)?;
-    let exists = tx
-        .query_row(
-            "SELECT 1 FROM discord_inbound_message_state \
-              WHERE provider='discord' AND org=?1 AND external_message_id=?2",
-            params![feedback.org.0, feedback.external_message_id],
-            |_| Ok(()),
-        )
-        .optional()
-        .map_err(internal)?
-        .is_some();
-
-    if exists {
-        tx.execute(
-            "UPDATE feedback SET body=?1, external_edited_at=?2, external_deleted_at=?3 \
-              WHERE id=?4 AND artifact_id=?5 AND org=?6 AND author_source='discord'",
-            params![
-                feedback.body,
-                feedback.external_edited_at,
-                feedback.external_deleted_at,
-                feedback.id.0,
-                feedback.artifact_id.0,
-                feedback.org.0
-            ],
-        )
-        .map_err(internal)?;
-        tx.execute(
-            "UPDATE discord_inbound_message_state \
-                SET provider_version=?1, external_author_display=?2, external_edited_at=?3, \
-                    external_deleted_at=?4, updated_at=datetime('now') \
-              WHERE provider='discord' AND org=?5 AND external_message_id=?6 \
-                AND artifact_id=?7 AND external_thread_id=?8",
-            params![
-                feedback.provider_version,
-                external_author_display,
-                feedback.external_edited_at,
-                feedback.external_deleted_at,
-                feedback.org.0,
-                feedback.external_message_id,
-                feedback.artifact_id.0,
-                thread_id
-            ],
-        )
-        .map_err(internal)?;
+    let revision = feedback_artifact_revision(tx, feedback)?;
+    if feedback_mapping_exists(tx, feedback)? {
+        update_feedback_mapping(tx, feedback, thread_id, external_author_display)
     } else {
-        tx.execute(
-            "INSERT INTO feedback \
-             (id, artifact_id, org, viewer_email, body, artifact_revision, parent_id, \
-              author_source, external_author_id, external_author_display, external_created_at, \
-              external_edited_at, external_deleted_at) \
-             VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, 'discord', ?7, ?8, ?9, ?10, ?11)",
-            params![
-                feedback.id.0,
-                feedback.artifact_id.0,
-                feedback.org.0,
-                feedback.body,
-                revision,
-                feedback.parent_id.as_ref().map(|id| id.0.as_str()),
-                external_author_id,
-                external_author_display,
-                feedback.external_created_at,
-                feedback.external_edited_at,
-                feedback.external_deleted_at
-            ],
+        insert_feedback_mapping(
+            tx,
+            feedback,
+            thread_id,
+            revision,
+            external_author_id,
+            external_author_display,
         )
-        .map_err(internal)?;
-        tx.execute(
-            "INSERT INTO discord_inbound_message_state \
-             (provider, external_message_id, org, artifact_id, feedback_id, \
-              external_thread_id, external_author_id, external_author_display, provider_version, \
-              external_created_at, external_edited_at, external_deleted_at) \
-             VALUES ('discord', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![
-                feedback.external_message_id,
-                feedback.org.0,
-                feedback.artifact_id.0,
-                feedback.id.0,
-                thread_id,
-                external_author_id,
-                external_author_display,
-                feedback.provider_version,
-                feedback.external_created_at,
-                feedback.external_edited_at,
-                feedback.external_deleted_at
-            ],
-        )
-        .map_err(internal)?;
     }
+}
+
+fn feedback_artifact_revision(
+    tx: &Transaction<'_>,
+    feedback: &InboundFeedback,
+) -> Result<i64, AppError> {
+    tx.query_row(
+        "SELECT revision FROM artifacts WHERE id=?1 AND org=?2",
+        params![feedback.artifact_id.0, feedback.org.0],
+        |row| row.get(0),
+    )
+    .map_err(internal)
+}
+
+fn feedback_mapping_exists(
+    tx: &Transaction<'_>,
+    feedback: &InboundFeedback,
+) -> Result<bool, AppError> {
+    tx.query_row(
+        "SELECT 1 FROM discord_inbound_message_state \
+          WHERE provider='discord' AND org=?1 AND external_message_id=?2",
+        params![feedback.org.0, feedback.external_message_id],
+        |_| Ok(()),
+    )
+    .optional()
+    .map(|row| row.is_some())
+    .map_err(internal)
+}
+
+fn update_feedback_mapping(
+    tx: &Transaction<'_>,
+    feedback: &InboundFeedback,
+    thread_id: &str,
+    external_author_display: &str,
+) -> Result<(), AppError> {
+    tx.execute(
+        "UPDATE feedback SET body=?1, external_edited_at=?2, external_deleted_at=?3 \
+          WHERE id=?4 AND artifact_id=?5 AND org=?6 AND author_source='discord'",
+        params![
+            feedback.body,
+            feedback.external_edited_at,
+            feedback.external_deleted_at,
+            feedback.id.0,
+            feedback.artifact_id.0,
+            feedback.org.0
+        ],
+    )
+    .map_err(internal)?;
+    tx.execute(
+        "UPDATE discord_inbound_message_state \
+            SET provider_version=?1, external_author_display=?2, external_edited_at=?3, \
+                external_deleted_at=?4, updated_at=datetime('now') \
+          WHERE provider='discord' AND org=?5 AND external_message_id=?6 \
+            AND artifact_id=?7 AND external_thread_id=?8",
+        params![
+            feedback.provider_version,
+            external_author_display,
+            feedback.external_edited_at,
+            feedback.external_deleted_at,
+            feedback.org.0,
+            feedback.external_message_id,
+            feedback.artifact_id.0,
+            thread_id
+        ],
+    )
+    .map_err(internal)?;
+    Ok(())
+}
+
+fn insert_feedback_mapping(
+    tx: &Transaction<'_>,
+    feedback: &InboundFeedback,
+    thread_id: &str,
+    revision: i64,
+    external_author_id: &str,
+    external_author_display: &str,
+) -> Result<(), AppError> {
+    tx.execute(
+        "INSERT INTO feedback \
+         (id, artifact_id, org, viewer_email, body, artifact_revision, parent_id, \
+          author_source, external_author_id, external_author_display, external_created_at, \
+          external_edited_at, external_deleted_at) \
+         VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, 'discord', ?7, ?8, ?9, ?10, ?11)",
+        params![
+            feedback.id.0,
+            feedback.artifact_id.0,
+            feedback.org.0,
+            feedback.body,
+            revision,
+            feedback.parent_id.as_ref().map(|id| id.0.as_str()),
+            external_author_id,
+            external_author_display,
+            feedback.external_created_at,
+            feedback.external_edited_at,
+            feedback.external_deleted_at
+        ],
+    )
+    .map_err(internal)?;
+    tx.execute(
+        "INSERT INTO discord_inbound_message_state \
+         (provider, external_message_id, org, artifact_id, feedback_id, \
+          external_thread_id, external_author_id, external_author_display, provider_version, \
+          external_created_at, external_edited_at, external_deleted_at) \
+         VALUES ('discord', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
+        params![
+            feedback.external_message_id,
+            feedback.org.0,
+            feedback.artifact_id.0,
+            feedback.id.0,
+            thread_id,
+            external_author_id,
+            external_author_display,
+            feedback.provider_version,
+            feedback.external_created_at,
+            feedback.external_edited_at,
+            feedback.external_deleted_at
+        ],
+    )
+    .map_err(internal)?;
     Ok(())
 }
 

@@ -3,7 +3,7 @@ use crate::{
     integrations::discord_inbound::{DiscordMessage, InboundEvent},
 };
 
-use super::common::{MAX_PROVIDER_ID_BYTES, MAX_SAFE_ERROR_BYTES};
+use super::common::{MAX_PROVIDER_ID_BYTES, MAX_SAFE_ERROR_BYTES, MAX_SESSION_ID_BYTES};
 
 pub(super) fn validate_event_envelope(event: &InboundEvent) -> Result<(), AppError> {
     for (label, value, max) in [
