@@ -11,6 +11,22 @@ use super::{KEY_ID, VERSION};
 
 /// Verify every retained event against its duplicated fields and atomic chain head.
 pub fn verify(conn: &Connection, key: &[u8; 32]) -> Result<bool, AppError> {
+    let Some((expected_sequence, bridge)) = verify_checkpoints(conn, key)? else {
+        return Ok(false);
+    };
+    let Some((expected_sequence, previous)) = verify_events(conn, key, expected_sequence, bridge)?
+    else {
+        return Ok(false);
+    };
+    verify_chain_head(conn, key, expected_sequence, previous)
+}
+
+/// Stage 1: walk the retention checkpoints in order. Returns the next expected event sequence
+/// and the bridge hash the first retained event must link to, or `None` when a checkpoint fails.
+fn verify_checkpoints(
+    conn: &Connection,
+    key: &[u8; 32],
+) -> Result<Option<(u64, String)>, AppError> {
     let mut previous_checkpoint = String::new();
     let mut expected_sequence = 1_u64;
     let mut bridge = String::new();
@@ -42,13 +58,25 @@ pub fn verify(conn: &Connection, key: &[u8; 32]) -> Result<bool, AppError> {
             || prior != previous_checkpoint
             || stored != checkpoint_mac(key, first, last, &checkpoint_bridge, &previous_checkpoint)
         {
-            return Ok(false);
+            return Ok(None);
         }
         expected_sequence = last.checked_add(1).ok_or(AppError::Internal)?;
         bridge = checkpoint_bridge;
         previous_checkpoint = stored;
     }
     drop(checkpoints);
+    Ok(Some((expected_sequence, bridge)))
+}
+
+/// Stage 2: walk the retained events in sequence order, recomputing each canonical encoding and
+/// chain link. Returns the sequence after the last event and the last event hash, or `None` when
+/// an entry fails. An inadmissible stored field propagates the encoder error.
+fn verify_events(
+    conn: &Connection,
+    key: &[u8; 32],
+    mut expected_sequence: u64,
+    bridge: String,
+) -> Result<Option<(u64, String)>, AppError> {
     let mut previous = bridge;
     let mut statement = conn.prepare("SELECT sequence,event_id,key_id,canonical_version,tenant,actor_type,actor_id,actor_role,operation,target_type,target_id,result,classification,source,request_id,revision,occurred_at,canonical,prev_hash,event_hash FROM security_audit_events ORDER BY sequence").map_err(|_| AppError::Internal)?;
     let rows = statement
@@ -104,11 +132,21 @@ pub fn verify(conn: &Connection, key: &[u8; 32]) -> Result<bool, AppError> {
             || canonical(&event_id, &context, &event, &occurred_at)? != stored
             || hash(key, sequence, &previous, &stored) != stored_hash
         {
-            return Ok(false);
+            return Ok(None);
         }
         previous = stored_hash;
         expected_sequence += 1;
     }
+    Ok(Some((expected_sequence, previous)))
+}
+
+/// Stage 3: the authenticated head must commit to the last event and the current pending set.
+fn verify_chain_head(
+    conn: &Connection,
+    key: &[u8; 32],
+    expected_sequence: u64,
+    previous: String,
+) -> Result<bool, AppError> {
     let head = load_head(conn)?;
     let recomputed_pending_root = pending_receipts_root(conn)?;
     Ok(
