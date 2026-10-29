@@ -77,6 +77,15 @@ mod tests {
 
 type PreparedIntent = (String, String, String, String, String, String);
 
+struct PreparedIntentRefs<'a> {
+    id: &'a str,
+    artifact_id: &'a str,
+    operation: &'a str,
+    expected: &'a str,
+    prior: &'a str,
+    staged: &'a str,
+}
+
 fn load_prepared_intents(conn: &Connection) -> Result<Vec<PreparedIntent>, AppError> {
     let mut statement = conn
         .prepare(
@@ -109,33 +118,25 @@ fn recover_prepared_intent(
     audit_key: &[u8; 32],
     (intent_id, artifact_id, operation, expected, prior, staged): PreparedIntent,
 ) -> Result<(), AppError> {
+    let intent = PreparedIntentRefs {
+        id: &intent_id,
+        artifact_id: &artifact_id,
+        operation: &operation,
+        expected: &expected,
+        prior: &prior,
+        staged: &staged,
+    };
     let row = rows.iter().find(|row| row.id == artifact_id);
     let final_path = row.and_then(|row| row.body_path(artifact_dir));
     if operation == "delete" {
-        if row.is_none() {
-            // The database delete committed. Complete the critical cleanup only through the
-            // fallible durable primitives; if either trash *or history* cannot be removed,
-            // retain the intent for the next startup/operator. Deleting the marker after
-            // trash alone would turn a later history-sync failure into best-effort cleanup.
-            let Some(safe_id) = SafeArtifactId::parse(&artifact_id) else {
-                return Ok(());
-            };
-            if let Some(trash) = transient_path_for_intent(artifact_dir, &artifact_id, &staged)
-                && path_exists(&trash)
-            {
-                durable::remove(&trash)?;
-            }
-            durable::remove(&paths::history_dir(artifact_dir, &safe_id))?;
-            complete_reconciled_intent(conn, audit_key, &intent_id, "recovered", "reconciliation")?;
-            return Ok(());
-        }
-        if let (Some(final_path), Some(row)) = (final_path, row)
-            && path_exists(&final_path)
-            && body_digest_at_path(&final_path, row.is_bundle).as_deref() == Some(prior.as_str())
-        {
-            complete_reconciled_intent(conn, audit_key, &intent_id, "failure", "compensated")?;
-        }
-        return Ok(());
+        return recover_prepared_delete_intent(
+            conn,
+            artifact_dir,
+            audit_key,
+            &intent,
+            row,
+            final_path.as_deref(),
+        );
     }
     if row.is_none() && operation == "publish" {
         // No metadata was ever committed. The staging body is unreferenced scratch and is
@@ -147,15 +148,71 @@ fn recover_prepared_intent(
     let Some(final_path) = final_path else {
         return Ok(());
     };
-    let final_digest = path_exists(&final_path)
-        .then(|| body_digest_at_path(&final_path, row.is_bundle))
+    recover_prepared_current_body_intent(conn, artifact_dir, audit_key, &intent, row, &final_path)
+}
+
+fn recover_prepared_delete_intent(
+    conn: &mut Connection,
+    artifact_dir: &Path,
+    audit_key: &[u8; 32],
+    intent: &PreparedIntentRefs<'_>,
+    row: Option<&BodyRow>,
+    final_path: Option<&Path>,
+) -> Result<(), AppError> {
+    if row.is_none() {
+        // The database delete committed. Complete the critical cleanup only through the
+        // fallible durable primitives; if either trash *or history* cannot be removed,
+        // retain the intent for the next startup/operator. Deleting the marker after
+        // trash alone would turn a later history-sync failure into best-effort cleanup.
+        let Some(safe_id) = SafeArtifactId::parse(intent.artifact_id) else {
+            return Ok(());
+        };
+        if let Some(trash) =
+            transient_path_for_intent(artifact_dir, intent.artifact_id, intent.staged)
+            && path_exists(&trash)
+        {
+            durable::remove(&trash)?;
+        }
+        durable::remove(&paths::history_dir(artifact_dir, &safe_id))?;
+        complete_reconciled_intent(conn, audit_key, intent.id, "recovered", "reconciliation")?;
+        return Ok(());
+    }
+    if let (Some(final_path), Some(row)) = (final_path, row)
+        && path_exists(final_path)
+        && body_digest_at_path(final_path, row.is_bundle).as_deref() == Some(intent.prior)
+    {
+        complete_reconciled_intent(conn, audit_key, intent.id, "failure", "compensated")?;
+    }
+    Ok(())
+}
+
+fn recover_prepared_current_body_intent(
+    conn: &mut Connection,
+    artifact_dir: &Path,
+    audit_key: &[u8; 32],
+    intent: &PreparedIntentRefs<'_>,
+    row: &BodyRow,
+    final_path: &Path,
+) -> Result<(), AppError> {
+    let final_digest = path_exists(final_path)
+        .then(|| body_digest_at_path(final_path, row.is_bundle))
         .flatten();
-    if final_digest.as_deref() == Some(expected.as_str()) {
-        let metadata_state =
-            classify_metadata_only_intent(&intent_id, &operation, &expected, &prior, row);
+    if final_digest.as_deref() == Some(intent.expected) {
+        let metadata_state = classify_metadata_only_intent(
+            intent.id,
+            intent.operation,
+            intent.expected,
+            intent.prior,
+            row,
+        );
         match metadata_state {
             MetadataOnlyIntent::Committed
-                if !ensure_metadata_only_history(artifact_dir, row, &final_path, &expected)? =>
+                if !ensure_metadata_only_history(
+                    artifact_dir,
+                    row,
+                    final_path,
+                    intent.expected,
+                )? =>
             {
                 // The body is current, but its immutable predecessor snapshot is not
                 // durable. Keep the marker concealed for retry/operator repair.
@@ -179,7 +236,7 @@ fn recover_prepared_intent(
         complete_reconciled_intent(
             conn,
             audit_key,
-            &intent_id,
+            intent.id,
             outcome,
             if outcome == "failure" {
                 "compensated"
@@ -187,18 +244,18 @@ fn recover_prepared_intent(
                 "reconciliation"
             },
         )?;
-    } else if row.body_sha256 == prior && final_digest.as_deref() == Some(prior.as_str()) {
+    } else if row.body_sha256 == intent.prior && final_digest.as_deref() == Some(intent.prior) {
         // Metadata never advanced. The prior body is intact, so this is an abort; discard
         // only the separately-durable staged replacement, never the last intact final body.
-        let staged = transient_path_for_intent(artifact_dir, &artifact_id, &staged);
+        let staged = transient_path_for_intent(artifact_dir, intent.artifact_id, intent.staged);
         if staged.as_ref().is_some_and(|path| path_exists(path))
             && staged.as_ref().is_some_and(|path| {
-                body_digest_at_path(path, row.is_bundle).as_deref() == Some(expected.as_str())
+                body_digest_at_path(path, row.is_bundle).as_deref() == Some(intent.expected)
             })
         {
             safe_remove(staged.as_deref().expect("checked staged path"));
         }
-        complete_reconciled_intent(conn, audit_key, &intent_id, "failure", "compensated")?;
+        complete_reconciled_intent(conn, audit_key, intent.id, "failure", "compensated")?;
     }
     Ok(())
 }
