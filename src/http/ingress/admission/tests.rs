@@ -127,6 +127,8 @@ async fn admission_headers_precede_multipart_and_declared_body_limits() {
     let mut config = AppConfig::default();
     config.ingress.max_headers = 1;
     config.body.category_json = 1;
+    config.body.feedback_json = 1;
+    config.body.reaction_json = 1;
     let response = router(Arc::new(IngressState::from_config(&config)))
         .oneshot(
             Request::builder()
@@ -149,6 +151,8 @@ async fn admission_headers_precede_multipart_and_declared_body_limits() {
 async fn admission_multipart_precedes_declared_body_limit() {
     let mut config = AppConfig::default();
     config.body.category_json = 1;
+    config.body.feedback_json = 1;
+    config.body.reaction_json = 1;
     let response = router(Arc::new(IngressState::from_config(&config)))
         .oneshot(
             Request::builder()
@@ -189,8 +193,14 @@ async fn admission_declared_body_limit_precedes_rate_limit() {
 async fn admission_rate_limit_precedes_request_concurrency_limit() {
     let mut config = AppConfig::default();
     config.ingress.mutations_per_window = 0;
-    config.ingress.max_concurrent_requests = 0;
-    let response = router(Arc::new(IngressState::from_config(&config)))
+    config.ingress.max_concurrent_requests = 1;
+    let state = Arc::new(IngressState::from_config(&config));
+    let _held_request_permit = state
+        .requests
+        .clone()
+        .try_acquire_owned()
+        .expect("test holds the only request permit");
+    let response = router(state)
         .oneshot(
             Request::builder()
                 .method(Method::POST)
