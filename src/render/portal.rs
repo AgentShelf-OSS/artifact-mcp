@@ -37,11 +37,68 @@ mod tests;
 
 use gallery::*;
 use helpers::*;
-use renderer::*;
 use shell::*;
 use templates::*;
 
-pub(super) use helpers::org_color;
-pub use renderer::{AskamaPageRenderer, TrustedStatic};
-pub(super) use renderer::{FAVICON, PORTAL_CSS, THEME_BOOT};
+pub use renderer::AskamaPageRenderer;
 pub use shell::{artifact_install_name, artifact_install_short_name, js_literal};
+
+/// A checked-in asset that is allowed to bypass Askama's HTML escaping.
+///
+/// This wrapper only accepts `&'static str`, which keeps request/database values out of the
+/// trusted channel by construction. Runtime values remain ordinary template fields and are
+/// always autoescaped.
+#[derive(Clone, Copy)]
+pub struct TrustedStatic(&'static str);
+
+impl TrustedStatic {
+    pub(super) const fn new(value: &'static str) -> Self {
+        Self(value)
+    }
+}
+
+impl fmt::Display for TrustedStatic {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.0)
+    }
+}
+
+impl HtmlSafe for TrustedStatic {}
+
+const PORTAL_FAVICON: &str = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='7' fill='%23142235'/%3E%3Cpath d='M18 47 30 15h5l12 32h-7l-3-9H27l-3 9Zm11-15h6l-3-10Z' fill='%23D5A252'/%3E%3C/svg%3E";
+pub(super) const FAVICON: TrustedStatic = TrustedStatic::new(PORTAL_FAVICON);
+pub(super) const PORTAL_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/portal.css"));
+const PORTAL_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/portal.js"));
+const COLLECTION_TOOLBAR_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collection-toolbar.css"));
+const COLLECTION_TOOLBAR_SCRIPT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collection-toolbar.js"));
+const COLLECTION_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collections.css"));
+const COLLECTION_SCRIPT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/collections.js"));
+pub(super) const THEME_BOOT: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/theme-boot.js"));
+const NOT_FOUND_CSS: TrustedStatic = TrustedStatic::new(include_str!("../../assets/not-found.css"));
+const NOT_SIGNED_IN_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/not-signed-in.css"));
+const ACCESS_RETRY_CSS: TrustedStatic =
+    TrustedStatic::new(include_str!("../../assets/access-retry.css"));
+
+pub(super) fn org_color(name: &str, color: Option<&str>) -> String {
+    if let Some(color) = color.filter(|color| valid_hex_color(color)) {
+        return color.to_owned();
+    }
+    if name == "admin" {
+        return "#66578B".to_owned();
+    }
+    let mut hash = 2_166_136_261_u32;
+    for character in name.chars() {
+        let mut units = [0_u16; 2];
+        let first = character.encode_utf16(&mut units)[0];
+        hash ^= u32::from(first);
+        hash = hash.wrapping_mul(16_777_619);
+    }
+    format!("hsl({} 68% 52%)", hash % 360)
+}

@@ -1,50 +1,5 @@
 use super::*;
 
-/// A checked-in asset that is allowed to bypass Askama's HTML escaping.
-///
-/// This wrapper only accepts `&'static str`, which keeps request/database values out of the
-/// trusted channel by construction. Runtime values remain ordinary template fields and are
-/// always autoescaped.
-#[derive(Clone, Copy)]
-pub struct TrustedStatic(&'static str);
-
-impl TrustedStatic {
-    pub const fn new(value: &'static str) -> Self {
-        Self(value)
-    }
-}
-
-impl fmt::Display for TrustedStatic {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str(self.0)
-    }
-}
-
-impl HtmlSafe for TrustedStatic {}
-
-pub(super) const PORTAL_FAVICON: &str = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='7' fill='%23142235'/%3E%3Cpath d='M18 47 30 15h5l12 32h-7l-3-9H27l-3 9Zm11-15h6l-3-10Z' fill='%23D5A252'/%3E%3C/svg%3E";
-pub const FAVICON: TrustedStatic = TrustedStatic::new(PORTAL_FAVICON);
-pub const PORTAL_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/portal.css"));
-pub(super) const PORTAL_SCRIPT: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/portal.js"));
-pub(super) const COLLECTION_TOOLBAR_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/collection-toolbar.css"));
-pub(super) const COLLECTION_TOOLBAR_SCRIPT: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/collection-toolbar.js"));
-pub(super) const COLLECTION_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/collections.css"));
-pub(super) const COLLECTION_SCRIPT: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/collections.js"));
-pub const THEME_BOOT: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/theme-boot.js"));
-pub(super) const NOT_FOUND_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/not-found.css"));
-pub(super) const NOT_SIGNED_IN_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/not-signed-in.css"));
-pub(super) const ACCESS_RETRY_CSS: TrustedStatic =
-    TrustedStatic::new(include_str!("../../../assets/access-retry.css"));
-
 pub(super) type RenderClock = Arc<dyn Fn() -> i64 + Send + Sync>;
 
 /// Production renderer for every page behind the frozen [`PageRenderer`] port.

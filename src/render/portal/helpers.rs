@@ -26,23 +26,6 @@ pub(super) fn color_for(
     org_color(&org.0, colors.get(org).and_then(Option::as_deref))
 }
 
-pub fn org_color(name: &str, color: Option<&str>) -> String {
-    if let Some(color) = color.filter(|color| valid_hex_color(color)) {
-        return color.to_owned();
-    }
-    if name == "admin" {
-        return "#66578B".to_owned();
-    }
-    let mut hash = 2_166_136_261_u32;
-    for character in name.chars() {
-        let mut units = [0_u16; 2];
-        let first = character.encode_utf16(&mut units)[0];
-        hash ^= u32::from(first);
-        hash = hash.wrapping_mul(16_777_619);
-    }
-    format!("hsl({} 68% 52%)", hash % 360)
-}
-
 pub(super) fn valid_hex_color(value: &str) -> bool {
     matches!(value.len(), 4 | 7)
         && value.starts_with('#')
