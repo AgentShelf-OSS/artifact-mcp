@@ -28,7 +28,7 @@ pub struct NewFeedback<'a> {
     /// `meta.revision`; `Number(x) || 1` maps a zero/absent revision to 1 [lib/feedback.js:104].
     pub artifact_revision: u64,
     pub submission: &'a SubmitFeedback,
-    /// The output of [`validate_anchor_page`], which the route runs first [lib/app.js:570].
+    /// The output of [`validate_anchor_page`](super::validate_anchor_page), which the route runs first [lib/app.js:570].
     pub anchor_page: Option<&'a str>,
     /// `FEEDBACK_MAX_BODY` from `AppConfig::limits` [lib/config.js:21].
     pub max_body: u64,

@@ -578,3 +578,42 @@ fn only_a_configured_proxy_can_supply_cf_connecting_ip() {
         "192.0.2.9"
     );
 }
+
+#[tokio::test]
+async fn admission_request_concurrency_limit_precedes_mutation_concurrency_limit() {
+    let mut config = AppConfig::default();
+    config.ingress.max_concurrent_requests = 1;
+    config.ingress.max_concurrent_mutations = 1;
+    let state = Arc::new(IngressState::from_config(&config));
+    let _held_request_permit = state
+        .requests
+        .clone()
+        .try_acquire_owned()
+        .expect("test holds the only request permit");
+    let _held_mutation_permit = state
+        .mutations
+        .clone()
+        .try_acquire_owned()
+        .expect("test holds the only mutation permit");
+    let response = router(Arc::clone(&state))
+        .oneshot(
+            Request::builder()
+                .method(Method::POST)
+                .uri("/ok")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(response.status(), StatusCode::SERVICE_UNAVAILABLE);
+    let metrics = state.metrics().render_prometheus();
+    assert!(
+        metrics
+            .contains("artifact_mcp_ingress_rejections_total{reason=\"request_concurrency\"} 1\n"),
+        "{metrics}"
+    );
+    assert!(
+        !metrics.contains("reason=\"mutation_concurrency\"} 1"),
+        "{metrics}"
+    );
+}

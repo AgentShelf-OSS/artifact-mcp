@@ -9,8 +9,8 @@
 //!
 //! A publisher key's secret is generated, hashed, and shown once; only `sha256Hex(secret)` is
 //! ever written to `api_keys.key_hash` ([lib/keys.js:38-39]). Inside this module the raw value
-//! never exists as a bare `String`: it is a [`Secret`], whose `Debug`/`Display` are redacted, and
-//! it is unwrapped only when the frozen [`CreatedPublisherKey`] is built for the caller. No error,
+//! never exists as a bare `String`: it is a [`Secret`](crate::config::Secret), whose `Debug`/`Display` are redacted, and
+//! it is unwrapped only when the frozen [`CreatedPublisherKey`](crate::model::CreatedPublisherKey) is built for the caller. No error,
 //! log line, or database column can therefore carry it.
 //!
 //! **Contract-delta request:** `CreatedPublisherKey.secret` is a plain `String` on a struct that
