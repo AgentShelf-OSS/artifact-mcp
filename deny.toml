@@ -1,5 +1,6 @@
 # cargo-deny policy for the server, preview-renderer and browser-tests workspaces.
-# CI runs `cargo deny check --config deny.toml advisories sources` against each one
+# CI runs `cargo deny --manifest-path <workspace>/Cargo.toml --workspace --config deny.toml
+# check advisories sources` against each one
 # (.github/workflows/dependencies.yml).
 
 [graph]
