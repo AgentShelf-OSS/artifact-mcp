@@ -824,7 +824,8 @@ mod tests {
     use twilight_gateway::Intents;
 
     use super::super::rest::{DiscordInboundReadinessRest, MessageFetch, discord_resource_url};
-    use super::{configured_intents, join_worker_with_grace};
+    use super::{configured_intents, event_fingerprint, join_worker_with_grace};
+    use crate::integrations::discord_inbound::{DiscordAuthor, DiscordMessage, InboundEventKind};
     use crate::{config::Secret, error::AppError};
 
     async fn fake_rest(responses: Vec<&'static str>) -> (String, JoinHandle<()>) {
@@ -944,5 +945,69 @@ mod tests {
         });
         stop.send(true).expect("signal stop");
         join_worker_with_grace(join, std::time::Duration::from_millis(100)).await;
+    }
+
+    fn message(id: &str, version: i64, content: Option<&str>) -> DiscordMessage {
+        DiscordMessage {
+            id: id.to_owned(),
+            guild_id: String::new(),
+            thread_id: String::new(),
+            author: DiscordAuthor {
+                id: String::new(),
+                display: String::new(),
+                is_bot: false,
+                webhook_id: None,
+            },
+            content: content.map(str::to_owned),
+            reply_to_message_id: None,
+            version,
+            created_at: None,
+            edited_at: None,
+            supported_text: true,
+        }
+    }
+
+    /// The fingerprint is stored as `payload_fingerprint` and deduplicates gateway events across
+    /// releases, so its bytes are pinned. The expected values were computed independently
+    /// (Python `hashlib`) from the same field order.
+    #[test]
+    fn event_fingerprint_matches_the_pinned_digests() {
+        let (guild, thread) = ("223456789012345678", "323456789012345678");
+        assert_eq!(
+            event_fingerprint(
+                &InboundEventKind::MessageCreate,
+                Some(&message(
+                    "423456789012345678",
+                    1_767_225_600_000_000,
+                    Some("hello")
+                )),
+                guild,
+                thread,
+            ),
+            "13244d9a86ae491cad99c314cfdb45fd9dbf32622728709e9bf2f69fb732d448"
+        );
+        assert_eq!(
+            event_fingerprint(
+                &InboundEventKind::MessageUpdate,
+                Some(&message("423456789012345678", 1_767_225_600_000_001, None)),
+                guild,
+                thread,
+            ),
+            "2f6d6fbe424dfec01f2b2e77dc7f20644537e86b1b708f763ad89a63bc95081c"
+        );
+        assert_eq!(
+            event_fingerprint(&InboundEventKind::ThreadDelete, None, guild, thread),
+            "437e5a797c83a49c590b955a7ba4274d08f9b953a19291197c7c7f8a21c094b0"
+        );
+        // Empty content still hashes the content digest, unlike absent content.
+        assert_eq!(
+            event_fingerprint(
+                &InboundEventKind::MessageDelete,
+                Some(&message("m", -1, Some(""))),
+                "g",
+                "t",
+            ),
+            "28291d93ce0503b50ebb4bc1ddafe83d858156c06156451295f4f536cbe84f3e"
+        );
     }
 }
