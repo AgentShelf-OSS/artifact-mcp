@@ -881,6 +881,21 @@ mod tests {
     }
 
     #[test]
+    fn invalid_point_precedes_invalid_box_pair() {
+        let anchor = FeedbackAnchor {
+            x: f64::NAN,
+            y: 0.5,
+            w: Some(0.25),
+            h: None,
+            approx: false,
+        };
+        assert_eq!(
+            normalize_anchor(Some(&anchor), None),
+            Err(AppError::Validation(ANCHOR_POINT_MESSAGE.to_owned()))
+        );
+    }
+
+    #[test]
     fn posix_normalize_preserves_a_trailing_slash() {
         assert_eq!(posix_normalize("a/./b"), "a/b");
         assert_eq!(posix_normalize("a//b/"), "a/b/");

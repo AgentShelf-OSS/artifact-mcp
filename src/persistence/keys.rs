@@ -913,4 +913,27 @@ mod tests {
             "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
         );
     }
+
+    #[test]
+    fn owner_verification_precedes_client_id_validation() {
+        let conn = Connection::open_in_memory().expect("in-memory database");
+        conn.execute_batch(
+            "CREATE TABLE org_email_members (email TEXT, org TEXT);
+             CREATE TABLE org_domains (domain TEXT, org TEXT);",
+        )
+        .expect("identity schema");
+        let request = CreatePublisherKey {
+            client_id: ClientId("x".to_owned()),
+            org: OrgId("default".to_owned()),
+            label: String::new(),
+            role: String::new(),
+            owner_email: Some("missing@example.com".to_owned()),
+        };
+        assert_eq!(
+            create_key(&conn, &request, &SeededRandom::new(1)),
+            Err(AppError::Validation(
+                "Owner must be a verified member of this organization.".to_owned()
+            ))
+        );
+    }
 }
