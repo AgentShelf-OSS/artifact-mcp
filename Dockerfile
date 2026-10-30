@@ -7,6 +7,11 @@ RUN apk add --no-cache binutils build-base ca-certificates cmake \
     && rustup target add x86_64-unknown-linux-musl \
     && mkdir -p /runtime-data
 
+# cargo-auditable embeds the resolved dependency list in the binary (`.dep-v0` section), so
+# syft and grype can see the Rust crates inside the static binary. Version pinned; its own
+# Cargo.lock is used.
+RUN cargo install --locked --version 0.7.7 cargo-auditable
+
 WORKDIR /build
 COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
 # `xtask` is a workspace member, so Cargo needs its manifest to load the workspace. The build
@@ -22,7 +27,7 @@ ENV RUSTUP_TOOLCHAIN=1.97.1 \
     CC_x86_64_unknown_linux_musl=cc \
     AR_x86_64_unknown_linux_musl=ar \
     RUSTFLAGS="-C strip=symbols"
-RUN cargo build --release --locked --target x86_64-unknown-linux-musl \
+RUN cargo auditable build --release --locked --target x86_64-unknown-linux-musl \
     && strip target/x86_64-unknown-linux-musl/release/artifact-mcp
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35

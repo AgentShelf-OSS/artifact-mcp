@@ -94,7 +94,9 @@ Each GitHub Release contains:
 `release-manifest.json` does not name `artifact-preview`, and its format did not change when the
 renderer was added. The renderer binary is bound by its `SHA256SUMS` entry and by its own build
 provenance attestation. The image SBOM and the vulnerability scan cover the server image, not the
-renderer binary. The renderer's dependencies are locked in `preview-renderer/Cargo.lock`.
+renderer binary. The server binary is built with `cargo auditable`, which embeds its resolved
+dependency list in a `.dep-v0` section, so the image SBOM lists the Rust crates inside the static
+binary and the scan matches advisories against them. CI checks that the section is present. The renderer's dependencies are locked in `preview-renderer/Cargo.lock`.
 
 Verify downloaded assets before using them. Run `cargo xtask` from a checkout of the release tag;
 the manifest path can be absolute or relative to the current directory:

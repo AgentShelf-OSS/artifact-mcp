@@ -50,6 +50,33 @@ jobs:
           fi
           MCP_SURFACE_BASE="$base" cargo test --locked --test mcp_surface -- --nocapture
 
+  image:
+    # The release image is otherwise built only when a tag is released. Build it on every change,
+    # and check that the binary carries cargo-auditable's dependency list, which the release SBOM
+    # and vulnerability scan read.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          push: false
+          tags: artifact-mcp:ci
+      - name: Check the binary carries its dependency list
+        run: |
+          set -euo pipefail
+          container="$(docker create artifact-mcp:ci)"
+          docker cp "$container:/artifact-mcp" "$RUNNER_TEMP/artifact-mcp"
+          docker rm "$container" >/dev/null
+          readelf --section-headers "$RUNNER_TEMP/artifact-mcp" | grep -q '\.dep-v0' || {
+            echo "artifact-mcp has no .dep-v0 section; build it with cargo auditable" >&2; exit 1;
+          }
+
   preview-renderer:
     # The isolated HTML-to-PNG sidecar is its own Cargo workspace. Its tests drive the pinned Chrome
     # for Testing headless shell, so a missing browser is a failure (CI=1), not a skip.
