@@ -1,5 +1,10 @@
 # Runbook: move CT222 from the Node renderer to the Rust renderer
 
+> Migration record. Steps 1–8 are complete: CT222 has run the Rust renderer since 2026-10-23 and has
+> had no Node since 2026-10-30 (step 8), so the Node rollback in step 7 no longer applies. The
+> "Chrome sandbox" section still describes the live setup. Use [`README.md`](README.md) for the
+> renderer contract and workspace commands.
+
 Do the steps in order and stop at the first failed check.
 
 **Run log.** Steps 1–6 ran on 2026-10-23 with a local build of `a34964b` (sha256 `47af6293…`); CT222
