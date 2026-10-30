@@ -20,7 +20,7 @@ path = "src/main.rs"
 test-util = []
 
 [dependencies]
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 askama = "0.16"
 axum = { version = "0.8", features = ["http1", "json", "tokio"] }
 base64 = "0.22"
