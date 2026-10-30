@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 
 use aes_gcm::{
     Aes256Gcm, Nonce,
-    aead::{AeadInPlace, KeyInit},
+    aead::{AeadInOut, KeyInit},
 };
 use artifact_mcp::persistence::migrations::{self, LATEST_SCHEMA_VERSION, MigrationContext};
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
@@ -493,7 +493,7 @@ fn encrypted(url: &str, nonce_byte: u8) -> Result<Vec<(&'static str, Value)>> {
     let nonce = [nonce_byte; 12];
     let mut ciphertext = url.as_bytes().to_vec();
     let tag = cipher
-        .encrypt_in_place_detached(&Nonce::from(nonce), &[], &mut ciphertext)
+        .encrypt_inout_detached(&Nonce::from(nonce), &[], ciphertext.as_mut_slice().into())
         .map_err(|_| "AES-GCM refused the fixture URL")?;
     // `url.slice(-4)`: the fixture URLs are ASCII, so four chars are four UTF-16 code units.
     let tail = url

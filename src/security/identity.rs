@@ -54,7 +54,7 @@
 //! [`AccessToken`] redacts itself in `Debug`/`Display`. No token, claim set, or signature is ever
 //! placed in an [`AppError`] or a log line; failures are reported as the anonymous viewer.
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit as _, Mac};
 use sha2::Sha256;
 use std::{fmt, sync::Arc};
 

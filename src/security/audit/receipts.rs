@@ -1,7 +1,7 @@
 //! Durable cross-resource receipts: reservation, finalization, reconciliation, and release,
 //! each authenticated against the pending-set commitment in the chain head.
 
-use hmac::Mac;
+use hmac::{KeyInit as _, Mac};
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::error::AppError;

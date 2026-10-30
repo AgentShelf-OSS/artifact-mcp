@@ -149,8 +149,7 @@ pub fn vapid_public_key(encoded: &str) -> Option<String> {
         return None;
     }
     let secret = p256::SecretKey::from_slice(&scalar).ok()?;
-    let point =
-        p256::elliptic_curve::sec1::ToEncodedPoint::to_encoded_point(&secret.public_key(), false);
+    let point = p256::elliptic_curve::sec1::ToSec1Point::to_sec1_point(&secret.public_key(), false);
     Some(URL_SAFE_NO_PAD.encode(point.as_bytes()))
 }
 

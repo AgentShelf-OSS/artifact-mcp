@@ -1137,7 +1137,7 @@ async fn malformed_discussion_payload_dead_letters_without_provider_call() {
         DELIVERY_KIND_DISCUSSION_MESSAGE,
     );
     record.payload = b"{".to_vec();
-    record.payload_sha256 = format!("{:x}", sha2::Sha256::digest(&record.payload));
+    record.payload_sha256 = hex::encode(sha2::Sha256::digest(&record.payload));
     let outbox = Arc::new(FakeOutbox::one(record.clone()));
     let discussions = fake_discussions(&record, Some("123456789012345678"));
     let (worker, provider) = make_discussion_worker(

@@ -1,7 +1,7 @@
 //! Capability-gated, tenant-scoped, cursor-paged readers and the bounded export.
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use hmac::Mac;
+use hmac::{KeyInit as _, Mac};
 use rusqlite::{Connection, params};
 use serde::Serialize;
 
