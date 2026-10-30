@@ -34,6 +34,13 @@ compromised dependency can still change the binary it is compiled into. It canno
 attestations for other subjects, push images, or change a release.
 `xtask/tests/release_workflow.rs` enforces this split.
 
+Files that pass between jobs are workflow artifacts, which code in the `build` job could try to
+replace. The `attest` job therefore records a hash of the candidate checksums as a job output.
+Before it promotes anything, `publish` checks the downloaded files against that hash and checks
+that `release-manifest.json` names the attested image digest and server binary. The fixture
+preflight boots the image from the loopback registry, and `--record-as` records the GHCR reference
+with the same digest. `release verify-manifest` requires that reference.
+
 To rehearse the pipeline without publishing, run the workflow by hand with an existing tag and
 `rehearse: true`. The rehearsal pushes and attests under `ghcr.io/<owner>/artifact-mcp-rehearsal`
 and skips the `publish` job. Its attestations name the branch that ran it, not a release tag, so

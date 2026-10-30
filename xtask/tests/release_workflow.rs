@@ -74,7 +74,8 @@ fn public_release_workflow_stays_independent_of_homelab_deployment() {
     assert!(!workflow.contains("docker run --detach --rm --name artifact-mcp-release-candidate"));
     assert!(workflow.contains("docker rm --force artifact-mcp-release-candidate"));
     assert!(workflow.contains(
-        "cargo --locked xtask release verify-fixtures-in-image \\\n            \"$IMAGE@$DIGEST\" \
+        "cargo --locked xtask release verify-fixtures-in-image \\\n            \
+         --record-as \"$RELEASE_IMAGE@$DIGEST\" \\\n            \"$IMAGE@$DIGEST\" \
          release/historical-fixture-preflight.json"
     ));
     assert!(workflow.contains("anchore/sbom-action"));
@@ -237,21 +238,83 @@ fn permissions(job: &str) -> Vec<&str> {
         .collect()
 }
 
+/// Every job name, in file order.
+fn job_names(workflow: &str) -> Vec<&str> {
+    workflow
+        .lines()
+        .skip_while(|line| *line != "jobs:")
+        .filter_map(|line| {
+            let name = line.strip_prefix("  ")?.strip_suffix(':')?;
+            (!name.starts_with(' ') && !name.is_empty()).then_some(name)
+        })
+        .collect()
+}
+
+/// What a job that holds a write permission must never contain: anything that fetches, builds, or
+/// runs repository or dependency code.
+const RUNS_CODE: &[&str] = &[
+    "actions/checkout",
+    "actions/cache",
+    "anchore/",
+    "cargo",
+    "rustc",
+    "xtask",
+    "docker run ",
+    "docker build ",
+    "docker create ",
+    "clone",
+    "curl",
+    "wget",
+    "uses: ./",
+    ".github/actions",
+    "./release/",
+    "gh release download",
+];
+
+/// What marks a job that compiles the tagged source and its dependencies.
+const COMPILES: &[&str] = &["cargo", "docker/build-push-action"];
+
+/// What a job that compiles must never reference.
+const CREDENTIALS: &[&str] = &[
+    "docker/login-action",
+    "secrets.",
+    "github.token",
+    "GH_TOKEN",
+    "id-token",
+];
+
 #[test]
 fn release_jobs_that_hold_credentials_run_no_repository_code() {
     let workflow = workflow();
-    // Build scripts, proc macros and xtask run only where nothing can be written.
-    for name in ["build", "manifest"] {
+    let (mut credentialed, mut compiling) = (Vec::new(), Vec::new());
+    for name in job_names(&workflow) {
         let job = job(&workflow, name);
-        assert_eq!(permissions(&job), ["contents: read"], "{name}");
-        for credential in ["docker/login-action", "secrets.", "id-token", "GH_TOKEN"] {
-            assert!(
-                !job.contains(credential),
-                "{name} must not hold {credential}"
-            );
+        let permissions = permissions(&job);
+        if permissions
+            .iter()
+            .any(|permission| permission.ends_with("write"))
+        {
+            credentialed.push(name);
+            for code in RUNS_CODE {
+                assert!(
+                    !job.contains(code),
+                    "{name} holds a write permission and runs {code}"
+                );
+            }
+        }
+        if COMPILES.iter().any(|marker| job.contains(marker)) {
+            compiling.push(name);
+            assert_eq!(permissions, ["contents: read"], "{name}");
+            for credential in CREDENTIALS {
+                assert!(
+                    !job.contains(credential),
+                    "{name} compiles and holds {credential}"
+                );
+            }
         }
     }
-    // The credentialed jobs never check out, compile, or run the tagged source.
+    assert_eq!(credentialed, ["attest", "publish"]);
+    assert_eq!(compiling, ["build", "manifest"]);
     assert_eq!(
         permissions(&job(&workflow, "attest")),
         [
@@ -265,12 +328,18 @@ fn release_jobs_that_hold_credentials_run_no_repository_code() {
         permissions(&job(&workflow, "publish")),
         ["attestations: read", "contents: write", "packages: write"]
     );
-    for name in ["attest", "publish"] {
+    // The jobs that compile hold read access only, and their checkouts keep no token.
+    let checkout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        \
+                    with:\n          ref: ${{ needs.prepare.outputs.tag }}\n          \
+                    # Dependency code runs in this job; leave no token in .git/config for it to \
+                    read.\n          persist-credentials: false\n";
+    for name in ["build", "manifest"] {
         let job = job(&workflow, name);
-        for code in ["actions/checkout", "cargo", "xtask", "anchore/"] {
-            assert!(!job.contains(code), "{name} must not run {code}");
-        }
+        assert_eq!(permissions(&job), ["contents: read"], "{name}");
+        assert_eq!(job.matches("actions/checkout@").count(), 1, "{name}");
+        assert_eq!(job.matches(checkout).count(), 1, "{name}");
     }
+
     // The build job tests the image on a loopback registry; only `attest` pushes to GHCR, and it
     // pushes the archived index with its digest unchanged.
     let build = job(&workflow, "build");
@@ -279,15 +348,33 @@ fn release_jobs_that_hold_credentials_run_no_repository_code() {
     ));
     assert!(build.contains("IMAGE: localhost:5000/artifact-mcp"));
     assert!(build.contains("driver-opts: network=host"));
+    assert!(build.contains("[[ \"$archived\" == \"$DIGEST\" ]]"));
     let attest = job(&workflow, "attest");
     assert!(attest.contains("IMAGE: ${{ needs.prepare.outputs.image }}"));
+    assert!(attest.contains("[[ \"$DIGEST\" =~ ^sha256:[0-9a-f]{64}$ ]]"));
+    assert!(attest.contains("[[ \"$archived\" == \"$DIGEST\" ]]"));
     assert!(attest.contains(
         "skopeo copy --all --preserve-digests \\\n            \
          oci-archive:candidate-image/candidate.oci.tar \"docker://$IMAGE:candidate-$COMMIT\""
     ));
+    assert!(attest.contains("[[ \"$pushed\" == \"$DIGEST\" ]]"));
+    // Files downloaded after the attest job are checked against its output, and the manifest
+    // an unprivileged job wrote must name the attested digest and binary.
+    assert!(attest.contains(
+        "echo \"candidate_sums=$(sha256sum < release/SHA256SUMS | cut -d' ' -f1)\" >> \
+         \"$GITHUB_OUTPUT\""
+    ));
+    let publish = job(&workflow, "publish");
+    assert!(publish.contains("CANDIDATE_SUMS: ${{ needs.attest.outputs.candidate_sums }}"));
+    assert!(publish.contains("[[ \"$candidate_sums\" == \"$CANDIDATE_SUMS\" ]]"));
+    assert!(publish.contains("'.image.digest == $digest and .binary.sha256 == $binary'"));
+    assert!(
+        position(&publish, "[[ \"$candidate_sums\" == \"$CANDIDATE_SUMS\" ]]")
+            < position(&publish, "Promote without rebuilding")
+    );
     // A rehearsal pushes under a separate image name and never reaches the publish job.
     assert!(workflow.contains("image=\"$image-rehearsal\""));
-    assert!(job(&workflow, "publish").contains("if: ${{ !inputs.rehearse }}"));
+    assert!(publish.contains("if: ${{ !inputs.rehearse }}"));
 }
 
 /// The pinned attestation action; every `uses:` of it must carry exactly this reference.
