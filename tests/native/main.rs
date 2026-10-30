@@ -20,6 +20,7 @@ mod u05_access_retry;
 mod u05_auth;
 mod u05_identity;
 mod u05_jwks;
+mod u05_jwt_vectors;
 mod u05_support;
 mod u06_access;
 mod u07_paths;
