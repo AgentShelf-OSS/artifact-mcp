@@ -1,4 +1,4 @@
-import { test, assert, readText } from "./harness.js";
+import { test, assert, readText, readParts } from "./harness.js";
 
 test("Rust gallery template places every collection control in the top toolbar", async () => {
   const template = await readText("templates/gallery.html");
@@ -19,7 +19,7 @@ test("Rust gallery template places every collection control in the top toolbar",
 test("gallery foundation keeps three, two, then one responsive columns and stateful controls", async () => {
   const [css, script] = await Promise.all([
     readText("assets/portal.css"),
-    readText("assets/portal.js"),
+    readParts("assets/portal"),
   ]);
 
   assert.match(css, /\.artifact-grid\{grid-template-columns:repeat\(3,minmax\(0,1fr\)\)/);

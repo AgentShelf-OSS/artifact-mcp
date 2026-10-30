@@ -214,3 +214,30 @@ mod shell_script_parts_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod portal_script_parts_tests {
+    use std::{collections::BTreeSet, fs, path::Path};
+
+    use super::PORTAL_SCRIPT;
+
+    #[test]
+    fn portal_script_is_the_listed_parts_in_order() {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets/portal");
+        let listing = fs::read_to_string(dir.join("parts.txt")).unwrap();
+        let listed: Vec<&str> = listing.lines().collect();
+        let mut expected = String::new();
+        for name in &listed {
+            expected.push_str(&fs::read_to_string(dir.join(name)).unwrap());
+        }
+        assert_eq!(PORTAL_SCRIPT.to_string(), expected);
+        let on_disk: BTreeSet<String> = fs::read_dir(&dir)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.ends_with(".js"))
+            .collect();
+        let listed_set: BTreeSet<String> = listed.iter().map(|name| (*name).to_owned()).collect();
+        assert_eq!(on_disk, listed_set, "every portal part is listed");
+        assert_eq!(listed.len(), listed_set.len(), "no part is listed twice");
+    }
+}

@@ -70,7 +70,7 @@ const ROOT = new URL("/", import.meta.url);
 
 function checkPath(path) {
   if (typeof path !== "string" || path === "" || path.startsWith("/") || path.split("/").some((part) => part === ".." || part === ".")) {
-    throw new TypeError(`expected a repository-relative path such as "assets/portal.js", got ${inspect(path)}`);
+    throw new TypeError(`expected a repository-relative path such as "assets/portal.css", got ${inspect(path)}`);
   }
   return path;
 }
@@ -89,13 +89,15 @@ export async function readText(path) {
   return utf8.decode(await load(new URL(checkPath(path), ROOT), `readText(${path})`));
 }
 
-/**
- * The viewer shell script as the server ships it after `dialogs.js`: every `assets/shell/` part,
- * joined in the order `assets/shell/parts.txt` lists (the server's `concat!` follows the same list).
- */
+/** Join numbered script parts in the order their parts.txt lists. */
+export async function readParts(dir) {
+  const names = (await readText(`${dir}/parts.txt`)).split("\n").filter((name) => name !== "");
+  return (await Promise.all(names.map((name) => readText(`${dir}/${name}`)))).join("");
+}
+
+/** The viewer shell script as the server ships it after dialogs.js. */
 export async function readShell() {
-  const names = (await readText("assets/shell/parts.txt")).split("\n").filter((name) => name !== "");
-  return (await Promise.all(names.map((name) => readText(`assets/shell/${name}`)))).join("");
+  return readParts("assets/shell");
 }
 
 /** A repository file as bytes. */
