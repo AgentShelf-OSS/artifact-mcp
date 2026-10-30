@@ -38,8 +38,10 @@ Files that pass between jobs are workflow artifacts, which code in the `build` j
 replace. The `attest` job therefore records a hash of the candidate checksums as a job output.
 Before it promotes anything, `publish` checks the downloaded files against that hash and checks
 that `release-manifest.json` names the attested image digest and server binary. The fixture
-preflight boots the image from the loopback registry, and `--record-as` records the GHCR reference
-with the same digest. `release verify-manifest` requires that reference.
+preflight boots the image from the loopback registry. The build job then checks that the report
+names that digest and replaces its `image` with the GHCR reference for the same digest, which
+`release verify-manifest` requires. The workflow uses no xtask option newer than the tag it
+releases, so it can still run against older tags.
 
 To rehearse the pipeline without publishing, run the workflow by hand with an existing tag and
 `rehearse: true`. The rehearsal pushes and attests under `ghcr.io/<owner>/artifact-mcp-rehearsal`

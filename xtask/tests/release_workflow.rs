@@ -74,8 +74,7 @@ fn public_release_workflow_stays_independent_of_homelab_deployment() {
     assert!(!workflow.contains("docker run --detach --rm --name artifact-mcp-release-candidate"));
     assert!(workflow.contains("docker rm --force artifact-mcp-release-candidate"));
     assert!(workflow.contains(
-        "cargo --locked xtask release verify-fixtures-in-image \\\n            \
-         --record-as \"$RELEASE_IMAGE@$DIGEST\" \\\n            \"$IMAGE@$DIGEST\" \
+        "cargo --locked xtask release verify-fixtures-in-image \\\n            \"$IMAGE@$DIGEST\" \
          release/historical-fixture-preflight.json"
     ));
     assert!(workflow.contains("anchore/sbom-action"));
@@ -349,6 +348,17 @@ fn release_jobs_that_hold_credentials_run_no_repository_code() {
     assert!(build.contains("IMAGE: localhost:5000/artifact-mcp"));
     assert!(build.contains("driver-opts: network=host"));
     assert!(build.contains("[[ \"$archived\" == \"$DIGEST\" ]]"));
+    // The preflight report is renamed to the GHCR reference only after it is checked to name the
+    // tested digest, and the new name carries the same digest.
+    assert!(
+        position(
+            &build,
+            "jq -e --arg ran \"$IMAGE@$DIGEST\" '.image == $ran' \"$preflight\""
+        ) < position(
+            &build,
+            "jq --arg image \"$RELEASE_IMAGE@$DIGEST\" '.image = $image'"
+        )
+    );
     let attest = job(&workflow, "attest");
     assert!(attest.contains("IMAGE: ${{ needs.prepare.outputs.image }}"));
     assert!(attest.contains("[[ \"$DIGEST\" =~ ^sha256:[0-9a-f]{64}$ ]]"));

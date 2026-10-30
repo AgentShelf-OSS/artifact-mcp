@@ -26,11 +26,8 @@ use super::{node_join, resolve, sha256_hex};
 use crate::Result;
 
 const USAGE: &str = "\
-usage: cargo xtask release verify-fixtures-in-image [--record-as REF@sha256:DIGEST] IMAGE@sha256:DIGEST OUT.json
-       cargo xtask release verify-fixtures-in-image --binary PATH [--fixtures DIR] OUT.json
-
---record-as writes REF as the report's `image` instead of IMAGE. Both must name the same digest:
-the release boots the image from a loopback registry and records the GHCR reference it publishes.";
+usage: cargo xtask release verify-fixtures-in-image IMAGE@sha256:DIGEST OUT.json
+       cargo xtask release verify-fixtures-in-image --binary PATH [--fixtures DIR] OUT.json";
 
 /// The fixed, public synthetic key material the frozen fixtures were written with.
 const AUDIT_KEY_ENV: &str = "AUDIT_LEDGER_HMAC_KEY=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
@@ -80,37 +77,26 @@ pub fn run(args: &[String]) -> Result<bool> {
 fn parse(args: &[String]) -> std::result::Result<Invocation, String> {
     let mut binary = None;
     let mut fixtures = None;
-    let mut record_as = None;
     let mut positional = Vec::new();
     let mut iter = args.iter();
     while let Some(arg) = iter.next() {
         match arg.as_str() {
             "--binary" => binary = Some(iter.next().ok_or(USAGE)?.clone()),
             "--fixtures" => fixtures = Some(iter.next().ok_or(USAGE)?.clone()),
-            "--record-as" => record_as = Some(iter.next().ok_or(USAGE)?.clone()),
             _ => positional.push(arg.clone()),
         }
     }
     let committed = crate::repo_root().join("conformance/fixtures/historical");
     match (binary, positional.as_slice()) {
         (None, [image, out]) if image.contains("@sha256:") && fixtures.is_none() => {
-            let identity = match record_as {
-                None => image.clone(),
-                Some(reference) if image_digest(&reference) == image_digest(image) => reference,
-                Some(reference) => {
-                    return Err(format!(
-                        "--record-as {reference} does not name the digest of {image}"
-                    ));
-                }
-            };
             Ok(Invocation {
                 target: Target::Image(image.clone()),
-                identity,
+                identity: image.clone(),
                 fixtures: committed,
                 out: out.clone(),
             })
         }
-        (Some(binary), [out]) if record_as.is_none() => {
+        (Some(binary), [out]) => {
             let binary =
                 fs::canonicalize(&binary).map_err(|error| format!("--binary {binary}: {error}"))?;
             let digest = fs::read(&binary)
@@ -129,14 +115,6 @@ fn parse(args: &[String]) -> std::result::Result<Invocation, String> {
         }
         _ => Err(USAGE.to_owned()),
     }
-}
-
-/// The `sha256:<hex>` digest after the last `@`, if the reference has a well-formed one.
-fn image_digest(reference: &str) -> Option<&str> {
-    let (_, digest) = reference.rsplit_once('@')?;
-    let hex = digest.strip_prefix("sha256:")?;
-    (hex.len() == 64 && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')))
-        .then_some(digest)
 }
 
 fn execute(invocation: Invocation) -> std::result::Result<usize, String> {
@@ -953,58 +931,6 @@ fn expect_concealed_read(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    const DIGEST: &str = "sha256:5c1220f299dc2c378f9d5c11b8e3a22f17fcf6a7c63f26eba175ac68cea6a51f";
-
-    fn strings(args: &[&str]) -> Vec<String> {
-        args.iter().map(|arg| (*arg).to_owned()).collect()
-    }
-
-    #[test]
-    fn record_as_names_the_published_reference_for_the_same_digest() {
-        let loopback = format!("localhost:5000/artifact-mcp@{DIGEST}");
-        let published = format!("ghcr.io/agentshelf-oss/artifact-mcp@{DIGEST}");
-        let invocation = parse(&strings(&[
-            "--record-as",
-            &published,
-            &loopback,
-            "out.json",
-        ]))
-        .unwrap();
-        assert!(matches!(&invocation.target, Target::Image(image) if *image == loopback));
-        assert_eq!(invocation.identity, published);
-        // Without the option the report names the image that ran, as before.
-        let invocation = parse(&strings(&[&loopback, "out.json"])).unwrap();
-        assert_eq!(invocation.identity, loopback);
-    }
-
-    #[test]
-    fn record_as_refuses_a_different_or_missing_digest_and_a_binary_target() {
-        let loopback = format!("localhost:5000/artifact-mcp@{DIGEST}");
-        let other = format!(
-            "ghcr.io/agentshelf-oss/artifact-mcp@sha256:{}",
-            "0".repeat(64)
-        );
-        for reference in [
-            other.as_str(),
-            "ghcr.io/agentshelf-oss/artifact-mcp:v1.29.3",
-        ] {
-            let error = parse(&strings(&["--record-as", reference, &loopback, "out.json"]))
-                .err()
-                .expect("refused");
-            assert!(error.contains("does not name the digest"), "{error}");
-        }
-        assert!(
-            parse(&strings(&[
-                "--record-as",
-                &loopback,
-                "--binary",
-                "x",
-                "out.json"
-            ]))
-            .is_err()
-        );
-    }
 
     #[test]
     fn candidate_uses_api_key_auth_without_trusted_identity_headers() {

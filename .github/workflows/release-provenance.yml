@@ -199,10 +199,17 @@ jobs:
             docker logs artifact-mcp-release-candidate >&2 || true
             exit 1
           fi
-          # The report names the GHCR reference the attest job publishes; same digest.
           cargo --locked xtask release verify-fixtures-in-image \
-            --record-as "$RELEASE_IMAGE@$DIGEST" \
             "$IMAGE@$DIGEST" release/historical-fixture-preflight.json
+          # The report names the image that ran. Record the GHCR reference the attest job
+          # publishes instead: same digest, and `release verify-manifest` requires that name. The
+          # report's `command` still shows the loopback run.
+          preflight=release/historical-fixture-preflight.json
+          jq -e --arg ran "$IMAGE@$DIGEST" '.image == $ran' "$preflight" >/dev/null || {
+            echo "Fixture preflight does not name the tested digest" >&2; exit 1;
+          }
+          jq --arg image "$RELEASE_IMAGE@$DIGEST" '.image = $image' "$preflight" > "$RUNNER_TEMP/preflight.json"
+          mv "$RUNNER_TEMP/preflight.json" "$preflight"
           container="$(docker create "$IMAGE@$DIGEST")"
           docker cp "$container:/artifact-mcp" release/artifact-mcp
           docker rm "$container" >/dev/null
