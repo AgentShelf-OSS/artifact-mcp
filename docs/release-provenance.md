@@ -8,15 +8,36 @@ approve or perform a deployment.
 1. The workflow accepts an annotated `vMAJOR.MINOR.PATCH` tag. The tag must match the `Cargo.toml`
    version, and its commit must be on the default branch.
 2. A successful `CI` push run must already exist for the exact tagged commit.
-3. The workflow builds one candidate image, boots every frozen historical fixture with that exact
-   digest, generates source and image SBOMs, and rejects high or critical vulnerability findings.
-   From the same checkout it builds the preview renderer, `artifact-preview`, as a static musl
-   binary and refuses it unless `file` reports `static-pie linked` or `statically linked`.
-4. GitHub's OIDC-backed attestation service records provenance for the native server binary, the
-   preview renderer binary, and the OCI digest. No repository signing key is required.
-5. The workflow assigns the stable image tag to the verified digest without rebuilding it, writes
-   the release manifest and checksums, attaches every asset to a draft GitHub Release, and then
-   publishes the complete draft.
+3. The `build` job builds one candidate image and pushes it to a registry on the runner's
+   loopback. It boots every frozen historical fixture with that exact digest, generates source and
+   image SBOMs, and rejects high or critical vulnerability findings. From the same checkout it
+   builds the preview renderer, `artifact-preview`, as a static musl binary and refuses it unless
+   `file` reports `static-pie linked` or `statically linked`. It exports the candidate index, with
+   every digest unchanged, as an OCI archive.
+4. The `attest` job checks the build job's checksums and that the archive holds the tested digest.
+   It then pushes that index to GHCR with its digest unchanged. GitHub's OIDC-backed attestation
+   service records provenance for the native server binary, the preview renderer binary, and the
+   OCI digest. No repository signing key is required.
+5. The `manifest` job writes and verifies the release manifest and the final checksums.
+6. The `publish` job verifies the checksums and all three attestations. It assigns the stable image
+   tag to the verified digest without rebuilding it, attaches every asset to a draft GitHub
+   Release, and then publishes the complete draft.
+
+### Job isolation
+
+A release compiles and runs code from every locked dependency: build scripts, procedural macros,
+and the `xtask` tool. Only the `build` and `manifest` jobs do that, and they hold only
+`contents: read`, no registry credential, and no checkout token. The `attest` and `publish` jobs
+hold the write permissions. They never check out, compile, or run repository code; they check and
+move the bytes the other jobs produced, with GitHub actions, `skopeo`, `docker`, and `gh`. A
+compromised dependency can still change the binary it is compiled into. It cannot mint
+attestations for other subjects, push images, or change a release.
+`xtask/tests/release_workflow.rs` enforces this split.
+
+To rehearse the pipeline without publishing, run the workflow by hand with an existing tag and
+`rehearse: true`. The rehearsal pushes and attests under `ghcr.io/<owner>/artifact-mcp-rehearsal`
+and skips the `publish` job. Its attestations name the branch that ran it, not a release tag, so
+a verifier that pins the tag rejects them.
 
 The stable GHCR tag is a pointer. The digest recorded in `release-manifest.json` is the immutable
 image identity. A retry may reuse an existing stable tag only when it already resolves to the same
@@ -36,8 +57,8 @@ git tag -a v1.7.2 -m "Artifact MCP 1.7.2"
 git push origin v1.7.2
 ```
 
-Repository Actions must be allowed to write packages and attestations for the candidate job and
-write release contents for the publish job. Protect `v*` tags from deletion and replacement. The
+Repository Actions must be allowed to write packages and attestations for the `attest` job and
+write release contents for the `publish` job. Protect `v*` tags from deletion and replacement. The
 workflow also refuses to point an existing stable image tag at a different digest. Enable GitHub
 release immutability for the repository. GitHub applies that policy to future releases only, so the
 workflow uploads every asset to a draft before publishing and locking it.
@@ -51,7 +72,8 @@ Each GitHub Release contains:
   tagged source with
   `cargo build --release --locked --target x86_64-unknown-linux-musl --manifest-path preview-renderer/Cargo.toml`;
 - `source.spdx.json`, the SPDX 2.3 inventory for the tagged source tree;
-- `image.spdx.json`, the SPDX 2.3 inventory for the exact candidate digest;
+- `image.spdx.json`, the SPDX 2.3 inventory for the exact candidate digest. The build job scans
+  the digest on its loopback registry, so the SBOM names the source `localhost:5000/artifact-mcp`;
 - `historical-fixture-preflight.json`, the exact-image compatibility report;
 - `migration-notes.md`, copied from the tracked release note;
 - `release-manifest.json`, which binds the tag, commit, image digest, binary, SBOMs, compatibility

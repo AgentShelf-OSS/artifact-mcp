@@ -10,9 +10,22 @@ on:
         description: Existing annotated tag to release (for example v1.7.2)
         required: true
         type: string
+      rehearse:
+        description: >-
+          Rehearse the pipeline: push and attest under the separate `-rehearsal` image name and
+          skip the publish job
+        required: false
+        type: boolean
+        default: false
 
 # Build and verify one candidate digest, then publish that same digest as the stable image and
 # GitHub Release. Homelab backup, approval, and rollback checks belong to the deployment process.
+#
+# Jobs that compile or run the tagged source and its dependencies (build scripts, proc macros,
+# xtask) hold no write permission and no registry credential: `build` and `manifest`. Jobs that hold
+# a credential (`attest`, `publish`) only check and move bytes those jobs produced, using GitHub
+# actions, skopeo, docker and gh. A malicious dependency can still change the binary it is
+# compiled into, but it cannot mint attestations, push images, or alter a release.
 concurrency:
   group: ${{ github.repository }}-release
   cancel-in-progress: false
@@ -40,6 +53,7 @@ jobs:
         name: Verify tag and version
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          REHEARSE: ${{ inputs.rehearse }}
         run: |
           set -euo pipefail
           tag="${INPUT_TAG:-${GITHUB_REF_NAME:-}}"
@@ -60,6 +74,9 @@ jobs:
           created="$(git for-each-ref --format='%(taggerdate:iso-strict)' "refs/tags/$tag")"
           created="$(date -u -d "$created" +%Y-%m-%dT%H:%M:%SZ)"
           image="ghcr.io/${GITHUB_REPOSITORY,,}"
+          if [[ "$REHEARSE" == "true" ]]; then
+            image="$image-rehearsal"
+          fi
           {
             echo "commit=$commit"
             echo "created=$created"
@@ -98,39 +115,41 @@ jobs:
             echo "No successful CI push run exists for $COMMIT" >&2; exit 1;
           }
 
-  candidate:
-    name: Build, test, scan, and attest candidate
+  build:
+    name: Build, test, and scan candidate without credentials
     needs: [prepare, verify-ci]
     runs-on: ubuntu-latest
+    # Compiles and runs untrusted dependency code, so it gets read access only. The candidate image
+    # goes to a registry on the runner's loopback, not to GHCR.
     permissions:
-      attestations: write
       contents: read
-      id-token: write
-      packages: write
+    services:
+      registry:
+        image: registry:3@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3
+        ports:
+          - 5000:5000
     outputs:
-      binary_attestation: ${{ steps.attest_binary.outputs.attestation-url }}
-      image_attestation: ${{ steps.attest_image.outputs.attestation-url }}
       image_digest: ${{ steps.build.outputs.digest }}
     env:
-      IMAGE: ${{ needs.prepare.outputs.image }}
+      IMAGE: localhost:5000/artifact-mcp
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
+          # Dependency code runs in this job; leave no token in .git/config for it to read.
+          persist-credentials: false
       - name: Build release tooling (cargo xtask)
         run: |
           set -euo pipefail
           # rustup installs the toolchain pinned in rust-toolchain.toml on first use. Build
-          # before any registry or release side effect, so a tooling failure stops the job early.
+          # before any image build, so a tooling failure stops the job early.
           cargo --version
           cargo build --locked --package xtask
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
       - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        with:
+          # BuildKit reaches the loopback registry service through the host network.
+          driver-opts: network=host
       - name: Generate deterministic source SBOM
         run: |
           mkdir release
@@ -200,6 +219,8 @@ jobs:
           cp "$renderer" release/artifact-preview
       - name: Generate SPDX image SBOM for exact candidate digest
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        env:
+          SYFT_REGISTRY_INSECURE_USE_HTTP: "true"
         with:
           image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           format: spdx-json
@@ -208,15 +229,95 @@ jobs:
           upload-release-assets: false
       - name: Enforce the high/critical vulnerability policy
         uses: anchore/scan-action@1638637db639e0ade3258b51db49a9a137574c3e # v6
+        env:
+          GRYPE_REGISTRY_INSECURE_USE_HTTP: "true"
         with:
           image: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
           fail-build: true
           severity-cutoff: high
+      - name: Export the exact candidate digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          # Every manifest of the index (the image and its build attestations), digests unchanged.
+          mkdir candidate-image
+          skopeo copy --all --preserve-digests --src-tls-verify=false \
+            "docker://$IMAGE@$DIGEST" oci-archive:candidate-image/candidate.oci.tar
+          archived="sha256:$(skopeo inspect --raw oci-archive:candidate-image/candidate.oci.tar | sha256sum | cut -d' ' -f1)"
+          [[ "$archived" == "$DIGEST" ]] || {
+            echo "Exported index $archived does not match candidate $DIGEST" >&2; exit 1;
+          }
       - name: Write candidate checksums
         run: |
           cd release
           sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json historical-fixture-preflight.json > SHA256SUMS
           sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-candidate-${{ needs.prepare.outputs.tag }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: candidate-image-${{ needs.prepare.outputs.tag }}
+          path: candidate-image/
+          if-no-files-found: error
+          retention-days: 14
+
+  attest:
+    name: Push and attest the tested candidate
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    # Holds the registry and attestation credentials. It never checks out, compiles, or runs
+    # repository code: it checks the build job's outputs, pushes the exact index and attests it.
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+      packages: write
+    outputs:
+      binary_attestation: ${{ steps.attest_binary.outputs.attestation-url }}
+      image_attestation: ${{ steps.attest_image.outputs.attestation-url }}
+      image_digest: ${{ needs.build.outputs.image_digest }}
+    env:
+      COMMIT: ${{ needs.prepare.outputs.commit }}
+      DIGEST: ${{ needs.build.outputs.image_digest }}
+      IMAGE: ${{ needs.prepare.outputs.image }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-candidate-${{ needs.prepare.outputs.tag }}
+          path: release
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: candidate-image-${{ needs.prepare.outputs.tag }}
+          path: candidate-image
+      - name: Verify the candidate artifacts
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check SHA256SUMS)
+          [[ "$DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Invalid candidate digest" >&2; exit 1; }
+          archived="sha256:$(skopeo inspect --raw oci-archive:candidate-image/candidate.oci.tar | sha256sum | cut -d' ' -f1)"
+          [[ "$archived" == "$DIGEST" ]] || {
+            echo "Candidate archive $archived does not match tested digest $DIGEST" >&2; exit 1;
+          }
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Push the exact candidate digest
+        run: |
+          set -euo pipefail
+          # skopeo reads the credential docker/login-action stored.
+          skopeo copy --all --preserve-digests \
+            oci-archive:candidate-image/candidate.oci.tar "docker://$IMAGE:candidate-$COMMIT"
+          pushed="sha256:$(skopeo inspect --raw "docker://$IMAGE@$DIGEST" | sha256sum | cut -d' ' -f1)"
+          [[ "$pushed" == "$DIGEST" ]] || {
+            echo "Pushed index $pushed does not match tested digest $DIGEST" >&2; exit 1;
+          }
       - id: attest_binary
         name: Attest the released native binary
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
@@ -232,89 +333,45 @@ jobs:
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
         with:
           subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.build.outputs.digest }}
+          subject-digest: ${{ needs.build.outputs.image_digest }}
           push-to-registry: true
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: release-candidate-${{ needs.prepare.outputs.tag }}
-          path: release/
-          if-no-files-found: error
-          retention-days: 14
 
-  publish:
-    name: Publish verified digest and release evidence
-    needs: [prepare, candidate]
+  manifest:
+    name: Write and verify the release manifest
+    needs: [prepare, build, attest]
     runs-on: ubuntu-latest
+    # Runs xtask, so it gets read access only, like the build job.
     permissions:
-      attestations: read
-      contents: write
-      packages: write
+      contents: read
     env:
-      GH_TOKEN: ${{ github.token }}
       IMAGE: ${{ needs.prepare.outputs.image }}
       TAG: ${{ needs.prepare.outputs.tag }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.prepare.outputs.tag }}
+          # Dependency code runs in this job; leave no token in .git/config for it to read.
+          persist-credentials: false
       - name: Build release tooling (cargo xtask)
         run: |
           set -euo pipefail
-          # rustup installs the toolchain pinned in rust-toolchain.toml on first use. Build
-          # before any registry or release side effect, so a tooling failure stops the job early.
+          # rustup installs the toolchain pinned in rust-toolchain.toml on first use.
           cargo --version
           cargo build --locked --package xtask
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: release-candidate-${{ needs.prepare.outputs.tag }}
           path: release
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - name: Verify inputs and candidate artifacts
+      - name: Generate and verify release manifest
         env:
-          DIGEST: ${{ needs.candidate.outputs.image_digest }}
+          DIGEST: ${{ needs.attest.outputs.image_digest }}
         run: |
           set -euo pipefail
           [[ -f "docs/releases/$TAG.md" ]] || {
             echo "Missing docs/releases/$TAG.md migration notes" >&2; exit 1;
           }
-          (cd release && sha256sum --check SHA256SUMS)
-          docker buildx imagetools inspect "$IMAGE@$DIGEST" >/dev/null
-          candidate_digest="$(docker buildx imagetools inspect "$IMAGE:candidate-${{ needs.prepare.outputs.commit }}" | awk '/^Digest:/ {print $2}')"
-          [[ "$candidate_digest" == "$DIGEST" ]] || {
-            echo "Candidate tag does not resolve to the attested digest" >&2; exit 1;
-          }
-          gh attestation verify release/artifact-mcp --repo "$GITHUB_REPOSITORY"
-          gh attestation verify release/artifact-preview --repo "$GITHUB_REPOSITORY"
-          gh attestation verify "oci://$IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
-          if docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
-            existing="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
-            [[ "$existing" == "$DIGEST" ]] || {
-              echo "Existing release image digest $existing does not match candidate $DIGEST" >&2; exit 1;
-            }
-          fi
-      - name: Promote without rebuilding
-        env:
-          DIGEST: ${{ needs.candidate.outputs.image_digest }}
-        run: |
-          set -euo pipefail
-          if ! docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
-            docker buildx imagetools create --tag "$IMAGE:$TAG" "$IMAGE@$DIGEST"
-          fi
-          published="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
-          [[ "$published" == "$DIGEST" ]] || {
-            echo "Published digest $published did not match verified candidate $DIGEST" >&2; exit 1;
-          }
-      - name: Generate and verify release manifest
-        env:
-          DIGEST: ${{ needs.candidate.outputs.image_digest }}
-        run: |
-          set -euo pipefail
           cd release
+          sha256sum --check SHA256SUMS
           cp "../docs/releases/$TAG.md" migration-notes.md
           cargo --locked xtask release manifest \
             --out release-manifest.json \
@@ -333,11 +390,80 @@ jobs:
             --migration-notes migration-notes.md \
             --fixture-preflight historical-fixture-preflight.json \
             --repository '${{ github.repository }}' \
-            --binary-attestation '${{ needs.candidate.outputs.binary_attestation }}' \
-            --image-attestation '${{ needs.candidate.outputs.image_attestation }}'
+            --binary-attestation '${{ needs.attest.outputs.binary_attestation }}' \
+            --image-attestation '${{ needs.attest.outputs.image_attestation }}'
           cargo --locked xtask release verify-manifest release-manifest.json
           sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
           sha256sum --check SHA256SUMS
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: release-evidence-${{ needs.prepare.outputs.tag }}
+          path: release/
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish verified digest and release evidence
+    needs: [prepare, attest, manifest]
+    # A rehearsal stops before the stable tag and the GitHub Release.
+    if: ${{ !inputs.rehearse }}
+    runs-on: ubuntu-latest
+    # Holds release and registry write access, so like the attest job it runs no repository code.
+    permissions:
+      attestations: read
+      contents: write
+      packages: write
+    env:
+      GH_REPO: ${{ github.repository }}
+      GH_TOKEN: ${{ github.token }}
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-evidence-${{ needs.prepare.outputs.tag }}
+          path: release
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - name: Verify inputs and candidate artifacts
+        env:
+          DIGEST: ${{ needs.attest.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          (cd release && sha256sum --check SHA256SUMS)
+          [[ -f release/migration-notes.md && -f release/release-manifest.json ]] || {
+            echo "Release evidence is incomplete" >&2; exit 1;
+          }
+          docker buildx imagetools inspect "$IMAGE@$DIGEST" >/dev/null
+          candidate_digest="$(docker buildx imagetools inspect "$IMAGE:candidate-${{ needs.prepare.outputs.commit }}" | awk '/^Digest:/ {print $2}')"
+          [[ "$candidate_digest" == "$DIGEST" ]] || {
+            echo "Candidate tag does not resolve to the attested digest" >&2; exit 1;
+          }
+          gh attestation verify release/artifact-mcp --repo "$GITHUB_REPOSITORY"
+          gh attestation verify release/artifact-preview --repo "$GITHUB_REPOSITORY"
+          gh attestation verify "oci://$IMAGE@$DIGEST" --repo "$GITHUB_REPOSITORY"
+          if docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+            existing="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
+            [[ "$existing" == "$DIGEST" ]] || {
+              echo "Existing release image digest $existing does not match candidate $DIGEST" >&2; exit 1;
+            }
+          fi
+      - name: Promote without rebuilding
+        env:
+          DIGEST: ${{ needs.attest.outputs.image_digest }}
+        run: |
+          set -euo pipefail
+          if ! docker buildx imagetools inspect "$IMAGE:$TAG" >/dev/null 2>&1; then
+            docker buildx imagetools create --tag "$IMAGE:$TAG" "$IMAGE@$DIGEST"
+          fi
+          published="$(docker buildx imagetools inspect "$IMAGE:$TAG" | awk '/^Digest:/ {print $2}')"
+          [[ "$published" == "$DIGEST" ]] || {
+            echo "Published digest $published did not match verified candidate $DIGEST" >&2; exit 1;
+          }
       - id: release_state
         name: Check existing release state
         run: |

@@ -130,24 +130,27 @@ fn release_workflow_runs_the_locked_rust_release_tooling() {
     );
 
     const BUILD: &str = "cargo build --locked --package xtask";
-    for name in ["prepare", "verify-ci"] {
+    for name in ["prepare", "verify-ci", "attest", "publish"] {
         assert!(!job(&workflow, name).contains("xtask"), "{name}");
     }
-    let candidate = job(&workflow, "candidate");
+    let build = job(&workflow, "build");
+    let attest = job(&workflow, "attest");
+    let manifest = job(&workflow, "manifest");
     let publish = job(&workflow, "publish");
-    for job in [&candidate, &publish] {
-        // Check out the tagged source, then build the tool before the first use.
+    for job in [&build, &manifest] {
+        // Check out the tagged source without a persisted token, then build the tool before the
+        // first use.
         let checkout = position(
             job,
             "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1\n        with:\n          \
              ref: ${{ needs.prepare.outputs.tag }}",
         );
+        assert!(checkout < position(job, "persist-credentials: false"));
         assert!(checkout < position(job, BUILD));
         assert!(position(job, BUILD) < position(job, "xtask release"));
-        assert!(position(job, BUILD) < position(job, "docker/login-action"));
     }
-    // Candidate: the source SBOM describes the checkout before the image build, and the exact
-    // digest passes the fixture preflight before the SBOM scan, checksums, and attestations.
+    // Build: the source SBOM describes the checkout before the image build, and the exact digest
+    // passes the fixture preflight before the SBOM scan, the export, checksums, and upload.
     let order = [
         BUILD,
         "cargo --locked xtask release source-sbom",
@@ -157,28 +160,60 @@ fn release_workflow_runs_the_locked_rust_release_tooling() {
         "docker cp \"$container:/artifact-mcp\" release/artifact-mcp",
         "anchore/sbom-action",
         "anchore/scan-action",
+        "oci-archive:candidate-image/candidate.oci.tar",
         "sha256sum --check SHA256SUMS",
-        "actions/attest-build-provenance",
         "actions/upload-artifact",
     ];
     for pair in order.windows(2) {
         assert!(
-            position(&candidate, pair[0]) < position(&candidate, pair[1]),
+            position(&build, pair[0]) < position(&build, pair[1]),
             "{} before {}",
             pair[0],
             pair[1]
         );
     }
-    // Publish: promotion only after verification, the manifest only after promotion, and the
-    // manifest verified before checksums and the draft release.
+    // Attest: the build job's checksums and the archive digest are checked before the push, and
+    // the pushed index digest is checked before any attestation.
+    let order = [
+        "actions/download-artifact",
+        "(cd release && sha256sum --check SHA256SUMS)",
+        "Candidate archive $archived does not match tested digest $DIGEST",
+        "docker/login-action",
+        "skopeo copy --all --preserve-digests",
+        "Pushed index $pushed does not match tested digest $DIGEST",
+        "actions/attest-build-provenance",
+    ];
+    for pair in order.windows(2) {
+        assert!(
+            position(&attest, pair[0]) < position(&attest, pair[1]),
+            "{} before {}",
+            pair[0],
+            pair[1]
+        );
+    }
+    // Manifest: written from the attest job's outputs and verified before the final checksums.
     let order = [
         BUILD,
+        "actions/download-artifact",
+        "cargo --locked xtask release manifest",
+        "${{ needs.attest.outputs.image_attestation }}",
+        "cargo --locked xtask release verify-manifest release-manifest.json",
+        "> SHA256SUMS",
+        "actions/upload-artifact",
+    ];
+    for pair in order.windows(2) {
+        assert!(
+            position(&manifest, pair[0]) < position(&manifest, pair[1]),
+            "{} before {}",
+            pair[0],
+            pair[1]
+        );
+    }
+    // Publish: promotion only after verification, and the draft release after promotion.
+    let order = [
         "Verify inputs and candidate artifacts",
         "gh attestation verify release/artifact-mcp",
         "Promote without rebuilding",
-        "cargo --locked xtask release manifest",
-        "cargo --locked xtask release verify-manifest release-manifest.json",
-        "> SHA256SUMS",
         "softprops/action-gh-release",
         "gh release edit",
     ];
@@ -192,6 +227,69 @@ fn release_workflow_runs_the_locked_rust_release_tooling() {
     }
 }
 
+/// The permissions block of one job, up to the next key at the same indentation.
+fn permissions(job: &str) -> Vec<&str> {
+    job.lines()
+        .skip_while(|line| *line != "    permissions:")
+        .skip(1)
+        .take_while(|line| line.starts_with("      "))
+        .map(str::trim)
+        .collect()
+}
+
+#[test]
+fn release_jobs_that_hold_credentials_run_no_repository_code() {
+    let workflow = workflow();
+    // Build scripts, proc macros and xtask run only where nothing can be written.
+    for name in ["build", "manifest"] {
+        let job = job(&workflow, name);
+        assert_eq!(permissions(&job), ["contents: read"], "{name}");
+        for credential in ["docker/login-action", "secrets.", "id-token", "GH_TOKEN"] {
+            assert!(
+                !job.contains(credential),
+                "{name} must not hold {credential}"
+            );
+        }
+    }
+    // The credentialed jobs never check out, compile, or run the tagged source.
+    assert_eq!(
+        permissions(&job(&workflow, "attest")),
+        [
+            "attestations: write",
+            "contents: read",
+            "id-token: write",
+            "packages: write"
+        ]
+    );
+    assert_eq!(
+        permissions(&job(&workflow, "publish")),
+        ["attestations: read", "contents: write", "packages: write"]
+    );
+    for name in ["attest", "publish"] {
+        let job = job(&workflow, name);
+        for code in ["actions/checkout", "cargo", "xtask", "anchore/"] {
+            assert!(!job.contains(code), "{name} must not run {code}");
+        }
+    }
+    // The build job tests the image on a loopback registry; only `attest` pushes to GHCR, and it
+    // pushes the archived index with its digest unchanged.
+    let build = job(&workflow, "build");
+    assert!(build.contains(
+        "image: registry:3@sha256:d4032d4cc323c1731c707931ecada07a53076eac38e3b61ae57533f170f2c6c3"
+    ));
+    assert!(build.contains("IMAGE: localhost:5000/artifact-mcp"));
+    assert!(build.contains("driver-opts: network=host"));
+    let attest = job(&workflow, "attest");
+    assert!(attest.contains("IMAGE: ${{ needs.prepare.outputs.image }}"));
+    assert!(attest.contains(
+        "skopeo copy --all --preserve-digests \\\n            \
+         oci-archive:candidate-image/candidate.oci.tar \"docker://$IMAGE:candidate-$COMMIT\""
+    ));
+    // A rehearsal pushes under a separate image name and never reaches the publish job.
+    assert!(workflow.contains("image=\"$image-rehearsal\""));
+    assert!(job(&workflow, "publish").contains("if: ${{ !inputs.rehearse }}"));
+}
+
 /// The pinned attestation action; every `uses:` of it must carry exactly this reference.
 const ATTEST: &str =
     "actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2";
@@ -199,7 +297,9 @@ const ATTEST: &str =
 #[test]
 fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
     let workflow = workflow();
-    let candidate = job(&workflow, "candidate");
+    let build = job(&workflow, "build");
+    let attest = job(&workflow, "attest");
+    let manifest_job = job(&workflow, "manifest");
     let publish = job(&workflow, "publish");
 
     const RENDERER_BUILD: &str = "cargo build --release --locked --target x86_64-unknown-linux-musl \\\n            \
@@ -211,17 +311,19 @@ fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
                                   image.spdx.json historical-fixture-preflight.json > SHA256SUMS";
     const ATTEST_SERVER: &str = "subject-path: release/artifact-mcp";
     const ATTEST_RENDERER: &str = "subject-path: release/artifact-preview";
-    const ATTEST_IMAGE: &str = "subject-digest: ${{ steps.build.outputs.digest }}";
+    const ATTEST_IMAGE: &str = "subject-digest: ${{ needs.build.outputs.image_digest }}";
     for needle in [
         RENDERER_BUILD,
         STATIC_CHECK,
         RENDERER_COPY,
         CANDIDATE_SUMS,
-        ATTEST_RENDERER,
         "file --brief \"$renderer\"",
         "echo \"artifact-preview is not statically linked\" >&2; exit 1;",
     ] {
-        assert_eq!(candidate.matches(needle).count(), 1, "{needle}");
+        assert_eq!(build.matches(needle).count(), 1, "{needle}");
+    }
+    for needle in [ATTEST_SERVER, ATTEST_RENDERER, ATTEST_IMAGE] {
+        assert_eq!(attest.matches(needle).count(), 1, "{needle}");
     }
 
     // Every attestation uses the same pinned action, including the renderer's.
@@ -234,10 +336,10 @@ fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
         "- id: attest_renderer\n        name: Attest the released preview renderer binary\n        \
          uses: {ATTEST}\n        with:\n          {ATTEST_RENDERER}"
     );
-    assert_eq!(candidate.matches(&renderer_step).count(), 1);
+    assert_eq!(attest.matches(&renderer_step).count(), 1);
 
-    // Candidate order: the image is exercised and its binary copied out, then the renderer is
-    // built and checked; both binaries are checksummed before any attestation, and uploaded last.
+    // Build order: the image is exercised and its binary copied out, then the renderer is built
+    // and checked; both binaries are checksummed and uploaded together.
     let order = [
         "docker cp \"$container:/artifact-mcp\" release/artifact-mcp",
         RENDERER_BUILD,
@@ -247,22 +349,46 @@ fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
         "anchore/scan-action",
         CANDIDATE_SUMS,
         "sha256sum --check SHA256SUMS",
-        ATTEST_SERVER,
-        ATTEST_RENDERER,
-        ATTEST_IMAGE,
         "actions/upload-artifact",
     ];
     for pair in order.windows(2) {
         assert!(
-            position(&candidate, pair[0]) < position(&candidate, pair[1]),
+            position(&build, pair[0]) < position(&build, pair[1]),
+            "{} before {}",
+            pair[0],
+            pair[1]
+        );
+    }
+    // Attest order: the checksums are verified before any attestation.
+    let order = [
+        "(cd release && sha256sum --check SHA256SUMS)",
+        ATTEST_SERVER,
+        ATTEST_RENDERER,
+        ATTEST_IMAGE,
+    ];
+    for pair in order.windows(2) {
+        assert!(
+            position(&attest, pair[0]) < position(&attest, pair[1]),
             "{} before {}",
             pair[0],
             pair[1]
         );
     }
 
-    // Publish: both binaries' attestations are verified before promotion; the final checksums,
-    // the published-asset check and the draft release all include the renderer.
+    // The final checksums include the renderer.
+    assert_eq!(
+        manifest_job
+            .matches(
+                "sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json \
+                 historical-fixture-preflight.json migration-notes.md release-manifest.json > \
+                 SHA256SUMS"
+            )
+            .count(),
+        1
+    );
+
+    // Publish: both binaries' attestations are verified before promotion; the published-asset
+    // check and the draft release include the renderer.
     let verify_renderer =
         "gh attestation verify release/artifact-preview --repo \"$GITHUB_REPOSITORY\"";
     let order = [
@@ -271,9 +397,6 @@ fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
         verify_renderer,
         "gh attestation verify \"oci://$IMAGE@$DIGEST\"",
         "Promote without rebuilding",
-        "cargo --locked xtask release verify-manifest release-manifest.json",
-        "sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json \
-         historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS",
         "for asset in artifact-mcp artifact-preview SHA256SUMS release-manifest.json",
         "release/artifact-mcp\n            release/artifact-preview\n            release/SHA256SUMS",
         "gh release edit",
@@ -290,8 +413,11 @@ fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
 
     // The release manifest format does not change: SHA256SUMS and the renderer's own attestation
     // bind it, and no xtask command names it.
-    let manifest = &publish[position(&publish, "cargo --locked xtask release manifest")
-        ..position(&publish, "cargo --locked xtask release verify-manifest")];
+    let manifest = &manifest_job[position(&manifest_job, "cargo --locked xtask release manifest")
+        ..position(
+            &manifest_job,
+            "cargo --locked xtask release verify-manifest",
+        )];
     assert!(!manifest.contains("artifact-preview"), "{manifest}");
     assert!(!manifest.contains("attest_renderer"), "{manifest}");
     assert_eq!(workflow.matches("xtask release").count(), 4);
