@@ -266,6 +266,24 @@ mod tests {
     }
 
     #[test]
+    fn jwt_signature_is_the_rfc6979_deterministic_one() {
+        // Computed independently with Python `cryptography` 46.0.3
+        // (`ECDSA(SHA256(), deterministic_signing=True)`, RFC 6979). Pins the exact token across
+        // p256 upgrades: same key, claims and signing input must give the same signature.
+        let signer = VapidSigner::new(
+            "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw",
+            "mailto:ops@example.test",
+        )
+        .unwrap();
+        assert_eq!(
+            signer.jwt("https://fcm.googleapis.com", 1_000),
+            "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.\
+             eyJhdWQiOiJodHRwczovL2ZjbS5nb29nbGVhcGlzLmNvbSIsImV4cCI6NDQyMDAsInN1YiI6Im1haWx0bzpvcHNAZXhhbXBsZS50ZXN0In0.\
+             Sm1u10iT8yZuKeZGVlzN2Fg40gSECeCrrUWcd9EB85TLTXzLsVCUFNu75Gd9XD3hHyAzToLJk8QOXuKl0RAFKA"
+        );
+    }
+
+    #[test]
     fn jwt_is_a_verifiable_es256_token() {
         let signer = VapidSigner::new(
             "yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw",
