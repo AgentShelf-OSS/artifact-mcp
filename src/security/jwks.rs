@@ -150,23 +150,8 @@ impl JwkKey {
             _ => return Err(malformed()),
         }
         .map_err(|_| malformed())?;
-        debug_assert_eq!(key.family(), algorithm_family(algorithm));
+        debug_assert_eq!(key.family(), algorithm.family());
         Ok(key)
-    }
-}
-
-const fn algorithm_family(algorithm: Algorithm) -> jsonwebtoken::AlgorithmFamily {
-    use jsonwebtoken::AlgorithmFamily as Family;
-    match algorithm {
-        Algorithm::HS256 | Algorithm::HS384 | Algorithm::HS512 => Family::Hmac,
-        Algorithm::ES256 | Algorithm::ES384 => Family::Ec,
-        Algorithm::EdDSA => Family::Ed,
-        Algorithm::RS256
-        | Algorithm::RS384
-        | Algorithm::RS512
-        | Algorithm::PS256
-        | Algorithm::PS384
-        | Algorithm::PS512 => Family::Rsa,
     }
 }
 
