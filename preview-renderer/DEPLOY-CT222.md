@@ -250,7 +250,10 @@ The `smoke` command works against either renderer.
 
 Wait until the Rust renderer has run without a rollback for at least a week. Then, in CT222:
 
-1. Fold the drop-in into the unit. Write `/etc/systemd/system/artifact-preview.service` as:
+1. Fold the drop-in into the unit. Write `/etc/systemd/system/artifact-preview.service` as below.
+   Keep every line the drop-in has: dropping `CHROME_SANDBOX`, `LoadCredential` or
+   `RENDER_TOKEN_FILE` turns the sandbox or the token check off, and `MemoryMax` must stay
+   below the container's 768 MB:
 
    ```ini
    [Unit]
@@ -266,6 +269,9 @@ Wait until the Rust renderer has run without a rollback for at least a week. The
    Environment=PORT=3000
    Environment=RENDER_TIMEOUT_MS=7000
    Environment=CHROME_HEADLESS_SHELL=/opt/chrome-headless-shell/chrome-headless-shell
+   Environment=CHROME_SANDBOX=1
+   LoadCredential=render-token:/etc/artifact-preview/render-token
+   Environment=RENDER_TOKEN_FILE=%d/render-token
    ExecStart=/usr/local/bin/artifact-preview
    Restart=on-failure
    RestartSec=5s
@@ -285,7 +291,7 @@ Wait until the Rust renderer has run without a rollback for at least a week. The
    CapabilityBoundingSet=
    AmbientCapabilities=
    TasksMax=256
-   MemoryMax=768M
+   MemoryMax=640M
    UMask=0077
 
    [Install]
