@@ -29,7 +29,7 @@ getrandom = "0.4"
 http-body = "1"
 hyper = { version = "1", features = ["http1", "server"] }
 hyper-util = { version = "0.1", features = ["http1", "server", "service", "tokio"] }
-hmac = "0.12"
+hmac = "0.13"
 hkdf = "0.12"
 hex = "0.4"
 jsonwebtoken = { version = "10", features = ["rust_crypto"] }
