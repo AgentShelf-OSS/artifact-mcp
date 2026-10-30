@@ -4,19 +4,19 @@ Run this checklist for each connector release and attach the evidence to the rel
 ticket. A checked item needs a link to test output, configuration review, or an operational owner;
 the checklist itself is not evidence.
 
-## 2026-07-29 native Rust / MCP 2026 release evidence
+## Historical release evidence (2026-07-29)
 
 - Release candidate: cache-free `Dockerfile.rust` build, promoted only after the isolated Rust
   server passed the browser, protocol, parity, security, and operations gates below.
 - Protocol: both MCP versions, discovery, resources, typed outputs, the review App, durable tasks,
   and the deliberately absent Skills extension are covered by the 472-test native suite and the
   black-box conformance replay.
-- Authorization: the 212-test Node suite, 472-test Rust suite, and 52-test cross-runtime Playwright
-  suite cover admin/recorded-owner controls and concealed same-org/cross-org denials.
+- Authorization: the former 212-test Node suite, 472-test Rust suite, and 52-test cross-runtime
+  Playwright suite covered admin/recorded-owner controls and concealed same-org/cross-org denials.
 - Browser: the isolated Rust release candidate completed the admin and member release audit with
   zero console errors, page errors, or failed requests. The README screenshots are captures from
   that server using fictional organizations and artifacts.
-- Operations: `cargo fmt`, Clippy with warnings denied, `npm audit --omit=dev`, Compose validation,
+- Operations: Rust formatting and Clippy, npm dependency audit, Compose validation,
   Prometheus rule validation, `/health`, `/metrics`, backup verification, rollback capture, and
   live legacy/modern MCP smoke results are recorded in the deployment log and GitHub issue
   closure comments.

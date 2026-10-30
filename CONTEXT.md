@@ -127,7 +127,7 @@ The main real seam is `build_router()`: `src/main.rs` assembles the production a
 
 ## Verification and operations
 
-- `cargo test --workspace --all-targets --locked` runs unit, persistence integration, MCP, and HTTP integration tests.
-- `cargo test --manifest-path browser-tests/Cargo.toml --locked` runs the browser-asset tests in `chrome-headless-shell`; its `browser-assets-parse` case requires every shipped `assets/*.js` file to parse.
+- `cargo test --workspace --all-targets --locked` runs the root server and `xtask` workspace tests, including persistence, MCP, and HTTP integration tests.
+- `cargo test --manifest-path preview-renderer/Cargo.toml --locked` runs the renderer workspace tests. `cargo test --manifest-path browser-tests/Cargo.toml --locked` runs the browser tests in `chrome-headless-shell`; journey and reader targets also require `ARTIFACT_MCP_BIN`.
 - Build with `docker compose build`; `.dockerignore` must prevent `.env` and `data/` from entering the image.
 - Deployment is an owner-run operation; repository changes should not deploy automatically.

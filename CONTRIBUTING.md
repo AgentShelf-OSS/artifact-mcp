@@ -17,7 +17,7 @@ Thanks for your interest in artifact-mcp. Issues, ideas, and pull requests are w
 ```bash
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features --locked -- -D warnings
-cargo test --workspace --all-targets --locked   # includes HTTP conformance and the MCP surface check
+cargo test --workspace --all-targets --locked   # server, HTTP conformance, MCP surface, and xtask
 cargo test --doc --locked
 cargo xtask historical-fixture --verify-against-committed
 
@@ -29,11 +29,10 @@ cargo test --manifest-path browser-tests/Cargo.toml --locked
 ```
 
 - `rust-toolchain.toml` pins the Rust toolchain. Repository tooling is `cargo xtask` (run
-  `cargo xtask --help`). The browser-asset tests in `browser-tests/` run the JavaScript in real
-  Chrome for Testing, driven from Rust; use the version pinned in `preview-renderer/Dockerfile`.
-  Without `CHROME_HEADLESS_SHELL` they are skipped. The browser journeys (`--test e2e`) and reader
-  regressions (`--test reader`) in the same crate also need `ARTIFACT_MCP_BIN`. The repository
-  needs no Node (ADR-0024).
+  `cargo xtask --help`). `preview-renderer/` and `browser-tests/` are separate Cargo workspaces.
+  The browser tests use the Chrome for Testing `chrome-headless-shell` version pinned in
+  `preview-renderer/Dockerfile`. Set `CHROME_HEADLESS_SHELL` to run them. The browser journeys
+  (`--test e2e`) and reader regressions (`--test reader`) also need `ARTIFACT_MCP_BIN`.
 - Changed browser JavaScript in `assets/` needs a test in `browser-tests/js/` when its behaviour
   changes; `browser-assets-parse` checks that every asset still parses.
 - Match the surrounding style: small modules behind the traits in `src/ports/`, and production or

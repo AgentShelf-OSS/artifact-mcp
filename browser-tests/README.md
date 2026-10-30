@@ -3,10 +3,11 @@
 Tests for the JavaScript in `../assets` (viewer shell brokers, reader, cast bridge, portal,
 anchor bridge, gallery layout, and so on), end-to-end browser journeys against the artifact-mcp
 release binary, and the reader regression suite, run in real Chrome for Testing
-`chrome-headless-shell` and driven from Rust. Nothing here starts Node.
+`chrome-headless-shell` and driven from Rust. The JavaScript suites run inside Chrome; no Node
+runtime or Playwright package is used.
 
 `cargo test` and the conformance oracle (`../conformance`) prove that the server emits the
-expected bytes. They do not run page JavaScript. This crate does: a truncated `shell.js` was once
+expected bytes. They do not run page JavaScript. This crate does: a truncated viewer shell was once
 served byte for byte, passed every conformance case, and still broke every button because the
 browser could not parse it. Add a journey here for every interactive flow before you trust it.
 
@@ -47,7 +48,7 @@ cargo test --manifest-path browser-tests/Cargo.toml --test reader -- --list
 | `ARTIFACT_MCP_BIN` | The server binary for `--test e2e` and `--test reader`. Without it those targets are skipped with a message. |
 | `CI` | When set, a missing `CHROME_HEADLESS_SHELL` or `ARTIFACT_MCP_BIN` fails the run instead of skipping it. |
 | `E2E_RUN_ID` | The e2e run id (organization `pwtest-<id>`); default: the last six digits of the start time. |
-| `E2E_TEST_TIMEOUT_MS` | Per-case timeout of the e2e target (default 30000, Playwright's `timeout`). |
+| `E2E_TEST_TIMEOUT_MS` | Per-case timeout of the e2e target (default 30000 ms). |
 | `BROWSER_TESTS_JOBS` | How many test files run at once (default 1; `--test-threads N` also works). |
 | `BROWSER_TESTS_CHROME_STDERR` | When set, the browser's own stderr is shown. |
 
@@ -61,17 +62,17 @@ Do not run them at the same time as these tests with the same browser path.
 | `js/*.test.js` | The JavaScript test files. One file is one suite. |
 | `js/harness.js` | The in-page runner: `test`, `assert`, `readText`, `readBytes`, `fixture`, `runInNewContext`, `createContext`, `runInContext`, `setImmediate`. |
 | `tests/js.rs` | `cargo test --test js`: runs every suite and reports each case by name. |
-| `tests/harness.rs` | Tests of the harness itself: evaluation, console and exception capture, compile checks, routes, network policies, process cleanup, and the Node semantics of `js/harness.js`. |
+| `tests/harness.rs` | Tests of the harness itself: evaluation, console and exception capture, compile checks, routes, network policies, and process cleanup. |
 | `tests/locators.rs` | Tests of the locator, action and expectation layer on routed pages (no server). |
-| `tests/e2e/` | `cargo test --test e2e`: browser journeys against the server, one module per former Playwright spec (`s01_gallery.rs` ...). |
-| `tests/reader/` | `cargo test --test reader`: the reader regression suite, one module per former `reader-*.cjs` program. |
+| `tests/e2e/` | `cargo test --test e2e`: browser journeys against the server, split into numbered modules (`s01_gallery.rs` ...). |
+| `tests/reader/` | `cargo test --test reader`: the reader regression suite, split into focused Rust modules. |
 | `src/` | The Rust harness API (below), the suite runner (`src/suite.rs`), the e2e fixtures and runner (`src/e2e.rs`, `src/server.rs`, `src/http.rs`), and the reader fixture, stub speech worker and runner (`src/reader.rs`). |
 | `src/injected.js` | The in-page locator engine (roles, accessible names, text, labels, states, matchers). |
 
 ## How a suite runs
 
-Each test file gets a fresh browser with a fresh profile and one page, as `node --test` gave each
-file its own process. The page lives on the virtual origin `https://harness.test`, which the Rust
+Each test file gets a fresh browser with a fresh profile and one page. The page lives on the
+virtual origin `https://harness.test`, which the Rust
 side answers inside the browser with DevTools `Fetch` interception: `/` is the repository root,
 read-only, plus a blank start page and `/__fixtures__/<name>`. The browser runs with the preview
 renderer's network lockdown, so a test cannot reach the network or this machine.
@@ -87,8 +88,9 @@ Something that fails while the module loads, or after the last case, fails the w
 (`suite <name> ... FAILED`).
 
 `browser-assets-parse :: every browser asset parses` is a Rust-side case in the same report. It
-parses every `assets/*.js` file with Chrome's parser, without running it, as a classic script
-(`Runtime.compileScript`) and as an ES module.
+parses every top-level `assets/*.js` file with Chrome's parser, without running it, as a classic
+script (`Runtime.compileScript`) and as an ES module. It also parses the viewer shell after joining
+the parts in `assets/shell/parts.txt` order, as the server does.
 
 ## Write a test
 
