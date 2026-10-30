@@ -44,7 +44,7 @@ All request-derived values in templates must be escaped. Keep CSRF/mutation prot
 ## Ownership and file map
 
 - Gallery markup: `templates/gallery.html`; composition and projections: `src/render/portal.rs` and `src/render/view_models.rs`.
-- Gallery behavior and layout: `assets/portal.js`, `assets/portal.css`.
+- Gallery behavior and layout: `assets/portal/`, `assets/portal.css`. The gallery script is one closure split into numbered parts. `assets/portal/parts.txt` lists their order; `src/render/portal.rs` joins them with `concat!`, and browser tests use `readParts("assets/portal")`. Add each new part to both lists in the same position. A unit test checks the lists and assembled script.
 - Full viewer shell and feedback inspector: `templates/artifact-shell.html`, `assets/shell/`, `assets/shell.css`, with shell projections in `src/render/portal.rs`.
   The shell script is one closure split by responsibility into numbered parts (brokers, reactions and inspector, the Listen reader, comments, history). `assets/shell/parts.txt` lists the order; `src/render/portal/templates.rs` joins the parts with `concat!` in that order, and `readShell()` in `browser-tests/js/harness.js` does the same for the browser tests. A part alone is not valid JavaScript. To add a part, add the file, list it in `parts.txt`, and add its `include_str!` at the same position; a unit test fails when the two lists differ.
 - Administration: `templates/settings.html`, `src/render/settings.rs`, `assets/settings.js`, `assets/settings.css`.
