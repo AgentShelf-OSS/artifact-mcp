@@ -395,7 +395,7 @@ fn release_jobs_that_hold_credentials_run_no_repository_code() {
 
 /// The pinned attestation action; every `uses:` of it must carry exactly this reference.
 const ATTEST: &str =
-    "actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2";
+    "actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2";
 
 #[test]
 fn release_workflow_builds_checksums_and_attests_the_static_renderer() {
