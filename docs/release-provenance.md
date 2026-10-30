@@ -45,8 +45,10 @@ releases, so it can still run against older tags.
 
 To rehearse the pipeline without publishing, run the workflow by hand with an existing tag and
 `rehearse: true`. The rehearsal pushes and attests under `ghcr.io/<owner>/artifact-mcp-rehearsal`
-and skips the `publish` job. Its attestations name the branch that ran it, not a release tag, so
-a verifier that pins the tag rejects them.
+and skips the `publish` job. `release verify-manifest` requires the release image name, so a
+rehearsal checks only that the manifest and the fixture preflight name the same image. Its
+attestations name the branch that ran it, not a release tag, so a verifier that pins the tag
+rejects them.
 
 The stable GHCR tag is a pointer. The digest recorded in `release-manifest.json` is the immutable
 image identity. A retry may reuse an existing stable tag only when it already resolves to the same

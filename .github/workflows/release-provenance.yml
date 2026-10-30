@@ -382,6 +382,7 @@ jobs:
       - name: Generate and verify release manifest
         env:
           DIGEST: ${{ needs.attest.outputs.image_digest }}
+          REHEARSE: ${{ inputs.rehearse }}
         run: |
           set -euo pipefail
           [[ -f "docs/releases/$TAG.md" ]] || {
@@ -409,7 +410,15 @@ jobs:
             --repository '${{ github.repository }}' \
             --binary-attestation '${{ needs.attest.outputs.binary_attestation }}' \
             --image-attestation '${{ needs.attest.outputs.image_attestation }}'
-          cargo --locked xtask release verify-manifest release-manifest.json
+          if [[ "$REHEARSE" == "true" ]]; then
+            # verify-manifest binds the image to ghcr.io/<owner>/<repo>, and a rehearsal pushes
+            # under another name, so check what this pipeline produced instead. A rehearsal never
+            # reaches the publish job.
+            jq -e --slurpfile preflight historical-fixture-preflight.json \
+              '.image.immutableReference == $preflight[0].image' release-manifest.json >/dev/null
+          else
+            cargo --locked xtask release verify-manifest release-manifest.json
+          fi
           sha256sum artifact-mcp artifact-preview source.spdx.json image.spdx.json historical-fixture-preflight.json migration-notes.md release-manifest.json > SHA256SUMS
           sha256sum --check SHA256SUMS
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

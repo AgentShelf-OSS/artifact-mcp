@@ -382,9 +382,15 @@ fn release_jobs_that_hold_credentials_run_no_repository_code() {
         position(&publish, "[[ \"$candidate_sums\" == \"$CANDIDATE_SUMS\" ]]")
             < position(&publish, "Promote without rebuilding")
     );
-    // A rehearsal pushes under a separate image name and never reaches the publish job.
+    // A rehearsal pushes under a separate image name and never reaches the publish job, so the
+    // one check it skips (verify-manifest's image name) cannot be skipped for a release.
     assert!(workflow.contains("image=\"$image-rehearsal\""));
     assert!(publish.contains("if: ${{ !inputs.rehearse }}"));
+    assert_eq!(
+        workflow.matches("REHEARSE: ${{ inputs.rehearse }}").count(),
+        2
+    );
+    assert!(job(&workflow, "manifest").contains("if [[ \"$REHEARSE\" == \"true\" ]]; then"));
 }
 
 /// The pinned attestation action; every `uses:` of it must carry exactly this reference.
