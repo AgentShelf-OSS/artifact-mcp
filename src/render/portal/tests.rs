@@ -175,3 +175,42 @@ mod portal_characterization_tests {
         );
     }
 }
+
+#[cfg(test)]
+mod shell_script_parts_tests {
+    use std::{collections::BTreeSet, fs, path::Path};
+
+    use super::templates::SHELL_SCRIPT;
+
+    /// `SHELL_SCRIPT` must be `dialogs.js`, a newline, and every `assets/shell/` part in the order
+    /// `parts.txt` lists. The browser tests rebuild the script from `parts.txt`, so a part missing
+    /// from the `concat!` list, or listed in another order, would make them test another script.
+    #[test]
+    fn shell_script_is_dialogs_then_the_listed_parts_in_order() {
+        let assets = Path::new(env!("CARGO_MANIFEST_DIR")).join("assets");
+        let listing = fs::read_to_string(assets.join("shell/parts.txt")).unwrap();
+        let listed: Vec<&str> = listing.lines().collect();
+        let mut expected = fs::read_to_string(assets.join("dialogs.js")).unwrap();
+        expected.push('\n');
+        for name in &listed {
+            expected.push_str(&fs::read_to_string(assets.join("shell").join(name)).unwrap());
+        }
+        assert_eq!(SHELL_SCRIPT.to_string(), expected);
+
+        let on_disk: BTreeSet<String> = fs::read_dir(assets.join("shell"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .filter(|name| name.ends_with(".js"))
+            .collect();
+        let listed_set: BTreeSet<String> = listed.iter().map(|name| (*name).to_owned()).collect();
+        assert_eq!(
+            on_disk, listed_set,
+            "every assets/shell/*.js part is listed exactly once"
+        );
+        assert_eq!(
+            listed.len(),
+            listed_set.len(),
+            "parts.txt lists no part twice"
+        );
+    }
+}

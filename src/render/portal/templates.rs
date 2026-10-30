@@ -178,10 +178,31 @@ pub(super) const SHELL_CSS: TrustedStatic = TrustedStatic::new(concat!(
     "\n",
     include_str!("../../../assets/shell.css")
 ));
+/// The viewer shell script: `assets/dialogs.js`, a newline, then the `assets/shell/` parts in the
+/// order `assets/shell/parts.txt` lists. The parts are one closure split across files, so each
+/// part alone is not valid JavaScript. A test keeps this list and `parts.txt` in step.
 pub(super) const SHELL_SCRIPT: TrustedStatic = TrustedStatic::new(concat!(
     include_str!("../../../assets/dialogs.js"),
     "\n",
-    include_str!("../../../assets/shell.js")
+    include_str!("../../../assets/shell/00-prelude.js"),
+    include_str!("../../../assets/shell/01-state-broker.js"),
+    include_str!("../../../assets/shell/02-geo-broker.js"),
+    include_str!("../../../assets/shell/03-native-broker.js"),
+    include_str!("../../../assets/shell/04-data-broker.js"),
+    include_str!("../../../assets/shell/05-reminder-broker.js"),
+    include_str!("../../../assets/shell/06-reactions-inspector.js"),
+    include_str!("../../../assets/shell/07-comment-bridge-wiring.js"),
+    include_str!("../../../assets/shell/08-speech-broker.js"),
+    include_str!("../../../assets/shell/09-reader-ui.js"),
+    include_str!("../../../assets/shell/10-reader-place.js"),
+    include_str!("../../../assets/shell/11-reader-host.js"),
+    include_str!("../../../assets/shell/12-reader-ahead.js"),
+    include_str!("../../../assets/shell/13-reader-controls.js"),
+    include_str!("../../../assets/shell/14-reader-voices.js"),
+    include_str!("../../../assets/shell/15-anchors-comments.js"),
+    include_str!("../../../assets/shell/16-frame-wiring.js"),
+    include_str!("../../../assets/shell/17-discussion-category.js"),
+    include_str!("../../../assets/shell/18-history-audience.js"),
 ));
 pub(super) const ACTION_SCRIPT: TrustedStatic =
     TrustedStatic::new(include_str!("../../../assets/actions.js"));

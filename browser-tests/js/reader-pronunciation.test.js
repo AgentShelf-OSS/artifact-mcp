@@ -1,6 +1,6 @@
-import { test, assert, readText, runInNewContext } from './harness.js';
+import { test, assert, readText, runInNewContext, readShell } from './harness.js';
 
-const source=await readText('assets/shell.js');
+const source=await readShell();
 const helpers=source.slice(source.indexOf('    function pronunciationPlan('),source.indexOf('    function splitLongText('));
 const {pronunciationPlan:plan,pronunciationRange:range}=runInNewContext(helpers+';({pronunciationPlan,pronunciationRange})');
 const plain=value=>JSON.parse(JSON.stringify(value));

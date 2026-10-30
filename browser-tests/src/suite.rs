@@ -337,6 +337,9 @@ pub fn rust_raw_string(source: &str, constant: &str) -> Result<String, String> {
 /// pages load them) and as an ES module (how `node --check` checked them before, under the
 /// root package's `"type": "module"`, and how the pitch worklet loads).
 ///
+/// The viewer shell is one closure split across `assets/shell/` parts, so it is parsed as the
+/// server ships it: the parts joined in `assets/shell/parts.txt` order.
+///
 /// `assets/shell.js` once shipped truncated: the closing `})();` of its IIFE was lost, so the
 /// browser could not parse the block and the reaction, share and comment controls were inert.
 /// Every server-side test still passed, because nothing executed page JavaScript. A brace-balance
@@ -376,6 +379,19 @@ async fn check_assets_parse(page: &Page, repo_root: &Path) -> Result<Vec<String>
             broken.push(format!("{name} (ES module): {error}"));
         }
     }
+    let name = "shell/parts.txt (joined)";
+    match joined_shell(&dir) {
+        Ok(source) => {
+            let url = format!("{ORIGIN}/assets/shell.js");
+            if let Some(error) = page.compile_script(&source, &url).await? {
+                broken.push(format!("{name} (classic script): {error}"));
+            }
+            if let Some(error) = page.compile_module(&source, &url).await? {
+                broken.push(format!("{name} (ES module): {error}"));
+            }
+        }
+        Err(error) => broken.push(format!("{name}: {error}")),
+    }
     if broken.is_empty() {
         Ok(Vec::new())
     } else {
@@ -386,9 +402,27 @@ async fn check_assets_parse(page: &Page, repo_root: &Path) -> Result<Vec<String>
     }
 }
 
+/// The viewer shell script: the `assets/shell/` parts joined in `assets/shell/parts.txt` order.
+fn joined_shell(assets: &Path) -> std::io::Result<String> {
+    let shell = assets.join("shell");
+    let listing = std::fs::read_to_string(shell.join("parts.txt"))?;
+    let mut source = String::new();
+    for name in listing.lines().filter(|name| !name.is_empty()) {
+        source.push_str(&std::fs::read_to_string(shell.join(name))?);
+    }
+    Ok(source)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_joined_shell_is_one_closed_closure() {
+        let shell = joined_shell(&crate::repo_root().join("assets")).unwrap();
+        assert!(shell.trim_start().starts_with("(function(){"));
+        assert!(shell.ends_with("})();\n"));
+    }
 
     #[test]
     fn raw_strings_are_extracted_exactly() {

@@ -1,9 +1,9 @@
-import { test, assert, readText, runInNewContext } from "./harness.js";
+import { test, assert, readText, runInNewContext, readShell } from "./harness.js";
 
-const shell = await readText("assets/shell.js");
+const shell = await readShell();
 const start = shell.indexOf("  function createViewerReminderBroker(options)");
 const end = shell.indexOf("  // End viewer reminder broker.", start);
-assert.ok(start > 0 && end > start, "reminder broker is delimited in shell.js");
+assert.ok(start > 0 && end > start, "reminder broker is delimited in the shell script");
 const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerReminderBroker", {});
 const settle = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
 const plain = value => JSON.parse(JSON.stringify(value));

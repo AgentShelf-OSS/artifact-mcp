@@ -1,8 +1,8 @@
-import { test, assert, readText, readBytes, runInNewContext } from "./harness.js";
+import { test, assert, readText, readBytes, runInNewContext, readShell } from "./harness.js";
 
 // Browser-side contracts of the viewer shell assets and the page templates. Server-rendered page
 // markup is covered by the Rust render and route suites.
-const SHELL_ASSET = await readText("assets/shell.js");
+const SHELL_ASSET = await readShell();
 
 function shellBrokerHarness(scriptOverride = null, { isBundle = false, revision = 3, fetchImpl = () => ({}), origin = "https://artifacts.example.test", popupBlocked = false, stateEnabled, windowExtras = {}, navigatorImpl = {}, search = "" } = {}) {
   const created = [];

@@ -45,7 +45,8 @@ All request-derived values in templates must be escaped. Keep CSRF/mutation prot
 
 - Gallery markup: `templates/gallery.html`; composition and projections: `src/render/portal.rs` and `src/render/view_models.rs`.
 - Gallery behavior and layout: `assets/portal.js`, `assets/portal.css`.
-- Full viewer shell and feedback inspector: `templates/artifact-shell.html`, `assets/shell.js`, `assets/shell.css`, with shell projections in `src/render/portal.rs`.
+- Full viewer shell and feedback inspector: `templates/artifact-shell.html`, `assets/shell/`, `assets/shell.css`, with shell projections in `src/render/portal.rs`.
+  The shell script is one closure split by responsibility into numbered parts (brokers, reactions and inspector, the Listen reader, comments, history). `assets/shell/parts.txt` lists the order; `src/render/portal/templates.rs` joins the parts with `concat!` in that order, and `readShell()` in `browser-tests/js/harness.js` does the same for the browser tests. A part alone is not valid JavaScript. To add a part, add the file, list it in `parts.txt`, and add its `include_str!` at the same position; a unit test fails when the two lists differ.
 - Administration: `templates/settings.html`, `src/render/settings.rs`, `assets/settings.js`, `assets/settings.css`.
 - Access states: `templates/not-found.html`, `templates/not-signed-in.html`, `templates/access-retry.html` and their matching `assets/not-found.css`, `assets/not-signed-in.css`, `assets/access-retry.css`.
 - Trusted MCP review surface: `assets/mcp-review-app.html`.
