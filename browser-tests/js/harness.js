@@ -70,7 +70,7 @@ const ROOT = new URL("/", import.meta.url);
 
 function checkPath(path) {
   if (typeof path !== "string" || path === "" || path.startsWith("/") || path.split("/").some((part) => part === ".." || part === ".")) {
-    throw new TypeError(`expected a repository-relative path such as "assets/shell.js", got ${inspect(path)}`);
+    throw new TypeError(`expected a repository-relative path such as "assets/portal.js", got ${inspect(path)}`);
   }
   return path;
 }
@@ -87,6 +87,15 @@ const utf8 = new TextDecoder("utf-8", { ignoreBOM: true });
 /** A repository file as text. `path` is relative to the repository root. */
 export async function readText(path) {
   return utf8.decode(await load(new URL(checkPath(path), ROOT), `readText(${path})`));
+}
+
+/**
+ * The viewer shell script as the server ships it after `dialogs.js`: every `assets/shell/` part,
+ * joined in the order `assets/shell/parts.txt` lists (the server's `concat!` follows the same list).
+ */
+export async function readShell() {
+  const names = (await readText("assets/shell/parts.txt")).split("\n").filter((name) => name !== "");
+  return (await Promise.all(names.map((name) => readText(`assets/shell/${name}`)))).join("");
 }
 
 /** A repository file as bytes. */

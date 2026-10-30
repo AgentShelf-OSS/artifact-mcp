@@ -95,9 +95,10 @@ parses every `assets/*.js` file with Chrome's parser, without running it, as a c
 Add `js/<name>.test.js`. The runner finds it; there is nothing to register in Rust.
 
 ```js
-import { test, assert, readText, runInNewContext } from "./harness.js";
+import { test, assert, runInNewContext, readShell } from "./harness.js";
 
-const shell = await readText("assets/shell.js");
+// The viewer shell is split across assets/shell/; readShell() joins the parts as the server does.
+const shell = await readShell();
 const start = shell.indexOf("  function createViewerGeoBroker(options)");
 const end = shell.indexOf("  // End viewer geolocation broker.", start);
 const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerGeoBroker", {});

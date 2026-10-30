@@ -1,6 +1,6 @@
-import { test, assert, readText, runInNewContext } from "./harness.js";
+import { test, assert, readText, runInNewContext, readShell } from "./harness.js";
 
-const shell = await readText("assets/shell.js");
+const shell = await readShell();
 const start = shell.indexOf("  function createViewerGeoBroker(options)");
 const end = shell.indexOf("  // End viewer geolocation broker.", start);
 const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerGeoBroker", {});
