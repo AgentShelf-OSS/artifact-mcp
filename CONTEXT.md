@@ -86,7 +86,7 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 - `src/persistence/db.rs` / `src/persistence/migrations.rs` — SQLite opening, the connection pool, and ordered schema evolution. The migration bodies live in `src/persistence/migrations/`, grouped by schema range. Some migrations load shared SQL from the top-level `migrations/` directory.
 - `src/persistence/keys.rs` / `src/persistence/reactions.rs` — publisher-key and reaction persistence.
 - `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
-- `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. `assets/shell.js` brokers state messages, caches reads, and debounces writes.
+- `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. The viewer shell (`assets/shell/01-state-broker.js`) brokers state messages, caches reads, and debounces writes.
 - `src/ports/state.rs` / `src/persistence/viewer_state_service.rs`: the authorization-gated viewer-state interface and its shared-pool SQLite adapter.
 - `src/http/artifact_response.rs` — raw-delivery response policy, including HTML sandbox headers. Viewer state does not alter raw, historical, or public-share response bodies. Those views have no shell; artifacts treat state as disabled if no `state:ready` arrives within about one second of `state:hello`.
 - `src/render/portal.rs` / `src/render/settings.rs` with `templates/` — server-rendered gallery, viewer shell, not-found, and key-management pages.
@@ -127,7 +127,7 @@ The main real seam is `build_router()`: `src/main.rs` assembles the production a
 
 ## Verification and operations
 
-- `cargo test --workspace --all-targets --locked` runs unit, persistence integration, MCP, and HTTP integration tests.
-- `cargo test --manifest-path browser-tests/Cargo.toml --locked` runs the browser-asset tests in `chrome-headless-shell`; its `browser-assets-parse` case requires every shipped `assets/*.js` file to parse.
+- `cargo test --workspace --all-targets --locked` runs the root server and `xtask` workspace tests, including persistence, MCP, and HTTP integration tests.
+- `cargo test --manifest-path preview-renderer/Cargo.toml --locked` runs the renderer workspace tests. `cargo test --manifest-path browser-tests/Cargo.toml --locked` runs the browser tests in `chrome-headless-shell`; journey and reader targets also require `ARTIFACT_MCP_BIN`.
 - Build with `docker compose build`; `.dockerignore` must prevent `.env` and `data/` from entering the image.
 - Deployment is an owner-run operation; repository changes should not deploy automatically.

@@ -1,7 +1,7 @@
-import { test, assert, readText, runInNewContext } from "./harness.js";
+import { test, assert, readText, runInNewContext, readShell } from "./harness.js";
 
 // ADR-0018: the shell relays consented native capabilities between the artifact frame and the app.
-const shell = await readText("assets/shell.js");
+const shell = await readShell();
 const start = shell.indexOf("  function createNativeBroker(options)");
 const end = shell.indexOf("  // End native broker.", start);
 const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateNativeBroker", { URL, JSON, Date, Promise, Math, Number, Array, Object, String });

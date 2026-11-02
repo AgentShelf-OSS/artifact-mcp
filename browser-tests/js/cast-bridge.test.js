@@ -1,7 +1,7 @@
-import { test, assert, readText, runInNewContext, setImmediate } from './harness.js';
+import { test, assert, readText, runInNewContext, setImmediate, readShell } from './harness.js';
 
 const source = await readText('assets/cast.js');
-const shellSource = await readText('assets/shell.js');
+const shellSource = await readShell();
 
 function harness(options = {}) {
   const posted = [];

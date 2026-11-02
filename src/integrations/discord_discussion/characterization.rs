@@ -1,7 +1,45 @@
 use super::*;
 
+use crate::integrations::discord_delivery::TerminalReason;
 use reqwest::Method;
 use serde_json::{Value, json};
+
+#[test]
+fn invalid_secret_precedes_invalid_operation_and_url() {
+    let operation = DiscussionOperation::Reply {
+        thread_id: "0".into(),
+        content: String::new(),
+    };
+    assert_eq!(
+        discussion_request("not a url", "bad ref".into(), operation),
+        Err(TerminalReason::InvalidSecret)
+    );
+}
+
+#[test]
+fn invalid_operation_precedes_webhook_allowlist() {
+    let operation = DiscussionOperation::Reply {
+        thread_id: "0".into(),
+        content: String::new(),
+    };
+    assert_eq!(
+        discussion_request("not a url", "discussion:valid".into(), operation),
+        Err(TerminalReason::BadRequest)
+    );
+}
+
+#[test]
+fn valid_operation_rejects_unapproved_webhook() {
+    let operation = DiscussionOperation::reply("123".into(), "hello".into()).unwrap();
+    assert_eq!(
+        discussion_request(
+            "https://example.com/api/webhooks/123/token",
+            "discussion:valid".into(),
+            operation
+        ),
+        Err(TerminalReason::AllowlistRejected)
+    );
+}
 
 #[test]
 fn discussion_request_preserves_operation_specific_routes_and_payloads() {

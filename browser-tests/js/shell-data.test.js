@@ -1,7 +1,7 @@
-import { test, assert, readText, runInNewContext, setImmediate } from "./harness.js";
+import { test, assert, readText, runInNewContext, setImmediate, readShell } from "./harness.js";
 
 const sdk = await readText("assets/artifact-data-client.js");
-const shell = await readText("assets/shell.js");
+const shell = await readShell();
 const brokerStart = shell.indexOf("  function createViewerDataBroker(options)");
 const brokerEnd = shell.indexOf("\n  var dataBroker=", brokerStart);
 let brokerFetch = () => Promise.reject(new Error("missing fetch"));

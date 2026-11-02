@@ -2,7 +2,7 @@
   "bindings": {
     "reviews": {
       "source": "pr-watch",
-      "operations": ["status", "runs", "run_detail", "run_routes", "route_detail", "daily", "analytics"],
+      "operations": ["status", "runs", "run_detail", "run_routes", "route_detail", "daily", "attention", "analytics"],
       "subscriptions": ["events"]
     }
   }

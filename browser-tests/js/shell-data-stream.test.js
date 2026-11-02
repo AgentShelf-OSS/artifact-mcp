@@ -1,7 +1,7 @@
-import { test, assert, readText, runInNewContext, setImmediate } from "./harness.js";
+import { test, assert, readText, runInNewContext, setImmediate, readShell } from "./harness.js";
 
 // ADR-0017: the viewer shell relays streaming operations as data:chunk messages.
-const shell = await readText("assets/shell.js");
+const shell = await readShell();
 const sdk = await readText("assets/artifact-data-client.js");
 const start = shell.indexOf("  function createViewerDataBroker(options)");
 const end = shell.indexOf("\n  var dataBroker=", start);

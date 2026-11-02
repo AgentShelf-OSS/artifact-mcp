@@ -69,7 +69,19 @@ const PORTAL_FAVICON: &str = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org
 pub(super) const FAVICON: TrustedStatic = TrustedStatic::new(PORTAL_FAVICON);
 pub(super) const PORTAL_CSS: TrustedStatic =
     TrustedStatic::new(include_str!("../../assets/portal.css"));
-const PORTAL_SCRIPT: TrustedStatic = TrustedStatic::new(include_str!("../../assets/portal.js"));
+/// The gallery script is one closure split into the parts listed in assets/portal/parts.txt.
+/// Keep this list in the same order; a unit test checks the assembled script.
+const PORTAL_SCRIPT: TrustedStatic = TrustedStatic::new(concat!(
+    include_str!("../../assets/portal/00-prelude-notifications.js"),
+    include_str!("../../assets/portal/01-theme-cards.js"),
+    include_str!("../../assets/portal/02-filters-sort.js"),
+    include_str!("../../assets/portal/03-library-state.js"),
+    include_str!("../../assets/portal/04-category-dialog.js"),
+    include_str!("../../assets/portal/05-menus.js"),
+    include_str!("../../assets/portal/06-share-delete.js"),
+    include_str!("../../assets/portal/07-card-actions.js"),
+    include_str!("../../assets/portal/08-initialization.js"),
+));
 const COLLECTION_TOOLBAR_CSS: TrustedStatic =
     TrustedStatic::new(include_str!("../../assets/collection-toolbar.css"));
 const COLLECTION_TOOLBAR_SCRIPT: TrustedStatic =

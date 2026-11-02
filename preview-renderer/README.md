@@ -4,9 +4,8 @@
 with no access to artifact data. Treat every request as hostile.
 
 It is one static Rust binary that starts Chrome for Testing `chrome-headless-shell` for each
-render and drives it over the Chrome DevTools Protocol (CDP). The service needs no Node.js and no
-Playwright. It replaces the Node and Playwright renderer (`server.js`, `worker.js`) and keeps that
-renderer's HTTP contract.
+render and drives it over the Chrome DevTools Protocol (CDP). The renderer is a separate Cargo
+workspace in `preview-renderer/`.
 
 The artifact-mcp server calls it through `src/integrations/preview.rs` when
 `PREVIEW_RENDERER_URL` is set.
@@ -77,8 +76,8 @@ artifact-preview healthcheck   # exit 0 if GET http://127.0.0.1:$PORT/health ret
 artifact-preview smoke         # render a test page through $PREVIEW_RENDERER_URL (default http://127.0.0.1:3000)
 ```
 
-`healthcheck` lets a container healthcheck run without curl or Node. `smoke` replaces
-`npm run smoke`. It checks the status, the content type, the PNG signature and the 2400×1260 size.
+`healthcheck` lets a container healthcheck run without curl. `smoke` checks the status, the content
+type, the PNG signature and the 2400×1260 size.
 It reads `RENDER_TOKEN` or `RENDER_TOKEN_FILE` with the same rules as the service and sends the
 token when one is set.
 

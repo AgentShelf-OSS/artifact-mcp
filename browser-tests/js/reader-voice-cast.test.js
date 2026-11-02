@@ -1,9 +1,9 @@
-import { test, assert, readText, runInNewContext } from './harness.js';
+import { test, assert, readText, runInNewContext, readShell } from './harness.js';
 
 const bridgeSource = await readText('assets/reader-bridge.js');
 const bridgeHelpers = bridgeSource.slice(bridgeSource.indexOf('  function sanitizeReaderCast('), bridgeSource.indexOf('  function allowed('));
 const {sanitizeReaderCast, resolveReaderRole, splitReaderRoleSegments} = runInNewContext(`${bridgeHelpers};({sanitizeReaderCast,resolveReaderRole,splitReaderRoleSegments})`, {TextEncoder});
-const shellSource = await readText('assets/shell.js');
+const shellSource = await readShell();
 const shellHelpers = shellSource.slice(shellSource.indexOf('    function defaultRoleVoices('), shellSource.indexOf('    function styleChanged('));
 const {defaultRoleVoices} = runInNewContext(`${shellHelpers};({defaultRoleVoices})`);
 

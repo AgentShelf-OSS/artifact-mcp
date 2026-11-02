@@ -35,8 +35,8 @@ build for development.
 
 ## Backups
 
-The server binary makes and checks backups itself, so the data host needs no shell, Python,
-`sqlite3`, or Node. This also works in the distroless container image.
+The server binary makes and checks backups itself, so the data host needs no shell, Python, or
+`sqlite3`. This also works in the distroless container image.
 
 ```text
 artifact-mcp backup [DATA_DIR] [DEST_ROOT] [KEEP]
