@@ -13,7 +13,7 @@ use hkdf::Hkdf;
 use p256::{
     PublicKey, SecretKey,
     ecdsa::{Signature, SigningKey, signature::Signer},
-    elliptic_curve::sec1::ToEncodedPoint,
+    elliptic_curve::sec1::ToSec1Point,
 };
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -68,7 +68,7 @@ impl VapidSigner {
             .decode(private_key_b64url)
             .map_err(|_| invalid())?;
         let secret = SecretKey::from_slice(&scalar).map_err(|_| invalid())?;
-        let public_key = URL_SAFE_NO_PAD.encode(secret.public_key().to_encoded_point(false));
+        let public_key = URL_SAFE_NO_PAD.encode(secret.public_key().to_sec1_point(false));
         Ok(Self {
             key: SigningKey::from(secret),
             public_key,
@@ -159,7 +159,7 @@ pub fn encrypt_with(
         return Err(EncryptError::BadKeys);
     }
     let ua_key = PublicKey::from_sec1_bytes(ua_public).map_err(|_| EncryptError::BadKeys)?;
-    let as_public = as_secret.public_key().to_encoded_point(false);
+    let as_public = as_secret.public_key().to_sec1_point(false);
     let shared = p256::ecdh::diffie_hellman(as_secret.to_nonzero_scalar(), ua_key.as_affine());
 
     // PRK_key = HKDF-Extract(auth_secret, ecdh_secret); IKM = HKDF-Expand(PRK_key, key_info, 32)
@@ -186,7 +186,7 @@ pub fn encrypt_with(
     record.push(0x02); // last-record padding delimiter, no padding
     let cipher = Aes128Gcm::new_from_slice(&cek).map_err(|_| EncryptError::Crypto)?;
     let ciphertext = cipher
-        .encrypt(Nonce::from_slice(&nonce), record.as_slice())
+        .encrypt(&Nonce::from(nonce), record.as_slice())
         .map_err(|_| EncryptError::Crypto)?;
 
     let mut body = Vec::with_capacity(16 + 4 + 1 + 65 + ciphertext.len());
@@ -243,7 +243,7 @@ mod tests {
         let as_secret =
             SecretKey::from_slice(&b64("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw")).unwrap();
         assert_eq!(
-            URL_SAFE_NO_PAD.encode(as_secret.public_key().to_encoded_point(false)),
+            URL_SAFE_NO_PAD.encode(as_secret.public_key().to_sec1_point(false)),
             "BP4z9KsN6nGRTbVYI_c7VJSPQTBtkgcy27mlmlMoZIIgDll6e3vCYLocInmYWAmS6TlzAC8wEqKK6PBru3jl7A8"
         );
         let ua_public = b64(
@@ -322,7 +322,7 @@ mod tests {
     fn oversized_payloads_are_refused() {
         let as_secret =
             SecretKey::from_slice(&b64("yfWPiYE-n46HLnH0KqZOF1fJJU3MYrct3AELtAQ-oRw")).unwrap();
-        let ua_public = as_secret.public_key().to_encoded_point(false);
+        let ua_public = as_secret.public_key().to_sec1_point(false);
         assert_eq!(
             encrypt_with(
                 &vec![b'x'; MAX_PLAINTEXT_BYTES + 1],

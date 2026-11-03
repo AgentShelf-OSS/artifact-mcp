@@ -1,6 +1,6 @@
 //! The HMAC key, the event hash chain, and the authenticated chain head and checkpoints.
 
-use hmac::Mac;
+use hmac::{KeyInit as _, Mac};
 use rusqlite::{Connection, params};
 use sha2::{Digest as _, Sha256};
 

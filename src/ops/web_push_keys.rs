@@ -7,7 +7,7 @@
 //! subscription unusable, so viewers must turn notifications on again.
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use p256::{SecretKey, elliptic_curve::sec1::ToEncodedPoint as _};
+use p256::{SecretKey, elliptic_curve::sec1::ToSec1Point as _};
 
 use crate::{config::RandomSource, error::AppError};
 
@@ -46,7 +46,7 @@ impl VapidKeyPair {
             let mut scalar = [0_u8; 32];
             random.fill_bytes(&mut scalar)?;
             if let Ok(secret) = SecretKey::from_slice(&scalar) {
-                let point = secret.public_key().to_encoded_point(false);
+                let point = secret.public_key().to_sec1_point(false);
                 return Ok(Self {
                     private_key: URL_SAFE_NO_PAD.encode(secret.to_bytes()),
                     public_key: URL_SAFE_NO_PAD.encode(point.as_bytes()),

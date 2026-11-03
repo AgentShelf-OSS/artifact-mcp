@@ -29,7 +29,7 @@ use axum::{
 };
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
 use hkdf::Hkdf;
-use p256::{SecretKey, elliptic_curve::sec1::ToEncodedPoint};
+use p256::{SecretKey, elliptic_curve::sec1::ToSec1Point};
 use rusqlite::{Connection, params};
 use serde_json::{Value, json};
 use sha2::Sha256;
@@ -74,7 +74,7 @@ impl Browser {
         }
     }
     fn p256dh(&self) -> String {
-        URL_SAFE_NO_PAD.encode(self.secret.public_key().to_encoded_point(false))
+        URL_SAFE_NO_PAD.encode(self.secret.public_key().to_sec1_point(false))
     }
     fn auth(&self) -> String {
         URL_SAFE_NO_PAD.encode(self.auth)
@@ -89,7 +89,7 @@ impl Browser {
         let as_key = p256::PublicKey::from_sec1_bytes(as_public).expect("as key");
         let shared =
             p256::ecdh::diffie_hellman(self.secret.to_nonzero_scalar(), as_key.as_affine());
-        let ua_public = self.secret.public_key().to_encoded_point(false);
+        let ua_public = self.secret.public_key().to_sec1_point(false);
         let mut info = b"WebPush: info\0".to_vec();
         info.extend_from_slice(ua_public.as_bytes());
         info.extend_from_slice(as_public);
@@ -105,7 +105,7 @@ impl Browser {
             .unwrap();
         let mut plain = Aes128Gcm::new_from_slice(&cek)
             .unwrap()
-            .decrypt(Nonce::from_slice(&nonce), ciphertext)
+            .decrypt(&Nonce::from(nonce), ciphertext)
             .expect("authentic");
         assert_eq!(plain.pop(), Some(0x02), "single record delimiter");
         plain

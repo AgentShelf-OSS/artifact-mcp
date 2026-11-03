@@ -38,7 +38,7 @@ use std::{
 
 use aes_gcm::{
     Aes256Gcm, Nonce, Tag,
-    aead::{AeadInPlace, KeyInit},
+    aead::{AeadInOut, KeyInit},
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 
@@ -221,7 +221,7 @@ impl WebhookCipher {
         let mut buffer = plaintext.as_bytes().to_vec();
         let tag = self
             .cipher
-            .encrypt_in_place_detached(&nonce, &[], &mut buffer)
+            .encrypt_inout_detached(&nonce, &[], buffer.as_mut_slice().into())
             .map_err(|_| aead_failure("webhook url encryption failed"))?;
 
         Ok(EncryptedUrl {
@@ -247,10 +247,10 @@ impl WebhookCipher {
             .map_err(|_| aead_failure("webhook url ciphertext is not valid base64"))?;
 
         self.cipher
-            .decrypt_in_place_detached(
+            .decrypt_inout_detached(
                 &Nonce::from(nonce_bytes),
                 &[],
-                &mut buffer,
+                buffer.as_mut_slice().into(),
                 &Tag::from(tag_bytes),
             )
             .map_err(|_| {
