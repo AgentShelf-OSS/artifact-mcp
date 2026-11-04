@@ -170,7 +170,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
         .to_have_attribute("title", "Show in gallery")
         .await?;
     expect(&eye.locator("svg path").first())
-        .to_have_attribute("d", "m3 3 18 18")
+        .to_have_attribute("d", regex(r"M2\.062 12\.348", ""))
         .await?;
     expect(&owner.locator("#toast"))
         .to_have_text("Artifact hidden from Gallery")
@@ -194,7 +194,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
         .to_have_attribute("title", "Hide from gallery")
         .await?;
     expect(&show_eye.locator("svg path").first())
-        .to_have_attribute("d", regex(r"M2\.062 12\.348", ""))
+        .to_have_attribute("d", "m3 3 18 18")
         .await?;
     expect(&owner.locator("#toast"))
         .to_have_text("Artifact shown in Gallery")

@@ -193,7 +193,7 @@
   function folderFieldMarkup(artifactId) {
     var names = membershipNamesByArtifact.get(String(artifactId)) || [];
     var summary = names.length ? names.join(", ") : "Choose folders";
-    return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span><span aria-hidden="true">⌄</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
+    return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
   }
   function folderPopoverContext(trigger) {
     var card = trigger.closest(".card");

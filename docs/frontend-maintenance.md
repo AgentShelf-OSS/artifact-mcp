@@ -50,6 +50,7 @@ All request-derived values in templates must be escaped. Keep CSRF/mutation prot
 - Administration: `templates/settings.html`, `src/render/settings.rs`, `assets/settings.js`, `assets/settings.css`.
 - Access states: `templates/not-found.html`, `templates/not-signed-in.html`, `templates/access-retry.html` and their matching `assets/not-found.css`, `assets/not-signed-in.css`, `assets/access-retry.css`.
 - Trusted MCP review surface: `assets/mcp-review-app.html`.
+- Design tokens and surface styling: the `UI refresh (2026-11)` block at the end of each stylesheet. It sets the fonts, palette, and radii. Add new visual rules after it. Use `--font-mono` only for identifiers and code. See [`docs/design/ui-refresh-2026-11.md`](design/ui-refresh-2026-11.md).
 - Anchored comment interactions are owned by PBI-086. Coordinate changes to marker, composer, inspector, and feedback projection behavior with that implementation rather than duplicating it in Gallery code.
 
 ## Focused verification

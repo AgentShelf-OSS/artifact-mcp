@@ -221,7 +221,7 @@ fn settings_renders_management_surfaces_without_trusting_runtime_values() {
     assert!(html.contains("aria-current=\"page\""));
     assert!(html.contains("class=\"key-edit\""));
     assert!(html.contains("data-owner=\"\""));
-    assert!(html.contains("<span>Webhooks</span>"));
+    assert!(html.contains("<span>webhooks</span>"));
     assert!(html.contains("id=\"webhook-total\">1</strong>"));
     assert!(html.contains("function adjustWebhookTotal"));
     assert!(html.contains("data-label=\"Owner\" class=\"key-owner\""));
@@ -495,7 +495,7 @@ fn fixed_clock_rendering_snapshot_matches_frozen_vectors() {
     assert!(gallery.contains("id=\"category-filter\""));
     assert!(gallery.contains("<option value=\"Reports\">Reports (1)</option>"));
     assert!(gallery.contains("<option value=\"\">Uncategorized (1)</option>"));
-    assert!(gallery.contains("Find every published artifact."));
+    assert!(gallery.contains("<h1 id=\"page-title\">Artifacts</h1>"));
     assert_eq!(
         html_attributes_after(
             gallery.split("</main>").next().expect("gallery markup"),

@@ -14,8 +14,9 @@
   const row = document.createElement('section'); row.className = 'library-presentation';
   row.setAttribute('aria-label', 'Library presentation'); wrapper.append(row);
   const nav = document.createElement('nav'); nav.className = 'library-viewchoices';
-  nav.setAttribute('aria-label', 'Library view'); row.append(nav);
-  const choices = {all:'All artifacts',reel:'Reel shelf',sheets:'Contact sheets',ribbons:'Gallery ribbons'};
+  nav.setAttribute('aria-labelledby', 'library-view-label'); row.append(nav);
+  const choices = {all:'Off',reel:'Shelf',sheets:'Contact sheets',ribbons:'Ribbons'};
+  const viewLabel = document.createElement('span'); viewLabel.className = 'library-viewchoices-label'; viewLabel.id = 'library-view-label'; viewLabel.textContent = 'Folder display'; nav.append(viewLabel);
   function invoke(method, value) { const api = window.ArtifactCollections; if (typeof api?.[method] === 'function') return api[method](value); }
   for (const [view, label] of Object.entries(choices)) {
     const button = document.createElement('button'); button.type = 'button';
@@ -25,7 +26,7 @@
   }
   const controls = document.createElement('div'); controls.className = 'library-display-options'; row.append(controls);
   const displayToggle = document.createElement('button'); displayToggle.type = 'button'; displayToggle.id = 'library-display-toggle';
-  displayToggle.textContent = 'Display ⌄'; displayToggle.setAttribute('aria-expanded','false'); displayToggle.setAttribute('aria-controls','library-display-panel');
+  displayToggle.textContent = 'Artifact layout'; displayToggle.title = 'Artifact layout options'; displayToggle.setAttribute('aria-expanded','false'); displayToggle.setAttribute('aria-controls','library-display-panel');
   controls.append(displayToggle);
   const display = document.createElement('div'); display.id='library-display-panel'; display.className='library-display-panel'; controls.append(display);
   const sort = document.getElementById('sort'); if (sort) display.append(sort.closest('label'));
@@ -33,7 +34,7 @@
   size.addEventListener('click',()=>{invoke('setDensity',size.getAttribute('aria-pressed')==='true'?'compact':'large');sync();}); display.append(size);
   const layout = tools.querySelector('.layout-toggle'); if (layout) { display.append(layout); layout.setAttribute('aria-label','Artifact layout'); }
   const create=document.createElement('button');create.type='button';create.id='new-folder';create.className='library-new-folder';create.textContent='+ New folder';
-  create.addEventListener('click',()=>document.querySelector('#collection-surface [data-collection-create]')?.click());row.append(create);
+  create.title='New folder';create.addEventListener('click',()=>document.querySelector('#collection-surface [data-collection-create]')?.click());row.append(create);
   const statusLabel=document.createElement('label');statusLabel.className='select-control library-status-control';
   const sr=document.createElement('span');sr.className='sr-only';sr.textContent='Show artifacts';statusLabel.append(sr);
   const status=document.createElement('select');status.id='library-status';status.setAttribute('aria-label','Show artifacts');statusLabel.append(status);
@@ -48,7 +49,7 @@
     originalFilters.find(button=>button.dataset.filterView===legacy)?.click();invoke('setStatus',value);sync();
   });
   if(!admin)document.getElementById('org-filter')?.closest('label')?.setAttribute('hidden','');
-  const filters=document.createElement('button');filters.type='button';filters.id='library-filters-toggle';filters.textContent='Filters ⌄';
+  const filters=document.createElement('button');filters.type='button';filters.id='library-filters-toggle';filters.textContent='Filters';
   filters.setAttribute('aria-expanded','false');filters.setAttribute('aria-controls','library-filter-panel');tools.append(filters);actions.id='library-filter-panel';
   filters.addEventListener('click',()=>{const open=filters.getAttribute('aria-expanded')!=='true';filters.setAttribute('aria-expanded',String(open));wrapper.dataset.filtersOpen=String(open);});
   displayToggle.addEventListener('click',()=>{const open=displayToggle.getAttribute('aria-expanded')!=='true';displayToggle.setAttribute('aria-expanded',String(open));controls.dataset.open=String(open);});
