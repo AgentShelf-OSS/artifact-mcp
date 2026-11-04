@@ -198,3 +198,6 @@ td .org-tag{color:var(--ink-2)}
 .settings-group h3,.key-issue h3,.owner-registry h3,.key-edit-head h3,.reveal h3,.notification-panel h3{font:600 15px/1.35 var(--font-ui);letter-spacing:0}
 /* Round 2: phones reach the first editable setting sooner. */
 @media(max-width:760px){.admin-tabs{margin-bottom:10px}.workspace{padding-top:0}.detail-head{padding-top:14px;padding-bottom:12px}}
+
+/* Round 3: compact phone administration and brass selected tabs. */
+@media(max-width:760px){.admin-tab{border:1px solid var(--line);background:transparent;color:var(--ink-2)}.admin-tab[aria-selected="true"]{border-color:var(--line);background:color-mix(in srgb,var(--brass) 14%,var(--paper));box-shadow:0 0 0 1px color-mix(in srgb,var(--brass) 55%,transparent);color:var(--ink)}.admin-tab span,.admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}.directory-head{padding:6px;gap:6px}.org-list{padding:4px}.org-list-button{min-height:44px;padding:6px 8px}.detail-head{padding:8px 150px 8px 12px}}

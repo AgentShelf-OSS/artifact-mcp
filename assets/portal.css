@@ -619,3 +619,12 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 @media(hover:none){.card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 28%,transparent)}}
 :root .card .label .actions>.act:not(.active){color:var(--ink-2)}
 @media(max-width:760px){:root .card .label>.actions{gap:4px;margin-right:-8px}:root .card .label .actions>.act{flex:none;width:44px;height:44px;min-height:44px;padding:0}}
+/* Round 3: make hidden status legible and compact the desktop list. */
+.card.is-hidden .hidden-tag{background:color-mix(in srgb,var(--ink) 10%,transparent);box-shadow:inset 0 0 0 1px var(--line)}
+@media(min-width:761px){
+.artifact-grid[data-layout="list"] .card{grid-template-columns:160px minmax(0,1fr)}
+.artifact-grid[data-layout="list"] .preview{width:150px;height:94px;min-height:0;aspect-ratio:auto;margin:8px 0 8px 8px}
+.artifact-grid[data-layout="list"] .label{grid-template-rows:auto auto auto auto;align-content:center;row-gap:2px;padding:8px 16px}
+.artifact-grid[data-layout="list"] .label>.facts{grid-column:1;grid-row:4;align-self:start;margin:2px 0 0;padding:0}
+.artifact-grid[data-layout="list"] .label>.actions{grid-column:2;grid-row:1/5;align-self:center;margin:0;padding:0}
+}

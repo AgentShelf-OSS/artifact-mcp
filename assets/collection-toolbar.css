@@ -284,3 +284,10 @@ body:has(#collection-config) .collection-head h1{font-size:28px}
 /* Round 2: a slimmer folder shelf on desktop, so artifacts lead the page. */
 @media(min-width:761px){#collection-surface{margin:12px 0 12px}.collection-surface[data-view=reel] .collection-grid{padding-top:1.35rem}.collection-surface[data-view=reel] .collection-face{height:92px}.collection-surface[data-view=reel] .collection-face-head button{min-height:0}}
 @media(max-width:360px){.library-new-folder{width:44px;padding:0;justify-content:center}.library-new-folder span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+
+/* Round 3: aligned summaries and compact phone controls. */
+.collection-results .result-summary .count{font:400 13px var(--font-ui);color:var(--ink-3)}
+.library-new-folder .folder-short{display:none}
+@media(max-width:760px){.library-controls .toolbar-actions .sort-control{grid-column:auto}.library-controls .toolbar-actions:has(#org-filter[hidden]) .sort-control,.library-controls .toolbar-actions:has(label[hidden] #org-filter) .sort-control{grid-column:1/-1}}
+@media(max-width:360px){.library-new-folder{width:auto;padding:0 8px}.library-new-folder .folder-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.library-new-folder .folder-short{display:inline;position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:nowrap}body:has(#collection-config) .collection-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}}
+@media(max-width:760px){.library-controls .toolbar-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.library-controls .toolbar-actions :is(#library-status,#org-filter,#category-filter,#sort){min-width:0;width:100%;max-width:100%}}

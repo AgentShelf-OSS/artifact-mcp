@@ -217,3 +217,10 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 .category-dialog .category-actions .solid:hover{border-color:color-mix(in srgb,var(--brass) 82%,#000);background:color-mix(in srgb,var(--brass) 82%,#000)}
 :root[data-theme="dark"] .category-dialog .category-actions .solid{color:#141a21}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .category-dialog .category-actions .solid{color:#141a21}}
+
+/* Round 3: display titles and readable folder actions. */
+.collection-sheet-body h3,.collection-ribbon-title,.collection-ribbon-title button,.collection-ribbon-title strong,.collection-folder-heading h2,.collection-reel-title,.collection-create-dialog .dialog-head h2,.collection-delete-dialog h2{font-family:var(--font-title);font-weight:600;letter-spacing:-.005em}
+.collection-sheet-body h3{font-size:18px}
+.collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:32px;font:13px var(--font-ui)}
+@media(max-width:760px){.collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:44px}}
+@media(min-width:761px){.collection-shelf-heading{margin-bottom:-.5rem}}

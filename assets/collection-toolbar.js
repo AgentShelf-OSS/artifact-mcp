@@ -65,14 +65,19 @@
   menu.append(folderGroup, el('hr'), layoutRow, sizeRow);
 
   const create = el('button', { type: 'button', id: 'new-folder', className: 'library-new-folder' });
-  create.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg><span>New folder</span>';
+  create.setAttribute('aria-label', 'New folder');
+  create.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9"/></svg><span class="folder-label">New folder</span><span class="folder-short" aria-hidden="true">Folder</span>';
   create.addEventListener('click', () => document.querySelector('#collection-surface [data-collection-create]')?.click());
 
   // Status filter: the legacy quick-filter buttons become one select.
   const statusLabel = el('label', { className: 'select-control library-status-control' });
   statusLabel.append(el('span', { className: 'sr-only' }, 'Show artifacts'));
   const status = el('select', { id: 'library-status' }); status.setAttribute('aria-label', 'Show artifacts'); statusLabel.append(status);
-  for (const button of originalFilters) status.append(el('option', { value: button.dataset.filterView }, button.textContent.trim().replace(/\s+/g, ' ')));
+  for (const button of originalFilters) {
+    const count = button.querySelector('span');
+    const label = [...button.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).map(node => node.textContent).join('').trim().replace(/\s+/g, ' ');
+    status.append(el('option', { value: button.dataset.filterView }, count ? `${label} (${count.textContent.trim()})` : label));
+  }
   if (status.options[0]) status.options[0].textContent = 'All artifacts';
   const uncollected = el('option', { value: 'uncollected' }, 'Uncollected'); status.append(uncollected);
   originalFilters.forEach(button => { button.hidden = true; });
