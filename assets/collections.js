@@ -291,7 +291,6 @@
     }).join("");
     var src = a.thumbnailSrc || a.thumbnail_src || a.thumbnail || "";
     var actions = '<div class="actions collection-actions">' +
-      '<a class="act open" href="/' + encodeURIComponent(a.id) + '">Open</a>' +
       '<button class="act save" data-action="favorite" type="button" aria-label="Save ' + escapeHtml(a.title) + '">Save</button>' +
       '<button class="act share" data-action="share" type="button" aria-label="Share ' + escapeHtml(a.title) + '">Share</button>' +
       '<button class="act icon-act more" data-action="more" type="button" aria-label="More actions for ' + escapeHtml(a.title) + '" aria-expanded="false">…</button>' +

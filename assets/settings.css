@@ -190,3 +190,7 @@ td .org-tag{color:var(--ink-2)}
 @media(max-width:760px){.detail-head .org-del{top:2px}}
 :root[data-theme="dark"]{--line:#3a3732;--line-2:#2c2a26}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--line:#3a3732;--line-2:#2c2a26}}
+/* IA pass (2026-11): page and section titles use the display face, as in the gallery. */
+.settings-hero h1{font:600 34px/1.1 var(--font-title);letter-spacing:-.015em}
+.detail-head h2,.workspace-heading h2{font:600 22px/1.25 var(--font-title);letter-spacing:-.01em}
+@media(max-width:760px){.settings-hero h1{font-size:26px}}

@@ -1054,6 +1054,10 @@ async fn push_routes_follow_the_viewer_contract() {
         let (status, headers, _) = call(&app, "GET", "/icons/badge-72.png", None, None, &[]).await;
         assert_eq!((status, headers["content-type"].to_str().unwrap()), (200, "image/png"));
         assert_eq!(call(&app, "GET", "/icons/nope.png", None, None, &[]).await.0, 404);
+        let (status, headers, _) = call(&app, "GET", "/fonts/fraunces-v1.woff2", None, None, &[]).await;
+        assert_eq!((status, headers["content-type"].to_str().unwrap()), (200, "font/woff2"));
+        assert!(headers["cache-control"].to_str().unwrap().contains("immutable"));
+        assert_eq!(call(&app, "GET", "/fonts/nope.woff2", None, None, &[]).await.0, 404);
 
         // Config requires a viewer.
         assert_eq!(call(&app, "GET", "/push/config", None, None, &[]).await.0, 404);

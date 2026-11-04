@@ -43,6 +43,9 @@ const ICON_APP_512: &[u8] = include_bytes!("../../../assets/icons/app-512.png");
 const ICON_MASKABLE_512: &[u8] = include_bytes!("../../../assets/icons/maskable-512.png");
 const ICON_APPLE_TOUCH: &[u8] = include_bytes!("../../../assets/icons/apple-touch-icon.png");
 const ICON_BADGE_72: &[u8] = include_bytes!("../../../assets/icons/badge-72.png");
+/// Portal display face: Fraunces (SIL OFL 1.1, `assets/licenses/fraunces-OFL.txt`), one weight,
+/// Latin subset. Bump the file name when the bytes change; the route caches it as immutable.
+const FONT_DISPLAY: &[u8] = include_bytes!("../../../assets/fonts/fraunces-v1.woff2");
 
 pub(crate) fn router() -> Router<AppDeps> {
     Router::new()
@@ -50,6 +53,7 @@ pub(crate) fn router() -> Router<AppDeps> {
         .route("/manifest.webmanifest", get(manifest))
         .route("/{id}/manifest.webmanifest", get(artifact_manifest))
         .route("/icons/{name}", get(icon))
+        .route("/fonts/{name}", get(font))
         .route("/push/config", get(config))
         .route(
             "/push/subscriptions",
@@ -173,6 +177,20 @@ async fn icon(Path(name): Path<String>) -> Response {
         &[
             ("content-type", "image/png"),
             ("cache-control", "public, max-age=3600"),
+            ("x-content-type-options", "nosniff"),
+        ],
+    )
+}
+
+async fn font(Path(name): Path<String>) -> Response {
+    if name != "fraunces-v1.woff2" {
+        return AppError::ConcealedNotFound.into_response();
+    }
+    static_file(
+        FONT_DISPLAY,
+        &[
+            ("content-type", "font/woff2"),
+            ("cache-control", "public, max-age=31536000, immutable"),
             ("x-content-type-options", "nosniff"),
         ],
     )

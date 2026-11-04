@@ -73,7 +73,7 @@
     trigger.setAttribute("aria-expanded", open ? "true" : "false");
     if (open) {
       positionMenu(menu, trigger);
-      var first = menu.querySelector("select,button");
+      var first = menu.querySelector("a[href],select,button");
       if (first) first.focus();
     }
   }
