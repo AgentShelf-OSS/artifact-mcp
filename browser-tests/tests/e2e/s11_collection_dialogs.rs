@@ -138,13 +138,20 @@ async fn sleep_ms(ms: u64) {
 async fn open_library(page: &Page, org: &str) -> Result<(), Error> {
     page.goto(&format!("/?libraryView=reel&org={}", encode_component(org)))
         .await?;
-    expect(&page.locator(".collection-new-tile")).to_be_visible().await
+    expect(&page.locator(".collection-new-tile"))
+        .to_be_visible()
+        .await
 }
 
 /// Contact sheets has no shelf tile, so the toolbar New folder button launches the dialog there.
 async fn toolbar_launcher(page: &Page) -> Result<Locator<'_>, Error> {
     page.locator("#library-view-toggle").click().await?;
+    // The view choice saves a preference; let that write finish before the no-mutation checks.
+    let saved = page.wait_for_response(|response| {
+        response.url.contains("/gallery/preferences") && response.request.method == "PUT"
+    });
     page.locator("[data-library-view='sheets']").click().await?;
+    saved.await?;
     page.keyboard().press("Escape").await?;
     let button = page.locator("#new-folder");
     expect(&button).to_be_visible().await?;

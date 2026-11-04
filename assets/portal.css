@@ -592,7 +592,13 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 .card:has(.card-title a:focus-visible){outline:2px solid var(--brass);outline-offset:2px}
 .card .actions{position:relative;z-index:2}
 .card .collection-artifact-select{z-index:3}
-.card:hover .card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent)}
+@media(hover:hover){.card:hover .card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent)}}
+/* Hidden cards say so in the meta line; Show in gallery is the first item in More. */
+.hidden-tag{display:none}
+.card.is-hidden .hidden-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--ground-2);color:var(--ink-2);font:600 11.5px/1.5 var(--font-ui)}
+.card.is-hidden{opacity:1;filter:none}
+.card.is-hidden::after{content:none}
+.card.is-hidden .preview .pv{opacity:.55;filter:saturate(.5)}
 /* Footer: facts on the left, Favorite, Share and More on the right, no divider. */
 .card .label{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto 1fr auto;column-gap:12px;row-gap:4px;padding:14px 16px 12px}
 .card .label>*{grid-column:1/-1}
@@ -604,6 +610,12 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 .card-menu .menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin:0 0 2px;padding:0 8px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--ink);font:500 13px var(--font-ui);text-align:left;text-decoration:none;cursor:pointer}
 .card-menu .menu-item:hover{background:var(--ground-2);color:var(--ink)}
 .card-menu .menu-item svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
-.card-menu .menu-item:last-of-type{margin-bottom:8px}
-.card-menu .menu-item+label,.card-menu .menu-item+.collection-folder-field{padding-top:10px;border-top:1px solid var(--line-2)}
+.card-menu .menu-note{display:flex;align-items:flex-start;gap:10px;margin:0 0 2px;padding:6px 8px;color:var(--ink-3);font:12.5px/1.4 var(--font-ui)}
+.card-menu .menu-note svg{width:16px;height:16px;flex:none;margin-top:1px}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:6px;padding-top:10px;border-top:1px solid var(--line-2)}
 @media(max-width:760px){.card .label>.actions{margin-right:-10px}.card-menu .menu-item{min-height:44px}}
+/* Round 2: touch screens get a resting title underline, since there is no hover to reveal the link;
+   footer actions read as controls and keep 44px targets on phones. */
+@media(hover:none){.card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 28%,transparent)}}
+:root .card .label .actions>.act:not(.active){color:var(--ink-2)}
+@media(max-width:760px){:root .card .label>.actions{gap:4px;margin-right:-8px}:root .card .label .actions>.act{flex:none;width:44px;height:44px;min-height:44px;padding:0}}

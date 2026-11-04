@@ -168,7 +168,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     eye.click().await?;
     assert_eq!(hidden_request.await?.status, 200);
     expect(&eye)
-        .to_have_attribute("aria-label", regex("Show .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Show in gallery: ", ""))
         .await?;
     expect(&eye)
         .to_have_attribute("title", "Show in gallery")
@@ -182,7 +182,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     owner.reload().await?;
     expect(&owner_card).to_be_visible().await?;
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
-        .to_have_attribute("aria-label", regex("Show .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Show in gallery: ", ""))
         .await?;
     let hidden_member = member_page(&t, &member_email).await?;
     expect(&card(&hidden_member, &id)).to_have_count(0).await?;
@@ -209,7 +209,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
         .await?;
     owner.reload().await?;
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
-        .to_have_attribute("aria-label", regex("Hide .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Hide from gallery: ", ""))
         .await?;
 
     let non_owner = member_page(&t, &member_email).await?;

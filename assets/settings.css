@@ -194,3 +194,7 @@ td .org-tag{color:var(--ink-2)}
 .settings-hero h1{font:600 34px/1.1 var(--font-title);letter-spacing:-.015em}
 .detail-head h2,.workspace-heading h2{font:600 22px/1.25 var(--font-title);letter-spacing:-.01em}
 @media(max-width:760px){.settings-hero h1{font-size:26px}}
+/* Panel heads stay sans and smaller, so the display face owns the section level. */
+.settings-group h3,.key-issue h3,.owner-registry h3,.key-edit-head h3,.reveal h3,.notification-panel h3{font:600 15px/1.35 var(--font-ui);letter-spacing:0}
+/* Round 2: phones reach the first editable setting sooner. */
+@media(max-width:760px){.admin-tabs{margin-bottom:10px}.workspace{padding-top:0}.detail-head{padding-top:14px;padding-bottom:12px}}

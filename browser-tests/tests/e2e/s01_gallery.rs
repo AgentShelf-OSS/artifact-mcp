@@ -444,7 +444,7 @@ async fn back_link_restores_scroll(t: Ctx) -> Result<(), Error> {
     let open = page
         .locator(".card")
         .filter_has_text(format!("{title} 0"))
-        .get_by_role(Role::new("link").exact_name(format!("{title} 0")));
+        .get_by_role(Role::new("link").exact_name(&format!("{title} 0")));
     let viewer_href = open.get_attribute("href").await?.unwrap_or_default();
     open.click().await?;
     expect(&page.locator(".vhome")).to_be_visible().await?;

@@ -8,7 +8,7 @@
     }).then(function (body) {
       document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function (instance) { instance.dataset.hidden = body.hidden ? "1" : "0"; instance.classList.toggle("is-hidden",!!body.hidden); });
       card.classList.toggle("is-hidden", !!body.hidden);
-      control.setAttribute("aria-label", (body.hidden ? "Show " : "Hide ") + card.querySelector(".card-title").textContent.trim() + " in the gallery");
+      control.setAttribute("aria-label", (body.hidden ? "Show in gallery: " : "Hide from gallery: ") + card.querySelector(".card-title").textContent.trim());
       control.title = body.hidden ? "Show in gallery" : "Hide from gallery";
       control.innerHTML = !body.hidden
         ? '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18"></path><path d="M10.6 6.2A10.5 10.5 0 0 1 12 6c6 0 9.5 6 9.5 6a17.7 17.7 0 0 1-3.1 3.8M6.1 6.1C3.8 7.7 2.5 10 2.5 12c0 0 3.5 6 9.5 6 1.4 0 2.7-.3 3.8-.8"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg><span>Hide from gallery</span>'
@@ -35,7 +35,7 @@
       document.querySelectorAll('.card[data-id="' + CSS.escape(card.dataset.id) + '"]').forEach(function (instance) {
         instance.dataset.fav = favorite ? "1" : "0";
         var button = instance.querySelector('[data-action="favorite"]');
-        if(button){button.classList.toggle("active",favorite);button.setAttribute("aria-pressed",String(favorite));var text=button.querySelector("span");if(text)text.textContent=favorite?"Saved":"Save";}
+        if(button){button.classList.toggle("active",favorite);button.setAttribute("aria-pressed",String(favorite));button.title=favorite?"Remove from favorites":"Save to favorites";var text=button.querySelector("span");if(text)text.textContent=favorite?"Saved":"Save";}
       });
       control.classList.toggle("active", favorite);
       control.setAttribute("aria-pressed", favorite ? "true" : "false");
