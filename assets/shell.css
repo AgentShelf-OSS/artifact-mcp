@@ -235,3 +235,6 @@
 .vbar{box-shadow:none;border-bottom:1px solid var(--line)}
 .vorg{display:inline-flex;align-items:center;gap:5px;color:var(--txt)}
 .vorg::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--k)}
+/* Pass X: inspector text meets the 12px floor used across the portal. */
+#vinspector :is(.inspector-tab,.vfb-count,.vfb-delete,.vfb-resolve,.vfb-send,dt,.vcat,.vdiscussion-state,.vdiscussion-copy,.vdiscussion-boundary,label,.vh-cur,.vh-size,.vh-when,.vh-view,.vh-restore),#vinspector span:not([class]),#vinspector button:not([class]){font-size:12px;letter-spacing:0}
+#vinspector :is(.vfb-count,.vh-cur,.vdiscussion-state){text-transform:none}

@@ -1,23 +1,27 @@
 # Screenshot gallery
 
-Screenshots 09–14 show the published Rust v1.12.0 binary at schema 38 in an isolated local server.
-The library contains six fictional artifacts in the `studio` organization and four folders.
-The artifact previews were captured from those demo pages. No production data or credentials
-appear in these images. These examples use the shipped light theme.
+Screenshots 01–14 show the November 2026 UI refresh (v1.29.4 plus the refresh) on an isolated
+local server at schema 40. The library holds twelve fictional artifacts in the `homelab`
+organization, four folders, one member account, a feedback thread, and three revisions of one
+artifact. The previews were rendered from those sample pages. No production data or credentials
+appear in these images. They use the shipped light theme. The hero image (00) is unchanged.
 
-Desktop captures use Chrome 146.0.7680.71 at 1440 × 1080 with a device scale factor of 1 and reduced motion.
-The folder dialogs are cropped to their rendered bounds. The mobile example uses a 390 × 844
-viewport; it demonstrates browser viewport emulation, not a physical device test. Captures wait
-for fonts, decoded previews, and the gallery loading placeholders to clear.
+Captures use Chrome 156 in headless mode with reduced motion. Screenshots 01–08 use a
+1600 × 1000 viewport and 09–11 use 1440 × 1080, both at a device scale factor of 1. The folder
+dialogs are cropped to their rendered bounds. The mobile example uses a 390 × 844 viewport; it
+demonstrates browser viewport emulation, not a physical device test. The capture host maps the
+system UI font to Inter and monospace to JetBrains Mono. Captures wait for fonts and decoded
+previews. See [the refresh notes](../design/ui-refresh-2026-11.md) for before and after
+comparisons.
 
-| Reel Shelf | Contact Sheets |
+| Shelf | Contact sheets |
 |---|---|
-| [![Reel Shelf with a pinned preview](09-library-reel-shelf.png)](09-library-reel-shelf.png) | [![Contact Sheets folder covers](10-library-contact-sheets.png)](10-library-contact-sheets.png) |
+| [![Shelf with a pinned preview](09-library-reel-shelf.png)](09-library-reel-shelf.png) | [![Contact sheets folder covers](10-library-contact-sheets.png)](10-library-contact-sheets.png) |
 | Hover to peek, click to pin, and drag artifact cards onto folders. | Each folder cover shows several artifact previews. |
 
-| Gallery Ribbons | Create a folder |
+| Ribbons | Create a folder |
 |---|---|
-| [![Expanded and collapsed Gallery Ribbons](11-library-gallery-ribbons.png)](11-library-gallery-ribbons.png) | [![Create folder editor with a live preview](12-folder-create.png)](12-folder-create.png) |
+| [![Expanded and collapsed Ribbons](11-library-gallery-ribbons.png)](11-library-gallery-ribbons.png) | [![Create folder editor with a live preview](12-folder-create.png)](12-folder-create.png) |
 | Reorder folders with drag or arrow controls. Collapsed ribbons retain a preview fan. | Set the name, optional context, color, and cover while viewing the folder preview. |
 
 | Delete a folder | Mobile folder editor |
@@ -25,31 +29,24 @@ for fonts, decoded previews, and the gallery loading placeholders to clear.
 | [![Delete folder confirmation](13-folder-delete.png)](13-folder-delete.png) | [![Mobile folder editor with visible actions](14-folder-create-mobile.png)](14-folder-create-mobile.png) |
 | The confirmation identifies the folder and explains that artifacts remain available. | The body scrolls while the header and action buttons remain visible. |
 
-## Earlier product captures
-
-Screenshots 01–08 come from an isolated Rust v1.7.2 release-candidate server at schema 32. That
-server contains twelve fictional artifacts across test organizations with the optional preview
-renderer enabled. These images cover review, version history, and organization administration;
-the folder library and dialogs above show the current v1.12.0 behavior.
-
 | Administrator gallery | Card actions |
 |---|---|
 | [![Administrator gallery](01-gallery-admin-grid.png)](01-gallery-admin-grid.png) | [![Administrator card actions](02-gallery-admin-actions.png)](02-gallery-admin-actions.png) |
-| Search, quick views, organization and category filters, sorting, and layout controls share one toolbar. | Change category or organization in place. Deletion remains explicit and confirmed. |
+| Search, status, organization and category filters, folder display, sorting, and layout controls share one toolbar. | Change category or folders in place. Deletion remains explicit and confirmed. |
 
 | List layout | Member gallery |
 |---|---|
 | [![List layout](03-gallery-admin-list.png)](03-gallery-admin-list.png) | [![Member gallery](04-gallery-member-grid.png)](04-gallery-member-grid.png) |
-| The list keeps previews, metadata, and controls readable for dense collections. | Members see organization-scoped counts, filters, and ownership controls for their own uploads. |
+| Compact rows keep previews, metadata, and labelled actions in one line. | Members see organization-scoped counts and filters, and ownership controls for their own uploads. |
 
-| Anchored review | Version history |
+| Feedback | Version history |
 |---|---|
 | [![Feedback inspector](05-viewer-feedback.png)](05-viewer-feedback.png) | [![History inspector](06-viewer-history.png)](06-viewer-history.png) |
-| The inspector holds threaded point and region feedback beside the sandboxed artifact. | Browse retained revisions or restore an older body as a new revision. |
+| The inspector holds threaded feedback beside the sandboxed artifact. Feedback can also pin to a point or region. | Browse retained revisions or restore an older body as a new revision. |
 
 | Organization administration | Publisher credentials |
 |---|---|
 | [![Organization administration](07-admin-organizations.png)](07-admin-organizations.png) | [![Publisher credentials](08-admin-publisher-keys.png)](08-admin-publisher-keys.png) |
-| Manage routing, colors, categories, members, and delivery settings for one organization. | Issue and revoke scoped keys, assign an owner, and preview legacy-owner backfills. |
+| Manage routing, colors, categories, members, and delivery settings for one organization. | Issue and revoke scoped keys, name an artifact owner, and preview ownership updates. |
 
 [Return to the README](../../README.md).
