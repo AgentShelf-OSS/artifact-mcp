@@ -4,11 +4,11 @@ This guide describes the current Artifact MCP UI contract. Keep the Rust rendere
 
 ## Design and layout contract
 
-The visual language is a restrained slate / paper / copper system: cool slate application chrome, warm paper panels, and copper for focus, active, and destructive-adjacent emphasis. Keep controls compact and information-dense, with clear monospace metadata and serif artifact titles.
+The visual language is warm paper and brass: a warm off-white ground (warm near-black in dark), paper cards, and brass for focus, the active state, and the primary action in each form or dialog. The gallery follows the operating-system dark setting when no theme is saved. Keep controls compact and information-dense. Interface text uses one sans family (`--font-ui`), titles use Fraunces (`--font-title`), and monospace (`--font-mono`) is only for identifiers and code.
 
-- The Gallery is a top-toolbar library with no left filter rail. It uses three columns by default, two below `1120px`, and one below `760px`; cards are equal-height in grid mode. The layout toggle supports grid and list modes.
+- The Gallery is a top-toolbar library with no left filter rail. It uses three columns by default, two below `1120px`, and one below `760px`; in grid mode, cards in the same row share a height and each row sizes to its content. The View menu holds folder display, grid or list layout, and preview size.
 - The full artifact view is a focused viewer shell. It does not include the global Gallery masthead; the shell's Back control returns to the library. Keep artifact content in the sandboxed iframe and keep viewer actions in the trusted shell/inspector.
-- Settings, not-found, sign-in, and access-retry pages use the same saved-theme foundation. MCP review is a trusted local review surface and uses the same slate/paper/copper vocabulary.
+- Settings, not-found, sign-in, and access-retry pages use the same saved-theme foundation. MCP review is a trusted local review surface with its own self-contained styles; the November 2026 refresh did not change it.
 - Interactive targets must remain usable on narrow screens: the mobile rules use at least 44px controls, no horizontal overflow, visible `:focus-visible` treatment, reduced-motion handling, and forced-colors fallbacks.
 
 ## Renderer and state boundaries
