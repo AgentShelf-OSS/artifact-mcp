@@ -96,11 +96,11 @@ mod portal_characterization_tests {
                     .expect("member gallery")
                     .as_bytes()
             ),
-            "ec0b780cec31da3e3d4389616203e38c81d76e5a0caca4beae28e0fe73d90f15"
+            "f421f15fa7fd5f97b7e0915f99f229de7e99e90cf06272a29e31f09189cffbc5"
         );
         assert_eq!(
             digest(renderer.gallery(&admin).expect("admin gallery").as_bytes()),
-            "6ca17a5048e015bef22a2e042839c41325c325fb68c9b2207dc6975284388572"
+            "870d6835e57ef7c6f492c95d908dff3ae41c7870c99449418018e2e4fec4060d"
         );
     }
 
@@ -171,7 +171,7 @@ mod portal_characterization_tests {
         };
         assert_eq!(
             digest(renderer.shell(&view).expect("bundle shell").as_bytes()),
-            "a0473fd628175cd7ff9a5def5d7b288651d076532639aade6a8b4d30b23e13c1"
+            "6cad743e072916125926f938e85ec07c30028358cd729141cd00409155a5cfa8"
         );
     }
 }

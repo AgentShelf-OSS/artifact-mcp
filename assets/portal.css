@@ -646,3 +646,20 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 @media(max-width:760px){.card-menu{padding:6px}.card-menu .menu-heading{display:block;overflow:hidden;margin:0 0 2px;color:var(--ink-3);font:600 12px var(--font-ui);text-overflow:ellipsis;white-space:nowrap}.card-menu .menu-note{padding-block:2px}.card-menu label,.card-menu .collection-folder-field{gap:1px;margin-bottom:2px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:1px;padding-top:3px}.card-menu .menu-action.del{margin-top:1px;padding-top:3px}}
 :root[data-theme="dark"] .card-menu .menu-heading{color:var(--ink-3)}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu .menu-heading{color:var(--ink-3)}}
+
+/* Round 6: card menu rhythm and title */
+.card-menu{padding:8px}
+.card-menu .menu-heading{display:block;overflow:hidden;margin:0 0 6px;color:var(--ink-3);font:600 12px var(--font-ui);text-overflow:ellipsis;white-space:nowrap}
+.card-menu .menu-item{min-height:36px;margin:0;padding:0}
+.card-menu .menu-note{margin:0;padding:6px 0;font-size:12px}
+.card-menu label,.card-menu .collection-folder-field{gap:4px;margin:0;color:var(--ink-2);font:600 12px var(--font-ui);letter-spacing:0;text-transform:none}
+.card-menu :is(label,.collection-folder-field)+:is(label,.collection-folder-field){margin-top:12px}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:8px;padding-top:8px;border-top:1px solid var(--line-2)}
+.card-menu .menu-action.del{position:relative;min-height:36px;margin:17px 0 0;padding:0;border:0;border-radius:0;font:600 13px var(--font-ui)}
+.card-menu .menu-action.del::before{position:absolute;top:-9px;right:0;left:0;border-top:1px solid var(--line-2);content:""}
+.card-menu .move-question,.card-menu .move-confirm button{font-size:12px}
+:root[data-theme="dark"] .card-menu .menu-heading{color:var(--ink-3)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu .menu-heading{color:var(--ink-3)}}
+@media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item,.card-menu .menu-action.del{min-height:44px;padding:0}.card-menu select,.card-menu .collection-folder-select,.card-menu .move-confirm button{min-height:44px}}
+/* The menu heading draws the title from data-title, so it is not a second text copy of the card title. */
+.card-menu .menu-heading::before{content:attr(data-title)}

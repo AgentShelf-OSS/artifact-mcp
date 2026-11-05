@@ -45,3 +45,6 @@ h1{text-wrap:balance}
 p,.hint,.retry p{font:14px/1.6 var(--sans)}
 .home,.go{min-height:40px;padding:0 16px;font:600 13px var(--sans)}
 @media(max-width:760px){.home,.go{min-height:44px}}
+
+/* Round 6: allow error titles to use more of the card. */
+h1{max-width:24ch;text-wrap:balance}
