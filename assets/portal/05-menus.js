@@ -44,6 +44,7 @@
     var box = menu.getBoundingClientRect();
     var desiredX = phone ? cardBox.left : triggerBox.right - box.width;
     var x = Math.min(Math.max(desiredX, left + pad), Math.max(left + pad, left + width - box.width - pad));
+    // Prefer below on phones too; try above if the menu does not fit below.
     var y = triggerBox.bottom + gap;
     if (y + box.height > top + height - pad) y = triggerBox.top - box.height - gap;
     y = Math.min(Math.max(y, top + pad), Math.max(top + pad, top + height - box.height - pad));

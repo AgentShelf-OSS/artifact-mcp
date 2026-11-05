@@ -298,3 +298,8 @@ body:has(#collection-config) .collection-head h1{font-size:28px}
 .library-active-filters [data-reset-filters]:hover{background:var(--ground-2)}
 @media(max-width:760px){.library-active-filters button{min-height:44px}}
 @media(max-width:360px){#library-filters-toggle svg,.library-view-toggle svg{display:none}.library-view-toggle,#library-filters-toggle{padding:0 8px}}
+
+/* Round 5: viewport-sized menu and consistent phone controls. */
+.library-view-menu{max-height:none;overflow:auto}
+@media(max-width:760px){.library-controls .toolbar-actions select,.library-controls .toolbar-actions #sort{box-sizing:border-box;height:44px;min-height:44px}}
+@media(max-width:360px){.library-controls>.collection-tools{grid-template-columns:repeat(3,minmax(0,1fr))}.library-controls #library-filters-toggle{grid-column:1}.library-controls .library-view{grid-column:2;min-width:0}.library-controls .library-new-folder{grid-column:3;width:100%;min-width:0;padding:0 4px;justify-content:center}.library-controls .library-view-toggle,.library-controls #library-filters-toggle{width:100%;min-width:0;justify-content:center;padding:0 4px;font-size:13px}.library-controls .library-new-folder{font-size:13px}.library-controls :is(#library-filters-toggle,.library-view-toggle,.library-new-folder) svg{display:none}.library-controls .library-new-folder .folder-label{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:nowrap}.library-controls .library-new-folder .folder-short{display:none}}

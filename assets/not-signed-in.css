@@ -38,3 +38,10 @@ p,.hint{max-width:60ch}
 h1{font:600 clamp(1.75rem,4.5vw,2.25rem)/1.15 var(--title);letter-spacing:-.015em}
 .mark{font:600 16px/1 var(--title)}
 .brand strong{font:600 16px/1.15 var(--title);letter-spacing:-.005em}
+
+/* Round 5: readable error page content. */
+.nf,.si,.retry{width:min(100%,640px)}
+h1{text-wrap:balance}
+p,.hint,.retry p{font:14px/1.6 var(--sans)}
+.home,.go{min-height:40px;padding:0 16px;font:600 13px var(--sans)}
+@media(max-width:760px){.home,.go{min-height:44px}}

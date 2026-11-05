@@ -177,7 +177,7 @@
     });
     if (empty) empty.hidden = shown !== 0;
     if (organizationLabel) organizationLabel.textContent = activeOrg === "all" ? defaultOrganizationLabel : activeOrg;
-    if (count) count.textContent = "Showing " + shown + " of " + visibleCards().length;
+    if (count) count.textContent = shown + " of " + visibleCards().length + " shown";
     if (resetFilters) {
       resetFilters.hidden = !term && activeView === "all" && activeOrg === "all" && activeCategory === "all" && (!sort || sort.value === "recent");
     }

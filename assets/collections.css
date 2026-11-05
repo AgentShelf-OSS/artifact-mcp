@@ -234,3 +234,18 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 .collection-ribbon-title button{font-size:18px}
 .collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{opacity:.55;filter:saturate(.2)}
 @media(max-width:760px){.collection-shelf-tools .shelf-arrow{width:44px;height:44px;min-width:44px;min-height:44px;border:0;border-radius:8px;background:transparent;font-size:0;line-height:0}.collection-shelf-tools .shelf-arrow:not(:disabled):is(:hover,:active){background:var(--ground-2)}}
+
+/* Round 5: single-line card facts and readable zero-match folders. */
+.collection-ribbon-card .card .label>.facts,.collection-reel-card .card .label>.facts{display:flex;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
+.collection-ribbon-card .facts>span,.collection-reel-card .facts>span{flex:none;white-space:nowrap}
+.collection-ribbon-card .facts>span:first-child,.collection-reel-card .facts>span:first-child{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.collection-ribbon-card .card .label>.actions,.collection-reel-card .card .label>.actions{justify-self:end;justify-content:flex-end}
+.collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{opacity:1;filter:none;border-color:var(--line);background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-ribbon.is-dragging[data-match="0"]{opacity:.55}
+.collection-face[data-match="0"]::before{border-color:var(--line);background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-head,.collection-sheet-card[data-match="0"] .collection-sheet-cover,.collection-ribbon[data-match="0"] .collection-ribbon-head{background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-face[data-match="0"] .collection-peek,.collection-sheet-card[data-match="0"] .sheet-shot,.collection-ribbon[data-match="0"] .collection-ribbon-fan{opacity:.45;filter:saturate(.2)}
+.collection-face[data-match="0"] .collection-face-title,.collection-sheet-card[data-match="0"] h3,.collection-ribbon[data-match="0"] .collection-ribbon-title button{color:var(--ink-2)}
+.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-meta,.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-meta .org,.collection-sheet-card[data-match="0"] .collection-sheet-body p,.collection-ribbon[data-match="0"] .collection-ribbon-title small{color:var(--ink-3)}
+:root[data-theme="dark"] :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:var(--line)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:var(--line)}}

@@ -639,3 +639,10 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 :root[data-theme="dark"]{--ink-3:#aea79b}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink-3:#aea79b}}
 @media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item{min-height:44px;margin-bottom:0}.card-menu .menu-note{padding-block:4px}.card-menu label,.card-menu .collection-folder-field{gap:2px;margin-bottom:4px}.card-menu select,.card-menu .collection-folder-select,.card-menu .menu-action.del{min-height:44px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:2px;padding-top:5px}.card-menu .menu-action.del{margin-top:2px;padding-top:5px;border-top-color:var(--line-2)}}
+/* Round 5: calm card links and retain context in compact phone menus. */
+.card-title a{text-decoration-thickness:1px;text-underline-offset:4px;text-decoration-color:color-mix(in srgb,var(--ink) 13%,transparent)}
+.card:hover .card-title a,.card:focus-within .card-title a{text-decoration-color:color-mix(in srgb,var(--ink) 55%,transparent)}
+.card-menu .menu-heading{display:none}
+@media(max-width:760px){.card-menu{padding:6px}.card-menu .menu-heading{display:block;overflow:hidden;margin:0 0 2px;color:var(--ink-3);font:600 12px var(--font-ui);text-overflow:ellipsis;white-space:nowrap}.card-menu .menu-note{padding-block:2px}.card-menu label,.card-menu .collection-folder-field{gap:1px;margin-bottom:2px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:1px;padding-top:3px}.card-menu .menu-action.del{margin-top:1px;padding-top:3px}}
+:root[data-theme="dark"] .card-menu .menu-heading{color:var(--ink-3)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu .menu-heading{color:var(--ink-3)}}

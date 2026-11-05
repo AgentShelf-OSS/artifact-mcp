@@ -98,10 +98,19 @@
   tools.append(view, create);
   filters.addEventListener('click', () => { const open = filters.getAttribute('aria-expanded') !== 'true'; filters.setAttribute('aria-expanded', String(open)); wrapper.dataset.filtersOpen = String(open); });
 
+  // Round 5: keep the menu inside the visible viewport on short screens.
+  function sizeMenu() {
+    if (menu.hidden) return;
+    const viewport = window.visualViewport;
+    const bottom = viewport ? viewport.offsetTop + viewport.height : window.innerHeight;
+    menu.style.maxHeight = Math.max(0, bottom - menu.getBoundingClientRect().top - 12) + 'px';
+  }
   function setMenu(open, focus) {
     menu.hidden = !open; viewToggle.setAttribute('aria-expanded', String(open)); view.dataset.open = String(open);
+    if (open) sizeMenu(); else menu.style.maxHeight = '';
     if (!open && focus) viewToggle.focus();
   }
+  window.visualViewport?.addEventListener('resize', sizeMenu);
   viewToggle.addEventListener('click', () => setMenu(menu.hidden));
   document.addEventListener('click', event => { if (!menu.hidden && !view.contains(event.target)) setMenu(false); });
   document.addEventListener('keydown', event => { if (event.key === 'Escape' && !menu.hidden) { event.preventDefault(); event.stopImmediatePropagation(); setMenu(false, true); } }, true);
@@ -138,7 +147,7 @@
     const summary = document.querySelector('.collection-results .result-summary'); if (summary) summary.hidden = entries.length === 0;
   }
   document.addEventListener('collections:rendered', sync);
-  let resizeFrame = 0; window.addEventListener('resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(sync); });
+  let resizeFrame = 0; window.addEventListener('resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(() => { sync(); sizeMenu(); }); });
   tools.addEventListener('change', () => requestAnimationFrame(sync)); document.getElementById('q')?.addEventListener('input', () => requestAnimationFrame(sync));
   layout?.addEventListener('click', event => { const button = event.target.closest('[data-layout]'); if (button && event.isTrusted) invoke('setLayout', button.dataset.layout); });
   sort?.addEventListener('change', () => requestAnimationFrame(sync));
