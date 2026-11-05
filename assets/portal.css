@@ -678,3 +678,8 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 @media(max-width:760px){.card-menu select,.card-menu .collection-folder-select{height:44px;min-height:44px}.card-menu .menu-action.del{margin-top:9px}:root .card .label>.actions{margin-right:0}:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]):not(:hover){background:color-mix(in srgb,var(--ink) 4%,transparent)}.artifact-grid[data-layout="list"] .actions>.act{height:44px;min-height:44px}}
 @media(max-width:760px){:root[data-theme="dark"] .card-menu{background:color-mix(in srgb,var(--ink) 9%,var(--paper));border:1px solid color-mix(in srgb,var(--ink) 24%,transparent);box-shadow:0 16px 40px -12px rgba(0,0,0,.7)}}
 @media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu{background:color-mix(in srgb,var(--ink) 9%,var(--paper));border:1px solid color-mix(in srgb,var(--ink) 24%,transparent);box-shadow:0 16px 40px -12px rgba(0,0,0,.7)}}
+
+/* Round 9: align card metadata and phone menu spacing */
+.card-overline{min-height:20px;align-items:center}
+.card.is-hidden .hidden-tag{line-height:18px;padding-block:1px}
+@media(max-width:760px){.card-menu .menu-action.del{min-height:44px;margin-top:21px;padding:0}}

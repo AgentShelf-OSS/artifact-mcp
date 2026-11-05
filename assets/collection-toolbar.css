@@ -324,3 +324,6 @@ body:has(#collection-config) .collection-head h1{font-size:28px}
 .library-active-filters button:hover span{background:var(--ground-2)}
 .library-active-filters [data-reset-filters]{min-height:30px;padding:0 10px;font:500 13px var(--font-ui)}
 @media(max-width:760px){.library-active-filters button,.library-active-filters [data-reset-filters]{min-height:44px}}
+
+/* Round 9: View menu row spacing */
+@media(max-width:760px){#library-view-menu .library-view-row+.library-view-row{margin-top:8px}}

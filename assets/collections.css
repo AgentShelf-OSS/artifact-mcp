@@ -285,3 +285,16 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 :root[data-theme="dark"] :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line))}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line))}}
 @media(hover:hover) and (max-width:760px){.collection-ribbon:not(:hover):not(:focus-within) [data-ribbon-move]{opacity:1}}
+
+/* Round 9: Contact sheets and card metadata */
+#collection-surface[data-view="sheets"]{margin-bottom:32px}
+.collection-sheet-cover .sheet-shot img{object-position:left top}
+.collection-sheet-body .collection-face-actions button{min-height:32px}
+.collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}
+.collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}
+:root[data-theme="dark"] .collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}
+:root[data-theme="dark"] .collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}:root:not([data-theme="light"]) .collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}}
+.collection-ribbon-card .org-dot,.collection-reel-card .org-dot{display:inline-block;width:7px;height:7px}
+.collection-ribbon-card .org-dot,.collection-reel-card .org-dot{background:var(--k,var(--org-k,var(--ink-3)))}
+@media(max-width:760px){.collection-sheet-body .collection-face-actions button{min-height:44px}}

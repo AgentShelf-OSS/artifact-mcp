@@ -261,7 +261,6 @@
       var clone = canonical.cloneNode(true);
       clone.hidden = false;
       clone.classList.add("collection-artifact-card");
-      clone.removeAttribute("style");
       clone.querySelectorAll("[id]").forEach(function (node) { node.removeAttribute("id"); });
       var canonicalMenu = clone.querySelector(".card-menu");
       if (canonicalMenu && !canonicalMenu.querySelector("[data-collection-folder-picker]")) {
@@ -302,7 +301,7 @@
       '</div></div>';
     return '<article class="card collection-artifact-card" draggable="true" data-collection-artifact="' + escapeHtml(a.id) + '" data-id="' + escapeHtml(a.id) + '" data-org="' + escapeHtml(a.org) + '" data-category="' + escapeHtml(a.category) + '" data-fav="' + (a.favorite ? "1" : "0") + '" data-hidden="' + (a.hidden ? "1" : "0") + '" data-needs-review="' + (a.needsReview ? "1" : "0") + '" data-q="' + escapeHtml([a.title, a.org, a.category, a.description].join(" ").toLowerCase()) + '">' +
       '<div class="collection-artifact-preview"><input type="checkbox" class="collection-artifact-select" data-collection-select="' + escapeHtml(a.id) + '" aria-label="Select ' + escapeHtml(a.title) + '">' + (src ? '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async">' : '<span class="collection-peek-empty">Preview unavailable</span>') + '<a href="/' + encodeURIComponent(a.id) + '" aria-label="Open ' + escapeHtml(a.title) + '"></a></div>' +
-      '<div class="collection-artifact-copy"><strong class="collection-artifact-title card-title">' + escapeHtml(a.title) + '</strong><small class="collection-artifact-sub">' + escapeHtml(a.org) + (a.category ? " · " + escapeHtml(a.category) : "") + '</small></div>' + actions + '</article>';
+      '<div class="collection-artifact-copy"><strong class="collection-artifact-title card-title">' + escapeHtml(a.title) + '</strong><small class="collection-artifact-sub"><span class="org-dot"></span> ' + escapeHtml(a.org) + (a.category ? " · " + escapeHtml(a.category) : "") + '</small></div>' + actions + '</article>';
   }
   function previewRows(collection, limit) {
     var rows = collectionArtifacts(collection);
@@ -340,7 +339,7 @@
     return shelf + '<section class="collection-reel" aria-label="Preview reel for ' + escapeHtml(current.name) + '"><header class="collection-reel-head"><strong class="collection-reel-title"><span>' + (reelPinned ? 'Pinned open' : 'Peeking at') + ' / </span>' + escapeHtml(current.name) + '</strong><div class="collection-reel-tools">' + tools + '</div></header><div class="collection-reel-track">' + reelItems.map(function (artifact) { return '<div class="collection-reel-card">' + cardMarkup(artifact, true) + '</div>'; }).join('') + (currentArtifacts.length ? '' : empty) + '</div></section>';
   }
   function renderSheets() {
-    return '<div class="collection-sheet">' + state.collections.map(function (collection) {
+    return '<header class="collection-shelf-heading"><h2>Your folders</h2></header><div class="collection-sheet">' + state.collections.map(function (collection) {
       var allRows = collectionArtifacts(collection).map(artifactData); var rows = previewRows(collection, 4); var count = allRows.length === 1 ? "1" : allRows.length === 2 ? "2" : allRows.length === 3 ? "3" : "more";
       return '<article class="collection-sheet-card" data-match="' + (collection.artifactCount > 0 && allRows.length === 0 ? "0" : "1") + '" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '"><div class="collection-sheet-cover" data-count="' + count + '">' + rows.map(function (a) { return '<span class="sheet-shot">' + previewImage(a) + '</span>'; }).join("") + (rows.length ? "" : '<span class="collection-peek-empty">'+(collection.artifactCount?"No matching artifacts":"Empty folder")+'</span>') + '</div><div class="collection-sheet-body"><h3>' + escapeHtml(collection.name) + '</h3><p>' + escapeHtml(collectionCountLabel(collection)) + ' · ' + escapeHtml(collection.org) + '</p><div class="collection-face-actions"><button type="button" data-collection-open="' + escapeHtml(collection.id) + '">Open folder</button>' + (collection.editable ? '<button type="button" data-collection-edit="'+escapeHtml(collection.id)+'" aria-label="Edit '+escapeHtml(collection.name)+'">Edit</button>' : '') + '</div></div></article>';
     }).join("") + '</div>';
