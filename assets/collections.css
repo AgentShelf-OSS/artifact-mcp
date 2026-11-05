@@ -217,3 +217,84 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 .category-dialog .category-actions .solid:hover{border-color:color-mix(in srgb,var(--brass) 82%,#000);background:color-mix(in srgb,var(--brass) 82%,#000)}
 :root[data-theme="dark"] .category-dialog .category-actions .solid{color:#141a21}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .category-dialog .category-actions .solid{color:#141a21}}
+
+/* Round 3: display titles and readable folder actions. */
+.collection-sheet-body h3,.collection-ribbon-title,.collection-ribbon-title button,.collection-ribbon-title strong,.collection-folder-heading h2,.collection-reel-title,.collection-create-dialog .dialog-head h2,.collection-delete-dialog h2{font-family:var(--font-title);font-weight:600;letter-spacing:-.005em}
+.collection-sheet-body h3{font-size:18px}
+.collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:32px;font:13px var(--font-ui)}
+@media(max-width:760px){.collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:44px}}
+@media(min-width:761px){.collection-shelf-heading{margin-bottom:-.5rem}}
+
+/* Round 4: compact card footers and filtered folder emphasis. */
+.collection-ribbon-card .card .label,.collection-reel-card .card .label{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto 1fr auto;column-gap:6px}
+.collection-ribbon-card .card .label>.facts,.collection-reel-card .card .label>.facts{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collection-ribbon-card .card .label>.actions,.collection-reel-card .card .label>.actions{justify-self:end;align-self:center}
+.collection-ribbon-card>.card>.actions,.collection-reel-card>.card>.actions{justify-content:flex-end;margin-left:auto}
+.collection-ribbon-card .card-title,.collection-reel-card .card-title,.collection-artifact-title{font-family:var(--font-title);font-size:15px;font-weight:600}
+.collection-ribbon-title button{font-size:18px}
+.collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{opacity:.55;filter:saturate(.2)}
+@media(max-width:760px){.collection-shelf-tools .shelf-arrow{width:44px;height:44px;min-width:44px;min-height:44px;border:0;border-radius:8px;background:transparent;font-size:0;line-height:0}.collection-shelf-tools .shelf-arrow:not(:disabled):is(:hover,:active){background:var(--ground-2)}}
+
+/* Round 5: single-line card facts and readable zero-match folders. */
+.collection-ribbon-card .card .label>.facts,.collection-reel-card .card .label>.facts{display:flex;flex-wrap:nowrap;white-space:nowrap;overflow:hidden}
+.collection-ribbon-card .facts>span,.collection-reel-card .facts>span{flex:none;white-space:nowrap}
+.collection-ribbon-card .facts>span:first-child,.collection-reel-card .facts>span:first-child{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.collection-ribbon-card .card .label>.actions,.collection-reel-card .card .label>.actions{justify-self:end;justify-content:flex-end}
+.collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{opacity:1;filter:none;border-color:var(--line);background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-ribbon.is-dragging[data-match="0"]{opacity:.55}
+.collection-face[data-match="0"]::before{border-color:var(--line);background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-head,.collection-sheet-card[data-match="0"] .collection-sheet-cover,.collection-ribbon[data-match="0"] .collection-ribbon-head{background:color-mix(in srgb,var(--ink) 6%,var(--paper))}
+.collection-face[data-match="0"] .collection-peek,.collection-sheet-card[data-match="0"] .sheet-shot,.collection-ribbon[data-match="0"] .collection-ribbon-fan{opacity:.45;filter:saturate(.2)}
+.collection-face[data-match="0"] .collection-face-title,.collection-sheet-card[data-match="0"] h3,.collection-ribbon[data-match="0"] .collection-ribbon-title button{color:var(--ink-2)}
+.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-meta,.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-meta .org,.collection-sheet-card[data-match="0"] .collection-sheet-body p,.collection-ribbon[data-match="0"] .collection-ribbon-title small{color:var(--ink-3)}
+:root[data-theme="dark"] :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:var(--line)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:var(--line)}}
+
+/* Round 6: consistent folder view spacing and controls. */
+:is(.collection-ribbon-card,.collection-reel-card) .card .format-badge{font-size:12px}
+.collection-ribbon-card .org-dot,.collection-reel-card .org-dot{display:none}
+.collection-ribbon-card .card-overline,.collection-reel-card .card-overline,.collection-ribbon-card .facts,.collection-reel-card .facts,.collection-artifact-sub,.collection-reel-paging small,.collection-reel-tools button,.collection-reel .actions .act,.collection-empty,.collection-peek-empty{font-size:12px}
+.collection-ribbon-card .card-overline time,.collection-reel-card .card-overline time{font-size:12px}
+.collection-ribbon-card>.card{height:100%}
+.collection-ribbon-card .card .label{min-height:0;grid-template-rows:auto auto minmax(0,1fr) auto}
+.collection-ribbon-title small,.collection-sheet-body p{font:13px var(--font-ui);color:var(--ink-2)}
+.collection-sheet-body{padding-top:12px}
+.collection-ribbon-grip,.collection-ribbon-tools button{box-sizing:border-box;min-width:32px;min-height:32px;border:1px solid var(--line);border-radius:4px;background:var(--paper);color:var(--ink-2)}
+.collection-ribbon-grip:hover,.collection-ribbon-tools button:hover{border-color:var(--brass);background:var(--ground-2)}
+@media(max-width:760px){.collection-ribbon-grip,.collection-ribbon-tools button{min-width:44px;min-height:44px}}
+.collection-reel-title,:is(.collection-ribbon-card,.collection-reel-card) .card.is-hidden .hidden-tag{font-size:12px}
+
+/* Round 7: content-sized ribbon cards and quieter ribbon controls. */
+.collection-ribbon-cards,.collection-reel-track{align-items:start}
+.collection-ribbon-card>.card,.collection-reel-card>.card{height:auto;align-self:start}
+.collection-ribbon-card .card .label,.collection-reel-card .card .label{grid-template-rows:auto auto auto;row-gap:8px;align-content:start}
+.collection-ribbon-card .card .label>.desc,.collection-reel-card .card .label>.desc{display:none}
+.collection-ribbon-card .card .label>.facts,.collection-ribbon-card .card .label>.actions,.collection-reel-card .card .label>.facts,.collection-reel-card .card .label>.actions{grid-row:3;margin-top:0}
+.collection-ribbon-tools:has([data-ribbon-page="-1"]:disabled):has([data-ribbon-page="1"]:disabled) [data-ribbon-page]{display:none}
+.collection-ribbon-tools [data-ribbon-page]{display:inline-grid;place-items:center;font-size:0;line-height:0}
+.collection-ribbon-tools [data-ribbon-page]::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m10 4-4 4 4 4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m10 4-4 4 4 4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat}
+.collection-ribbon-tools [data-ribbon-page="1"]::before{transform:rotate(180deg)}
+.collection-ribbon-tools [data-ribbon-page="1"]:not(:disabled)+:not([data-ribbon-page]),.collection-ribbon-tools:has([data-ribbon-page="-1"]:not(:disabled)) [data-ribbon-page="1"]+:not([data-ribbon-page]){margin-left:8px}
+@media(hover:hover){.collection-ribbon:not(:hover):not(:focus-within) [data-ribbon-move]{opacity:0}}
+
+/* Round 8: compact ribbon controls and quiet folder colours */
+@media(hover:hover) and (min-width:761px){.collection-ribbon-tools{position:relative;gap:8px;padding-left:72px}.collection-ribbon-tools [data-ribbon-move]{position:absolute;top:50%;transform:translateY(-50%);z-index:5}.collection-ribbon-tools [data-ribbon-move="up"]{left:0}.collection-ribbon-tools [data-ribbon-move="down"]{left:36px}}
+.collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line));background:color-mix(in srgb,var(--collection-color) 7%,var(--paper))}
+.collection-face[data-match="0"]::before{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line));background:color-mix(in srgb,var(--collection-color) 40%,var(--paper))}
+.collection-surface[data-view="reel"] .collection-face[data-match="0"] .collection-face-head,.collection-sheet-card[data-match="0"] .collection-sheet-cover,.collection-ribbon[data-match="0"] .collection-ribbon-head{background:color-mix(in srgb,var(--collection-color) 7%,var(--paper))}
+:root[data-theme="dark"] :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line))}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) :is(.collection-face,.collection-sheet-card,.collection-ribbon)[data-match="0"]{border-color:color-mix(in srgb,var(--collection-color) 40%,var(--line))}}
+@media(hover:hover) and (max-width:760px){.collection-ribbon:not(:hover):not(:focus-within) [data-ribbon-move]{opacity:1}}
+
+/* Round 9: Contact sheets and card metadata */
+#collection-surface[data-view="sheets"]{margin-bottom:32px}
+.collection-sheet-cover .sheet-shot img{object-position:left top}
+.collection-sheet-body .collection-face-actions button{min-height:32px}
+.collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}
+.collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}
+:root[data-theme="dark"] .collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}
+:root[data-theme="dark"] .collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .collection-sheet-body [data-collection-open]{background:var(--ink);color:var(--paper);border:0}:root:not([data-theme="light"]) .collection-sheet-body [data-collection-edit]{background:transparent;color:var(--ink);border:1px solid var(--line)}}
+.collection-ribbon-card .org-dot,.collection-reel-card .org-dot{display:inline-block;width:7px;height:7px}
+.collection-ribbon-card .org-dot,.collection-reel-card .org-dot{background:var(--k,var(--org-k,var(--ink-3)))}
+@media(max-width:760px){.collection-sheet-body .collection-face-actions button{min-height:44px}}

@@ -3,7 +3,7 @@
 //! `gallery`, from `playwright/tests/01-gallery.spec.mjs`.
 
 use browser_tests::e2e::{Case, Ctx, Identity, now_millis};
-use browser_tests::{Error, Role, e2e_case, exact, expect};
+use browser_tests::{Error, Role, e2e_case, expect};
 use serde_json::{Value, json};
 
 const SPEC: &str = "01-gallery";
@@ -160,11 +160,12 @@ async fn toolbar_filters(t: Ctx) -> Result<(), Error> {
     )
     .to_be_visible()
     .await?;
+    page.locator("#library-view-toggle").click().await?;
     page.locator(r#"[data-library-view="all"]"#).click().await?;
     expect(
         &page
-            .locator("#library-controls")
-            .get_by_label(exact("Artifact layout")),
+            .locator("#library-view-menu")
+            .get_by_role(Role::new("group").exact_name("Layout")),
     )
     .to_be_visible()
     .await?;
@@ -443,7 +444,7 @@ async fn back_link_restores_scroll(t: Ctx) -> Result<(), Error> {
     let open = page
         .locator(".card")
         .filter_has_text(format!("{title} 0"))
-        .get_by_role(Role::new("link").exact_name("Open"));
+        .get_by_role(Role::new("link").exact_name(&format!("{title} 0")));
     let viewer_href = open.get_attribute("href").await?.unwrap_or_default();
     open.click().await?;
     expect(&page.locator(".vhome")).to_be_visible().await?;

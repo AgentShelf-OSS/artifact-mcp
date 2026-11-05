@@ -146,12 +146,16 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     expect(&owner_card)
         .to_have_attribute("data-owned", "1")
         .await?;
+    // Hide and Show live in the card's More menu.
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
-        .to_be_visible()
+        .to_have_count(1)
         .await?;
     owner_card
         .locator(r#"[data-action="more"]"#)
         .click()
+        .await?;
+    expect(&owner_card.locator(r#"[data-action="visibility"]"#))
+        .to_be_visible()
         .await?;
     expect(&owner_card.get_by_role(Role::new("button").name("Delete artifact")))
         .to_be_visible()
@@ -164,7 +168,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     eye.click().await?;
     assert_eq!(hidden_request.await?.status, 200);
     expect(&eye)
-        .to_have_attribute("aria-label", regex("Show .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Show in gallery: ", ""))
         .await?;
     expect(&eye)
         .to_have_attribute("title", "Show in gallery")
@@ -178,11 +182,15 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     owner.reload().await?;
     expect(&owner_card).to_be_visible().await?;
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
-        .to_have_attribute("aria-label", regex("Show .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Show in gallery: ", ""))
         .await?;
     let hidden_member = member_page(&t, &member_email).await?;
     expect(&card(&hidden_member, &id)).to_have_count(0).await?;
     hidden_member.close().await;
+    owner_card
+        .locator(r#"[data-action="more"]"#)
+        .click()
+        .await?;
     let show_eye = owner_card.locator(r#"[data-action="visibility"]"#);
     let path = visibility_path.clone();
     let shown_request = owner.wait_for_response(move |response| {
@@ -201,7 +209,7 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
         .await?;
     owner.reload().await?;
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
-        .to_have_attribute("aria-label", regex("Hide .* in the gallery", ""))
+        .to_have_attribute("aria-label", regex("^Hide from gallery: ", ""))
         .await?;
 
     let non_owner = member_page(&t, &member_email).await?;
@@ -240,12 +248,12 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     let admin = t.page_as(Identity::Headers(admin_headers)).await?;
     admin.goto(&format!("{}/", t.base_url())).await?;
     let admin_card = card(&admin, &id);
-    expect(&admin_card.locator(r#"[data-action="visibility"]"#))
-        .to_be_visible()
-        .await?;
     admin_card
         .locator(r#"[data-action="more"]"#)
         .click()
+        .await?;
+    expect(&admin_card.locator(r#"[data-action="visibility"]"#))
+        .to_be_visible()
         .await?;
     expect(&admin_card.get_by_role(Role::new("button").name("Delete artifact")))
         .to_be_visible()

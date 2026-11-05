@@ -8,7 +8,7 @@ use std::future::Future;
 use std::time::Duration;
 
 use browser_tests::e2e::{Case, Ctx, encode_component, now_millis};
-use browser_tests::{Error, LogEntry, Page, Response, Role, e2e_case, expect, poll};
+use browser_tests::{Error, Locator, LogEntry, Page, Response, Role, e2e_case, expect, poll};
 use serde_json::{Value, json};
 
 const SPEC: &str = "11-collection-dialogs";
@@ -138,7 +138,24 @@ async fn sleep_ms(ms: u64) {
 async fn open_library(page: &Page, org: &str) -> Result<(), Error> {
     page.goto(&format!("/?libraryView=reel&org={}", encode_component(org)))
         .await?;
-    expect(&page.locator("#new-folder")).to_be_visible().await
+    expect(&page.locator(".collection-new-tile"))
+        .to_be_visible()
+        .await
+}
+
+/// Contact sheets has no shelf tile, so the toolbar New folder button launches the dialog there.
+async fn toolbar_launcher(page: &Page) -> Result<Locator<'_>, Error> {
+    page.locator("#library-view-toggle").click().await?;
+    // The view choice saves a preference; let that write finish before the no-mutation checks.
+    let saved = page.wait_for_response(|response| {
+        response.url.contains("/gallery/preferences") && response.request.method == "PUT"
+    });
+    page.locator("[data-library-view='sheets']").click().await?;
+    saved.await?;
+    page.keyboard().press("Escape").await?;
+    let button = page.locator("#new-folder");
+    expect(&button).to_be_visible().await?;
+    Ok(button)
 }
 
 /// The `beforeEach` hook: reset the library preferences and open the library.
@@ -241,7 +258,8 @@ async fn open_edit(page: &Page, folder_id: &str) -> Result<(), Error> {
 
 async fn cancel_closes_new_folder(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
-    page.locator("#new-folder").click().await?;
+    let launcher = toolbar_launcher(&page).await?;
+    launcher.click().await?;
     let dialog = page.locator(".collection-create-dialog");
     expect(&dialog).to_be_visible().await?;
     let name = dialog.locator("input[name=name]");
@@ -257,12 +275,13 @@ async fn cancel_closes_new_folder(t: Ctx) -> Result<(), Error> {
     )
     .await?;
     expect(&dialog).to_have_count(0).await?;
-    expect(&page.locator("#new-folder")).to_be_focused().await
+    expect(&launcher).to_be_focused().await
 }
 
 async fn x_closes_new_folder(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
-    page.locator("#new-folder").click().await?;
+    let launcher = toolbar_launcher(&page).await?;
+    launcher.click().await?;
     let dialog = page.locator(".collection-create-dialog");
     expect(&dialog).to_be_visible().await?;
     expect_no_browser_errors(
@@ -276,7 +295,7 @@ async fn x_closes_new_folder(t: Ctx) -> Result<(), Error> {
     )
     .await?;
     expect(&dialog).to_have_count(0).await?;
-    expect(&page.locator("#new-folder")).to_be_focused().await
+    expect(&launcher).to_be_focused().await
 }
 
 async fn shelf_tile_dialog(t: Ctx) -> Result<(), Error> {
@@ -300,7 +319,8 @@ async fn shelf_tile_dialog(t: Ctx) -> Result<(), Error> {
 
 async fn escape_closes_new_folder(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
-    page.locator("#new-folder").click().await?;
+    let launcher = toolbar_launcher(&page).await?;
+    launcher.click().await?;
     let dialog = page.locator(".collection-create-dialog");
     expect(&dialog).to_be_visible().await?;
     expect_no_browser_errors(
@@ -309,12 +329,12 @@ async fn escape_closes_new_folder(t: Ctx) -> Result<(), Error> {
     )
     .await?;
     expect(&dialog).to_have_count(0).await?;
-    expect(&page.locator("#new-folder")).to_be_focused().await
+    expect(&launcher).to_be_focused().await
 }
 
 async fn required_name(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
-    page.locator("#new-folder").click().await?;
+    page.locator(".collection-new-tile").click().await?;
     let dialog = page.locator(".collection-create-dialog");
     let name = dialog.locator("input[name=name]");
     dialog
@@ -463,7 +483,7 @@ async fn enter_submits_once(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
     // The `request` listener starts here.
     let seen = page.requests().len();
-    page.locator("#new-folder").click().await?;
+    page.locator(".collection-new-tile").click().await?;
     let dialog = page.get_by_role(Role::new("dialog").exact_name("Create a folder"));
     let name = format!("Keyboard create {}", now_millis());
     dialog.get_by_label("Folder name").fill(&name).await?;
@@ -484,7 +504,7 @@ async fn enter_submits_once(t: Ctx) -> Result<(), Error> {
 
 async fn failed_creation_keeps_draft(t: Ctx) -> Result<(), Error> {
     let page = before_each(&t).await?;
-    page.locator("#new-folder").click().await?;
+    page.locator(".collection-new-tile").click().await?;
     let dialog = page.get_by_role(Role::new("dialog").exact_name("Create a folder"));
     dialog
         .get_by_label("Folder name")

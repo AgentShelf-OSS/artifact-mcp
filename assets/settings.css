@@ -190,3 +190,41 @@ td .org-tag{color:var(--ink-2)}
 @media(max-width:760px){.detail-head .org-del{top:2px}}
 :root[data-theme="dark"]{--line:#3a3732;--line-2:#2c2a26}
 @media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--line:#3a3732;--line-2:#2c2a26}}
+/* IA pass (2026-11): page and section titles use the display face, as in the gallery. */
+.settings-hero h1{font:600 34px/1.1 var(--font-title);letter-spacing:-.015em}
+.detail-head h2,.workspace-heading h2{font:600 22px/1.25 var(--font-title);letter-spacing:-.01em}
+@media(max-width:760px){.settings-hero h1{font-size:26px}}
+/* Panel heads stay sans and smaller, so the display face owns the section level. */
+.settings-group h3,.key-issue h3,.owner-registry h3,.key-edit-head h3,.reveal h3,.notification-panel h3{font:600 15px/1.35 var(--font-ui);letter-spacing:0}
+/* Round 2: phones reach the first editable setting sooner. */
+@media(max-width:760px){.admin-tabs{margin-bottom:10px}.workspace{padding-top:0}.detail-head{padding-top:14px;padding-bottom:12px}}
+
+/* Round 3: compact phone administration and brass selected tabs. */
+@media(max-width:760px){.admin-tab{border:1px solid var(--line);background:transparent;color:var(--ink-2)}.admin-tab[aria-selected="true"]{border-color:var(--line);background:color-mix(in srgb,var(--brass) 14%,var(--paper));box-shadow:0 0 0 1px color-mix(in srgb,var(--brass) 55%,transparent);color:var(--ink)}.admin-tab span,.admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}.directory-head{padding:6px;gap:6px}.org-list{padding:4px}.org-list-button{min-height:44px;padding:6px 8px}.detail-head{padding:8px 150px 8px 12px}}
+
+/* Round 4: quieter phone navigation and compact administration panels. */
+.settings-group h3,.key-issue h3,.owner-registry h3,#key-owner-records h3,.key-edit-head h3,.reveal h3,.notification-panel h3{font:600 15px/1.35 var(--font-ui);letter-spacing:0}
+#keys td.key-role{text-transform:capitalize}
+@media(max-width:760px){.admin-tabs{row-gap:2px;margin-bottom:6px}.admin-tab{min-height:44px;border:0;background:transparent;color:var(--ink-2);box-shadow:none}.admin-tab[aria-selected="true"]{background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink);font-weight:600;box-shadow:inset 0 -2px var(--brass)}.admin-tab span,.admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}.directory-head{padding:4px;gap:4px}.org-list{padding:2px}.detail-head{padding-top:6px;padding-bottom:6px}.detail-head .org-del{top:-4px}}
+@media(max-width:760px){:root[data-theme="dark"] .admin-tab span,:root[data-theme="dark"] .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}
+@media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .admin-tab span,:root:not([data-theme="light"]) .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}
+
+/* Round 5: flat phone administration navigation. */
+@media(max-width:760px){.admin-tabs{gap:0;border-bottom:1px solid var(--line)}.admin-tab{position:relative;justify-content:flex-start;min-height:44px;padding:0 10px;border:0;border-radius:0;background:transparent;color:var(--ink-2);text-align:left;box-shadow:none}.admin-tab[aria-selected="true"]{border:0;border-radius:0;background:transparent;color:var(--ink);font-weight:600;box-shadow:none}.admin-tab[aria-selected="true"]::after{content:"";position:absolute;left:10px;right:10px;bottom:0;height:2px;border-radius:0;background:var(--brass)}}
+@media(max-width:760px){:root[data-theme="dark"] .admin-tab span,:root[data-theme="dark"] .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}
+@media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .admin-tab span,:root:not([data-theme="light"]) .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}
+
+/* Round 6: align and tighten phone administration navigation. */
+@media(max-width:760px){.settings-hero{padding-bottom:8px}.admin-tabs{padding:0;margin-bottom:4px}.admin-tab{justify-self:start;min-width:44px;padding:0}.admin-tab[aria-selected="true"]::after{left:0;right:0}}
+
+/* Round 7: consistent workspace spacing and a flat phone organization picker. */
+@media(min-width:761px){.workspace{padding-top:4px}.workspace-heading{padding-top:0}}
+@media(max-width:760px){.org-directory{padding:0;border:0;background:transparent;box-shadow:none}.directory-head{padding:0;gap:4px;border-bottom:0}.org-list{padding:0}}
+
+/* Round 8: remove the phone picker seam and restore workspace spacing. */
+@media(max-width:760px){.organizations-workspace{padding-top:20px}.org-directory,.directory-head{border:0;border-radius:0}.org-directory .search-field{min-height:44px;border:1px solid var(--line);border-radius:var(--radius-sm,8px);background:var(--paper)}.org-directory .search-field:focus-within{border-color:color-mix(in srgb,var(--brass) 60%,var(--line))}}
+@media(max-width:760px){:root[data-theme="dark"] .org-directory,:root[data-theme="dark"] .directory-head{border:0;border-radius:0}:root[data-theme="dark"] .org-directory .search-field{min-height:44px;border:1px solid var(--line);border-radius:var(--radius-sm,8px);background:var(--paper)}:root[data-theme="dark"] .org-directory .search-field:focus-within{border-color:color-mix(in srgb,var(--brass) 60%,var(--line))}}
+@media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .org-directory,:root:not([data-theme="light"]) .directory-head{border:0;border-radius:0}:root:not([data-theme="light"]) .org-directory .search-field{min-height:44px;border:1px solid var(--line);border-radius:var(--radius-sm,8px);background:var(--paper)}:root:not([data-theme="light"]) .org-directory .search-field:focus-within{border-color:color-mix(in srgb,var(--brass) 60%,var(--line))}}
+
+/* Round 9: space phone organization picker controls. */
+@media(max-width:760px){.directory-head{gap:8px}.org-list{margin-top:12px}}

@@ -577,3 +577,109 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 .share-list>.share-copy{padding:8px 0;border:0;background:none;text-align:left;color:var(--ink-3)}
 /* Pass W: the "more" button shows its menu is open. */
 .act.more[aria-expanded="true"]{background:color-mix(in srgb,var(--brass) 16%,transparent);color:var(--brass);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--brass) 45%,transparent)}
+/* IA pass (2026-11): a display face for titles, cards that open on click, and a one-row card footer.
+   Fraunces (SIL OFL 1.1) ships as one 600-weight Latin subset; UI text stays on the system sans. */
+@font-face{font-family:"Fraunces Display";src:url("/fonts/fraunces-v1.woff2") format("woff2");font-weight:500 800;font-style:normal;font-display:swap}
+:root{--font-title:"Fraunces Display",ui-serif,Georgia,Cambria,"Times New Roman",serif}
+.brand-mark{font:600 16px/1 var(--font-title)}
+.brand strong{font:600 16px/1.15 var(--font-title);letter-spacing:-.005em}
+.card-title,.collection-artifact-title{font:600 17px/1.28 var(--font-title);letter-spacing:-.005em}
+.dialog-head h2,.empty h2,.empty-all h2{font-family:var(--font-title);font-weight:600;letter-spacing:-.01em}
+/* The title link covers the whole card; the footer controls and the selection box sit above it. */
+.card .label,.card .card-title{position:static}
+.card-title a::after{content:"";position:absolute;inset:0;z-index:1}
+.card-title a:focus-visible{outline:0}
+.card:has(.card-title a:focus-visible){outline:2px solid var(--brass);outline-offset:2px}
+.card .actions{position:relative;z-index:2}
+.card .collection-artifact-select{z-index:3}
+@media(hover:hover){.card:hover .card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 35%,transparent)}}
+/* Hidden cards say so in the meta line; Show in gallery is the first item in More. */
+.hidden-tag{display:none}
+.card.is-hidden .hidden-tag{display:inline-block;margin-left:8px;padding:1px 7px;border-radius:999px;background:var(--ground-2);color:var(--ink-2);font:600 11.5px/1.5 var(--font-ui)}
+.card.is-hidden{opacity:1;filter:none}
+.card.is-hidden::after{content:none}
+.card.is-hidden .preview .pv{opacity:.55;filter:saturate(.5)}
+/* Footer: facts on the left, Favorite, Share and More on the right, no divider. */
+.card .label{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto 1fr auto;column-gap:12px;row-gap:4px;padding:14px 16px 12px}
+.card .label>*{grid-column:1/-1}
+.card .label>.facts{grid-column:1;grid-row:4;align-self:center;min-width:0;margin:8px 0 0;padding:0}
+.card .label>.actions{grid-column:2;grid-row:4;align-self:center;margin:8px -6px 0 0;padding:0;border:0;gap:0}
+:root .card .label .actions>.act:not(.active){background:transparent;color:var(--ink-3)}
+:root .card .label .actions>.act:not(.active):hover,:root .card .label .actions>.act[aria-expanded="true"]{background:var(--ground-2);color:var(--ink);box-shadow:none}
+/* More menu: Download and Hide read as menu items above the category and folder fields. */
+.card-menu .menu-item{display:flex;align-items:center;gap:10px;width:100%;min-height:36px;margin:0 0 2px;padding:0 8px;border:0;border-radius:var(--radius-sm);background:transparent;color:var(--ink);font:500 13px var(--font-ui);text-align:left;text-decoration:none;cursor:pointer}
+.card-menu .menu-item:hover{background:var(--ground-2);color:var(--ink)}
+.card-menu .menu-item svg{width:16px;height:16px;flex:none;color:var(--ink-3)}
+.card-menu .menu-note{display:flex;align-items:flex-start;gap:10px;margin:0 0 2px;padding:6px 8px;color:var(--ink-3);font:12.5px/1.4 var(--font-ui)}
+.card-menu .menu-note svg{width:16px;height:16px;flex:none;margin-top:1px}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:6px;padding-top:10px;border-top:1px solid var(--line-2)}
+@media(max-width:760px){.card .label>.actions{margin-right:-10px}.card-menu .menu-item{min-height:44px}}
+/* Round 2: touch screens get a resting title underline, since there is no hover to reveal the link;
+   footer actions read as controls and keep 44px targets on phones. */
+@media(hover:none){.card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 28%,transparent)}}
+:root .card .label .actions>.act:not(.active){color:var(--ink-2)}
+@media(max-width:760px){:root .card .label>.actions{gap:4px;margin-right:-8px}:root .card .label .actions>.act{flex:none;width:44px;height:44px;min-height:44px;padding:0}}
+/* Round 3: make hidden status legible and compact the desktop list. */
+.card.is-hidden .hidden-tag{background:color-mix(in srgb,var(--ink) 10%,transparent);box-shadow:inset 0 0 0 1px var(--line)}
+@media(min-width:761px){
+.artifact-grid[data-layout="list"] .card{grid-template-columns:160px minmax(0,1fr)}
+.artifact-grid[data-layout="list"] .preview{width:150px;height:94px;min-height:0;aspect-ratio:auto;margin:8px 0 8px 8px}
+.artifact-grid[data-layout="list"] .label{grid-template-rows:auto auto auto auto;align-content:center;row-gap:2px;padding:8px 16px}
+.artifact-grid[data-layout="list"] .label>.facts{grid-column:1;grid-row:4;align-self:start;margin:2px 0 0;padding:0}
+.artifact-grid[data-layout="list"] .label>.actions{grid-column:2;grid-row:1/5;align-self:center;margin:0;padding:0}
+}
+/* Round 4: clarify card links and compact the More menu. */
+.card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 22%,transparent)}
+.card:hover .card-title a,.card:focus-within .card-title a{text-decoration-color:color-mix(in srgb,var(--ink) 55%,transparent)}
+.card:has(.card-title a:focus-visible){outline:2px solid var(--brass);outline-offset:2px}
+.artifact-grid[data-layout="list"] .card.is-hidden .preview .pv{opacity:.55;filter:saturate(.5)}
+.card-menu .menu-item,.card-menu .menu-note{padding-inline:0}
+.card-menu .menu-action.del{padding-inline:0}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:6px;padding-top:10px;border-top:1px solid var(--line-2)}
+:root[data-theme="dark"]{--ink-3:#aea79b}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink-3:#aea79b}}
+@media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item{min-height:44px;margin-bottom:0}.card-menu .menu-note{padding-block:4px}.card-menu label,.card-menu .collection-folder-field{gap:2px;margin-bottom:4px}.card-menu select,.card-menu .collection-folder-select,.card-menu .menu-action.del{min-height:44px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:2px;padding-top:5px}.card-menu .menu-action.del{margin-top:2px;padding-top:5px;border-top-color:var(--line-2)}}
+/* Round 5: calm card links and retain context in compact phone menus. */
+.card-title a{text-decoration-thickness:1px;text-underline-offset:4px;text-decoration-color:color-mix(in srgb,var(--ink) 13%,transparent)}
+.card:hover .card-title a,.card:focus-within .card-title a{text-decoration-color:color-mix(in srgb,var(--ink) 55%,transparent)}
+.card-menu .menu-heading{display:none}
+@media(max-width:760px){.card-menu{padding:6px}.card-menu .menu-heading{display:block;overflow:hidden;margin:0 0 2px;color:var(--ink-3);font:600 12px var(--font-ui);text-overflow:ellipsis;white-space:nowrap}.card-menu .menu-note{padding-block:2px}.card-menu label,.card-menu .collection-folder-field{gap:1px;margin-bottom:2px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:1px;padding-top:3px}.card-menu .menu-action.del{margin-top:1px;padding-top:3px}}
+:root[data-theme="dark"] .card-menu .menu-heading{color:var(--ink-3)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu .menu-heading{color:var(--ink-3)}}
+
+/* Round 6: card menu rhythm and title */
+.card-menu{padding:8px}
+.card-menu .menu-heading{display:block;overflow:hidden;margin:0 0 6px;color:var(--ink-3);font:600 12px var(--font-ui);text-overflow:ellipsis;white-space:nowrap}
+.card-menu .menu-item{min-height:36px;margin:0;padding:0}
+.card-menu .menu-note{margin:0;padding:6px 0;font-size:12px}
+.card-menu label,.card-menu .collection-folder-field{gap:4px;margin:0;color:var(--ink-2);font:600 12px var(--font-ui);letter-spacing:0;text-transform:none}
+.card-menu :is(label,.collection-folder-field)+:is(label,.collection-folder-field){margin-top:12px}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:8px;padding-top:8px;border-top:1px solid var(--line-2)}
+.card-menu .menu-action.del{position:relative;min-height:36px;margin:17px 0 0;padding:0;border:0;border-radius:0;font:600 13px var(--font-ui)}
+.card-menu .menu-action.del::before{position:absolute;top:-9px;right:0;left:0;border-top:1px solid var(--line-2);content:""}
+.card-menu .move-question,.card-menu .move-confirm button{font-size:12px}
+:root[data-theme="dark"] .card-menu .menu-heading{color:var(--ink-3)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu .menu-heading{color:var(--ink-3)}}
+@media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item,.card-menu .menu-action.del{min-height:44px;padding:0}.card-menu select,.card-menu .collection-folder-select,.card-menu .move-confirm button{min-height:44px}}
+/* The menu heading draws the title from data-title, so it is not a second text copy of the card title. */
+.card-menu .menu-heading::before{content:attr(data-title)}
+/* Round 7: clarify card actions and enlarge phone share controls. */
+.card .actions>.act svg{width:18px;height:18px}
+:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]){border-radius:var(--radius-sm);background:color-mix(in srgb,var(--ink) 6%,transparent)}
+:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]):hover{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+:root[data-theme="dark"] .card .label .actions>.act.more[aria-expanded="true"]{background:color-mix(in srgb,var(--ink) 16%,transparent);color:var(--ink)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card .label .actions>.act.more[aria-expanded="true"]{background:color-mix(in srgb,var(--ink) 16%,transparent);color:var(--ink)}}
+@media(max-width:760px){.share-dialog .share-form select,.share-dialog .share-form .act.open{min-height:44px}}
+
+/* Round 8: align card menu fields and footer actions */
+.card-menu select,.card-menu .collection-folder-select{box-sizing:border-box;height:34px;min-height:34px;padding:0 32px 0 10px;border:1px solid var(--line);border-radius:var(--radius-sm);background:var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='%237b8794' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") right 10px center/14px no-repeat;color:var(--ink);font:13px var(--font-ui)}
+.card-menu select{appearance:none;-webkit-appearance:none}
+.artifact-grid[data-layout="list"] .actions>.act{height:32px;min-height:32px}
+@media(max-width:760px){.card-menu select,.card-menu .collection-folder-select{height:44px;min-height:44px}.card-menu .menu-action.del{margin-top:9px}:root .card .label>.actions{margin-right:0}:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]):not(:hover){background:color-mix(in srgb,var(--ink) 4%,transparent)}.artifact-grid[data-layout="list"] .actions>.act{height:44px;min-height:44px}}
+@media(max-width:760px){:root[data-theme="dark"] .card-menu{background:color-mix(in srgb,var(--ink) 9%,var(--paper));border:1px solid color-mix(in srgb,var(--ink) 24%,transparent);box-shadow:0 16px 40px -12px rgba(0,0,0,.7)}}
+@media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .card-menu{background:color-mix(in srgb,var(--ink) 9%,var(--paper));border:1px solid color-mix(in srgb,var(--ink) 24%,transparent);box-shadow:0 16px 40px -12px rgba(0,0,0,.7)}}
+
+/* Round 9: align card metadata and phone menu spacing */
+.card-overline{min-height:20px;align-items:center}
+.card.is-hidden .hidden-tag{line-height:18px;padding-block:1px}
+@media(max-width:760px){.card-menu .menu-action.del{min-height:44px;margin-top:21px;padding:0}}

@@ -227,3 +227,103 @@ body:has(#collection-config) .collection-results{padding-top:0}
 .shelf-arrow{position:relative;width:36px;height:36px;min-width:36px;min-height:36px}
 .shelf-arrow::after{content:"";position:absolute;inset:-4px}
 }
+/* IA pass (2026-11): one toolbar row — search, filters and sort, then one View menu (folders, layout,
+   preview size) and New folder when the shelf's New folder tile is not on screen. Titles use the
+   display face. */
+body:has(#collection-config) .collection-head h1{font:600 34px/1.1 var(--font-title);letter-spacing:-.015em}
+.collection-shelf-heading h2{font:600 18px/1.3 var(--font-title);letter-spacing:-.005em}
+.collection-face-title,.collection-surface[data-view=reel] .collection-face-title{font:600 18px/1.25 var(--font-title);letter-spacing:-.005em}
+.library-controls>.collection-tools{display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px;border-bottom:0;border-radius:var(--radius,12px)}
+.library-controls .toolbar-actions{display:flex;flex:none;align-items:center;gap:6px}
+.library-view{position:relative;display:flex;flex:none;align-items:center;margin-left:4px;padding-left:12px;border-left:1px solid var(--line-2)}
+.library-view-toggle,.library-new-folder,#library-filters-toggle{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 12px;border:1px solid var(--line);border-radius:var(--radius-sm,8px);background:var(--paper);color:var(--ink);font:500 13px var(--font-ui);white-space:nowrap;cursor:pointer}
+#library-filters-toggle{display:none}
+.library-new-folder[hidden],.library-view-menu[hidden],.library-view-row[hidden]{display:none}
+.library-view-toggle:hover,.library-new-folder:hover,#library-filters-toggle:hover{border-color:color-mix(in srgb,var(--ink) 30%,var(--line));background:var(--ground-2)}
+.library-view-toggle[aria-expanded=true],#library-filters-toggle[aria-expanded=true]{border-color:color-mix(in srgb,var(--ink) 30%,var(--line));background:color-mix(in srgb,var(--ink) 7%,var(--paper))}
+.library-view-toggle svg,.library-new-folder svg,#library-filters-toggle svg{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;color:var(--ink-2)}
+.library-view-toggle::after{content:"";width:14px;height:14px;margin-left:2px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 6 4 4 4-4' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;transition:transform .15s}
+.library-view-toggle[aria-expanded=true]::after{transform:rotate(180deg)}
+#library-filters-toggle::after{content:none}
+.library-view-menu{position:absolute;top:calc(100% + 8px);right:0;z-index:40;width:304px;max-height:calc(100dvh - 96px);overflow:auto;padding:8px;border:1px solid color-mix(in srgb,var(--ink) 16%,var(--line));border-radius:var(--radius,12px);background:var(--paper);box-shadow:0 12px 32px -8px rgba(10,14,18,.35),0 2px 6px rgba(10,14,18,.12);overscroll-behavior:contain}
+:root[data-theme="dark"] .library-view-menu{background:#2a2824}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .library-view-menu{background:#2a2824}}
+.library-view-heading{margin:4px 8px 4px;font:600 12px/1.3 var(--font-ui);color:var(--ink-3)}
+.library-view-choice{display:grid;grid-template-columns:minmax(0,1fr) 16px;column-gap:10px;row-gap:1px;align-items:center;width:100%;padding:7px 8px;border:0;border-radius:var(--radius-sm,8px);background:transparent;color:var(--ink);text-align:left;cursor:pointer}
+.library-view-choice-label{font:500 14px/1.3 var(--font-ui)}
+.library-view-choice small{grid-column:1;font:12.5px/1.35 var(--font-ui);color:var(--ink-3)}
+.library-view-choice::after{content:"";grid-column:2;grid-row:1/span 2;width:16px;height:16px;background:var(--brass);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 8.5 3 3 6-7' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m3.5 8.5 3 3 6-7' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/contain no-repeat;visibility:hidden}
+.library-view-choice:hover{background:var(--ground-2)}
+.library-view-choice[aria-pressed=true]{background:color-mix(in srgb,var(--brass) 8%,transparent)}
+.library-view-choice[aria-pressed=true]::after{visibility:visible}
+.library-view-choice[aria-pressed=true] .library-view-choice-label{font-weight:600}
+.library-view-choice:focus-visible{outline:2px solid var(--brass);outline-offset:-2px}
+.library-view-menu hr{margin:8px 0;border:0;border-top:1px solid var(--line-2)}
+.library-view-row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:3px 0}
+.library-view-row .library-view-heading{margin:0 8px}
+.library-controls .library-view-row .layout-toggle{display:flex;gap:2px;padding:2px;border-radius:var(--radius-sm,8px);background:color-mix(in srgb,var(--ink) 9%,transparent)}
+.library-controls .library-view-row .layout-toggle button{min-height:30px;min-width:76px;padding:4px 10px;border:0;border-radius:6px;background:transparent;color:var(--ink-2);font:500 13px var(--font-ui);box-shadow:none;cursor:pointer}
+.library-controls .library-view-row .layout-toggle button[aria-pressed=true]{background:color-mix(in srgb,var(--brass) 14%,var(--paper));color:var(--ink);font-weight:600;box-shadow:0 0 0 1px color-mix(in srgb,var(--brass) 55%,transparent),0 1px 2px rgba(0,0,0,.12)}
+@media(max-width:1100px) and (min-width:761px){.library-controls>.collection-tools{flex-wrap:wrap}.library-controls .search{flex:1 1 100%}.library-view{margin-left:auto}}
+@media(max-width:760px){
+body:has(#collection-config) .collection-head h1{font-size:28px}
+.library-controls>.collection-tools{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;gap:6px;padding:8px}
+.library-controls .search{grid-row:1;grid-column:1/-1}
+#library-filters-toggle{display:inline-flex;grid-row:2;grid-column:1}
+.library-view{position:static;grid-row:2;grid-column:2;margin:0;padding:0;border:0}
+.library-new-folder{grid-row:2;grid-column:4}
+.library-view-toggle,.library-new-folder,#library-filters-toggle{min-height:44px;padding:0 12px;font-size:14px}
+.library-view-toggle::after{content:none}
+.library-controls .toolbar-actions{grid-row:3;grid-column:1/-1}
+.library-controls:not([data-filters-open=true]) .toolbar-actions{display:none}
+.library-view-menu{top:calc(100% + 6px);right:8px;left:8px;width:auto}
+.library-view-choice{min-height:48px}
+.library-controls .library-view-row .layout-toggle{flex:none;width:auto}
+.library-controls .library-view-row .layout-toggle button{flex:none;min-height:44px}
+}
+/* Round 2: a slimmer folder shelf on desktop, so artifacts lead the page. */
+@media(min-width:761px){#collection-surface{margin:12px 0 12px}.collection-surface[data-view=reel] .collection-grid{padding-top:1.35rem}.collection-surface[data-view=reel] .collection-face{height:92px}.collection-surface[data-view=reel] .collection-face-head button{min-height:0}}
+@media(max-width:360px){.library-new-folder{width:44px;padding:0;justify-content:center}.library-new-folder span{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}}
+
+/* Round 3: aligned summaries and compact phone controls. */
+.collection-results .result-summary .count{font:400 13px var(--font-ui);color:var(--ink-3)}
+.library-new-folder .folder-short{display:none}
+@media(max-width:760px){.library-controls .toolbar-actions .sort-control{grid-column:auto}.library-controls .toolbar-actions:has(#org-filter[hidden]) .sort-control,.library-controls .toolbar-actions:has(label[hidden] #org-filter) .sort-control{grid-column:1/-1}}
+@media(max-width:360px){.library-new-folder{width:auto;padding:0 8px}.library-new-folder .folder-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.library-new-folder .folder-short{display:inline;position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:nowrap}body:has(#collection-config) .collection-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}}
+@media(max-width:760px){.library-controls .toolbar-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.library-controls .toolbar-actions :is(#library-status,#org-filter,#category-filter,#sort){min-width:0;width:100%;max-width:100%}}
+
+/* Round 4: a quiet reset in the active filter row and compact phone controls. */
+.library-active-filters [data-reset-filters]{border:0;background:transparent;color:var(--ink-2);font:500 12px var(--font-ui);padding:4px 8px}
+.library-active-filters [data-reset-filters][hidden]{display:none}
+.library-active-filters [data-reset-filters]:hover{background:var(--ground-2)}
+@media(max-width:760px){.library-active-filters button{min-height:44px}}
+@media(max-width:360px){#library-filters-toggle svg,.library-view-toggle svg{display:none}.library-view-toggle,#library-filters-toggle{padding:0 8px}}
+
+/* Round 5: viewport-sized menu and consistent phone controls. */
+.library-view-menu{max-height:none;overflow:auto}
+@media(max-width:760px){.library-controls .toolbar-actions select,.library-controls .toolbar-actions #sort{box-sizing:border-box;height:44px;min-height:44px}}
+@media(max-width:360px){.library-controls>.collection-tools{grid-template-columns:repeat(3,minmax(0,1fr))}.library-controls #library-filters-toggle{grid-column:1}.library-controls .library-view{grid-column:2;min-width:0}.library-controls .library-new-folder{grid-column:3;width:100%;min-width:0;padding:0 4px;justify-content:center}.library-controls .library-view-toggle,.library-controls #library-filters-toggle{width:100%;min-width:0;justify-content:center;padding:0 4px;font-size:13px}.library-controls .library-new-folder{font-size:13px}.library-controls :is(#library-filters-toggle,.library-view-toggle,.library-new-folder) svg{display:none}.library-controls .library-new-folder .folder-label{position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:nowrap}.library-controls .library-new-folder .folder-short{display:none}}
+
+/* Round 6: compact short-screen view menu and grouped phone statistics. */
+.library-view-menu{background-image:linear-gradient(var(--paper) 30%,transparent),linear-gradient(transparent,var(--paper) 70%),linear-gradient(to bottom,rgba(0,0,0,.12),transparent),linear-gradient(to top,rgba(0,0,0,.12),transparent);background-size:100% 24px,100% 24px,100% 8px,100% 8px;background-repeat:no-repeat;background-attachment:local,local,scroll,scroll;background-position:0 0,0 100%,0 0,0 100%;background-color:var(--paper)}
+:root[data-theme="dark"] #library-view-menu{background-image:linear-gradient(#2a2824 30%,transparent),linear-gradient(transparent,#2a2824 70%),linear-gradient(to bottom,rgba(0,0,0,.35),transparent),linear-gradient(to top,rgba(0,0,0,.35),transparent);background-size:100% 24px,100% 24px,100% 8px,100% 8px;background-repeat:no-repeat;background-attachment:local,local,scroll,scroll;background-position:0 0,0 100%,0 0,0 100%;background-color:#2a2824}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) #library-view-menu{background-image:linear-gradient(#2a2824 30%,transparent),linear-gradient(transparent,#2a2824 70%),linear-gradient(to bottom,rgba(0,0,0,.35),transparent),linear-gradient(to top,rgba(0,0,0,.35),transparent);background-size:100% 24px,100% 24px,100% 8px,100% 8px;background-repeat:no-repeat;background-attachment:local,local,scroll,scroll;background-position:0 0,0 100%,0 0,0 100%;background-color:#2a2824}}
+@media(max-width:760px) and (max-height:700px){.library-view-menu{padding:4px 8px}.library-view-heading{margin:2px 8px}.library-view-choice{min-height:44px;padding:2px 8px}.library-view-menu hr{margin:4px 0}.library-view-row{padding:0}}
+@media(max-width:360px){body:has(#collection-config) .collection-stats{grid-template-columns:auto auto;justify-content:start;gap:5px 20px}}
+
+/* Round 7: edge-aligned phone menu and visible touch selection targets. */
+@media(max-width:360px){.library-view-menu{left:-1px;right:-1px}}
+@media(hover:none){.collection-artifact-select,.collection-artifact-select:not(:checked),:root[data-theme="dark"] .collection-artifact-select:not(:checked){appearance:none;-webkit-appearance:none;box-sizing:border-box;top:0;right:0;width:44px;height:44px;border:0;border-radius:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='.75' y='.75' width='18.5' height='18.5' rx='5.25' fill='%2314161a' fill-opacity='.55' stroke='white' stroke-opacity='.9' stroke-width='1.5'/%3E%3C/svg%3E") center/20px 20px no-repeat;box-shadow:none;filter:drop-shadow(0 1px 2px rgba(0,0,0,.4))}.collection-artifact-select:checked,:root[data-theme="dark"] .collection-artifact-select:checked{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='.75' y='.75' width='18.5' height='18.5' rx='5.25' fill='%2314161a' stroke='white' stroke-opacity='.9' stroke-width='1.5'/%3E%3Cpath d='m5 10 3.3 3.3L15 6.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E")}}
+@media(hover:none) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .collection-artifact-select:not(:checked){border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='.75' y='.75' width='18.5' height='18.5' rx='5.25' fill='%2314161a' fill-opacity='.55' stroke='white' stroke-opacity='.9' stroke-width='1.5'/%3E%3C/svg%3E") center/20px 20px no-repeat}}
+@media(hover:none) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .collection-artifact-select:checked{border:0;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Crect x='.75' y='.75' width='18.5' height='18.5' rx='5.25' fill='%2314161a' stroke='white' stroke-opacity='.9' stroke-width='1.5'/%3E%3Cpath d='m5 10 3.3 3.3L15 6.5' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/20px 20px no-repeat}}
+
+/* Round 8: accessible active filter chips */
+.library-active-filters:not([hidden]){padding-bottom:12px}
+.library-active-filters button{display:inline-flex;align-items:center;gap:4px;box-sizing:border-box;min-height:30px;padding:0 10px;font:500 13px var(--font-ui)}
+.library-active-filters button span{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font:16px var(--font-ui)}
+.library-active-filters button:hover span{background:var(--ground-2)}
+.library-active-filters [data-reset-filters]{min-height:30px;padding:0 10px;font:500 13px var(--font-ui)}
+@media(max-width:760px){.library-active-filters button,.library-active-filters [data-reset-filters]{min-height:44px}}
+
+/* Round 9: View menu row spacing */
+@media(max-width:760px){#library-view-menu .library-view-row+.library-view-row{margin-top:8px}}

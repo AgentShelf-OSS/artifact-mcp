@@ -80,7 +80,7 @@
       <span id="org-category-data" hidden data-json="{{ org_category_json }}" data-can-create="{% if viewer_is_admin %}1{% else %}0{% endif %}"></span>
         <div class="result-summary">
           <span><span id="organization-label">{% if viewer_is_admin %}All organizations{% else %}{{ viewer_org }}{% endif %}</span> · <span id="sort-label">Updated recently</span></span>
-          <span class="count" id="count" aria-live="polite">Showing {{ total }} of {{ total }}</span>
+          <span class="count" id="count" aria-live="polite">{{ total }} of {{ total }} shown</span>
         </div>
 
         {% if total == 0 %}<div class="empty-all">
@@ -102,7 +102,7 @@
               <span class="pid">/{{ card.id }}</span>
             </div>
             <div class="label">
-              <div class="card-overline"><span class="org-tag"><span class="org-dot"></span>{{ card.org }} · {{ card.category_label }}</span><time datetime="{{ card.updated_datetime }}">{{ card.updated_label }}</time></div>
+              <div class="card-overline"><span class="org-tag"><span class="org-dot"></span>{{ card.org }} · {{ card.category_label }}<span class="hidden-tag">Hidden</span></span><time datetime="{{ card.updated_datetime }}">{{ card.updated_label }}</time></div>
               <h3 class="card-title"><a href="/{{ card.id }}">{{ card.title }}</a></h3>
               {% if card.has_description %}<p class="desc">{{ card.description }}</p>{% else %}<p class="desc desc-empty">No description supplied.</p>{% endif %}
               <div class="facts">
@@ -114,13 +114,13 @@
                 </div>{% else if card.vote > 0 %}<span class="your-vote positive">Approved</span>{% else if card.vote < 0 %}<span class="your-vote negative">Needs work</span>{% endif %}
               </div>
               <div class="actions">
-                <a class="act open" href="/{{ card.id }}">{{ icons.open }}<span>Open</span></a>
-                <button class="act save{% if card.favorite %} active{% endif %}" data-action="favorite" type="button" aria-pressed="{% if card.favorite %}true{% else %}false{% endif %}" aria-label="{% if card.favorite %}Remove{% else %}Save{% endif %} {{ card.title }} {% if card.favorite %}from{% else %}to{% endif %} favorites">{{ icons.heart }}<span>{% if card.favorite %}Favorited{% else %}Favorite{% endif %}</span></button>
-                <button class="act share" data-action="share" type="button" aria-label="Share {{ card.title }}">{{ icons.share }}<span>Share</span></button>
-                {% if card.is_bundle %}<button class="act card-download" type="button" disabled title="Bundles open in the Viewer and do not have a single HTML download" aria-label="HTML download unavailable for {{ card.title }}">{{ icons.download }}<span>Download</span></button>{% else %}<a class="act card-download dl" href="/raw/{{ card.id }}?download" download aria-label="Download {{ card.title }} as HTML" title="Download HTML">{{ icons.download }}<span>Download</span></a>{% endif %}
-                {% if card.show_visibility %}<button class="act icon-act visibility" data-action="visibility" type="button" aria-label="{% if card.hidden %}Show{% else %}Hide{% endif %} {{ card.title }} in the gallery" title="{% if card.hidden %}Show in gallery{% else %}Hide from gallery{% endif %}">{% if card.hidden %}{{ icons.eye }}<span>Show</span>{% else %}{{ icons.eye_off }}<span>Hide</span>{% endif %}</button>{% endif %}
-                <button class="act icon-act more" data-action="more" type="button" aria-label="More actions for {{ card.title }}" aria-expanded="false" aria-controls="card-menu-{{ card.id }}">{{ icons.more }}</button>
+                <button class="act save{% if card.favorite %} active{% endif %}" data-action="favorite" type="button" title="{% if card.favorite %}Remove from favorites{% else %}Save to favorites{% endif %}" aria-pressed="{% if card.favorite %}true{% else %}false{% endif %}" aria-label="{% if card.favorite %}Remove{% else %}Save{% endif %} {{ card.title }} {% if card.favorite %}from{% else %}to{% endif %} favorites">{{ icons.heart }}<span>{% if card.favorite %}Favorited{% else %}Favorite{% endif %}</span></button>
+                <button class="act share" data-action="share" type="button" aria-label="Share {{ card.title }}" title="Share">{{ icons.share }}<span>Share</span></button>
+                <button class="act icon-act more" data-action="more" type="button" aria-label="More actions for {{ card.title }}" title="More actions" aria-expanded="false" aria-controls="card-menu-{{ card.id }}">{{ icons.more }}</button>
                 <div class="card-menu" id="card-menu-{{ card.id }}" data-ui="card-menu" hidden>
+                  <p class="menu-heading" aria-hidden="true" data-title="{{ card.title }}"></p>
+                  {% if card.show_visibility %}<button class="menu-action menu-item visibility" data-action="visibility" type="button" aria-label="{% if card.hidden %}Show in gallery{% else %}Hide from gallery{% endif %}: {{ card.title }}" title="{% if card.hidden %}Show in gallery{% else %}Hide from gallery{% endif %}">{% if card.hidden %}{{ icons.eye }}<span>Show in gallery</span>{% else %}{{ icons.eye_off }}<span>Hide from gallery</span>{% endif %}</button>{% endif %}
+                  {% if card.is_bundle %}<p class="menu-note">{{ icons.download }}<span>Bundles open in the viewer and have no single-file download.</span></p>{% else %}<a class="menu-action menu-item card-download dl" href="/raw/{{ card.id }}?download" download aria-label="Download HTML: {{ card.title }}">{{ icons.download }}<span>Download HTML</span></a>{% endif %}
                   <label>Category<select class="category-menu" data-action="category" data-can-create="{% if card.show_visibility %}1{% else %}0{% endif %}" aria-label="Change category for {{ card.title }}"><option value=""{% if !card.has_category %} selected{% endif %}>Uncategorized</option>{% for option in card.category_options %}<option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>{% endfor %}{% if card.show_visibility %}<option value="__create_category__">+ Category</option>{% endif %}</select></label>
                   {% if viewer_is_admin && !card.org_options.is_empty() %}<label>Organization<select class="org-menu" data-action="move-org" aria-label="Move {{ card.title }} to another organization"><option value="">{{ card.org }}</option>{% for option in card.org_options %}<option value="{{ option.value }}">{{ option.label }}</option>{% endfor %}</select></label>{% endif %}
                   {% if card.show_delete %}<button class="menu-action del" data-action="delete" type="button">Delete artifact</button>{% endif %}
@@ -143,7 +143,7 @@
     </dialog>
     <dialog class="share-dialog" id="share-dialog" aria-labelledby="share-title">
       <form method="dialog" class="dialog-head"><div><p class="eyebrow">Public access</p><h2 id="share-title">Share artifact</h2></div><button class="dialog-close" value="cancel" aria-label="Close share dialog">×</button></form>
-      <p class="share-copy" id="share-copy">Create and revoke public links. Hiding an artifact from Gallery does not revoke these links.</p>
+      <p class="share-copy" id="share-copy">Create and revoke public links. Hiding an artifact from the gallery does not revoke these links.</p>
       <form class="share-form" id="share-form"><label>Expiry<select id="share-expiry"><option value="">No expiry</option><option value="1h">1 hour</option><option value="1d">1 day</option><option value="7d">7 days</option></select></label><button class="act open" type="submit">Create link</button></form>
       <div class="share-list" id="share-list" aria-live="polite"></div>
     </dialog>
