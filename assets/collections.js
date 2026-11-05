@@ -328,7 +328,7 @@
     if (current && reelPage > Math.max(0, pageCount - 1)) reelPage = 0;
     var reelItems = currentArtifacts.slice(reelPage * reelPageSize(), (reelPage + 1) * reelPageSize());
     var createTile = '<button type="button" class="collection-new-tile" data-collection-create>' + icon("plus") + '<strong>New folder</strong><small>A home for another idea</small></button>';
-    var shelf = '<header class="collection-shelf-heading"><h2>Your folders</h2><div class="collection-shelf-tools"><p>Drag artifacts onto a folder to file them.</p><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div></header>' +
+    var shelf = '<header class="collection-shelf-heading"><h2>Your folders</h2><div class="collection-shelf-tools"><p>Hover to preview. Click to pin. Drag artifacts into folders.</p><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div></header>' +
       '<div class="collection-shelf-nav"><div class="collection-grid">' + rows.map(faceMarkup).join("") + createTile + '</div></div>';
     if (!current) return shelf + '<section class="collection-reel" hidden></section>';
     var empty = '<div class="collection-empty">' + (current.artifactCount ? 'No artifacts match the current filters.' : 'This folder is ready for its first artifact.') + '</div>';
