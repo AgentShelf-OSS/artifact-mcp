@@ -663,3 +663,10 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 @media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item,.card-menu .menu-action.del{min-height:44px;padding:0}.card-menu select,.card-menu .collection-folder-select,.card-menu .move-confirm button{min-height:44px}}
 /* The menu heading draws the title from data-title, so it is not a second text copy of the card title. */
 .card-menu .menu-heading::before{content:attr(data-title)}
+/* Round 7: clarify card actions and enlarge phone share controls. */
+.card .actions>.act svg{width:18px;height:18px}
+:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]){border-radius:var(--radius-sm);background:color-mix(in srgb,var(--ink) 6%,transparent)}
+:root .card .label .actions>.act.more:not(.active):not([aria-expanded="true"]):hover{background:color-mix(in srgb,var(--ink) 10%,transparent)}
+:root[data-theme="dark"] .card .label .actions>.act.more[aria-expanded="true"]{background:color-mix(in srgb,var(--ink) 16%,transparent);color:var(--ink)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .card .label .actions>.act.more[aria-expanded="true"]{background:color-mix(in srgb,var(--ink) 16%,transparent);color:var(--ink)}}
+@media(max-width:760px){.share-dialog .share-form select,.share-dialog .share-form .act.open{min-height:44px}}

@@ -217,13 +217,19 @@ async fn select_org(page: &Page, org: &str) -> Result<(), Error> {
     Ok(())
 }
 
-/// Folder views live in the View menu; open it when the choice is folded away.
+/// Folder views live in the View menu; open it when the choice is folded away and close it
+/// again afterwards, so the open menu does not cover the shelf.
 async fn view_button(page: &Page, view: &str) -> Result<(), Error> {
     let button = page.locator(&format!("[data-library-view='{view}']"));
-    if !button.is_visible().await? {
+    let opened = !button.is_visible().await?;
+    if opened {
         page.locator("#library-view-toggle").click().await?;
     }
-    button.click().await
+    button.click().await?;
+    if opened {
+        page.keyboard().press("Escape").await?;
+    }
+    Ok(())
 }
 
 async fn sleep_ms(ms: u64) {
