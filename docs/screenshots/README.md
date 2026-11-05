@@ -1,18 +1,19 @@
 # Screenshot gallery
 
-Screenshots 01–14 show the November 2026 UI refresh (v1.29.4 plus the refresh) on an isolated
-local server at schema 40. The library holds twelve fictional artifacts in the `homelab`
-organization, four folders, one member account, a feedback thread, and three revisions of one
-artifact. The previews were rendered from those sample pages. No production data or credentials
-appear in these images. They use the shipped light theme. The hero image (00) is unchanged.
+Screenshots 01–14 show the November 2026 UI refresh, including its information architecture pass
+(v1.29.4 plus #151 and #152), on an isolated local server at schema 40. The library holds twelve
+fictional artifacts in the `homelab` organization, four folders, one member account, a feedback
+thread, and three revisions of one artifact. The previews were rendered from those sample pages. No
+production data or credentials appear in these images. They use the shipped light theme. The hero
+image (00) is unchanged.
 
-Captures use Chrome 156 in headless mode with reduced motion. Screenshots 01–08 use a
-1600 × 1000 viewport and 09–11 use 1440 × 1080, both at a device scale factor of 1. The folder
-dialogs are cropped to their rendered bounds. The mobile example uses a 390 × 844 viewport; it
-demonstrates browser viewport emulation, not a physical device test. The capture host maps the
-system UI font to Inter and monospace to JetBrains Mono. Captures wait for fonts and decoded
-previews. See [the refresh notes](../design/ui-refresh-2026-11.md) for before and after
-comparisons.
+Captures use Chrome 156 in headless mode with reduced motion. Screenshots 01–08 use a 1600 × 1000
+viewport and 09–11 use 1440 × 1080, both at a device scale factor of 1. The folder dialogs are
+cropped to their rendered bounds. The mobile example uses a 390 × 844 viewport; it demonstrates
+browser viewport emulation, not a physical device test. Titles use the self-hosted Fraunces face.
+The capture host maps the system UI font to Inter and monospace to JetBrains Mono. Captures wait
+for fonts and decoded previews. See [the refresh notes](../design/ui-refresh-2026-11.md) for before
+and after comparisons.
 
 | Shelf | Contact sheets |
 |---|---|
@@ -32,12 +33,12 @@ comparisons.
 | Administrator gallery | Card actions |
 |---|---|
 | [![Administrator gallery](01-gallery-admin-grid.png)](01-gallery-admin-grid.png) | [![Administrator card actions](02-gallery-admin-actions.png)](02-gallery-admin-actions.png) |
-| Search, status, organization and category filters, folder display, sorting, and layout controls share one toolbar. | Change category or folders in place. Deletion remains explicit and confirmed. |
+| Search, status, organization and category filters, sorting, and a View menu for folder display, layout, and preview size share one toolbar row. Click anywhere on a card to open it. | The More menu holds Download, Hide or Show, category, and folders. Deletion remains explicit and confirmed. |
 
 | List layout | Member gallery |
 |---|---|
 | [![List layout](03-gallery-admin-list.png)](03-gallery-admin-list.png) | [![Member gallery](04-gallery-member-grid.png)](04-gallery-member-grid.png) |
-| Compact rows keep previews, metadata, and labelled actions in one line. | Members see organization-scoped counts and filters, and ownership controls for their own uploads. |
+| Compact rows keep previews, metadata, and actions in one line. | Members see organization-scoped counts and filters, and ownership controls for their own uploads. |
 
 | Feedback | Version history |
 |---|---|
