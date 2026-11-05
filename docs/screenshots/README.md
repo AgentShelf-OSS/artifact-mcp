@@ -1,9 +1,9 @@
 # Screenshot gallery
 
 Screenshots 01–14 show the November 2026 UI refresh, including its information architecture pass
-(v1.29.4 plus #151 and #152), on an isolated local server at schema 40. The library holds twelve
-fictional artifacts in the `homelab` organization, four folders, one member account, a feedback
-thread, and three revisions of one artifact. The previews were rendered from those sample pages. No
+(#151 and #152, released in v1.30.0), on an isolated local server at schema 40. The library holds
+twelve fictional artifacts in the `homelab` organization, four folders, one member account, a
+feedback thread, and three revisions of one artifact. The previews were rendered from those sample pages. No
 production data or credentials appear in these images. They use the shipped light theme. The hero
 image (00) is unchanged.
 
