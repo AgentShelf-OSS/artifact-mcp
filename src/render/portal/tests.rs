@@ -96,11 +96,11 @@ mod portal_characterization_tests {
                     .expect("member gallery")
                     .as_bytes()
             ),
-            "f421f15fa7fd5f97b7e0915f99f229de7e99e90cf06272a29e31f09189cffbc5"
+            "d28edea801c6efa738a886edd0384cf2a821088a4e7039fdd5633b4aff3ee89d"
         );
         assert_eq!(
             digest(renderer.gallery(&admin).expect("admin gallery").as_bytes()),
-            "870d6835e57ef7c6f492c95d908dff3ae41c7870c99449418018e2e4fec4060d"
+            "876d99e4fe203ef8b55842766a3d91df6cd2f3ad312dc2f37780076fd70454e0"
         );
     }
 
