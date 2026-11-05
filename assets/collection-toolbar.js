@@ -91,7 +91,7 @@
 
   // Phones fold the filters behind one toggle; desktop shows them inline.
   const filters = el('button', { type: 'button', id: 'library-filters-toggle' });
-  filters.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M4.5 8h7M6.5 12h3"/></svg><span>Filters</span>';
+  filters.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M4.5 8h7M6.5 12h3"/></svg><span>Filter &amp; sort</span>';
   filters.setAttribute('aria-expanded', 'false'); filters.setAttribute('aria-controls', 'library-filter-panel');
   actions.id = 'library-filter-panel';
   actions.after(filters);
@@ -110,7 +110,7 @@
   const chips = el('div', { id: 'library-active-filters', className: 'library-active-filters', hidden: true });
   chips.setAttribute('aria-label', 'Active filters'); wrapper.after(chips);
   const intro = document.querySelector('.collection-head .intro-copy'); if (intro) intro.textContent = 'Browse, collect, and return to the latest revision.';
-  const reset = document.querySelector('[data-reset-filters]'); reset?.addEventListener('click', () => { invoke('clearFilters'); status.value = 'all'; sync(); });
+  const reset = document.querySelector('[data-reset-filters]'); if (reset) reset.textContent = 'Clear all'; reset?.addEventListener('click', () => { invoke('clearFilters'); status.value = 'all'; sync(); });
   function current() { return window.ArtifactCollections?.getState?.() || {}; }
   function portal() { return window.ArtifactPortal?.getLibraryState?.() || {}; }
   function removeFilter(field) {
@@ -134,9 +134,8 @@
     const shelf = document.querySelector('#collection-surface .collection-grid');
     create.hidden = activeView === 'reel' && !c.selected && !!shelf?.querySelector('[data-collection-create]') && shelf.scrollWidth <= shelf.clientWidth + 1;
     const entries = []; if (p.q) entries.push(['q', 'Search: ' + p.q]); if (p.org && p.org !== 'all' && admin) entries.push(['org', p.org]); if (p.category && p.category !== 'all') entries.push(['category', p.category]); if (activeStatus !== 'all') entries.push(['status', status.selectedOptions[0]?.textContent || activeStatus]); if (p.sort && p.sort !== 'recent') entries.push(['sort', sort?.selectedOptions[0]?.textContent || p.sort]); if (c.selected) { const folder = c.collections?.find(item => item.id === c.selected); entries.push(['collection', folder?.name || 'Folder']); }
-    chips.replaceChildren(); for (const [field, text] of entries) { const button = el('button', { type: 'button' }, text + ' ×'); button.setAttribute('aria-label', 'Remove ' + text + ' filter'); button.addEventListener('click', () => removeFilter(field)); chips.append(button); } chips.hidden = entries.length === 0;
+    chips.replaceChildren(); for (const [field, text] of entries) { const button = el('button', { type: 'button' }, text + ' ×'); button.setAttribute('aria-label', 'Remove ' + text + ' filter'); button.addEventListener('click', () => removeFilter(field)); chips.append(button); } if (reset) { reset.hidden = entries.length < 2; chips.append(reset); } chips.hidden = entries.length === 0;
     const summary = document.querySelector('.collection-results .result-summary'); if (summary) summary.hidden = entries.length === 0;
-    if (reset) reset.hidden = entries.length === 0;
   }
   document.addEventListener('collections:rendered', sync);
   let resizeFrame = 0; window.addEventListener('resize', () => { cancelAnimationFrame(resizeFrame); resizeFrame = requestAnimationFrame(sync); });

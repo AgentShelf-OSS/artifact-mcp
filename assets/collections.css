@@ -224,3 +224,13 @@ html[data-collection-density="large"] .collection-ribbon-card{flex-basis:320px}
 .collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:32px;font:13px var(--font-ui)}
 @media(max-width:760px){.collection-sheet-body .collection-face-actions button,.collection-ribbon-tools button{min-height:44px}}
 @media(min-width:761px){.collection-shelf-heading{margin-bottom:-.5rem}}
+
+/* Round 4: compact card footers and filtered folder emphasis. */
+.collection-ribbon-card .card .label,.collection-reel-card .card .label{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto 1fr auto;column-gap:6px}
+.collection-ribbon-card .card .label>.facts,.collection-reel-card .card .label>.facts{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.collection-ribbon-card .card .label>.actions,.collection-reel-card .card .label>.actions{justify-self:end;align-self:center}
+.collection-ribbon-card>.card>.actions,.collection-reel-card>.card>.actions{justify-content:flex-end;margin-left:auto}
+.collection-ribbon-card .card-title,.collection-reel-card .card-title,.collection-artifact-title{font-family:var(--font-title);font-size:15px;font-weight:600}
+.collection-ribbon-title button{font-size:18px}
+.collection-face[data-match="0"],.collection-sheet-card[data-match="0"],.collection-ribbon[data-match="0"]{opacity:.55;filter:saturate(.2)}
+@media(max-width:760px){.collection-shelf-tools .shelf-arrow{width:44px;height:44px;min-width:44px;min-height:44px;border:0;border-radius:8px;background:transparent;font-size:0;line-height:0}.collection-shelf-tools .shelf-arrow:not(:disabled):is(:hover,:active){background:var(--ground-2)}}

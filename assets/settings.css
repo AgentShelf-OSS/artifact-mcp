@@ -201,3 +201,10 @@ td .org-tag{color:var(--ink-2)}
 
 /* Round 3: compact phone administration and brass selected tabs. */
 @media(max-width:760px){.admin-tab{border:1px solid var(--line);background:transparent;color:var(--ink-2)}.admin-tab[aria-selected="true"]{border-color:var(--line);background:color-mix(in srgb,var(--brass) 14%,var(--paper));box-shadow:0 0 0 1px color-mix(in srgb,var(--brass) 55%,transparent);color:var(--ink)}.admin-tab span,.admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}.directory-head{padding:6px;gap:6px}.org-list{padding:4px}.org-list-button{min-height:44px;padding:6px 8px}.detail-head{padding:8px 150px 8px 12px}}
+
+/* Round 4: quieter phone navigation and compact administration panels. */
+.settings-group h3,.key-issue h3,.owner-registry h3,#key-owner-records h3,.key-edit-head h3,.reveal h3,.notification-panel h3{font:600 15px/1.35 var(--font-ui);letter-spacing:0}
+#keys td.key-role{text-transform:capitalize}
+@media(max-width:760px){.admin-tabs{row-gap:2px;margin-bottom:6px}.admin-tab{min-height:44px;border:0;background:transparent;color:var(--ink-2);box-shadow:none}.admin-tab[aria-selected="true"]{background:color-mix(in srgb,var(--ink) 7%,transparent);color:var(--ink);font-weight:600;box-shadow:inset 0 -2px var(--brass)}.admin-tab span,.admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}.directory-head{padding:4px;gap:4px}.org-list{padding:2px}.detail-head{padding-top:6px;padding-bottom:6px}.detail-head .org-del{top:-4px}}
+@media(max-width:760px){:root[data-theme="dark"] .admin-tab span,:root[data-theme="dark"] .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}
+@media(max-width:760px) and (prefers-color-scheme:dark){:root:not([data-theme="light"]) .admin-tab span,:root:not([data-theme="light"]) .admin-tab[aria-selected="true"] span{background:color-mix(in srgb,var(--ink) 10%,var(--card));color:var(--ink-2)}}

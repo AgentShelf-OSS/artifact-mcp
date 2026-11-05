@@ -628,3 +628,14 @@ input::placeholder,textarea::placeholder{color:var(--ink-3);opacity:1}
 .artifact-grid[data-layout="list"] .label>.facts{grid-column:1;grid-row:4;align-self:start;margin:2px 0 0;padding:0}
 .artifact-grid[data-layout="list"] .label>.actions{grid-column:2;grid-row:1/5;align-self:center;margin:0;padding:0}
 }
+/* Round 4: clarify card links and compact the More menu. */
+.card-title a{text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:3px;text-decoration-color:color-mix(in srgb,var(--ink) 22%,transparent)}
+.card:hover .card-title a,.card:focus-within .card-title a{text-decoration-color:color-mix(in srgb,var(--ink) 55%,transparent)}
+.card:has(.card-title a:focus-visible){outline:2px solid var(--brass);outline-offset:2px}
+.artifact-grid[data-layout="list"] .card.is-hidden .preview .pv{opacity:.55;filter:saturate(.5)}
+.card-menu .menu-item,.card-menu .menu-note{padding-inline:0}
+.card-menu .menu-action.del{padding-inline:0}
+.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:6px;padding-top:10px;border-top:1px solid var(--line-2)}
+:root[data-theme="dark"]{--ink-3:#aea79b}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--ink-3:#aea79b}}
+@media(max-width:760px){.card-menu{padding:8px}.card-menu .menu-item{min-height:44px;margin-bottom:0}.card-menu .menu-note{padding-block:4px}.card-menu label,.card-menu .collection-folder-field{gap:2px;margin-bottom:4px}.card-menu select,.card-menu .collection-folder-select,.card-menu .menu-action.del{min-height:44px}.card-menu :is(.menu-item,.menu-note)+:is(label,.collection-folder-field){margin-top:2px;padding-top:5px}.card-menu .menu-action.del{margin-top:2px;padding-top:5px;border-top-color:var(--line-2)}}

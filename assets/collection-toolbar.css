@@ -291,3 +291,10 @@ body:has(#collection-config) .collection-head h1{font-size:28px}
 @media(max-width:760px){.library-controls .toolbar-actions .sort-control{grid-column:auto}.library-controls .toolbar-actions:has(#org-filter[hidden]) .sort-control,.library-controls .toolbar-actions:has(label[hidden] #org-filter) .sort-control{grid-column:1/-1}}
 @media(max-width:360px){.library-new-folder{width:auto;padding:0 8px}.library-new-folder .folder-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}.library-new-folder .folder-short{display:inline;position:static;width:auto;height:auto;overflow:visible;clip:auto;white-space:nowrap}body:has(#collection-config) .collection-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:5px 10px}}
 @media(max-width:760px){.library-controls .toolbar-actions{grid-template-columns:repeat(2,minmax(0,1fr))}.library-controls .toolbar-actions :is(#library-status,#org-filter,#category-filter,#sort){min-width:0;width:100%;max-width:100%}}
+
+/* Round 4: a quiet reset in the active filter row and compact phone controls. */
+.library-active-filters [data-reset-filters]{border:0;background:transparent;color:var(--ink-2);font:500 12px var(--font-ui);padding:4px 8px}
+.library-active-filters [data-reset-filters][hidden]{display:none}
+.library-active-filters [data-reset-filters]:hover{background:var(--ground-2)}
+@media(max-width:760px){.library-active-filters button{min-height:44px}}
+@media(max-width:360px){#library-filters-toggle svg,.library-view-toggle svg{display:none}.library-view-toggle,#library-filters-toggle{padding:0 8px}}

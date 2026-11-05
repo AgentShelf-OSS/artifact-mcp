@@ -243,3 +243,6 @@
 @font-face{font-family:"Fraunces Display";src:url("/fonts/fraunces-v1.woff2") format("woff2");font-weight:500 800;font-style:normal;font-display:swap}
 .vtitle{font:600 16px/1.25 "Fraunces Display",ui-serif,Georgia,Cambria,"Times New Roman",serif;letter-spacing:-.005em}
 @media(max-width:760px){.vtitle{font-size:15px}}
+
+/* Round 4: give phone viewer titles more room between controls. */
+@media(max-width:760px){.vright,.vgroup{gap:0}.vgroup+.vgroup{padding-left:0}.vdisclosure{margin-left:2px}.vtitle-toggle{min-width:44px;min-height:44px}}
