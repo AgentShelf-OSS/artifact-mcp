@@ -193,7 +193,7 @@
   function folderFieldMarkup(artifactId) {
     var names = membershipNamesByArtifact.get(String(artifactId)) || [];
     var summary = names.length ? names.join(", ") : "Choose folders";
-    return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span><span aria-hidden="true">⌄</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
+    return '<div class="collection-folder-field"><span>Folders</span><button type="button" class="collection-folder-select" data-collection-folder-picker="' + escapeHtml(artifactId) + '" aria-label="Choose folders" aria-expanded="false"><span>' + escapeHtml(summary) + '</span></button><div class="collection-folder-panel" data-collection-folder-panel hidden></div></div>';
   }
   function folderPopoverContext(trigger) {
     var card = trigger.closest(".card");
@@ -261,7 +261,6 @@
       var clone = canonical.cloneNode(true);
       clone.hidden = false;
       clone.classList.add("collection-artifact-card");
-      clone.removeAttribute("style");
       clone.querySelectorAll("[id]").forEach(function (node) { node.removeAttribute("id"); });
       var canonicalMenu = clone.querySelector(".card-menu");
       if (canonicalMenu && !canonicalMenu.querySelector("[data-collection-folder-picker]")) {
@@ -291,7 +290,6 @@
     }).join("");
     var src = a.thumbnailSrc || a.thumbnail_src || a.thumbnail || "";
     var actions = '<div class="actions collection-actions">' +
-      '<a class="act open" href="/' + encodeURIComponent(a.id) + '">Open</a>' +
       '<button class="act save" data-action="favorite" type="button" aria-label="Save ' + escapeHtml(a.title) + '">Save</button>' +
       '<button class="act share" data-action="share" type="button" aria-label="Share ' + escapeHtml(a.title) + '">Share</button>' +
       '<button class="act icon-act more" data-action="more" type="button" aria-label="More actions for ' + escapeHtml(a.title) + '" aria-expanded="false">…</button>' +
@@ -303,18 +301,22 @@
       '</div></div>';
     return '<article class="card collection-artifact-card" draggable="true" data-collection-artifact="' + escapeHtml(a.id) + '" data-id="' + escapeHtml(a.id) + '" data-org="' + escapeHtml(a.org) + '" data-category="' + escapeHtml(a.category) + '" data-fav="' + (a.favorite ? "1" : "0") + '" data-hidden="' + (a.hidden ? "1" : "0") + '" data-needs-review="' + (a.needsReview ? "1" : "0") + '" data-q="' + escapeHtml([a.title, a.org, a.category, a.description].join(" ").toLowerCase()) + '">' +
       '<div class="collection-artifact-preview"><input type="checkbox" class="collection-artifact-select" data-collection-select="' + escapeHtml(a.id) + '" aria-label="Select ' + escapeHtml(a.title) + '">' + (src ? '<img src="' + escapeHtml(src) + '" alt="" loading="lazy" decoding="async">' : '<span class="collection-peek-empty">Preview unavailable</span>') + '<a href="/' + encodeURIComponent(a.id) + '" aria-label="Open ' + escapeHtml(a.title) + '"></a></div>' +
-      '<div class="collection-artifact-copy"><strong class="collection-artifact-title card-title">' + escapeHtml(a.title) + '</strong><small class="collection-artifact-sub">' + escapeHtml(a.org) + (a.category ? " · " + escapeHtml(a.category) : "") + '</small></div>' + actions + '</article>';
+      '<div class="collection-artifact-copy"><strong class="collection-artifact-title card-title">' + escapeHtml(a.title) + '</strong><small class="collection-artifact-sub"><span class="org-dot"></span> ' + escapeHtml(a.org) + (a.category ? " · " + escapeHtml(a.category) : "") + '</small></div>' + actions + '</article>';
   }
   function previewRows(collection, limit) {
     var rows = collectionArtifacts(collection);
     if (collection.coverArtifactId) rows.sort(function(a,b){return Number(b.id === collection.coverArtifactId) - Number(a.id === collection.coverArtifactId);});
     return rows.slice(0, limit || 3).map(artifactData);
   }
+  function collectionCountLabel(collection) {
+    var visible = collectionArtifacts(collection).length;
+    return visible !== collection.artifactCount ? visible + " of " + collection.artifactCount + " match" : visible + (visible === 1 ? " artifact" : " artifacts");
+  }
   function faceMarkup(collection) {
     var previews = previewRows(collection, 3).map(function (artifact) { return '<span class="collection-peek">' + previewImage(artifact) + '</span>'; }).join("");
-    return '<article class="collection-face" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '">' +
+    return '<article class="collection-face" data-match="' + (collection.artifactCount > 0 && collectionArtifacts(collection).length === 0 ? "0" : "1") + '" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '">' +
       '<div class="collection-face-preview">' + previews + '</div>' +
-      '<div class="collection-face-head"><button type="button" data-collection-peek="' + escapeHtml(collection.id) + '" aria-expanded="' + (reelId === collection.id) + '" aria-label="Preview ' + escapeHtml(collection.name) + '"><strong class="collection-face-title">' + escapeHtml(collection.name) + '</strong><span class="collection-face-meta"><span>' + collectionArtifacts(collection).length + ' ' + (collection.artifactCount === 1 ? "artifact" : "artifacts") + '</span><span aria-hidden="true">·</span><span class="org">' + escapeHtml(collection.org) + '</span></span></button></div></article>';
+      '<div class="collection-face-head"><button type="button" data-collection-peek="' + escapeHtml(collection.id) + '" aria-expanded="' + (reelId === collection.id) + '" aria-label="Preview ' + escapeHtml(collection.name) + '"><strong class="collection-face-title">' + escapeHtml(collection.name) + '</strong><span class="collection-face-meta"><span>' + escapeHtml(collectionCountLabel(collection)) + '</span><span aria-hidden="true">·</span><span class="org">' + escapeHtml(collection.org) + '</span></span></button></div></article>';
   }
   function reelPageSize() { return matchMedia("(max-width:760px)").matches ? 1 : 3; }
   function renderReel() {
@@ -325,7 +327,7 @@
     if (current && reelPage > Math.max(0, pageCount - 1)) reelPage = 0;
     var reelItems = currentArtifacts.slice(reelPage * reelPageSize(), (reelPage + 1) * reelPageSize());
     var createTile = '<button type="button" class="collection-new-tile" data-collection-create>' + icon("plus") + '<strong>New folder</strong><small>A home for another idea</small></button>';
-    var shelf = '<header class="collection-shelf-heading"><h2>Your folders</h2><div class="collection-shelf-tools"><p>Hover to peek. Click to pin. Drop to collect.</p><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div></header>' +
+    var shelf = '<header class="collection-shelf-heading"><h2>Your folders</h2><div class="collection-shelf-tools"><p>Hover to preview. Click to pin. Drag artifacts into folders.</p><button type="button" class="shelf-arrow" data-shelf-scroll="-1" aria-label="Previous folders">‹</button><button type="button" class="shelf-arrow" data-shelf-scroll="1" aria-label="Next folders">›</button></div></header>' +
       '<div class="collection-shelf-nav"><div class="collection-grid">' + rows.map(faceMarkup).join("") + createTile + '</div></div>';
     if (!current) return shelf + '<section class="collection-reel" hidden></section>';
     var empty = '<div class="collection-empty">' + (current.artifactCount ? 'No artifacts match the current filters.' : 'This folder is ready for its first artifact.') + '</div>';
@@ -337,9 +339,9 @@
     return shelf + '<section class="collection-reel" aria-label="Preview reel for ' + escapeHtml(current.name) + '"><header class="collection-reel-head"><strong class="collection-reel-title"><span>' + (reelPinned ? 'Pinned open' : 'Peeking at') + ' / </span>' + escapeHtml(current.name) + '</strong><div class="collection-reel-tools">' + tools + '</div></header><div class="collection-reel-track">' + reelItems.map(function (artifact) { return '<div class="collection-reel-card">' + cardMarkup(artifact, true) + '</div>'; }).join('') + (currentArtifacts.length ? '' : empty) + '</div></section>';
   }
   function renderSheets() {
-    return '<div class="collection-sheet">' + state.collections.map(function (collection) {
+    return '<header class="collection-shelf-heading"><h2>Your folders</h2></header><div class="collection-sheet">' + state.collections.map(function (collection) {
       var allRows = collectionArtifacts(collection).map(artifactData); var rows = previewRows(collection, 4); var count = allRows.length === 1 ? "1" : allRows.length === 2 ? "2" : allRows.length === 3 ? "3" : "more";
-      return '<article class="collection-sheet-card" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '"><div class="collection-sheet-cover" data-count="' + count + '">' + rows.map(function (a) { return '<span class="sheet-shot">' + previewImage(a) + '</span>'; }).join("") + (rows.length ? "" : '<span class="collection-peek-empty">'+(collection.artifactCount?"No matching artifacts":"Empty folder")+'</span>') + '</div><div class="collection-sheet-body"><h3>' + escapeHtml(collection.name) + '</h3><p>' + collectionArtifacts(collection).length + ' artifacts · ' + escapeHtml(collection.org) + '</p><div class="collection-face-actions"><button type="button" data-collection-open="' + escapeHtml(collection.id) + '">Open folder</button>' + (collection.editable ? '<button type="button" data-collection-edit="'+escapeHtml(collection.id)+'" aria-label="Edit '+escapeHtml(collection.name)+'">Edit</button>' : '') + '</div></div></article>';
+      return '<article class="collection-sheet-card" data-match="' + (collection.artifactCount > 0 && allRows.length === 0 ? "0" : "1") + '" data-collection-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '"><div class="collection-sheet-cover" data-count="' + count + '">' + rows.map(function (a) { return '<span class="sheet-shot">' + previewImage(a) + '</span>'; }).join("") + (rows.length ? "" : '<span class="collection-peek-empty">'+(collection.artifactCount?"No matching artifacts":"Empty folder")+'</span>') + '</div><div class="collection-sheet-body"><h3>' + escapeHtml(collection.name) + '</h3><p>' + escapeHtml(collectionCountLabel(collection)) + ' · ' + escapeHtml(collection.org) + '</p><div class="collection-face-actions"><button type="button" data-collection-open="' + escapeHtml(collection.id) + '">Open folder</button>' + (collection.editable ? '<button type="button" data-collection-edit="'+escapeHtml(collection.id)+'" aria-label="Edit '+escapeHtml(collection.name)+'">Edit</button>' : '') + '</div></div></article>';
     }).join("") + '</div>';
   }
   function orderedCollections() {
@@ -353,7 +355,7 @@
       var pageSize=reelPageSize(),page=Math.min(ribbonPages[collection.id]||0,Math.max(0,Math.ceil(rows.length/pageSize)-1));ribbonPages[collection.id]=page;
       var pageRows=rows.slice(page*pageSize,(page+1)*pageSize);
       var body = isCollapsed ? '<div class="collection-ribbon-fan" aria-label="Preview fan">' + rows.slice(0, 3).map(function (a, i) { return '<span style="--i:' + i + '">' + previewImage(a) + '</span>'; }).join("") + '</div>' : '<div class="collection-ribbon-cards">' + pageRows.map(function (a) { return '<div class="collection-ribbon-card">' + cardMarkup(a, true) + '</div>'; }).join("") + (rows.length ? "" : '<div class="collection-empty">'+(collection.artifactCount?"No matching artifacts":"Empty folder")+'</div>') + '</div>';
-      return '<article class="collection-ribbon ' + (isCollapsed ? "is-collapsed" : "") + '" draggable="true" data-collection-id="' + escapeHtml(collection.id) + '" data-ribbon-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '"><header class="collection-ribbon-head"><button class="collection-ribbon-grip" type="button" draggable="true" data-ribbon-drag aria-label="Reorder ' + escapeHtml(collection.name) + '">' + icon("grip") + '</button><div class="collection-ribbon-title"><button type="button" data-collection-open="' + escapeHtml(collection.id) + '">' + escapeHtml(collection.name) + '</button><small>' + collectionArtifacts(collection).length + ' artifacts · ' + escapeHtml(collection.org) + '</small></div><div class="collection-ribbon-tools">' + (!isCollapsed ? '<button type="button" data-ribbon-page="-1" aria-label="Previous artifacts in '+escapeHtml(collection.name)+'" '+(page===0?'disabled':'')+'>‹</button><button type="button" data-ribbon-page="1" aria-label="Next artifacts in '+escapeHtml(collection.name)+'" '+((page+1)*pageSize>=rows.length?'disabled':'')+'>›</button>':'') + (collection.editable ? '<button type="button" data-collection-edit="'+escapeHtml(collection.id)+'" aria-label="Edit '+escapeHtml(collection.name)+'">Edit</button>' : '') + '<button type="button" data-ribbon-move="up" aria-label="Move ' + escapeHtml(collection.name) + ' up">' + icon("up") + '</button><button type="button" data-ribbon-move="down" aria-label="Move ' + escapeHtml(collection.name) + ' down">' + icon("down") + '</button><button type="button" data-ribbon-collapse aria-expanded="' + (!isCollapsed) + '">' + (isCollapsed ? "Expand" : "Collapse") + '</button></div></header><div class="collection-ribbon-body">' + body + '</div></article>';
+      return '<article class="collection-ribbon ' + (isCollapsed ? "is-collapsed" : "") + '" draggable="true" data-match="' + (collection.artifactCount > 0 && rows.length === 0 ? "0" : "1") + '" data-collection-id="' + escapeHtml(collection.id) + '" data-ribbon-id="' + escapeHtml(collection.id) + '" style="--collection-color:' + escapeHtml(collection.color) + '"><header class="collection-ribbon-head"><button class="collection-ribbon-grip" type="button" draggable="true" data-ribbon-drag aria-label="Reorder ' + escapeHtml(collection.name) + '">' + icon("grip") + '</button><div class="collection-ribbon-title"><button type="button" data-collection-open="' + escapeHtml(collection.id) + '">' + escapeHtml(collection.name) + '</button><small>' + escapeHtml(collectionCountLabel(collection)) + ' · ' + escapeHtml(collection.org) + '</small></div><div class="collection-ribbon-tools">' + (!isCollapsed ? '<button type="button" data-ribbon-page="-1" aria-label="Previous artifacts in '+escapeHtml(collection.name)+'" '+(page===0?'disabled':'')+'>‹</button><button type="button" data-ribbon-page="1" aria-label="Next artifacts in '+escapeHtml(collection.name)+'" '+((page+1)*pageSize>=rows.length?'disabled':'')+'>›</button>':'') + (collection.editable ? '<button type="button" data-collection-edit="'+escapeHtml(collection.id)+'" aria-label="Edit '+escapeHtml(collection.name)+'">Edit</button>' : '') + '<button type="button" data-ribbon-move="up" aria-label="Move ' + escapeHtml(collection.name) + ' up">' + icon("up") + '</button><button type="button" data-ribbon-move="down" aria-label="Move ' + escapeHtml(collection.name) + ' down">' + icon("down") + '</button><button type="button" data-ribbon-collapse aria-expanded="' + (!isCollapsed) + '">' + (isCollapsed ? "Expand" : "Collapse") + '</button></div></header><div class="collection-ribbon-body">' + body + '</div></article>';
     }).join("") + '</div>';
   }
   function render() {

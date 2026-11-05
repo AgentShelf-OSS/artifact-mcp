@@ -3,14 +3,27 @@
 .artifact-confirm-dialog::backdrop{background:#0e151d94;backdrop-filter:blur(2px)}
 .artifact-confirm-dialog header{display:flex;justify-content:space-between;align-items:start;gap:1rem;padding:1.1rem;border-bottom:1px solid var(--line)}
 .artifact-confirm-kicker{margin:0 0 .35rem;color:var(--brass);font:600 .6rem/1.4 var(--font-mono,monospace);letter-spacing:.1em;text-transform:uppercase}
-.artifact-confirm-dialog h2{margin:0;font:400 1.7rem/1.15 Georgia,"Times New Roman",serif}
+.artifact-confirm-dialog h2{margin:0;font:400 1.7rem/1.15 var(--font-display,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif)}
 .artifact-confirm-dialog button{min-height:44px;padding:.5rem .75rem;border:1px solid var(--line);border-radius:5px;background:var(--card,var(--bar));color:inherit;font:600 .72rem var(--font-ui,system-ui);cursor:pointer}
 .artifact-confirm-dialog [data-confirm-close]{min-width:44px;font-size:1.1rem}
 .artifact-confirm-dialog button:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
 .artifact-confirm-body{padding:1.1rem;font:.85rem/1.6 var(--font-ui,system-ui);overflow-wrap:anywhere}
 .artifact-confirm-body p{margin:.5rem 0 0}
-.artifact-confirm-subject{display:block;font:400 1.2rem/1.3 Georgia,"Times New Roman",serif}
+.artifact-confirm-subject{display:block;font:400 1.2rem/1.3 var(--font-display,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif)}
 .artifact-confirm-subject[hidden]{display:none}
 .artifact-confirm-dialog footer{display:flex;justify-content:flex-end;gap:.5rem;padding:1rem 1.1rem;border-top:1px solid var(--line)}
 .artifact-confirm-dialog .artifact-confirm-primary{background:var(--ink,var(--txt));color:var(--paper,var(--panel));border-color:var(--ink,var(--txt))}
 .artifact-confirm-dialog .artifact-confirm-primary.is-danger{background:#9e3441;color:#fff;border-color:#9e3441}
+
+/* UI refresh (2026-11) */
+.artifact-confirm-dialog{border-radius:16px}
+.artifact-confirm-kicker{font:600 12px/1.3 var(--font-ui,system-ui);letter-spacing:0;text-transform:none}
+.artifact-confirm-dialog h2{font:650 18px/1.3 var(--font-display,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,system-ui,sans-serif);letter-spacing:-.01em}
+.artifact-confirm-subject{font-weight:600;font-size:16px}
+.artifact-confirm-dialog button{min-height:36px;border-radius:8px;font:600 13px var(--font-ui,system-ui)}
+@media(pointer:coarse){.artifact-confirm-dialog button{min-height:44px}}
+.artifact-confirm-dialog .artifact-confirm-primary:not(.is-danger){border-color:var(--brass);background:var(--brass);color:#fff}
+:root[data-theme="dark"] .artifact-confirm-dialog .artifact-confirm-primary:not(.is-danger){color:#141a21}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .artifact-confirm-dialog .artifact-confirm-primary:not(.is-danger){color:#141a21}}
+.artifact-confirm-dialog [data-confirm-close]{display:inline-grid;place-items:center;font-size:0}
+.artifact-confirm-dialog [data-confirm-close]::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 4 8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='m4 4 8 8M12 4l-8 8' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round'/%3E%3C/svg%3E") center/contain no-repeat}

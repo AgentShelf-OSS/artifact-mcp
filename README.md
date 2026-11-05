@@ -124,14 +124,14 @@ continues through local gallery access, organization setup, and a production Clo
 
 | Artifact library | Anchored review |
 |---|---|
-| [![Reel Shelf with a pinned folder preview](docs/screenshots/09-library-reel-shelf.png)](docs/screenshots/09-library-reel-shelf.png) | [![Artifact feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) |
-| Search, filter, sort, and switch layouts without losing the collection context. | Leave threaded feedback on a point or region and copy its revision context for an agent. |
+| [![Shelf with a pinned folder preview](docs/screenshots/09-library-reel-shelf.png)](docs/screenshots/09-library-reel-shelf.png) | [![Artifact feedback inspector](docs/screenshots/05-viewer-feedback.png)](docs/screenshots/05-viewer-feedback.png) |
+| Search, filter, sort, and switch layouts without losing the collection context. | Leave threaded feedback, pinned to a point or region if you like, and copy its revision context for an agent. |
 
 The three folder views share the same memberships. Switch views without copying artifacts.
 
-| Contact Sheets | Gallery Ribbons |
+| Contact sheets | Ribbons |
 |---|---|
-| [![Contact Sheets with artifact previews](docs/screenshots/10-library-contact-sheets.png)](docs/screenshots/10-library-contact-sheets.png) | [![Gallery Ribbons with expanded and collapsed folders](docs/screenshots/11-library-gallery-ribbons.png)](docs/screenshots/11-library-gallery-ribbons.png) |
+| [![Contact sheets with artifact previews](docs/screenshots/10-library-contact-sheets.png)](docs/screenshots/10-library-contact-sheets.png) | [![Ribbons with expanded and collapsed folders](docs/screenshots/11-library-gallery-ribbons.png)](docs/screenshots/11-library-gallery-ribbons.png) |
 | Scan several previews on each folder cover, then open a collection. | Collapse a ribbon into a preview fan. Drag ribbons to change their order, or use the arrow controls. |
 
 | Create a folder | Delete a folder |

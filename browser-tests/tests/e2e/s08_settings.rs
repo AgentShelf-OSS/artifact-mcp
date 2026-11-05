@@ -58,7 +58,7 @@ pub fn cases() -> Vec<Case> {
 async fn settings_renders(t: Ctx) -> Result<(), Error> {
     let page = t.page().await?;
     page.goto("/settings").await?;
-    expect(&page.get_by_role(Role::new("heading").name(regex("Operate the registry", "i"))))
+    expect(&page.get_by_role(Role::new("heading").name(regex("^Administration$", "i"))))
         .to_be_visible()
         .await?;
     expect(&page.get_by_role(Role::new("tab").name(regex("Organizations", "i"))))
@@ -76,7 +76,7 @@ async fn dark_phone_layout(t: Ctx) -> Result<(), Error> {
     expect(&page.locator("html"))
         .to_have_attribute("data-theme", "dark")
         .await?;
-    expect(&page.get_by_role(Role::new("heading").name(regex("Operate the registry", "i"))))
+    expect(&page.get_by_role(Role::new("heading").name(regex("^Administration$", "i"))))
         .to_be_visible()
         .await?;
     let dimensions = page
@@ -355,7 +355,7 @@ async fn owner_backfill_preview(t: Ctx) -> Result<(), Error> {
         .fill(&owner_email)
         .await?;
     owner_card
-        .get_by_role(Role::new("button").name("Save binding"))
+        .get_by_role(Role::new("button").name("Save owner"))
         .click()
         .await?;
     expect(&owner_card.locator(".owner-current"))
@@ -366,7 +366,7 @@ async fn owner_backfill_preview(t: Ctx) -> Result<(), Error> {
         .await?;
 
     owner_card
-        .get_by_role(Role::new("button").name("Preview legacy backfill"))
+        .get_by_role(Role::new("button").name("Preview ownership update"))
         .click()
         .await?;
     expect(&owner_card.locator(".backfill-count"))

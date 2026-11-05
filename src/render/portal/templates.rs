@@ -6,7 +6,6 @@ pub(super) struct Icons {
     pub(super) bell: TrustedStatic,
     pub(super) theme: TrustedStatic,
     pub(super) signout: TrustedStatic,
-    pub(super) open: TrustedStatic,
     pub(super) download: TrustedStatic,
     pub(super) heart: TrustedStatic,
     pub(super) up: TrustedStatic,
@@ -32,9 +31,6 @@ pub(super) const ICONS: Icons = Icons {
     ),
     signout: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H5v14h5"></path><path d="m14 8 4 4-4 4M8 12h10"></path></svg>"#,
-    ),
-    open: TrustedStatic::new(
-        r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 5h5v5M19 5l-8 8"></path><path d="M19 13v6H5V5h6"></path></svg>"#,
     ),
     download: TrustedStatic::new(
         r#"<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4"></path><path d="M5 19h14"></path></svg>"#,

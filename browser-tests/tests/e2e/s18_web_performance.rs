@@ -156,6 +156,7 @@ async fn search_preserves_sort(t: Ctx) -> Result<(), Error> {
     expect(&visible_titles)
         .to_have_texts(&["Perf Alpha", "Perf Beta", "Perf Gamma"])
         .await?;
+    page.locator("#library-view-toggle").click().await?;
     page.locator("[data-library-view=\"reel\"]").click().await?;
     expect(&page.locator(".collection-grid"))
         .to_be_visible()

@@ -47,8 +47,10 @@ fn html(title: &str) -> String {
 /// Open the Reel Shelf for every organization and the "Create a folder" dialog.
 async fn open_admin_shelf(page: &Page) -> Result<Locator<'_>, Error> {
     page.goto("/?libraryView=reel&org=all").await?;
-    expect(&page.locator("#new-folder")).to_be_visible().await?;
-    page.locator("#new-folder").click().await?;
+    expect(&page.locator(".collection-new-tile"))
+        .to_be_visible()
+        .await?;
+    page.locator(".collection-new-tile").click().await?;
     Ok(page.get_by_role(Role::new("dialog").exact_name("Create a folder")))
 }
 
