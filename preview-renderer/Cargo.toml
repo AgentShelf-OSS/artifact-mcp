@@ -37,7 +37,7 @@ serde_json = { version = "1", features = ["float_roundtrip"] }
 tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt", "signal", "time"] }
 
 [dev-dependencies]
-png = "0.17"
+png = "0.18"
 tokio = { version = "1", features = ["rt-multi-thread", "sync"] }
 
 [lints.rust]
