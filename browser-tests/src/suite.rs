@@ -309,7 +309,7 @@ fn fixture(repo_root: &Path, name: &str) -> Result<String, String> {
         // The anchor bridge the server injects into artifact HTML: the exact bytes that
         // src/http/artifact_response.rs embeds with include_str!.
         "ANCHOR_BRIDGE" => {
-            let path = repo_root.join("assets/artifact-anchor-bridge.js");
+            let path = repo_root.join("assets/artifact-anchor-bridge.html");
             std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))
         }
         other => Err(format!(

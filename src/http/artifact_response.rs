@@ -32,7 +32,7 @@ pub const DATA_CLIENT: &str = include_str!("../../assets/artifact-data-client.js
 /// Keep this asset static: artifact content must never be interpolated into the script. The
 /// only variable portion is the optional page path, which [`inject_anchor_bridge`] JSON-encodes and
 /// escapes before replacing the fixed `page=null` initializer.
-pub const ANCHOR_BRIDGE: &str = include_str!("../../assets/artifact-anchor-bridge.js");
+pub const ANCHOR_BRIDGE: &str = include_str!("../../assets/artifact-anchor-bridge.html");
 
 const PRIVATE_CACHE_CONTROL: &str = "private, max-age=60";
 const PUBLIC_SHARE_CACHE_CONTROL: &str = "no-store";
