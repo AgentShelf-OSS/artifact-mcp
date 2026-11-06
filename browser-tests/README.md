@@ -115,8 +115,8 @@ test("forget clears consent", async () => {
 
 * `readText(path)` and `readBytes(path)` read repository files (paths relative to the root) and
   are async. Read at module level with `await`, or inside an `async` test.
-* `fixture(name)` returns a value computed in Rust. `ANCHOR_BRIDGE` is the raw-string constant in
-  `src/http/artifact_response.rs`. Add new fixtures in `src/suite.rs` (`fixture`).
+* `fixture(name)` returns a value computed in Rust. `ANCHOR_BRIDGE` is the script in
+  `assets/artifact-anchor-bridge.js` that `src/http/artifact_response.rs` embeds. Add new fixtures in `src/suite.rs` (`fixture`).
 * `assert` is the `node:assert/strict` subset: `ok`, `equal`, `notEqual`, `deepEqual`,
   `notDeepEqual`, `match`, `doesNotMatch`, `throws`, `rejects`, `fail`. `equal` is `Object.is`;
   `deepEqual` is deep-strict and compares prototypes.

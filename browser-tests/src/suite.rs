@@ -306,31 +306,16 @@ async fn load_cases(page: &Page, module: &str) -> Result<Vec<String>, Error> {
 /// A value computed in Rust for `await fixture(name)`.
 fn fixture(repo_root: &Path, name: &str) -> Result<String, String> {
     match name {
-        // The anchor bridge the server injects into artifact HTML: the exact bytes of the raw
-        // string constant in src/http/artifact_response.rs.
+        // The anchor bridge the server injects into artifact HTML: the exact bytes that
+        // src/http/artifact_response.rs embeds with include_str!.
         "ANCHOR_BRIDGE" => {
-            let path = repo_root.join("src/http/artifact_response.rs");
-            let source = std::fs::read_to_string(&path)
-                .map_err(|error| format!("{}: {error}", path.display()))?;
-            rust_raw_string(&source, "ANCHOR_BRIDGE")
+            let path = repo_root.join("assets/artifact-anchor-bridge.js");
+            std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))
         }
         other => Err(format!(
             "unknown fixture {other:?}; add it to browser-tests/src/suite.rs"
         )),
     }
-}
-
-/// The body of `pub const NAME: &str = r###"…"###;` in Rust source.
-pub fn rust_raw_string(source: &str, constant: &str) -> Result<String, String> {
-    let marker = format!("pub const {constant}: &str = r###\"");
-    let start = source
-        .find(&marker)
-        .ok_or_else(|| format!("could not find {constant}"))?
-        + marker.len();
-    let length = source[start..]
-        .find("\"###;")
-        .ok_or_else(|| format!("could not find the end of {constant}"))?;
-    Ok(source[start..start + length].to_owned())
 }
 
 /// Parse every `assets/*.js` file in Chrome, without running it: as a classic script (how the
@@ -431,17 +416,6 @@ mod tests {
         let portal = joined_parts(&crate::repo_root().join("assets"), "portal").unwrap();
         assert!(portal.starts_with("(function () {"));
         assert!(portal.ends_with("}());\n"));
-    }
-
-    #[test]
-    fn raw_strings_are_extracted_exactly() {
-        let source = "x\npub const A: &str = r###\"<script>\"quoted\"</script>\"###;\n";
-        assert_eq!(
-            rust_raw_string(source, "A").unwrap(),
-            "<script>\"quoted\"</script>"
-        );
-        assert!(rust_raw_string(source, "B").is_err());
-        assert!(rust_raw_string("pub const A: &str = r###\"open", "A").is_err());
     }
 
     #[test]
