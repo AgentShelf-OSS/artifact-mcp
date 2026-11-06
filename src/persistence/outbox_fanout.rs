@@ -94,15 +94,15 @@ where
            AND (?3 IS NULL OR id <> ?3) \
          ORDER BY created_at ASC, id ASC",
         )
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("fanout with policy", error))?;
     let ids = statement
         .query_map(
             params![envelope.tenant(), event_name(event), policy.excluded_target],
             |row| row.get::<_, String>(0),
         )
-        .map_err(internal)?
+        .map_err(|error| crate::error::internal("fanout with policy", error))?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("fanout with policy", error))?;
     let payload = envelope.canonical_bytes()?;
     let digest = envelope.payload_sha256()?;
     let inputs = ids
@@ -127,7 +127,4 @@ where
         })
         .collect::<Result<Vec<_>, AppError>>()?;
     outbox::enqueue_many_in_transaction(tx, &inputs, now)
-}
-fn internal(_: rusqlite::Error) -> AppError {
-    AppError::Internal
 }

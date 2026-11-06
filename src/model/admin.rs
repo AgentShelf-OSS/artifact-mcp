@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — administrator, organization, key, and webhook records.
+//! Administrator, organization, key, and webhook records.
 
 use serde::{Deserialize, Serialize};
 
@@ -148,8 +148,7 @@ impl std::fmt::Debug for WebhookDelivery {
     ///
     /// A webhook URL is a bearer credential: anyone holding it can post to the channel. The derived
     /// implementation meant a single `tracing::debug!(?delivery)` in any future caller would leak a
-    /// live one. Flagged by U12, which never formats this type but could not fix the U01-frozen
-    /// model itself. Same defect class as `CreatedPublisherKey`.
+    /// live credential. The same risk applies to `CreatedPublisherKey`.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("WebhookDelivery")
             .field("id", &self.id)

@@ -1,12 +1,12 @@
 //! [`DataService`] port implementation. Each method delegates to the inherent `DataBroker`
 //! method of the same name.
 
+use super::DataError;
 use super::{
     BindingManifest, DataBroker, DataStream, Event, ImpactArtifact, PublicSource,
     RequestedSubscription, SourceConfig, SourceView, TestResult,
 };
 use crate::{
-    persistence::db::DbPool,
     ports::{BoxFuture, DataService},
     security::audit::MutationAudit,
 };
@@ -15,17 +15,16 @@ use std::collections::BTreeMap;
 use tokio::sync::mpsc;
 
 impl DataService for DataBroker {
-    fn pool(&self) -> Option<DbPool> {
-        self.pool.clone()
-    }
-
     fn source_views<'a>(
         &'a self,
         org: Option<&'a str>,
-    ) -> BoxFuture<'a, Result<Vec<SourceView>, String>> {
+    ) -> BoxFuture<'a, Result<Vec<SourceView>, DataError>> {
         Box::pin(DataBroker::source_views(self, org))
     }
-    fn source_view_by_id<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<SourceView, String>> {
+    fn source_view_by_id<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> BoxFuture<'a, Result<SourceView, DataError>> {
         Box::pin(DataBroker::source_view_by_id(self, id))
     }
     fn create_managed_source(
@@ -33,7 +32,7 @@ impl DataService for DataBroker {
         source: SourceConfig,
         enabled: bool,
         audit: MutationAudit,
-    ) -> BoxFuture<'_, Result<SourceView, String>> {
+    ) -> BoxFuture<'_, Result<SourceView, DataError>> {
         Box::pin(DataBroker::create_managed_source(
             self, source, enabled, audit,
         ))
@@ -45,7 +44,7 @@ impl DataService for DataBroker {
         enabled: bool,
         expected: u64,
         audit: MutationAudit,
-    ) -> BoxFuture<'a, Result<SourceView, String>> {
+    ) -> BoxFuture<'a, Result<SourceView, DataError>> {
         Box::pin(DataBroker::set_managed_source(
             self, id, source, enabled, expected, audit,
         ))
@@ -56,7 +55,7 @@ impl DataService for DataBroker {
         enabled: bool,
         expected: u64,
         audit: MutationAudit,
-    ) -> BoxFuture<'a, Result<SourceView, String>> {
+    ) -> BoxFuture<'a, Result<SourceView, DataError>> {
         Box::pin(DataBroker::set_managed_enabled(
             self, id, enabled, expected, audit,
         ))
@@ -66,13 +65,13 @@ impl DataService for DataBroker {
         id: &'a str,
         expected: u64,
         audit: MutationAudit,
-    ) -> BoxFuture<'a, Result<(), String>> {
+    ) -> BoxFuture<'a, Result<(), DataError>> {
         Box::pin(DataBroker::delete_managed(self, id, expected, audit))
     }
     fn impact<'a>(
         &'a self,
         source_id: &'a str,
-    ) -> BoxFuture<'a, Result<Vec<ImpactArtifact>, String>> {
+    ) -> BoxFuture<'a, Result<Vec<ImpactArtifact>, DataError>> {
         Box::pin(DataBroker::impact(self, source_id))
     }
     fn test_source<'a>(
@@ -80,7 +79,7 @@ impl DataService for DataBroker {
         id: &'a str,
         operation: &'a str,
         params: Value,
-    ) -> BoxFuture<'a, Result<TestResult, String>> {
+    ) -> BoxFuture<'a, Result<TestResult, DataError>> {
         Box::pin(DataBroker::test_source(self, id, operation, params))
     }
     fn audit_mutation<'a>(
@@ -91,7 +90,7 @@ impl DataService for DataBroker {
         org: &'a str,
         result: &'a str,
         revision: Option<u64>,
-    ) -> BoxFuture<'a, Result<(), String>> {
+    ) -> BoxFuture<'a, Result<(), DataError>> {
         Box::pin(DataBroker::audit_mutation(
             self, audit, operation, id, org, result, revision,
         ))
@@ -100,7 +99,10 @@ impl DataService for DataBroker {
         Box::pin(DataBroker::public_sources(self, org))
     }
 
-    fn try_bindings<'a>(&'a self, id: &'a str) -> BoxFuture<'a, Result<BindingManifest, String>> {
+    fn try_bindings<'a>(
+        &'a self,
+        id: &'a str,
+    ) -> BoxFuture<'a, Result<BindingManifest, DataError>> {
         Box::pin(DataBroker::try_bindings(self, id))
     }
     fn get_bindings<'a>(&'a self, id: &'a str) -> BoxFuture<'a, BindingManifest> {
@@ -111,7 +113,7 @@ impl DataService for DataBroker {
         id: &'a str,
         manifest: BindingManifest,
         org: &'a str,
-    ) -> BoxFuture<'a, Result<(), String>> {
+    ) -> BoxFuture<'a, Result<(), DataError>> {
         Box::pin(DataBroker::set_bindings(self, id, manifest, org))
     }
     fn set_bindings_audited<'a>(
@@ -120,7 +122,7 @@ impl DataService for DataBroker {
         manifest: BindingManifest,
         org: &'a str,
         audit: MutationAudit,
-    ) -> BoxFuture<'a, Result<(), String>> {
+    ) -> BoxFuture<'a, Result<(), DataError>> {
         Box::pin(DataBroker::set_bindings_audited(
             self, id, manifest, org, audit,
         ))
@@ -132,7 +134,7 @@ impl DataService for DataBroker {
         binding: &'a str,
         operation: &'a str,
         params: Value,
-    ) -> BoxFuture<'a, Result<Value, String>> {
+    ) -> BoxFuture<'a, Result<Value, DataError>> {
         Box::pin(DataBroker::query(self, id, binding, operation, params))
     }
     fn query_stream<'a>(
@@ -141,7 +143,7 @@ impl DataService for DataBroker {
         binding: &'a str,
         operation: &'a str,
         params: Value,
-    ) -> BoxFuture<'a, Result<mpsc::Receiver<Result<Value, String>>, String>> {
+    ) -> BoxFuture<'a, Result<mpsc::Receiver<Result<Value, DataError>>, DataError>> {
         Box::pin(DataBroker::query_stream(
             self, id, binding, operation, params,
         ))
@@ -153,7 +155,7 @@ impl DataService for DataBroker {
         binding: &'a str,
         key: &'a str,
         value: Value,
-    ) -> BoxFuture<'a, Result<u64, String>> {
+    ) -> BoxFuture<'a, Result<u64, DataError>> {
         Box::pin(DataBroker::set_snapshot(self, id, binding, key, value))
     }
     fn append_events<'a>(
@@ -162,7 +164,7 @@ impl DataService for DataBroker {
         binding: &'a str,
         subscription: &'a str,
         events: Vec<Event>,
-    ) -> BoxFuture<'a, Result<(usize, usize), String>> {
+    ) -> BoxFuture<'a, Result<(usize, usize), DataError>> {
         Box::pin(DataBroker::append_events(
             self,
             id,
@@ -176,7 +178,7 @@ impl DataService for DataBroker {
         id: &'a str,
         topics: Vec<RequestedSubscription>,
         cursor: BTreeMap<String, String>,
-    ) -> BoxFuture<'a, Result<DataStream, String>> {
+    ) -> BoxFuture<'a, Result<DataStream, DataError>> {
         Box::pin(DataBroker::stream(self, id, topics, cursor))
     }
 }

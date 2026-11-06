@@ -120,7 +120,10 @@ impl AccessSync {
         });
         let weak = Arc::downgrade(&inner);
         let task = tokio::spawn(worker(weak, base, receiver, period));
-        *inner.task.lock().map_err(|_| AppError::Internal)? = Some(task);
+        *inner
+            .task
+            .lock()
+            .map_err(|error| crate::error::internal("lock access sync task", error))? = Some(task);
         Ok(Self { inner })
     }
 
@@ -190,13 +193,16 @@ async fn reconcile(inner: &Inner, base: &str) -> Result<(), AppError> {
         let desired = db::interact(&inner.pool, |conn| {
             let mut statement = conn
                 .prepare("SELECT email FROM org_email_members")
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("prepare member email query", error))?;
             let rows = statement
                 .query_map([], |row| row.get::<_, String>(0))
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("query member emails", error))?;
             let mut emails = BTreeSet::new();
             for row in rows {
-                let email = row.map_err(|_| AppError::Internal)?.trim().to_lowercase();
+                let email = row
+                    .map_err(|error| crate::error::internal("read member email", error))?
+                    .trim()
+                    .to_lowercase();
                 if !email.is_empty() {
                     emails.insert(email);
                 }

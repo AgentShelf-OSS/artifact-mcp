@@ -121,7 +121,7 @@ pub async fn dispatch_for_era(
                 ))
                 .into());
             }
-            super::tasks::dispatch_task_method(message, auth, deps)
+            super::tasks::dispatch_task_method(message, auth, deps).await
         }
         Some(method) => Err(JsonRpcError::MethodNotFound(method.to_owned()).into()),
         None => Err(JsonRpcError::InvalidRequest.into()),

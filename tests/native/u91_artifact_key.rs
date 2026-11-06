@@ -8,6 +8,7 @@ use std::{
 
 use artifact_mcp::{
     artifacts::lifecycle::ARTIFACT_KEY_TAKEN,
+    artifacts::lifecycle::testing::RawLifecycleTestExt,
     config::{AppConfig, Secret, SeedKeys},
     error::AppError,
     mcp::dispatch::{ARTIFACT_KEY_INVALID, is_valid_artifact_key},

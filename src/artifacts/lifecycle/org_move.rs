@@ -3,7 +3,7 @@
 use super::*;
 
 impl StoreContext {
-    /// `moveArtifactToOrg(id, targetOrg, category)` — [lib/store.js:463-480]
+    /// `moveArtifactToOrg(id, targetOrg, category)`
     ///
     /// One transaction with deferred foreign keys so the parent and every org-bearing child move
     /// together; public shares are REVOKED rather than carried into the new tenant, and
@@ -16,10 +16,9 @@ impl StoreContext {
         category: Option<&str>,
         audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|_| AppError::Internal)?;
+        let _gate = self.lifecycle_gate.write().map_err(|error| {
+            crate::error::internal("lock artifact lifecycle for org move", error)
+        })?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };

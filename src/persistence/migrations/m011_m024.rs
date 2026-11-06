@@ -20,7 +20,7 @@ pub(super) fn m012_feedback_anchors(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-013: a NULL anchor remains the original artifact-wide feedback behavior.
+    // a NULL anchor remains the original artifact-wide feedback behavior.
     ensure_column(tx, "feedback", "anchor_path", "TEXT")?;
     ensure_column(tx, "feedback", "anchor_x", "REAL")?;
     ensure_column(tx, "feedback", "anchor_y", "REAL")?;
@@ -50,7 +50,7 @@ pub(super) fn m014_feedback_anchor_boxes(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-013 extension: NULL dimensions retain the original point-anchor model.
+    // NULL dimensions retain the original point-anchor model.
     ensure_column(tx, "feedback", "anchor_w", "REAL")?;
     ensure_column(tx, "feedback", "anchor_h", "REAL")
 }
@@ -114,7 +114,7 @@ pub(super) fn m019_feedback_anchor_page(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-024: NULL retains single-file and pre-page-identity anchor semantics.
+    // NULL retains single-file and pre-page-identity anchor semantics.
     ensure_column(tx, "feedback", "anchor_page", "TEXT")
 }
 
@@ -122,7 +122,7 @@ pub(super) fn m020_notification_read_watermarks(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-020: one durable read watermark per verified gallery viewer.
+    // one durable read watermark per verified gallery viewer.
     tx.execute_batch(
         "
         CREATE TABLE IF NOT EXISTS notification_reads (

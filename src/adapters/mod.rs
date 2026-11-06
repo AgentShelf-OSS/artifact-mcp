@@ -4,6 +4,7 @@
 //! (`src/main.rs`) constructs them during startup and passes them to the router as `AppDeps`.
 
 mod admin;
+mod collections;
 mod directories;
 mod discussions;
 mod engagement;
@@ -12,6 +13,7 @@ mod preview_index;
 mod shares;
 
 pub use admin::ProductionAdmin;
+pub use collections::ProductionCollections;
 pub use directories::ProductionDirectories;
 pub use discussions::ProductionDiscussions;
 pub use engagement::ProductionEngagement;

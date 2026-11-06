@@ -11,7 +11,7 @@ use crate::{
     artifacts::validation::sanitize_relative_path,
     error::{AppError, JsonRpcError, McpError},
     model::{ArtifactFile, ArtifactId, ArtifactMeta, PublisherIdentity},
-    security::access::AccessPolicy,
+    security::access::{AccessPolicy, ListScope},
 };
 
 use super::{
@@ -72,16 +72,17 @@ async fn list_resources(
         .map(parse_cursor)
         .transpose()?
         .unwrap_or(0);
-    let rows = if !auth.is_admin() && matches!(auth.role.as_str(), "reader" | "collaborator") {
-        deps.artifacts
+    let rows = match AccessPolicy::publisher_list_scope(auth) {
+        ListScope::Org => deps
+            .artifacts
             .list_org_artifacts(&auth.org, true)
             .await
-            .map_err(resource_app_error)?
-    } else {
-        deps.artifacts
+            .map_err(resource_app_error)?,
+        ListScope::All | ListScope::Own => deps
+            .artifacts
             .list_for_publisher(auth)
             .await
-            .map_err(resource_app_error)?
+            .map_err(resource_app_error)?,
     };
     if offset > rows.len() {
         return Err(JsonRpcError::InvalidParams("Invalid resource cursor".to_owned()).into());

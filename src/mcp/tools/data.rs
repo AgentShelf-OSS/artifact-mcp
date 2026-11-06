@@ -11,6 +11,7 @@ use crate::{
         shape::{object, tool_result},
     },
     model::PublisherIdentity,
+    ports::data::DataError,
 };
 
 pub(crate) async fn list_data_sources(
@@ -44,11 +45,7 @@ pub(crate) async fn data_bindings(
         publisher_read(id, auth, deps).await?.into_authorized()
     };
     if !write {
-        let manifest = deps
-            .data
-            .try_bindings(id)
-            .await
-            .map_err(AppError::Validation)?;
+        let manifest = deps.data.try_bindings(id).await.map_err(data_error)?;
         return tool_result(
             object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
         );
@@ -63,7 +60,7 @@ pub(crate) async fn data_bindings(
     deps.data
         .set_bindings(id, manifest.clone(), &authorized.meta().org.0)
         .await
-        .map_err(AppError::Validation)?;
+        .map_err(data_error)?;
     tool_result(
         object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
     )
@@ -86,7 +83,7 @@ pub(crate) async fn set_artifact_data(
         .data
         .set_snapshot(id, binding, key, serde_json::to_value(value).unwrap())
         .await
-        .map_err(AppError::Validation)?;
+        .map_err(data_error)?;
     let _ = owned;
     tool_result(
         object! {"id"=>OrderedJson::string(id),"revision"=>OrderedJson::number_u64(revision)},
@@ -113,7 +110,7 @@ pub(crate) async fn append_artifact_events(
         .data
         .append_events(id, binding, sub, events)
         .await
-        .map_err(AppError::Validation)?;
+        .map_err(data_error)?;
     let _ = owned;
     tool_result(
         object! {"id"=>OrderedJson::string(id),"accepted"=>OrderedJson::number_u64(accepted as u64),"duplicates"=>OrderedJson::number_u64(duplicates as u64)},
@@ -151,7 +148,7 @@ pub(crate) async fn set_artifact_reminder(
     if clear {
         push.clear_reminder(meta.id.0, ReminderScope::Org, String::new(), key.to_owned())
             .await
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("clear organization reminder", error))?;
         return tool_result(object! {
             "id" => OrderedJson::string(id),
             "key" => OrderedJson::string(key),
@@ -179,7 +176,7 @@ pub(crate) async fn set_artifact_reminder(
             PushError::BadTime => AppError::Validation(REMINDER_TIME_ERROR.to_owned()),
             PushError::BadText => AppError::Validation(REMINDER_TEXT_ERROR.to_owned()),
             PushError::ReminderLimit => AppError::Conflict(REMINDER_LIMIT_ERROR.to_owned()),
-            _ => AppError::Internal,
+            error => crate::error::internal("set organization reminder", error),
         })?;
     tool_result(object! {
         "id" => OrderedJson::string(id),
@@ -188,4 +185,45 @@ pub(crate) async fn set_artifact_reminder(
         "fire_at" => OrderedJson::number_i64(saved.fire_at),
         "revision" => OrderedJson::number_i64(saved.revision),
     })
+}
+
+fn data_error(error: DataError) -> AppError {
+    match error {
+        DataError::Unavailable | DataError::Internal => {
+            AppError::Unavailable(error.reason().into())
+        }
+        DataError::NotFound
+        | DataError::StaleVersion
+        | DataError::SourceConflict
+        | DataError::SourceInUse
+        | DataError::BindingInUse
+        | DataError::OrgInUse
+        | DataError::OperatorReadOnly
+        | DataError::TestUnavailable
+        | DataError::BadParams
+        | DataError::TooLarge
+        | DataError::InvalidSource
+        | DataError::InvalidDataSources
+        | DataError::MissingReference
+        | DataError::CredentialReferenceNotAllowed
+        | DataError::UnknownOrg
+        | DataError::ConfigError => AppError::Validation(error.reason().into()),
+    }
+}
+
+#[cfg(test)]
+mod data_error_tests {
+    use super::*;
+    #[test]
+    fn classifies_unavailability_without_changing_reason_text() {
+        for (error, token) in crate::data::error_cases() {
+            let mapped = data_error(error);
+            if token == "data_unavailable" {
+                assert_eq!(mapped, AppError::Unavailable(token.into()));
+            } else {
+                assert_eq!(mapped, AppError::Validation(token.into()));
+            }
+            assert_eq!(mapped.to_string(), token);
+        }
+    }
 }

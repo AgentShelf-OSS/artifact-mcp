@@ -11,7 +11,7 @@ use crate::model::{OrgId, Organization, Timestamp};
 // Synchronous operations — one connection, no `.await` (see `db::interact`)
 // ---------------------------------------------------------------------------
 
-/// `orgExists(name)` — [lib/orgs.js:53-55]
+/// `orgExists(name)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -26,7 +26,7 @@ pub fn org_exists(conn: &Connection, name: &str) -> Result<bool, AppError> {
     .map_err(|error| database_failure("org exists", &error))
 }
 
-/// `orgForDomain(domain)` — [lib/orgs.js:58-61]
+/// `orgForDomain(domain)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -34,7 +34,7 @@ pub fn org_for_domain(conn: &Connection, domain: &str) -> Result<Option<OrgId>, 
     domain_owner(conn, &norm_domain(domain)).map(|org| org.map(OrgId))
 }
 
-/// `orgForEmail(email)` — [lib/orgs.js:64-67]
+/// `orgForEmail(email)`
 ///
 /// The v21 column is `COLLATE NOCASE`, so an un-normalized address would still match; the
 /// normalization is kept anyway because Node performs it before the query.
@@ -45,7 +45,7 @@ pub fn org_for_email(conn: &Connection, email: &str) -> Result<Option<OrgId>, Ap
     email_owner(conn, &norm_email(email)).map(|org| org.map(OrgId))
 }
 
-/// `categoriesFor(org)` — [lib/orgs.js:69-71]
+/// `categoriesFor(org)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -58,7 +58,7 @@ pub fn categories(conn: &Connection, org: &str) -> Result<Vec<String>, AppError>
     .map_err(|error| database_failure("list categories", &error))
 }
 
-/// `listOrgNames()` — [lib/orgs.js:73-75]
+/// List organization names in ascending order.
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -73,7 +73,7 @@ pub fn org_names(conn: &Connection) -> Result<Vec<OrgId>, AppError> {
         .map_err(|error| database_failure("list org names", &error))
 }
 
-/// `listOrgs()` — [lib/orgs.js:77-89]
+/// List organizations with their membership, categories, and active key counts.
 ///
 /// # Errors
 /// [`AppError::Internal`] when any of the underlying queries fails.
@@ -113,7 +113,7 @@ pub fn list_orgs(conn: &Connection) -> Result<Vec<Organization>, AppError> {
     Ok(organizations)
 }
 
-/// `colorMap()` — [lib/orgs.js:92-96]
+/// Map organization IDs to their optional colors.
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -162,7 +162,7 @@ fn emails_for(conn: &Connection, org: &str) -> Result<Vec<String>, AppError> {
     .map_err(|error| database_failure("list org emails", &error))
 }
 
-/// `activeKeyCountsStmt` — [lib/orgs.js:14-16]
+/// `activeKeyCountsStmt`
 fn active_key_counts(conn: &Connection) -> Result<BTreeMap<String, u64>, AppError> {
     let mut statement = conn
         .prepare("SELECT org, COUNT(*) AS n FROM api_keys WHERE revoked_at IS NULL GROUP BY org")

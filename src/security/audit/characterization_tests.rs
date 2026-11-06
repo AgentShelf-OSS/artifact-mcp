@@ -219,7 +219,7 @@ fn scoped(org: &str, scopes: Option<&[&str]>) -> PublisherIdentity {
         client_id: "auditor".into(),
         org: org.into(),
         label: "audit".to_owned(),
-        role: "reader".to_owned(),
+        role: crate::model::Role::Reader,
         scopes: scopes.map(|scopes| {
             scopes
                 .iter()

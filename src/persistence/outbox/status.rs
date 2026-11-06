@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use rusqlite::Connection;
 
-use super::{QueueStatus, internal};
+use super::QueueStatus;
 
 struct QueueStatusRow {
     active: i64,
@@ -74,7 +74,7 @@ pub fn queue_status(conn: &Connection, now: i64) -> Result<QueueStatus, AppError
                 })
             },
         )
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("queue status", error))?;
     Ok(QueueStatus {
         active: u64::try_from(row.active).unwrap_or_default(),
         ready: u64::try_from(row.ready).unwrap_or_default(),

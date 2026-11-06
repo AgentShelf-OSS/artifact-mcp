@@ -24,5 +24,5 @@ pub use transition::{
     retry, verify_payload_hash,
 };
 
-use support::{find_event, get, hash, internal};
+use support::{find_event, get, hash};
 use validation::{validate, validate_dependency_contract};

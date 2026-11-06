@@ -9,9 +9,9 @@ use crate::{
     AppDeps,
     error::{AppError, McpError},
     model::{ArtifactId, PublisherIdentity},
-    persistence::collections::{
-        CollectionActor, CollectionPrincipal, CollectionStore, CollectionUpdate,
-        MAX_COLLECTIONS_PER_ORG,
+    ports::collections::{
+        CollectionActor, CollectionPrincipal, CollectionPublisher, CollectionService,
+        CollectionUpdate, MAX_COLLECTIONS_PER_ORG, NewCollection,
     },
     security::audit::MutationAudit,
 };
@@ -39,7 +39,7 @@ pub async fn call(
     let org = target_org(args, auth, deps).await?;
     let mut actor = actor;
     actor.org = org.clone();
-    if auth.role == "reader"
+    if auth.role == crate::model::Role::Reader
         && matches!(
             name,
             "create_collection"
@@ -54,31 +54,20 @@ pub async fn call(
         )
         .into());
     }
-    let store = store(deps)?;
+    let store = deps.collections.as_ref();
     let result = match name {
-        "list_collections" => list(args, auth, &store, actor, org).await,
-        "get_collection" => get(args, auth, &store, actor, org, deps).await,
-        "create_collection" => create(args, auth, &store, actor, org).await,
-        "update_collection" => update(args, auth, &store, actor, org).await,
-        "delete_collection" => delete(args, auth, &store, actor, org).await,
-        "add_artifacts_to_collection" => membership(args, auth, &store, actor, org, true).await,
+        "list_collections" => list(args, auth, store, actor, org).await,
+        "get_collection" => get(args, auth, store, actor, org, deps).await,
+        "create_collection" => create(args, auth, store, actor, org).await,
+        "update_collection" => update(args, auth, store, actor, org).await,
+        "delete_collection" => delete(args, auth, store, actor, org).await,
+        "add_artifacts_to_collection" => membership(args, auth, store, actor, org, true).await,
         "remove_artifacts_from_collection" => {
-            membership(args, auth, &store, actor, org, false).await
+            membership(args, auth, store, actor, org, false).await
         }
         _ => Err(AppError::Internal.into()),
     };
     result.map_err(collection_error)
-}
-
-fn store(deps: &AppDeps) -> Result<CollectionStore, McpError> {
-    let pool = deps
-        .data
-        .pool()
-        .ok_or_else(|| AppError::Unavailable("database unavailable".into()))?;
-    Ok(match deps.audit_access.as_ref() {
-        Some(audit) => CollectionStore::with_audit(pool, audit.mutation_key()),
-        None => CollectionStore::new(pool),
-    })
 }
 
 fn actor(auth: &PublisherIdentity, deps: &AppDeps) -> CollectionActor {
@@ -95,7 +84,13 @@ fn actor(auth: &PublisherIdentity, deps: &AppDeps) -> CollectionActor {
         org: auth.org.0.clone(),
         is_admin: auth.is_admin(),
         principal,
-        publisher: Some(auth.clone()),
+        publisher: Some(CollectionPublisher {
+            org: auth.org.0.clone(),
+            client_id: auth.client_id.0.clone(),
+            role: auth.role,
+            is_admin: auth.is_admin(),
+            can_publish: auth.has_scope("artifacts:publish"),
+        }),
     }
 }
 
@@ -236,14 +231,14 @@ fn next_cursor(
     )
 }
 
-fn summary(row: &crate::persistence::collections::Collection, actor: &CollectionActor) -> Value {
-    json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.clone().unwrap_or_default(),"cover_artifact_id":row.cover_artifact_id.clone().unwrap_or_default(),"artifact_count":row.artifact_count,"editable":actor.publisher.as_ref().is_none_or(|p| p.role != "reader" && p.has_scope("artifacts:publish")) && (actor.is_admin || (row.created_by_kind == actor.principal.kind_id().0 && row.created_by == actor.principal.kind_id().1))})
+fn summary(row: &crate::ports::collections::Collection, actor: &CollectionActor) -> Value {
+    json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.clone().unwrap_or_default(),"cover_artifact_id":row.cover_artifact_id.clone().unwrap_or_default(),"artifact_count":row.artifact_count,"editable":actor.publisher.as_ref().is_none_or(|p| p.role != crate::model::Role::Reader && p.can_publish) && (actor.is_admin || (row.created_by_kind == actor.principal.kind_id().0 && row.created_by == actor.principal.kind_id().1))})
 }
 
 async fn list(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     actor: CollectionActor,
     org: String,
 ) -> Result<Value, McpError> {
@@ -293,7 +288,7 @@ async fn list(
 async fn get(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     actor: CollectionActor,
     org: String,
     deps: &AppDeps,
@@ -366,7 +361,7 @@ async fn get(
 async fn create(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     mut actor: CollectionActor,
     org: String,
 ) -> Result<Value, McpError> {
@@ -377,16 +372,19 @@ async fn create(
     let row = store
         .create_atomic(
             &actor,
-            collection_id()?,
-            name,
-            args.get("description")
-                .and_then(OrderedJson::as_str)
-                .unwrap_or_default()
-                .to_owned(),
-            empty_clear(args, "color"),
-            cover,
-            ids,
-            Some(MutationAudit::publisher(auth)?),
+            NewCollection {
+                id: collection_id()?,
+                name,
+                description: args
+                    .get("description")
+                    .and_then(OrderedJson::as_str)
+                    .unwrap_or_default()
+                    .to_owned(),
+                color: empty_clear(args, "color"),
+                cover,
+                artifact_ids: ids,
+            },
+            MutationAudit::publisher(auth)?,
         )
         .await?;
     Ok(json!({"collection":project_summary(&row,&actor,store).await?}))
@@ -394,7 +392,7 @@ async fn create(
 async fn update(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     mut actor: CollectionActor,
     org: String,
 ) -> Result<Value, McpError> {
@@ -426,7 +424,7 @@ async fn update(
             &actor,
             collection_id.clone(),
             u,
-            Some(MutationAudit::publisher(auth)?),
+            MutationAudit::publisher(auth)?,
         )
         .await?;
     let row = store
@@ -440,7 +438,7 @@ async fn update(
 async fn delete(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     actor: CollectionActor,
     org: String,
 ) -> Result<Value, McpError> {
@@ -451,7 +449,7 @@ async fn delete(
         .delete_audited(
             &actor,
             collection_id.clone(),
-            Some(MutationAudit::publisher(auth)?),
+            MutationAudit::publisher(auth)?,
         )
         .await?;
     Ok(json!({"id":collection_id,"deleted":true}))
@@ -459,7 +457,7 @@ async fn delete(
 async fn membership(
     args: &OrderedJson,
     auth: &PublisherIdentity,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
     actor: CollectionActor,
     org: String,
     add: bool,
@@ -470,21 +468,21 @@ async fn membership(
     actor.org = org;
     if add {
         let (added, already_present) = store
-            .add_memberships_diff_audited(
+            .add_memberships_audited(
                 &actor,
                 collection_id.clone(),
                 ids.clone(),
-                Some(MutationAudit::publisher(auth)?),
+                MutationAudit::publisher(auth)?,
             )
             .await?;
         Ok(json!({"collection_id":collection_id,"added":added,"already_present":already_present}))
     } else {
         let (removed, already_absent) = store
-            .remove_memberships_diff_audited(
+            .remove_memberships_audited(
                 &actor,
                 collection_id.clone(),
                 ids.clone(),
-                Some(MutationAudit::publisher(auth)?),
+                MutationAudit::publisher(auth)?,
             )
             .await?;
         Ok(json!({"collection_id":collection_id,"removed":removed,"already_absent":already_absent}))
@@ -521,14 +519,15 @@ fn empty_clear(args: &OrderedJson, key: &str) -> Option<String> {
 
 fn collection_id() -> Result<String, AppError> {
     let mut bytes = [0_u8; 6];
-    getrandom::fill(&mut bytes).map_err(|_| AppError::Internal)?;
+    getrandom::fill(&mut bytes)
+        .map_err(|error| crate::error::internal("generate collection id", error))?;
     Ok(hex::encode(bytes))
 }
 
 async fn project_summary(
-    row: &crate::persistence::collections::Collection,
+    row: &crate::ports::collections::Collection,
     actor: &CollectionActor,
-    store: &CollectionStore,
+    store: &dyn CollectionService,
 ) -> Result<Value, McpError> {
     let ids = store
         .readable_members(actor, row.id.clone(), 0, 1000)

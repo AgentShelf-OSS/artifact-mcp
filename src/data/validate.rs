@@ -1,4 +1,5 @@
 //! Source, parameter, and binding validation, and upstream request building.
+use super::DataError;
 use super::{
     BindingManifest, MAX_BINDINGS, MAX_BYTES, MAX_POST_BODY, OperationConfig, ParamConfig,
     SourceConfig,
@@ -81,19 +82,19 @@ pub(super) fn managed_credential_names(names: impl IntoIterator<Item = OsString>
 /// Rejects a managed connection definition whose credential references break
 /// [`managed_credential_allowed`]. Runs when an administrator saves, not at startup, so a
 /// connection saved before the rule loads and reports `config_error` instead.
-pub(super) fn validate_managed_credentials(s: &SourceConfig) -> Result<(), String> {
+pub(super) fn validate_managed_credentials(s: &SourceConfig) -> Result<(), DataError> {
     if s.headers_env
         .iter()
         .all(|(header, env)| managed_credential_allowed(header, env))
     {
         Ok(())
     } else {
-        Err("credential_reference_not_allowed".into())
+        Err(DataError::CredentialReferenceNotAllowed)
     }
 }
 
-pub(super) fn validate_source(s: &SourceConfig) -> Result<(), String> {
-    let error = || "invalid_data_sources".to_owned();
+pub(super) fn validate_source(s: &SourceConfig) -> Result<(), DataError> {
+    let error = || DataError::InvalidDataSources;
     if !valid_name(&s.id)
         || s.org.trim().is_empty()
         || !matches!(s.kind.as_str(), "http" | "push")
@@ -120,7 +121,7 @@ pub(super) fn validate_source(s: &SourceConfig) -> Result<(), String> {
     validate_subscriptions(s, &error)
 }
 
-fn validate_operations(s: &SourceConfig, error: &dyn Fn() -> String) -> Result<(), String> {
+fn validate_operations(s: &SourceConfig, error: &dyn Fn() -> DataError) -> Result<(), DataError> {
     for (n, o) in &s.operations {
         let post = o.method == "POST";
         let max_timeout = if o.stream { 120000 } else { 30000 };
@@ -191,7 +192,10 @@ fn validate_operations(s: &SourceConfig, error: &dyn Fn() -> String) -> Result<(
     Ok(())
 }
 
-fn validate_subscriptions(s: &SourceConfig, error: &dyn Fn() -> String) -> Result<(), String> {
+fn validate_subscriptions(
+    s: &SourceConfig,
+    error: &dyn Fn() -> DataError,
+) -> Result<(), DataError> {
     for (n, sub) in &s.subscriptions {
         if !valid_name(n)
             || sub.events.len() > 16
@@ -241,27 +245,27 @@ pub(super) fn validate_param(
     c: &ParamConfig,
     v: &Value,
     check_enum: bool,
-) -> Result<String, String> {
+) -> Result<String, DataError> {
     let value = match c.kind.as_str() {
         "string" => {
-            let s = v.as_str().ok_or("bad_params")?;
+            let s = v.as_str().ok_or(DataError::BadParams)?;
             if s.chars().count() > c.max_length.unwrap_or(256) {
-                return Err("bad_params".into());
+                return Err(DataError::BadParams);
             }
             s.to_owned()
         }
         "integer" => {
-            let i = v.as_i64().ok_or("bad_params")?;
+            let i = v.as_i64().ok_or(DataError::BadParams)?;
             if c.minimum.is_some_and(|m| i < m) || c.maximum.is_some_and(|m| i > m) {
-                return Err("bad_params".into());
+                return Err(DataError::BadParams);
             }
             i.to_string()
         }
-        "boolean" => v.as_bool().ok_or("bad_params")?.to_string(),
-        _ => return Err("bad_params".into()),
+        "boolean" => v.as_bool().ok_or(DataError::BadParams)?.to_string(),
+        _ => return Err(DataError::BadParams),
     };
     if check_enum && c.enum_values.as_ref().is_some_and(|e| !e.contains(v)) {
-        return Err("bad_params".into());
+        return Err(DataError::BadParams);
     }
     Ok(value)
 }
@@ -269,15 +273,15 @@ pub(super) fn validate_bindings(
     m: &BindingManifest,
     sources: &BTreeMap<String, SourceConfig>,
     org: &str,
-) -> Result<(), String> {
+) -> Result<(), DataError> {
     if m.bindings.len() > MAX_BINDINGS {
-        return Err("bad_params".into());
+        return Err(DataError::BadParams);
     }
     for (n, b) in &m.bindings {
         let s = sources
             .get(&b.source)
             .filter(|s| s.org == org)
-            .ok_or("bad_params")?;
+            .ok_or(DataError::BadParams)?;
         if !valid_name(n)
             || b.operations.iter().collect::<HashSet<_>>().len() != b.operations.len()
             || b.subscriptions.iter().collect::<HashSet<_>>().len() != b.subscriptions.len()
@@ -286,7 +290,7 @@ pub(super) fn validate_bindings(
                 .iter()
                 .any(|n| !s.subscriptions.contains_key(n))
         {
-            return Err("bad_params".into());
+            return Err(DataError::BadParams);
         }
     }
     Ok(())
@@ -295,7 +299,7 @@ pub(super) fn build_url(
     s: &SourceConfig,
     o: &OperationConfig,
     params: &Value,
-) -> Result<Url, String> {
+) -> Result<Url, DataError> {
     build_request(s, o, params).map(|(url, _)| url)
 }
 /// Builds the upstream URL and, for POST operations, the typed JSON body (ADR-0017).
@@ -303,14 +307,14 @@ pub(super) fn build_request(
     s: &SourceConfig,
     o: &OperationConfig,
     params: &Value,
-) -> Result<(Url, Option<Value>), String> {
-    let object = params.as_object().ok_or("bad_params")?;
+) -> Result<(Url, Option<Value>), DataError> {
+    let object = params.as_object().ok_or(DataError::BadParams)?;
     if object.keys().any(|p| !o.params.contains_key(p)) {
-        return Err("bad_params".into());
+        return Err(DataError::BadParams);
     }
-    let mut url = Url::parse(s.base_url.as_deref().ok_or("data_unavailable")?)
-        .map_err(|_| "data_unavailable")?;
-    let mut path = o.path.clone().ok_or("data_unavailable")?;
+    let mut url = Url::parse(s.base_url.as_deref().ok_or(DataError::Unavailable)?)
+        .map_err(|error| DataError::internal("build request", error))?;
+    let mut path = o.path.clone().ok_or(DataError::Unavailable)?;
     let original = path.clone();
     let mut query = Vec::new();
     let post = o.method == "POST";
@@ -318,7 +322,7 @@ pub(super) fn build_request(
     for (p, c) in &o.params {
         let Some(v) = object.get(p).or(c.default.as_ref()) else {
             if c.required {
-                return Err("bad_params".into());
+                return Err(DataError::BadParams);
             }
             continue;
         };
@@ -331,7 +335,7 @@ pub(super) fn build_request(
                 || value.contains('\\')
                 || value.chars().any(char::is_control)
             {
-                return Err("bad_params".into());
+                return Err(DataError::BadParams);
             }
             let encoded: String = value
                 .as_bytes()
@@ -359,8 +363,12 @@ pub(super) fn build_request(
         return Ok((url, None));
     }
     let body = Value::Object(body);
-    if serde_json::to_vec(&body).map_err(|_| "bad_params")?.len() > MAX_POST_BODY {
-        return Err("too_large".into());
+    if serde_json::to_vec(&body)
+        .map_err(|_| DataError::BadParams)?
+        .len()
+        > MAX_POST_BODY
+    {
+        return Err(DataError::TooLarge);
     }
     Ok((url, Some(body)))
 }

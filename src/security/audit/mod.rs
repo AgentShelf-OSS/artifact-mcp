@@ -1,19 +1,12 @@
-//! PBI-058 durable security-audit ledger primitives.
+//! Durable security-audit ledger primitives.
 //!
-//! This is the Rust twin of `lib/audit.js`. It intentionally accepts only server-derived
-//! contexts and fixed identifiers; request bodies and credentials never cross this boundary.
+//! The ledger accepts only server-derived contexts and fixed identifiers; request bodies and credentials never cross this boundary.
 //!
 //! Failure policy is deliberately non-oracular:
-//! - verified successful SQLite mutations append exactly one terminal event in the business
-//!   transaction; append/key failures roll back the mutation;
-//! - validation failures, missing/no-op targets, unauthenticated requests, and concealed probes
-//!   append nothing, because a ledger row could confirm a probed identifier;
-//! - terminal `denied`/`failure` rows are allowed only after authorization and target disclosure
-//!   are established, so they cannot create an existence oracle;
-//! - the authorized webhook-test exception commits a redacted requested marker before external
-//!   I/O and one correlated terminal success/failure afterward. A crash can leave requested-only
-//!   evidence and a manual retry may redeliver, but the ledger never silently erases the attempt
-//!   or claims external atomicity/exactly-once delivery.
+//! - verified successful SQLite mutations append exactly one terminal event in the business transaction; append/key failures roll back the mutation;
+//! - validation failures, missing/no-op targets, unauthenticated requests, and concealed probes append nothing, because a ledger row could confirm a probed identifier;
+//! - terminal `denied`/`failure` rows are allowed only after authorization and target disclosure are established, so they cannot create an existence oracle;
+//! - the authorized webhook-test exception commits a redacted requested marker before external I/O and one correlated terminal success/failure afterward. A crash can leave requested-only evidence and a manual retry may redeliver, but the ledger never silently erases the attempt or claims external atomicity/exactly-once delivery.
 
 mod access;
 mod append;

@@ -1,4 +1,5 @@
 //! Viewer subscription streams over push, poll, and SSE transports.
+use super::DataError;
 use super::{
     Binding, DataBroker, DataEnvelope, DataStream, MAX_BYTES, RequestedSubscription, SourceConfig,
     SubscriptionConfig,
@@ -18,9 +19,9 @@ impl DataBroker {
         id: &str,
         topics: Vec<RequestedSubscription>,
         cursor: BTreeMap<String, String>,
-    ) -> Result<DataStream, String> {
+    ) -> Result<DataStream, DataError> {
         if topics.is_empty() || topics.len() > 16 {
-            return Err("bad_params".into());
+            return Err(DataError::BadParams);
         }
         let mut unique = HashSet::new();
         let mut selected = Vec::new();
@@ -29,16 +30,16 @@ impl DataBroker {
                 || !valid_name(&topic.subscription)
                 || !unique.insert(format!("{}:{}", topic.binding, topic.subscription))
             {
-                return Err("bad_params".into());
+                return Err(DataError::BadParams);
             }
             let (binding, source) = self.binding_source(id, &topic.binding).await?;
             if !binding.subscriptions.contains(&topic.subscription) {
-                return Err("not_found".into());
+                return Err(DataError::NotFound);
             }
             let sub = source
                 .subscriptions
                 .get(&topic.subscription)
-                .ok_or("not_found")?
+                .ok_or(DataError::NotFound)?
                 .clone();
             selected.push((topic, binding, source, sub));
         }
@@ -46,7 +47,7 @@ impl DataBroker {
             .stream_slots
             .clone()
             .try_acquire_owned()
-            .map_err(|_| "data_unavailable")?;
+            .map_err(|error| DataError::internal("stream", error))?;
         let (tx, receiver) = mpsc::channel(32);
         let mut tasks = Vec::new();
         for (topic, binding, source, sub) in selected {
@@ -199,7 +200,7 @@ impl DataBroker {
         binding: &Binding,
         cursor: &mut Option<String>,
         tx: &mpsc::Sender<DataEnvelope>,
-    ) -> Result<(), String> {
+    ) -> Result<(), DataError> {
         emit(tx, topic, "data:status", "", json!({"state":"connected"})).await?;
         loop {
             if !self.current_binding(id, topic, binding).await {
@@ -242,11 +243,11 @@ impl DataBroker {
         source: &SourceConfig,
         sub: &SubscriptionConfig,
         tx: &mpsc::Sender<DataEnvelope>,
-    ) -> Result<(), String> {
+    ) -> Result<(), DataError> {
         let operation = source
             .operations
-            .get(sub.operation.as_deref().ok_or("data_unavailable")?)
-            .ok_or("data_unavailable")?;
+            .get(sub.operation.as_deref().ok_or(DataError::Unavailable)?)
+            .ok_or(DataError::Unavailable)?;
         loop {
             if !self.current_binding(id, topic, binding).await {
                 return Ok(());
@@ -259,11 +260,8 @@ impl DataBroker {
                 return Ok(());
             }
             let result = self.http_query(source, operation, &json!({})).await;
-            self.record_query_health(
-                &binding.source,
-                result.as_ref().map(|_| ()).map_err(|error| error.as_str()),
-            )
-            .await;
+            self.record_query_health(&binding.source, result.as_ref().map(|_| ()))
+                .await;
             let value = result?;
             emit(tx, topic, "data:status", "", json!({"state":"connected"})).await?;
             self.record_event_health(&binding.source, Ok(())).await;
@@ -281,13 +279,13 @@ impl DataBroker {
         sub: &SubscriptionConfig,
         cursor: &mut Option<String>,
         tx: &mpsc::Sender<DataEnvelope>,
-    ) -> Result<(), String> {
-        let mut url = Url::parse(source.base_url.as_deref().ok_or("data_unavailable")?)
-            .map_err(|_| "data_unavailable")?;
+    ) -> Result<(), DataError> {
+        let mut url = Url::parse(source.base_url.as_deref().ok_or(DataError::Unavailable)?)
+            .map_err(|error| DataError::internal("sse stream", error))?;
         url.set_path(&format!(
             "{}{}",
             url.path().trim_end_matches('/'),
-            sub.path.as_deref().ok_or("data_unavailable")?
+            sub.path.as_deref().ok_or(DataError::Unavailable)?
         ));
         let mut request = self
             .client
@@ -299,8 +297,8 @@ impl DataBroker {
         }
         let mut response = tokio::time::timeout(Duration::from_secs(10), request.send())
             .await
-            .map_err(|_| "data_unavailable")?
-            .map_err(|_| "data_unavailable")?;
+            .map_err(|error| DataError::internal("sse stream", error))?
+            .map_err(|error| DataError::internal("sse stream", error))?;
         if !response.status().is_success()
             || !response
                 .headers()
@@ -308,7 +306,7 @@ impl DataBroker {
                 .and_then(|v| v.to_str().ok())
                 .is_some_and(|s| s.starts_with("text/event-stream"))
         {
-            return Err("data_unavailable".into());
+            return Err(DataError::Unavailable);
         }
         emit(tx, topic, "data:status", "", json!({"state":"connected"})).await?;
         let mut activity = tokio::time::Instant::now();
@@ -323,23 +321,23 @@ impl DataBroker {
                 _=tx.closed()=>return Ok(()),
                 _=check.tick()=>{if !self.current_binding(id,topic,binding).await || !self.source_record(&binding.source).await.is_ok_and(|(_, enabled, _, _)| enabled) {return Ok(())}
                     if self.current_source(id,binding,&topic.subscription,source).await.is_some() {return Ok(())}
-                    if activity.elapsed()>Duration::from_secs(45){return Err("data_unavailable".into())}continue;},
-                chunk=response.chunk()=>chunk.map_err(|_|"data_unavailable")?,
+                    if activity.elapsed()>Duration::from_secs(45){return Err(DataError::Unavailable)}continue;},
+                chunk=response.chunk()=>chunk.map_err(|error| DataError::internal("sse stream", error))?,
             };
             let Some(chunk) = chunk else { return Ok(()) };
             activity = tokio::time::Instant::now();
             if pending.len() + chunk.len() > MAX_BYTES {
-                return Err("too_large".into());
+                return Err(DataError::TooLarge);
             }
             pending.extend_from_slice(&chunk);
             while let Some(pos) = pending.iter().position(|b| *b == b'\n') {
                 let bytes: Vec<u8> = pending.drain(..=pos).collect();
                 frame_bytes += bytes.len();
                 if frame_bytes > MAX_BYTES {
-                    return Err("too_large".into());
+                    return Err(DataError::TooLarge);
                 }
                 let line = std::str::from_utf8(&bytes[..pos])
-                    .map_err(|_| "data_unavailable")?
+                    .map_err(|error| DataError::internal("sse stream", error))?
                     .trim_end_matches('\r');
                 if line.is_empty() {
                     let kind = if event.is_empty() { "message" } else { &event };
@@ -383,7 +381,7 @@ pub(super) async fn emit(
     event: &str,
     id: &str,
     data: Value,
-) -> Result<(), String> {
+) -> Result<(), DataError> {
     tx.send(DataEnvelope {
         binding: topic.binding.clone(),
         subscription: topic.subscription.clone(),
@@ -392,5 +390,5 @@ pub(super) async fn emit(
         data,
     })
     .await
-    .map_err(|_| "data_unavailable".into())
+    .map_err(|error| DataError::internal("emit", error))
 }

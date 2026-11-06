@@ -136,7 +136,7 @@ pub fn valid_endpoint(endpoint: &str, allowlist: &[String]) -> bool {
         && matches!(url.host(), Some(url::Host::Domain(host)) if host_allowed(host, allowlist))
 }
 
-/// Decode canonical base64url (optional `=` padding), as `base64urlBytes` in `lib/push.js`.
+/// Decode canonical base64url with optional `=` padding.
 #[must_use]
 pub fn base64url_bytes(value: &str) -> Option<Vec<u8>> {
     let unpadded = value.trim_end_matches('=');
@@ -171,7 +171,7 @@ pub fn endpoint_sha256(endpoint: &str) -> String {
 }
 
 /// One-column form of the `WEBHOOK_ENC_KEY` record: `v1:<nonce>:<ciphertext>:<tag>` (standard
-/// base64), shared with `packEndpointCiphertext` in `lib/push.js`.
+/// base64), matching the packed endpoint ciphertext format.
 #[must_use]
 pub fn pack_endpoint_ciphertext(record: &EncryptedUrl) -> String {
     format!("v1:{}:{}:{}", record.nonce, record.ciphertext, record.tag)

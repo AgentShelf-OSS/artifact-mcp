@@ -1,19 +1,17 @@
-//! Owned by U07 (terra) — authorization-gated body reads.
+//! Authorization-gated body reads.
 //!
-//! Read-only. Staging, swapping, trash, history pruning, and reconciliation are U08's.
+//! Staging, swapping, trash, history pruning, and reconciliation belong to the lifecycle module.
 //!
 //! Node oracle:
 //!
-//! - `MIME` / `mimeFor` — [lib/store.js:21-27], [lib/store.js:46-48]
-//! - `readArtifact` — [lib/store.js:494-501]
-//! - `readBundleFile` — [lib/store.js:482-492]
-//! - `readHistoryArtifact` — [lib/store.js:583-589]
-//! - `readHistoryBundleFile` — [lib/store.js:591-601]
-//! - `readTree` — [lib/store.js:527-536]
+//! - `MIME` / `mimeFor`
+//! - `readArtifact`
+//! - `readBundleFile`
+//! - `readHistoryArtifact`
+//! - `readHistoryBundleFile`
+//! - `readTree`
 //!
-//! Authorization is *not* performed here. The frozen ports take an `AuthorizedArtifact`
-//! (contract §"Frozen domain and access types"), so the caller has already proven access; these
-//! functions receive only the validated id and the metadata fields the read depends on.
+//! Authorization is *not* performed here. The frozen ports take an `AuthorizedArtifact` (contract §"Frozen domain and access types"), so the caller has already proven access; these functions receive only the validated id and the metadata fields the read depends on.
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -24,7 +22,7 @@ use crate::model::ArtifactFile;
 use super::paths::{self, SafeArtifactId};
 use super::validation::{contained_path, sanitize_relative_path};
 
-/// `MIME` — [lib/store.js:21-27]. Frozen: this exact table is what raw delivery emits.
+/// `MIME`. Frozen: this exact table is what raw delivery emits.
 pub const MIME_TABLE: [(&str, &str); 19] = [
     ("html", "text/html; charset=utf-8"),
     ("htm", "text/html; charset=utf-8"),
@@ -47,16 +45,15 @@ pub const MIME_TABLE: [(&str, &str); 19] = [
     ("xml", "application/xml"),
 ];
 
-/// `|| "application/octet-stream"` — [lib/store.js:47]
+/// `|| "application/octet-stream"`
 pub const DEFAULT_CONTENT_TYPE: &str = "application/octet-stream";
 
 /// The content type every single-file body is served with. A single-file artifact is always
 /// HTML by construction (`<id>.html`), and the routes hard-code this string rather than
-/// deriving it. [lib/app.js:138], [lib/app.js:447], [lib/app.js:485]
+/// deriving it.
 pub const SINGLE_BODY_CONTENT_TYPE: &str = "text/html; charset=utf-8";
 
 /// ``mimeFor(filePath) = MIME[filePath.split(".").pop().toLowerCase()] || "application/octet-stream"``
-/// — [lib/store.js:46-48]
 ///
 /// `split(".").pop()` is not "the file extension": a name with no dot yields the whole name,
 /// `"a.tar.gz"` yields `gz`, and `"file."` yields the empty string. All three fall through to
@@ -80,7 +77,7 @@ pub fn mime_for(rel: &str) -> &'static str {
 // Single-file bodies
 // ---------------------------------------------------------------------------
 
-/// The body half of `readArtifact(id)` — [lib/store.js:494-501]
+/// The body half of `readArtifact(id)`
 ///
 /// Node's `isReserved` gate is already enforced by [`SafeArtifactId::addressable`], and the
 /// metadata lookup belongs to the persistence layer, so what remains is: read the file, or
@@ -97,7 +94,7 @@ pub fn read_body(artifact_dir: &Path, id: &SafeArtifactId) -> Option<ArtifactFil
     )
 }
 
-/// The body half of `readHistoryArtifact(id, revision)` — [lib/store.js:583-589]
+/// The body half of `readHistoryArtifact(id, revision)`
 ///
 /// The caller supplies the revision row's `is_bundle`; Node returns `null` for a bundle
 /// revision here, which is expressed by the `is_bundle` guard at the call site.
@@ -117,7 +114,7 @@ pub fn read_revision_body(
 // Bundle bodies
 // ---------------------------------------------------------------------------
 
-/// The body half of `readBundleFile(id, relPath)` — [lib/store.js:482-492]
+/// The body half of `readBundleFile(id, relPath)`
 #[must_use]
 pub fn read_bundle_file(
     artifact_dir: &Path,
@@ -128,7 +125,7 @@ pub fn read_bundle_file(
     read_bundle_file_at(&paths::bundle_dir(artifact_dir, id), entry, requested)
 }
 
-/// The body half of `readHistoryBundleFile(id, revision, relPath)` — [lib/store.js:591-601]
+/// The body half of `readHistoryBundleFile(id, revision, relPath)`
 ///
 /// `entry` is the *revision row's* entry, not the current metadata's.
 #[must_use]
@@ -153,7 +150,8 @@ pub fn list_bundle_files(root: &Path) -> Result<Option<Vec<(String, u64)>>, AppE
         return Ok(None);
     }
     let mut listed = Vec::new();
-    collect_bundle_files(root, root, &mut listed).map_err(|_| AppError::Internal)?;
+    collect_bundle_files(root, root, &mut listed)
+        .map_err(|error| crate::error::internal("list bundle files", error))?;
     listed.sort_by(|left, right| left.0.encode_utf16().cmp(right.0.encode_utf16()));
     Ok(Some(listed))
 }
@@ -192,7 +190,6 @@ fn collect_bundle_files(
 /// if (!files.existsSync(full) || !files.statSync(full).isFile()) return null;
 /// return { content: files.readFileSync(full), contentType: mimeFor(rel) };
 /// ```
-/// — [lib/store.js:485-491]
 ///
 /// Note that the stored `entry` is used *unsanitized* when no path is requested: it was
 /// sanitized when the bundle was written, and re-sanitizing would not change it.
@@ -213,20 +210,21 @@ pub fn read_bundle_file_at(
     read_file_at(&full, mime_for(&rel))
 }
 
-/// `readTree(dir)` — [lib/store.js:527-536]
+/// `readTree(dir)`
 ///
 /// Reads a bundle snapshot back into `{ 'rel/path': content }`. Node decodes as UTF-8, so
 /// invalid sequences become U+FFFD; `from_utf8_lossy` matches that.
 ///
 /// The returned map is ordered lexicographically rather than by directory enumeration. Node's
-/// only caller is `restoreById`, which passes an explicit `entry` alongside it
-/// ([lib/store.js:617-618]), so entry auto-selection never observes the difference.
+/// only caller is `restoreById`, which passes an explicit `entry` alongside it,
+/// so entry auto-selection never observes the difference.
 ///
 /// # Errors
 /// [`AppError::Internal`] if the snapshot cannot be walked.
 pub fn read_tree(root: &Path) -> Result<BTreeMap<String, String>, AppError> {
     let mut out = BTreeMap::new();
-    collect_tree(root, root, &mut out).map_err(|_| AppError::Internal)?;
+    collect_tree(root, root, &mut out)
+        .map_err(|error| crate::error::internal("read artifact tree", error))?;
     Ok(out)
 }
 
@@ -257,7 +255,6 @@ fn collect_tree(
 }
 
 /// `if (!files.existsSync(full) || !files.statSync(full).isFile()) return null;`
-/// — [lib/store.js:490]
 ///
 /// A directory, a broken symlink, or an unreadable file all become `None`, exactly as Node's
 /// `existsSync`/`isFile` pair does.

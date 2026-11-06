@@ -2,7 +2,6 @@
 
 #![forbid(unsafe_code)]
 
-pub mod actions;
 pub mod adapters;
 pub mod app;
 pub mod artifacts;

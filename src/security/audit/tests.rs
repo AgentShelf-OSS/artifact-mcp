@@ -29,7 +29,7 @@ fn scoped(org: &str, scopes: &[&str]) -> PublisherIdentity {
         client_id: "auditor".into(),
         org: org.into(),
         label: "audit".to_owned(),
-        role: "reader".to_owned(),
+        role: crate::model::Role::Reader,
         scopes: Some(
             scopes
                 .iter()
@@ -139,7 +139,7 @@ fn terminal_event_ids_are_distinct_from_request_correlation() {
         client_id: "key-1".into(),
         org: "acme".into(),
         label: "test".to_owned(),
-        role: "admin".to_owned(),
+        role: crate::model::Role::Author,
         scopes: None,
     };
     let audit = MutationAudit::publisher(&publisher).expect("random audit context");

@@ -34,7 +34,7 @@ mod support;
 fn managed_definition_reuses_strict_source_schema() {
     let invalid = r#"{"sources":[{"id":"demo","org":"acme","kind":"http","base_url":"http://127.0.0.1","operations":{"status":{"path":"/status","unexpected":true}}}]}"#;
     assert!(
-        matches!(DataBroker::from_json(invalid), Err(error) if error == "invalid_data_sources")
+        matches!(DataBroker::from_json(invalid), Err(error) if error.reason() == "invalid_data_sources")
     );
 }
 
@@ -42,7 +42,7 @@ fn managed_definition_reuses_strict_source_schema() {
 fn push_sources_reject_http_configuration() {
     let invalid = r#"{"sources":[{"id":"demo","org":"acme","kind":"push","base_url":"http://127.0.0.1","operations":{"status":{}},"subscriptions":{"events":{"transport":"push"}}}]}"#;
     assert!(
-        matches!(DataBroker::from_json(invalid), Err(error) if error == "invalid_data_sources")
+        matches!(DataBroker::from_json(invalid), Err(error) if error.reason() == "invalid_data_sources")
     );
 }
 
@@ -55,7 +55,7 @@ async fn managed_source_audit_failure_rolls_back_the_insert() {
         client_id: ClientId("admin".into()),
         org: OrgId("acme".into()),
         label: "test".into(),
-        role: "admin".into(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     })
     .unwrap();
@@ -153,7 +153,7 @@ async fn source_edit_disable_reenable_restarts_only_affected_long_sse() {
             client_id: ClientId("admin".into()),
             org: OrgId("acme".into()),
             label: "test".into(),
-            role: "admin".into(),
+            role: artifact_mcp::model::Role::Author,
             scopes: None,
         })
         .unwrap()
@@ -289,7 +289,7 @@ fn admin_audit() -> MutationAudit {
         client_id: ClientId("admin".into()),
         org: OrgId("acme".into()),
         label: "test".into(),
-        role: "admin".into(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     })
     .unwrap()
@@ -333,7 +333,8 @@ async fn managed_sources_reference_only_managed_credential_variables() {
             .await
             .expect_err("reference must be rejected");
         assert_eq!(
-            error, "credential_reference_not_allowed",
+            error.reason(),
+            "credential_reference_not_allowed",
             "{header} -> {env}"
         );
     }
@@ -362,7 +363,7 @@ async fn managed_sources_reference_only_managed_credential_variables() {
         )
         .await
         .expect_err("an edit cannot widen the reference");
-    assert_eq!(error, "credential_reference_not_allowed");
+    assert_eq!(error.reason(), "credential_reference_not_allowed");
 }
 
 async fn count_request(State(requests): State<Arc<AtomicUsize>>) -> Response<Body> {
@@ -470,7 +471,8 @@ async fn stored_reference_outside_the_managed_prefix_is_never_sent() {
         broker
             .test_source("metrics", "status", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "test_unavailable"
     );
     assert!(

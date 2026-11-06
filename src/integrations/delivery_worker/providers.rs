@@ -24,7 +24,7 @@ impl WorkerProvider for DiscordProviderTransport {
     }
 }
 
-/// Provider port for PBI-079's forum/media-thread operations.
+/// Provider port for forum/media-thread operations.
 pub trait WorkerDiscussionProvider: Send + Sync {
     fn deliver<'a>(
         &'a self,

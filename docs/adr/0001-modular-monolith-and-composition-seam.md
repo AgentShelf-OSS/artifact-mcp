@@ -3,6 +3,8 @@
 - **Status:** Accepted
 - **Date:** 2026-07-09
 
+Amended 2026-11-06 by ADR-0024: in the Rust server, the composition seam is `build_router` with `AppDeps` (`src/app.rs`). Each port is an `Arc<dyn Trait>` injected by `src/main.rs` and by tests.
+
 ## Context
 
 artifact-mcp is one small operational unit, but route registration, production configuration, database imports, policy checks, rendering, and listener startup previously lived together in `server.js`. Importing the application started real infrastructure, repeated tenant checks across routes, and made HTTP behavior difficult to test without a production-shaped environment.

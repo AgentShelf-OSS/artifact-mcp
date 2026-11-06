@@ -7,10 +7,10 @@ impl StoreContext {
     // update
     // -----------------------------------------------------------------------
 
-    /// `update({ … })` — [lib/store.js:314-442]
+    /// `update({ … })`
     ///
     /// `expected_revision` is already resolved by the caller: Node substitutes `meta.revision`
-    /// when the client omitted it ([lib/store.js:318], [lib/mcp.js:407]), and the frozen
+    /// when the client omitted it, and the frozen
     /// [`ArtifactUpdate`] has no "absent" state.
     pub(super) fn update_sync(
         &self,
@@ -24,7 +24,7 @@ impl StoreContext {
         let _gate = self
             .lifecycle_gate
             .write()
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("lock artifact lifecycle for update", error))?;
         self.update_locked(conn, id, expected_revision, update, audit, operation)
     }
 
@@ -47,7 +47,6 @@ impl StoreContext {
         let safe_id = SafeArtifactId::parse(id).ok_or(AppError::ConcealedNotFound)?;
 
         // `if (!Number.isInteger(g) || g < 1 || g !== meta.revision) return conflict;`
-        // — [lib/store.js:319-321]
         if expected_revision < 1 || expected_revision != meta.revision {
             return Err(AppError::Conflict("conflict".to_owned()));
         }
@@ -55,7 +54,6 @@ impl StoreContext {
         let plan = self.plan_update(&safe_id, &meta, update)?;
         if !plan.changed {
             // An exact no-op creates NO revision, no history snapshot, and no replacement body.
-            // [lib/store.js:365-370]
             return Ok(UpdateArtifactResult {
                 meta,
                 changed: false,
@@ -91,7 +89,7 @@ impl StoreContext {
             return Err(interrupt.error);
         }
 
-        // Commit metadata FIRST, then swap the body. [lib/store.js:386-393]
+        // Commit metadata FIRST, then swap the body.
         let committed = match self.commit_update(
             conn,
             &meta,
@@ -125,7 +123,6 @@ impl StoreContext {
         };
         if !committed {
             // `if (!committed) { if (staged) safeRemove(staged); return conflict; }`
-            // — [lib/store.js:416-419]
             if let Some(path) = &staged {
                 safe_remove(path);
             }
@@ -249,7 +246,6 @@ impl StoreContext {
     }
 
     /// Validation, digesting, and change detection — everything before the first side effect.
-    /// [lib/store.js:323-372]
     fn plan_update(
         &self,
         id: &SafeArtifactId,
@@ -321,7 +317,6 @@ impl StoreContext {
             }
             Some(ArtifactContent::Bundle { entry, .. }) => {
                 // Entry-only: the directory stays live and is snapshotted by copy.
-                // [lib/store.js:354-360]
                 let requested = entry.as_deref().unwrap_or_default();
                 let selected = if requested.is_empty() {
                     Some(meta.entry.clone())
@@ -342,7 +337,6 @@ impl StoreContext {
             None => {}
         }
 
-        // [lib/store.js:362-364]
         let content_changed = next_bytes != meta.bytes || next_body_sha256 != meta.body_sha256;
         let changed = content_changed
             || next_entry != meta.entry
@@ -368,7 +362,6 @@ impl StoreContext {
     }
 
     /// The metadata transaction: guarded UPDATE plus the OUTGOING revision row, atomically.
-    /// [lib/store.js:406-415]
     ///
     /// The guard pins `client_id` and `org` to the values read at the start of the operation, so
     /// a concurrent re-tenant or delete turns into a conflict instead of a lost update.

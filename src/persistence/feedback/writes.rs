@@ -20,28 +20,28 @@ use super::{
 // ---------------------------------------------------------------------------
 
 /// Everything `addFeedback` derives from the *authorized artifact* rather than from viewer input
-/// — org and revision are read off the artifact row in Node too [lib/app.js:571-574].
+/// Organization and revision are read from the artifact row.
 #[derive(Clone, Copy, Debug)]
 pub struct NewFeedback<'a> {
     pub artifact_id: &'a ArtifactId,
     pub org: &'a OrgId,
-    /// `meta.revision`; `Number(x) || 1` maps a zero/absent revision to 1 [lib/feedback.js:104].
+    /// `meta.revision`; `Number(x) || 1` maps a zero/absent revision to 1.
     pub artifact_revision: u64,
     pub submission: &'a SubmitFeedback,
-    /// The output of [`validate_anchor_page`](super::validate_anchor_page), which the route runs first [lib/app.js:570].
+    /// The output of [`validate_anchor_page`](super::validate_anchor_page), which the route runs first.
     pub anchor_page: Option<&'a str>,
-    /// `FEEDBACK_MAX_BODY` from `AppConfig::limits` [lib/config.js:21].
+    /// `FEEDBACK_MAX_BODY` from `AppConfig::limits`.
     pub max_body: u64,
 }
 
-/// `addFeedback({ … })` — [lib/feedback.js:84-110].
+/// `addFeedback({ … })`.
 ///
 /// # Errors
 /// [`AppError::Validation`] for [`EMPTY_BODY_MESSAGE`], [`too_long_message`], the three reply-parent
 /// messages, and the anchor messages — evaluated in exactly that order. A `CHECK` violation from
 /// the `feedback` table (reachable only when `FEEDBACK_MAX_BODY` is configured above the schema's
 /// own 4000-character bound) is surfaced as [`AppError::Validation`] with SQLite's message, the way
-/// Node's route surfaces a thrown `SqliteError` as a 400 [lib/app.js:600]. Any other SQL fault is
+/// Node's route surfaces a thrown `SqliteError` as a 400. Any other SQL fault is
 /// [`AppError::Unavailable`].
 pub fn add(
     conn: &Connection,
@@ -56,7 +56,7 @@ pub fn add(
         return Err(AppError::Validation(too_long_message(input.max_body)));
     }
 
-    // `parentId == null || parentId === "" ? null : String(parentId)` — [lib/feedback.js:89]
+    // `parentId == null || parentId === "" ? null : String(parentId)`
     let parent_id = input
         .submission
         .parent_id
@@ -78,7 +78,7 @@ pub fn add(
     }
 
     // A reply never carries an anchor or a page: `parent_id ? normalizeAnchor(null) : …`
-    // [lib/feedback.js:106-107]. Both are silently dropped, not rejected.
+    // Both are silently dropped, not rejected.
     let anchor = if parent_id.is_some() {
         None
     } else {
@@ -134,11 +134,11 @@ pub fn add(
     get(conn, &id)?.ok_or(AppError::Internal)
 }
 
-/// `resolveFeedback(id, resolvedBy)` — [lib/feedback.js:121-123]. The agent/publisher path; the
-/// caller has already proven artifact ownership [lib/mcp.js:546-549].
+/// `resolveFeedback(id, resolvedBy)`. The agent/publisher path; the
+/// caller has already proven artifact ownership.
 ///
 /// `false` means "no state transition" (already resolved), which is what suppresses a duplicate
-/// `resolved` webhook [lib/mcp.js:551].
+/// `resolved` webhook.
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the update fails.
@@ -153,7 +153,7 @@ pub fn resolve_as_publisher(
     Ok(changed > 0)
 }
 
-/// `reopenFeedback(id)` — [lib/feedback.js:143-145]. `false` when it was not resolved.
+/// `reopenFeedback(id)`. `false` when it was not resolved.
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the update fails.
@@ -164,12 +164,12 @@ pub fn reopen(conn: &Connection, id: &FeedbackId) -> Result<bool, AppError> {
     Ok(changed > 0)
 }
 
-/// `resolveByViewer(id, { viewerEmail, isAdmin })` [lib/feedback.js:125-133] **composed with** the
-/// route's artifact-scope guard [lib/app.js:624-626].
+/// `resolveByViewer(id, { viewerEmail, isAdmin })` **composed with** the
+/// route's artifact-scope guard.
 ///
-/// `resolved_by` is `admin:<email>` for an administrator [lib/feedback.js:131].
+/// `resolved_by` is `admin:<email>` for an administrator.
 /// [`FeedbackMutation::changed`] is `false` for an already-resolved row, which is what stops a
-/// retried resolve from re-emitting the `resolved` notification [lib/app.js:629].
+/// retried resolve from re-emitting the `resolved` notification.
 ///
 /// # Errors
 /// [`AppError::NotFound`] ([`NOT_FOUND_MESSAGE`]) when the row is missing or belongs to another
@@ -194,8 +194,8 @@ pub fn resolve_as_viewer(
     })
 }
 
-/// `deleteFeedback(id, { viewerEmail, isAdmin })` [lib/feedback.js:135-141] composed with the
-/// route's artifact-scope guard [lib/app.js:604-606]. Replies cascade with their parent.
+/// `deleteFeedback(id, { viewerEmail, isAdmin })` composed with the
+/// route's artifact-scope guard. Replies cascade with their parent.
 ///
 /// # Errors
 /// As [`resolve_as_viewer`].

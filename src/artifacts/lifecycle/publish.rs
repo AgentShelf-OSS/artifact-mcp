@@ -7,17 +7,16 @@ impl StoreContext {
     // publish
     // -----------------------------------------------------------------------
 
-    /// `publish` / `publishBundle` — [lib/store.js:206-281]
+    /// `publish` / `publishBundle`
     pub(super) fn publish_sync(
         &self,
         conn: &mut Connection,
         request: PublishArtifact,
         audit: MutationAudit,
     ) -> Result<PublishedArtifact, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|_| AppError::Internal)?;
+        let _gate = self.lifecycle_gate.write().map_err(|error| {
+            crate::error::internal("lock artifact lifecycle for publish", error)
+        })?;
         let prepared = self.prepare_publish(&request.content)?;
         // A publisher administrator may select a tenant other than its own.  Audit under the
         // artifact's persisted/target tenant while preserving the verified actor identity.
@@ -72,7 +71,6 @@ impl StoreContext {
             Err(interrupt) => {
                 if interrupt.compensate {
                     // `if (inserted) deleteById.run(id); safeRemove(staging); safeRemove(final);`
-                    // — [lib/store.js:222-227], [lib/store.js:275-280]
                     if state.inserted {
                         self.bare_fault(FaultPoint::PublishDeleteRow)?;
                         conn.execute("DELETE FROM artifacts WHERE id = ?1", params![id.as_str()])
@@ -103,8 +101,7 @@ impl StoreContext {
         }
     }
 
-    /// Validation and digesting, before any side effect. [lib/store.js:207-211],
-    /// [lib/store.js:231-260]
+    /// Validation and digesting, before any side effect.
     fn prepare_publish(&self, content: &ArtifactContent) -> Result<PreparedPublish, AppError> {
         match content {
             ArtifactContent::SingleHtml(html) => {
@@ -121,7 +118,7 @@ impl StoreContext {
             }
             ArtifactContent::Bundle { files, entry } => {
                 // `publishBundle` passes no `preferEntry`, so auto-selection takes the FIRST
-                // `.html` in publisher order. [lib/store.js:252-255]
+                // `.html` in publisher order.
                 let validated =
                     validation::validate_bundle(files, entry.as_deref(), None, &self.limits)?;
                 let body_sha256 = bundle_manifest_digest(&validated.files);

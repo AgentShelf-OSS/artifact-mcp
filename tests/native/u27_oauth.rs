@@ -88,7 +88,7 @@ async fn a_valid_service_token_maps_only_trusted_identity_and_scopes() {
     assert_eq!(identity.client_id, ClientId::from("ci-publisher"));
     assert_eq!(identity.org, OrgId::from("acme"));
     assert_eq!(identity.label, "CI publisher");
-    assert_eq!(identity.role, "author");
+    assert_eq!(identity.role, artifact_mcp::model::Role::Author);
     assert!(identity.is_oauth());
     assert!(identity.has_scope(SCOPE_READ));
     assert!(identity.has_scope(SCOPE_PUBLISH));

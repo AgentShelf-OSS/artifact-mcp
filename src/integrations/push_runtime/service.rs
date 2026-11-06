@@ -22,7 +22,7 @@ use crate::{
     config::{AppConfig, Clock, OsRandom, RandomSource, SystemClock, format_sqlite_datetime},
     error::AppError,
     integrations::web_push::{self, VapidSigner},
-    mcp::protocol::OrderedJson,
+    model::json::OrderedJson,
     persistence::{
         db::{self, DbPool},
         push::{

@@ -3,10 +3,7 @@
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use super::{
-    internal,
-    types::{DiscussionConnectionStrategy, DiscussionConnectionSummary},
-};
+use super::types::{DiscussionConnectionStrategy, DiscussionConnectionSummary};
 use crate::{
     error::AppError,
     model::{OrgId, Timestamp},
@@ -134,7 +131,7 @@ pub(super) fn delivery_url_for_connection(
         },
     )
     .optional()
-    .map_err(internal)?
+    .map_err(|error| crate::error::internal("delivery url for connection", error))?
     .ok_or(AppError::Internal)
 }
 
@@ -150,7 +147,7 @@ pub(super) fn connection_row(
         DiscussionConnectionRow::from_row,
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("connection row", error))
 }
 
 pub(super) fn connection_row_by_id(
@@ -166,14 +163,14 @@ pub(super) fn connection_row_by_id(
         DiscussionConnectionRow::from_row,
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("connection row by id", error))
 }
 
 pub(super) fn org_exists(conn: &Connection, org: &str) -> Result<bool, AppError> {
     conn.query_row("SELECT 1 FROM orgs WHERE name = ?1", [org], |_| Ok(()))
         .optional()
         .map(|row: Option<()>| row.is_some())
-        .map_err(internal)
+        .map_err(|error| crate::error::internal("org exists", error))
 }
 
 pub(super) fn notification_webhook_is_eligible(
@@ -188,7 +185,7 @@ pub(super) fn notification_webhook_is_eligible(
         params![webhook_id, org],
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("notification webhook is eligible", error))
 }
 
 pub(super) fn valid_discord_id(value: &str) -> bool {
@@ -204,5 +201,5 @@ pub(super) fn has_bound_connection_authority(
          OR EXISTS(SELECT 1 FROM discussion_message_links WHERE org = ?1)",
         [org],
         |row| row.get(0),
-    ).map_err(internal)
+    ).map_err(|error| crate::error::internal("has bound connection authority", error))
 }

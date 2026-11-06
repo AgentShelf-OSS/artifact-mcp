@@ -141,12 +141,14 @@ async fn only_creator_can_change_shared_collection_and_cover_cleanup_is_safe() {
         .store
         .create_atomic(
             &alice,
-            "collection-two".into(),
-            "Research".into(),
-            "".into(),
-            None,
-            Some("one".into()),
-            vec!["one".into()],
+            artifact_mcp::ports::collections::NewCollection {
+                id: "collection-two".into(),
+                name: "Research".into(),
+                description: "".into(),
+                color: None,
+                cover: Some("one".into()),
+                artifact_ids: vec!["one".into()],
+            },
             None,
         )
         .await
@@ -301,12 +303,14 @@ async fn preferences_are_pruned_to_authorized_collections_and_audited_mutations_
         audited
             .create_atomic(
                 &alice,
-                "collection-five".into(),
-                "Rollback".into(),
-                "".into(),
-                None,
-                None,
-                Vec::new(),
+                artifact_mcp::ports::collections::NewCollection {
+                    id: "collection-five".into(),
+                    name: "Rollback".into(),
+                    description: "".into(),
+                    color: None,
+                    cover: None,
+                    artifact_ids: Vec::new(),
+                },
                 Some(audit)
             )
             .await

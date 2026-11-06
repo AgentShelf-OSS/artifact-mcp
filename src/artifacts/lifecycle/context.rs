@@ -209,7 +209,6 @@ impl StoreContext {
     }
 
     /// `transientPath(id, kind)` — the random suffix is a fresh artifact-alphabet nanoid.
-    /// [lib/store.js:178-180]
     pub(super) fn transient_path(
         &self,
         id: &SafeArtifactId,
@@ -219,7 +218,7 @@ impl StoreContext {
         paths::transient_path(&self.artifact_dir, id, kind, &token.0).ok_or(AppError::Internal)
     }
 
-    /// `nextId()` — [lib/store.js:182-188]
+    /// Generate an unused artifact ID.
     ///
     /// Node loops forever; a bounded retry keeps a broken id source from hanging a request. The
     /// chance of 64 consecutive collisions over a 33^12 space is not physically meaningful.
@@ -245,7 +244,7 @@ impl StoreContext {
         Err(AppError::Internal)
     }
 
-    /// `files.writeFileSync(staging, html, "utf8")` — [lib/store.js:217], [lib/store.js:376]
+    /// `files.writeFileSync(staging, html, "utf8")`
     pub(super) fn stage_single_body(
         &self,
         staging: &Path,
@@ -273,7 +272,6 @@ impl StoreContext {
     ///   files.writeFileSync(full, content, "utf8");
     /// }
     /// ```
-    /// — [lib/store.js:263-267], [lib/store.js:379-383]
     ///
     /// Files are written in the caller's order — the order the publisher supplied, and the order
     /// entry auto-selection already used (contract delta 4). Nothing here re-sorts them, and a

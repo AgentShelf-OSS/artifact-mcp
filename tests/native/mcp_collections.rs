@@ -34,6 +34,10 @@ fn fixture() -> (TempDir, AppDeps, DbPool) {
     config.oauth.issuer = "https://issuer.example.test".into();
     let mut deps = super::u18_admin_routes::collection_test_deps(config);
     deps.data = Arc::new(artifact_mcp::data::DataBroker::empty().with_pool(pool.clone()));
+    deps.collections = Arc::new(artifact_mcp::adapters::ProductionCollections::new(
+        pool.clone(),
+        deps.audit_access.as_deref(),
+    ));
     (dir, deps, pool)
 }
 
@@ -42,7 +46,7 @@ fn oauth(scopes: &[&str]) -> PublisherIdentity {
         client_id: ClientId::from("scope-client"),
         org: OrgId::from("acme"),
         label: "synthetic test credential".into(),
-        role: "collaborator".into(),
+        role: artifact_mcp::model::Role::Collaborator,
         scopes: Some(
             scopes
                 .iter()
@@ -137,7 +141,7 @@ async fn every_registered_folder_tool_requires_its_exact_oauth_scope() {
         false
     );
     let mut reader = oauth(&["artifacts:read", "artifacts:publish"]);
-    reader.role = "reader".into();
+    reader.role = artifact_mcp::model::Role::Reader;
     let inspected = call(&deps, &reader, "get_collection", json!({"id":id}))
         .await
         .unwrap();
@@ -254,7 +258,7 @@ async fn metadata_outputs_redact_members_and_cover_when_read_access_narrows() {
         folder["structuredContent"]["collection"]["artifact_count"],
         1
     );
-    owner.role = "author".into();
+    owner.role = artifact_mcp::model::Role::Author;
     for collection in [
         call(
             &deps,

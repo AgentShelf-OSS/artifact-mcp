@@ -148,7 +148,9 @@ async fn seed_configured_keys(
     }
     let pool = pool.clone();
     db::interact(&pool, move |conn| {
-        let tx = conn.transaction().map_err(|_| AppError::Internal)?;
+        let tx = conn
+            .transaction()
+            .map_err(|error| crate::error::internal("begin seed transaction", error))?;
         let mut statement = tx
             .prepare(
                 "INSERT INTO api_keys (client_id, org, key_hash) VALUES (?1, ?2, ?3) \
@@ -188,7 +190,8 @@ async fn seed_configured_keys(
                 &event,
             )?;
         }
-        tx.commit().map_err(|_| AppError::Internal)?;
+        tx.commit()
+            .map_err(|error| crate::error::internal("commit seed transaction", error))?;
         Ok(seeded)
     })
     .await

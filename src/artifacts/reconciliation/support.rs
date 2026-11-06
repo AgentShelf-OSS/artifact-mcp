@@ -6,7 +6,7 @@ use crate::artifacts::lifecycle::{InjectedFault, io_failure, sql_error};
 use crate::artifacts::paths::{self, SafeArtifactId, TransientKind};
 use crate::error::AppError;
 
-/// One row of the current-body reconciliation query — [lib/store.js:120]
+/// One row of the current-body reconciliation query
 #[derive(Debug, Clone)]
 pub(super) struct BodyRow {
     pub(super) id: String,
@@ -18,17 +18,17 @@ pub(super) struct BodyRow {
 }
 
 impl BodyRow {
-    /// `row.is_bundle ? bundleDir(row.id) : filePath(row.id)` — [lib/store.js:700]
+    /// `row.is_bundle ? bundleDir(row.id) : filePath(row.id)`
     ///
     /// `None` when the stored id cannot be a path segment. Every generated id satisfies
-    /// `/^[0-9a-z]{6,24}$/` ([lib/store.js:30]), so this only guards a hand-edited database.
+    /// `/^[0-9a-z]{6,24}$/`, so this only guards a hand-edited database.
     pub(super) fn body_path(&self, artifact_dir: &Path) -> Option<PathBuf> {
         self.safe_id
             .as_ref()
             .map(|id| paths::body_path(artifact_dir, id, self.is_bundle))
     }
 
-    /// ``rows.map((row) => row.is_bundle ? row.id : `${row.id}.html`)`` — [lib/store.js:678]
+    /// ``rows.map((row) => row.is_bundle ? row.id : `${row.id}.html`)``
     pub(super) fn expected_name(&self) -> String {
         if self.is_bundle {
             self.id.clone()
@@ -83,7 +83,7 @@ pub(super) fn load_body_rows(conn: &Connection) -> Result<Vec<BodyRow>, AppError
 }
 
 /// Directory entries in Node's processing order: `.staging-` first, then `.trash-`, then
-/// everything else. [lib/store.js:688-691]
+/// everything else.
 ///
 /// Node keeps `readdirSync` order inside a rank because `Array.prototype.sort` is stable; this
 /// sorts by name inside a rank instead, which is deterministic across runtimes and filesystems.
@@ -94,7 +94,7 @@ pub(super) fn ranked_entries(artifact_dir: &Path) -> Result<Vec<String>, AppErro
     let entries = match std::fs::read_dir(artifact_dir) {
         Ok(entries) => entries,
         // Node would throw; at startup a missing directory just means an empty store, and both
-        // `lib/db.js` and `Database::open_at` create it.
+        // `Database::open_at` creates it.
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(names),
         Err(error) => return Err(io_failure("list artifact directory", artifact_dir, &error)),
     };
@@ -112,7 +112,6 @@ pub(super) fn ranked_entries(artifact_dir: &Path) -> Result<Vec<String>, AppErro
 }
 
 /// `const rank = (n) => (n.includes(".staging-") ? 0 : n.includes(".trash-") ? 1 : 2);`
-/// — [lib/store.js:689]
 pub(super) fn transient_rank(name: &str) -> u8 {
     if name.contains(&staging_marker()) {
         0
@@ -123,12 +122,12 @@ pub(super) fn transient_rank(name: &str) -> u8 {
     }
 }
 
-/// `".staging-"` — [lib/store.js:689], [lib/store.js:705]
+/// `".staging-"`
 pub(super) fn staging_marker() -> String {
     format!(".{}-", TransientKind::Staging.as_str())
 }
 
-/// `".trash-"` — [lib/store.js:689]
+/// `".trash-"`
 pub(super) fn trash_marker() -> String {
     format!(".{}-", TransientKind::Trash.as_str())
 }

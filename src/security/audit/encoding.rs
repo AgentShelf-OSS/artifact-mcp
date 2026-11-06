@@ -98,7 +98,9 @@ pub(super) fn canonical(
     for field in fields {
         let bytes = field.as_bytes();
         output.extend_from_slice(
-            &(u32::try_from(bytes.len()).map_err(|_| AppError::Internal)?).to_be_bytes(),
+            &(u32::try_from(bytes.len())
+                .map_err(|error| crate::error::internal("convert audit field length", error))?)
+            .to_be_bytes(),
         );
         output.extend_from_slice(bytes);
     }
@@ -132,7 +134,8 @@ pub(super) fn canonical_receipt_bytes(input: ReceiptMacInput<'_>) -> Result<Vec<
         ));
     }
     let event_id = id(input.event_id, input.state == "finalized")?;
-    let version = u8::try_from(input.canonical_version).map_err(|_| AppError::Internal)?;
+    let version = u8::try_from(input.canonical_version)
+        .map_err(|error| crate::error::internal("convert receipt canonical version", error))?;
     let revision = input
         .event
         .revision
@@ -162,7 +165,9 @@ pub(super) fn canonical_receipt_bytes(input: ReceiptMacInput<'_>) -> Result<Vec<
     for field in fields {
         let bytes = field.as_bytes();
         output.extend_from_slice(
-            &(u32::try_from(bytes.len()).map_err(|_| AppError::Internal)?).to_be_bytes(),
+            &(u32::try_from(bytes.len())
+                .map_err(|error| crate::error::internal("convert receipt field length", error))?)
+            .to_be_bytes(),
         );
         output.extend_from_slice(bytes);
     }

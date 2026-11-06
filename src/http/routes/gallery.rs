@@ -82,7 +82,8 @@ pub(crate) fn found_redirect(location: &str, noindex: bool) -> Result<Response, 
     *response.status_mut() = StatusCode::FOUND;
     response.headers_mut().insert(
         header::LOCATION,
-        HeaderValue::from_str(location).map_err(|_| AppError::Internal)?,
+        HeaderValue::from_str(location)
+            .map_err(|error| crate::error::internal("encode gallery redirect header", error))?,
     );
     response.headers_mut().insert(
         header::CONTENT_TYPE,

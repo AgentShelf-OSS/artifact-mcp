@@ -12,7 +12,7 @@ use super::sql::{COLUMNS, JOINED_COLUMNS};
 // Reads
 // ---------------------------------------------------------------------------
 
-/// `getFeedback(id)` — [lib/feedback.js:116-118]
+/// `getFeedback(id)`
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the query fails.
@@ -48,7 +48,7 @@ pub fn feedback_ref(conn: &Connection, id: &FeedbackId) -> Result<Option<Feedbac
     .map_err(|error| failed("read feedback reference", &error))
 }
 
-/// `listForArtifact(artifactId)` — [lib/feedback.js:50-52,112-114].
+/// `listForArtifact(artifactId)`.
 ///
 /// Frozen order: unresolved first, then oldest-first, then id — the thread reading order the
 /// viewer shell renders.
@@ -69,7 +69,7 @@ pub fn list_for_artifact(
     )
 }
 
-/// `listAll(artifactId)` — [lib/feedback.js:153-155]. With an artifact it is
+/// `listAll(artifactId)`. With an artifact it is
 /// [`list_for_artifact`]; without one it is the admin firehose, newest-first.
 ///
 /// # Errors
@@ -103,11 +103,11 @@ pub fn list_for_org(conn: &Connection, org: &OrgId) -> Result<Vec<Feedback>, App
     )
 }
 
-/// `listForClient(clientId, artifactId, org)` — [lib/feedback.js:61-79,147-151].
+/// `listForClient(clientId, artifactId, org)`.
 ///
-/// The `org` filter is not optional cosmetics: `client_id` survives an org move
-/// [lib/store.js:478], so a non-admin key that listed by `client_id` alone would keep reading the
-/// *new* tenant's feedback bodies, anchors, and verified viewer emails [lib/feedback.js:69-71].
+/// The `org` filter is required because `client_id` survives an org move.
+/// A non-admin key that listed by `client_id` alone would keep reading the
+/// *new* tenant's feedback bodies, anchors, and verified viewer emails.
 /// `None` is the admin path, which intentionally sees every org.
 ///
 /// # Errors

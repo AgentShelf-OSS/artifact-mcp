@@ -272,7 +272,9 @@ fn complete_reconciled_intent(
     classification: &str,
 ) -> Result<(), AppError> {
     let mut random = [0_u8; 16];
-    getrandom::fill(&mut random).map_err(|_| AppError::Internal)?;
+    getrandom::fill(&mut random).map_err(|error| {
+        crate::error::internal("generate reconciliation event identifier", error)
+    })?;
     let event_id = format!("reconcile-{}", hex::encode(random));
     let transaction = conn
         .transaction()

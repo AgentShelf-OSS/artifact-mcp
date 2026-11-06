@@ -17,6 +17,7 @@ use crate::{
         notifications, reactions, views,
     },
     ports::{BoxFuture, EngagementService},
+    security::access::{AccessPolicy, ListScope},
 };
 
 #[derive(Clone)]
@@ -242,20 +243,19 @@ impl EngagementService for ProductionEngagement {
         let publisher = publisher.clone();
         let artifact_id = artifact.map(|owned| owned.meta().id.clone());
         Box::pin(async move {
-            db::interact(&pool, move |conn| {
-                if publisher.is_admin() {
-                    feedback::list_all(conn, artifact_id.as_ref())
-                } else if matches!(publisher.role.as_str(), "reader" | "collaborator") {
-                    feedback::list_for_org(conn, &publisher.org)
-                } else {
-                    feedback::list_for_client(
+            db::interact(
+                &pool,
+                move |conn| match AccessPolicy::publisher_list_scope(&publisher) {
+                    ListScope::All => feedback::list_all(conn, artifact_id.as_ref()),
+                    ListScope::Org => feedback::list_for_org(conn, &publisher.org),
+                    ListScope::Own => feedback::list_for_client(
                         conn,
                         &publisher.client_id,
                         artifact_id.as_ref(),
                         Some(&publisher.org),
-                    )
-                }
-            })
+                    ),
+                },
+            )
             .await
         })
     }

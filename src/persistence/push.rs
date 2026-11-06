@@ -1,8 +1,6 @@
 //! ADR-0012 scheduled reminders and Web Push subscriptions.
 //!
-//! The Node reference `lib/push.js` stores and validates the same rows; only this runtime runs
-//! the sweeper and the sender. Every function here is synchronous `rusqlite` work: callers run it
-//! inside `spawn_blocking` (see [`crate::persistence::db::interact`]).
+//! This module stores and validates reminder and subscription rows and runs the sweeper and sender. Every function here is synchronous `rusqlite` work: callers run it inside `spawn_blocking` (see [`crate::persistence::db::interact`]).
 
 use base64::{
     Engine as _,
@@ -14,7 +12,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     error::AppError,
-    mcp::protocol::OrderedJson,
+    model::json::OrderedJson,
     persistence::{migrations::EncryptedUrl, state},
 };
 

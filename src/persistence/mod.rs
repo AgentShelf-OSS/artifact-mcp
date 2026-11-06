@@ -1,3 +1,6 @@
+//! Persistence stores integration-owned outbox envelopes and inbound contracts. This is the
+//! single accepted dependency from persistence to integrations.
+
 //! Persistence declarations frozen by U01; adapters are owned by U03 and U09–U12.
 
 pub mod collections;

@@ -4,6 +4,7 @@
 //! and its SQLite intent/outbox rows therefore follow the exact production ordering; we only
 //! inspect durable state between the interrupted request and startup reconciliation.
 
+use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use std::sync::Arc;
 
 use artifact_mcp::{

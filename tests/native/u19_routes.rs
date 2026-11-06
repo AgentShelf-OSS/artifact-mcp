@@ -834,6 +834,7 @@ fn deps(harness: Arc<RouteHarness>) -> AppDeps {
 fn deps_with_config(harness: Arc<RouteHarness>, config: AppConfig) -> AppDeps {
     AppDeps {
         data: Arc::new(artifact_mcp::data::DataBroker::empty()),
+        collections: Arc::new(artifact_mcp::ports::collections::InertCollections),
         publisher_auth: harness.clone(),
         viewer_identity: harness.clone(),
         artifacts: harness.clone(),
@@ -1209,7 +1210,7 @@ async fn category_registration_audit_failure_is_an_explicit_mcp_error_before_ret
                 client_id: ClientId::from("publisher"),
                 org: OrgId::from("acme"),
                 label: "Publisher".to_owned(),
-                role: "author".to_owned(),
+                role: artifact_mcp::model::Role::Author,
                 scopes: Some(["artifacts:publish".to_owned()].into_iter().collect()),
             },
         ),
@@ -1502,7 +1503,7 @@ async fn mcp_feedback_submit_and_resolve_do_not_invoke_the_legacy_notifier() {
         client_id: ClientId::from("publisher"),
         org: OrgId::from("acme"),
         label: "Publisher".to_owned(),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     };
     let submitted: OrderedJson = serde_json::from_str(
@@ -1848,7 +1849,7 @@ fn mcp_publisher(scopes: Option<&[&str]>) -> PublisherIdentity {
         client_id: ClientId::from("publisher"),
         org: OrgId::from("acme"),
         label: "Publisher".to_owned(),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: scopes.map(|scopes| scopes.iter().map(|scope| (*scope).to_owned()).collect()),
     }
 }

@@ -11,9 +11,9 @@ use crate::{
     mcp::tasks::PreviewTaskStore,
     observability::McpTelemetry,
     ports::{
-        AdminService, ArtifactService, DataService, DiscussionService, EngagementService,
-        HealthProbe, NotificationSink, PageRenderer, PreviewService, PublisherAuthenticator,
-        ShareService, ViewerIdentity,
+        AdminService, ArtifactService, CollectionService, DataService, DiscussionService,
+        EngagementService, HealthProbe, NotificationSink, PageRenderer, PreviewService,
+        PublisherAuthenticator, ShareService, ViewerIdentity,
     },
     security::audit::AuditAccess,
 };
@@ -25,6 +25,7 @@ use crate::{
 #[derive(Clone)]
 pub struct AppDeps {
     pub data: Arc<dyn DataService>,
+    pub collections: Arc<dyn CollectionService>,
     pub publisher_auth: Arc<dyn PublisherAuthenticator>,
     pub viewer_identity: Arc<dyn ViewerIdentity>,
     pub artifacts: Arc<dyn ArtifactService>,

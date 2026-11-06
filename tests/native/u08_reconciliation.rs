@@ -7,6 +7,7 @@
 //! Ported from the retired Node runtime's `auditStorage({ cleanTransient })`
 //! ([lib/store.js:675-744]).
 
+use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use artifact_mcp::model::ArtifactMeta;
 use artifact_mcp::ports::ArtifactService as _;
 

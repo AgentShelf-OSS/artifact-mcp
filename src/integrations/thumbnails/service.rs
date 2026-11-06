@@ -146,7 +146,7 @@ impl PreviewService for PreviewIntegration {
             // The lane exists to serialise *renders*. With no renderer there is nothing to
             // serialise, so the store is consulted directly — which still returns a thumbnail
             // left on disk by an earlier run that had the sidecar enabled, exactly as Node's
-            // `generate` does before it checks `renderer?.enabled` ([lib/thumbnails.js:113-115]).
+            // `generate` does before it checks `renderer?.enabled`.
             if !self.store.enabled() {
                 return Ok(self.store.ensure_thumbnail(meta, Some(html)).await);
             }

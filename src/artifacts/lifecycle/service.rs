@@ -14,7 +14,6 @@ impl ArtifactService for ArtifactStore {
         let id = id.0.clone();
         Box::pin(async move {
             // `getArtifactMeta: (id) => isReserved(id) ? null : getMetaStmt.get(id) || null`
-            // — [lib/store.js:793]
             if is_reserved_artifact_id(&id) {
                 return Ok(None);
             }
@@ -62,7 +61,7 @@ impl ArtifactService for ArtifactStore {
         let org = (!publisher.is_admin()).then(|| publisher.org.0.clone());
         Box::pin(async move {
             db::interact(&self.pool, move |conn| match org {
-                // `listByClient` — [lib/store.js:112]
+                // `listByClient`
                 None => list_metas(
                     conn,
                     &format!(
@@ -72,7 +71,7 @@ impl ArtifactService for ArtifactStore {
                     &[&client_id],
                 ),
                 // `listByClientOrg` — an org-locked key must never keep listing artifacts moved
-                // to another tenant. [lib/store.js:115]
+                // to another tenant.
                 Some(org) => list_metas(
                     conn,
                     &format!(
@@ -94,7 +93,7 @@ impl ArtifactService for ArtifactStore {
         let org = org.0.clone();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
-                // `listByOrg` / `listByOrgIncludingHidden` — [lib/store.js:116-117]
+                // `listByOrg` / `listByOrgIncludingHidden`
                 let filter = if include_hidden {
                     ""
                 } else {
@@ -120,7 +119,6 @@ impl ArtifactService for ArtifactStore {
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
                 // `listAll` / `listAllVisible`, grouped by org in first-seen order.
-                // [lib/store.js:118-119], [lib/store.js:61-69]
                 let filter = if include_hidden {
                     ""
                 } else {
@@ -158,7 +156,7 @@ impl ArtifactService for ArtifactStore {
         let org = org.0.clone();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
-                // `listIdsByOrg` / `listIdsByOrgIncludingHidden` — [lib/store.js:109-110]
+                // `listIdsByOrg` / `listIdsByOrgIncludingHidden`
                 let filter = if include_hidden {
                     ""
                 } else {
@@ -202,10 +200,9 @@ impl ArtifactService for ArtifactStore {
         let authorized_client_id = artifact.meta().client_id.clone();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
-                let _gate = context
-                    .lifecycle_gate
-                    .read()
-                    .map_err(|_| AppError::Internal)?;
+                let _gate = context.lifecycle_gate.read().map_err(|error| {
+                    crate::error::internal("lock artifact lifecycle for service", error)
+                })?;
                 let Some(current) = load_meta(conn, &id)? else {
                     return Ok(None);
                 };
@@ -328,10 +325,9 @@ impl ArtifactService for ArtifactStore {
         let context = self.context();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
-                let _gate = context
-                    .lifecycle_gate
-                    .write()
-                    .map_err(|_| AppError::Internal)?;
+                let _gate = context.lifecycle_gate.write().map_err(|error| {
+                    crate::error::internal("lock artifact lifecycle for service", error)
+                })?;
                 reconciliation::audit_storage(
                     conn,
                     &context.artifact_dir,
@@ -348,10 +344,9 @@ impl ArtifactService for ArtifactStore {
         let context = self.context();
         Box::pin(async move {
             db::interact(&self.pool, move |conn| {
-                let _gate = context
-                    .lifecycle_gate
-                    .write()
-                    .map_err(|_| AppError::Internal)?;
+                let _gate = context.lifecycle_gate.write().map_err(|error| {
+                    crate::error::internal("lock artifact lifecycle for service", error)
+                })?;
                 reconciliation::backfill_body_digests(
                     conn,
                     &context.artifact_dir,

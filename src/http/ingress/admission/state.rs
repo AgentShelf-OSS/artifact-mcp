@@ -1,3 +1,4 @@
+pub use crate::model::rendering::RenderQueuePressure;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -129,22 +130,6 @@ pub struct IngressMetrics {
     render_queue_pending: Arc<AtomicU64>,
     render_queue_running: Arc<AtomicU64>,
     render_queue_reserved_bytes: Arc<AtomicU64>,
-}
-
-/// Low-cardinality live preview-queue gauges updated by the production queue itself.
-#[derive(Clone, Debug, Default)]
-pub struct RenderQueuePressure {
-    pending: Arc<AtomicU64>,
-    running: Arc<AtomicU64>,
-    reserved_bytes: Arc<AtomicU64>,
-}
-
-impl RenderQueuePressure {
-    pub fn update(&self, pending: usize, running: bool, reserved_bytes: u64) {
-        self.pending.store(pending as u64, Ordering::Relaxed);
-        self.running.store(u64::from(running), Ordering::Relaxed);
-        self.reserved_bytes.store(reserved_bytes, Ordering::Relaxed);
-    }
 }
 
 impl IngressMetrics {

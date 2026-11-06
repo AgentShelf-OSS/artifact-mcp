@@ -3,7 +3,7 @@ use rusqlite::{Transaction, params};
 
 use super::{
     DeliveryRecord, EnqueueDelivery, MAX_QUEUE_GLOBAL, MAX_QUEUE_TENANT, find_event, get, hash,
-    internal, validate, validate_dependency_contract,
+    validate, validate_dependency_contract,
 };
 
 /// Atomically creates all new fan-out rows with a single global/tenant capacity decision.
@@ -41,7 +41,7 @@ pub fn enqueue_many_in_transaction(
             fresh.push((input, id));
         }
     }
-    let active: i64 = tx.query_row("SELECT COUNT(*) FROM provider_delivery_outbox WHERE state IN ('blocked', 'ready', 'leased', 'retry')", [], |r| r.get(0)).map_err(internal)?;
+    let active: i64 = tx.query_row("SELECT COUNT(*) FROM provider_delivery_outbox WHERE state IN ('blocked', 'ready', 'leased', 'retry')", [], |r| r.get(0)).map_err(|error| crate::error::internal("enqueue many in transaction", error))?;
     if active + i64::try_from(fresh.len()).unwrap_or(i64::MAX) > MAX_QUEUE_GLOBAL {
         return Err(AppError::RateLimited);
     }
@@ -50,7 +50,7 @@ pub fn enqueue_many_in_transaction(
         .map(|(i, _)| &i.tenant)
         .collect::<std::collections::BTreeSet<_>>()
     {
-        let count: i64 = tx.query_row("SELECT COUNT(*) FROM provider_delivery_outbox WHERE tenant = ?1 AND state IN ('blocked', 'ready', 'leased', 'retry')", [tenant], |r| r.get(0)).map_err(internal)?;
+        let count: i64 = tx.query_row("SELECT COUNT(*) FROM provider_delivery_outbox WHERE tenant = ?1 AND state IN ('blocked', 'ready', 'leased', 'retry')", [tenant], |r| r.get(0)).map_err(|error| crate::error::internal("enqueue many in transaction", error))?;
         let additions = fresh.iter().filter(|(i, _)| &i.tenant == tenant).count();
         if count + i64::try_from(additions).unwrap_or(i64::MAX) > MAX_QUEUE_TENANT {
             return Err(AppError::RateLimited);
@@ -69,7 +69,7 @@ pub fn enqueue_many_in_transaction(
                 [&input.ordering_key],
                 |row| row.get(0),
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("enqueue many in transaction", error))?;
         let created_at = prior_created_at.map_or(Ok(now), |prior| {
             prior
                 .checked_add(1)
@@ -77,7 +77,7 @@ pub fn enqueue_many_in_transaction(
                 .ok_or(AppError::Internal)
         })?;
         let digest = hash(&input.payload);
-        tx.execute("INSERT INTO provider_delivery_outbox (id, provider, event_id, tenant, event_type, target_key, bucket_id, secret_ref, payload, payload_sha256, durability_intent_id, delivery_kind, ordering_key, depends_on_outbox_id, state, next_attempt_at, created_at, updated_at) VALUES (?1, 'discord', ?2, ?3, ?4, ?5, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?14)", params![id, input.event_id, input.tenant, input.event_type, input.target_key, input.secret_ref, input.payload, digest, input.durability_intent_id, input.delivery_kind, input.ordering_key, input.depends_on_outbox_id, state, now, created_at]).map_err(internal)?;
+        tx.execute("INSERT INTO provider_delivery_outbox (id, provider, event_id, tenant, event_type, target_key, bucket_id, secret_ref, payload, payload_sha256, durability_intent_id, delivery_kind, ordering_key, depends_on_outbox_id, state, next_attempt_at, created_at, updated_at) VALUES (?1, 'discord', ?2, ?3, ?4, ?5, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?14)", params![id, input.event_id, input.tenant, input.event_type, input.target_key, input.secret_ref, input.payload, digest, input.durability_intent_id, input.delivery_kind, input.ordering_key, input.depends_on_outbox_id, state, now, created_at]).map_err(|error| crate::error::internal("enqueue many in transaction", error))?;
         records.push(get(tx, id)?.ok_or(AppError::Internal)?);
     }
     Ok(records)
@@ -98,13 +98,15 @@ pub fn finalize_durability_success_in_transaction(
     intent: &str,
     now: i64,
 ) -> Result<usize, AppError> {
-    let changed = tx.execute("UPDATE provider_delivery_outbox SET state = 'ready', durability_intent_id = NULL, updated_at = ?1 WHERE durability_intent_id = ?2 AND state = 'blocked'", params![now, intent]).map_err(internal)?;
+    let changed = tx.execute("UPDATE provider_delivery_outbox SET state = 'ready', durability_intent_id = NULL, updated_at = ?1 WHERE durability_intent_id = ?2 AND state = 'blocked'", params![now, intent]).map_err(|error| crate::error::internal("finalize durability success in transaction", error))?;
     if tx
         .execute(
             "DELETE FROM artifact_durability_intents WHERE id = ?1",
             [intent],
         )
-        .map_err(internal)?
+        .map_err(|error| {
+            crate::error::internal("finalize durability success in transaction", error)
+        })?
         != 1
     {
         return Err(AppError::Internal);
@@ -116,13 +118,13 @@ pub fn compensate_durability_in_transaction(
     tx: &Transaction<'_>,
     intent: &str,
 ) -> Result<usize, AppError> {
-    let changed = tx.execute("DELETE FROM provider_delivery_outbox WHERE durability_intent_id = ?1 AND state = 'blocked'", [intent]).map_err(internal)?;
+    let changed = tx.execute("DELETE FROM provider_delivery_outbox WHERE durability_intent_id = ?1 AND state = 'blocked'", [intent]).map_err(|error| crate::error::internal("compensate durability in transaction", error))?;
     if tx
         .execute(
             "DELETE FROM artifact_durability_intents WHERE id = ?1",
             [intent],
         )
-        .map_err(internal)?
+        .map_err(|error| crate::error::internal("compensate durability in transaction", error))?
         != 1
     {
         return Err(AppError::Internal);

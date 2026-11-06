@@ -1,28 +1,19 @@
-//! Owned by U08 (sol) — artifact publish, update, restore, and delete lifecycle.
+//! Artifact publish, update, restore, and delete lifecycle.
 //!
-//! This is the cross-resource unit: every mutation touches SQLite *and* the filesystem, and no
-//! transaction can span both. ADR-0002 (`docs/adr/0002-sqlite-filesystem-artifact-lifecycle.md`)
-//! fixes the orderings that make each interruption recoverable, and the Node reference
-//! (`lib/store.js`) is the normative implementation of them. **The ordering is deliberate, not
-//! incidental**; the table below is the contract this module preserves.
+//! This is the cross-resource unit: every mutation touches SQLite *and* the filesystem, and no transaction can span both. ADR-0002 (`docs/adr/0002-sqlite-filesystem-artifact-lifecycle.md`) fixes the orderings that make each interruption recoverable. The table below is the contract this module preserves.
 //!
-//! | Operation | Ordered steps | Node oracle |
-//! |---|---|---|
-//! | publish | write staging body → insert row → rename staging into place | [lib/store.js:216-221], [lib/store.js:262-274] |
-//! | publish compensation | delete row (if inserted) → remove staging → remove final | [lib/store.js:222-227], [lib/store.js:275-280] |
-//! | update | validate+digest → *no-op returns without a revision* → stage body → **commit metadata** → snapshot outgoing body → swap staged body → prune history | [lib/store.js:343-438] |
-//! | update compensation | restore snapshot body → remove staging → delete revision row + revert metadata | [lib/store.js:429-437] |
-//! | restore | read revision row → read history body → replay through `update` as a NEW revision | [lib/store.js:605-624] |
-//! | delete | move body to trash → delete row → remove trash → remove history | [lib/store.js:626-644] |
-//! | delete compensation | move the body back out of trash | [lib/store.js:635], [lib/store.js:642] |
-//! | move/re-tenant | one transaction with `defer_foreign_keys` → artifact, feedback, revisions, views, then revoke shares | [lib/store.js:469-477] |
+//! | Operation | Ordered steps |
+//! |---|---|
+//! | publish | write staging body → insert row → rename staging into place |
+//! | publish compensation | delete row (if inserted) → remove staging → remove final |
+//! | update | validate+digest → *no-op returns without a revision* → stage body → **commit metadata** → snapshot outgoing body → swap staged body → prune history |
+//! | update compensation | restore snapshot body → remove staging → delete revision row + revert metadata |
+//! | restore | read revision row → read history body → replay through `update` as a NEW revision |
+//! | delete | move body to trash → delete row → remove trash → remove history |
+//! | delete compensation | move the body back out of trash |
+//! | move/re-tenant | one transaction with `defer_foreign_keys` → artifact, feedback, revisions, views, then revoke shares |
 //!
-//! The single most important choice is **commit-then-swap** in `update` ([lib/store.js:386-393]):
-//! a crash between the metadata commit and the body swap leaves committed metadata, the *old*
-//! body still installed, and the *new* body in staging — a state
-//! [`crate::artifacts::reconciliation::audit_storage`] repairs by digest. The reverse ordering
-//! (swap inside the transaction) would roll metadata back while keeping the new file, and startup
-//! would then delete the only copy of the old body.
+//! The single most important choice is **commit-then-swap** in `update`: a crash between the metadata commit and the body swap leaves committed metadata, the *old* body still installed, and the *new* body in staging — a state [`crate::artifacts::reconciliation::audit_storage`] repairs by digest. The reverse ordering (swap inside the transaction) would roll metadata back while keeping the new file, and startup would then delete the only copy of the old body.
 //!
 //! # Blocking discipline
 //!
@@ -39,27 +30,11 @@
 //! [`InjectedFault::Crash`] (the process died here, so nothing compensates and startup
 //! reconciliation has to repair it). Production composes [`NoFaults`].
 //!
-//! # Contract-delta requests raised by U08
+//! # Compatibility constraints
 //!
-//! 1. **`ArtifactUpdate` cannot express Node's "entry-only bundle update".** Node distinguishes
-//!    `files === undefined && entry !== undefined` ([lib/store.js:354-360]) from `files === {}`
-//!    (which is the error `files is empty`). The frozen model has a single
-//!    `content: Option<ArtifactContent>`, so this module reads
-//!    `Bundle { files: [], entry: Some(_) }` as the entry-only update and
-//!    `Bundle { files: [], entry: None }` as `files is empty`. The one divergent input is a
-//!    caller that supplies *both* an empty file map and an entry: Node reports `files is empty`,
-//!    this reports success on the entry change. U13 must map MCP arguments accordingly.
-//! 2. **A bundle path that sanitizes to a trailing separator is an I/O failure, not a validated
-//!    rejection.** `sanitizeRel("a/b/")` returns `"a/b/"` ([lib/store.js:50-55]) and Node then
-//!    fails inside `writeFileSync` with `EISDIR`; Rust's `Path::join` would silently drop the
-//!    separator and create a *file*. `StoreContext::stage_bundle_files` therefore refuses such
-//!    a name so both runtimes fail the publish. Fixing it properly means rejecting the name in
-//!    `sanitizeRel` on both sides.
-//! 3. **Lifecycle failures carry Node's `reason` token as their message** (`not_found`,
-//!    `conflict`, `revision_not_found`, `type_mismatch`, `body_missing`). The HTTP restore route
-//!    returns that token verbatim ([lib/app.js:718-719]) while the MCP tool renders a friendly
-//!    sentence ([lib/mcp.js:517-523]), so the token is the only shape both consumers can derive
-//!    theirs from. The `AppError` variant already encodes the status Node uses.
+//! 1. **`ArtifactUpdate` cannot express Node's "entry-only bundle update".** Node distinguishes `files === undefined && entry !== undefined` from `files === {}` (which is the error `files is empty`). The frozen model has a single `content: Option<ArtifactContent>`, so this module reads `Bundle { files: [], entry: Some(_) }` as the entry-only update and `Bundle { files: [], entry: None }` as `files is empty`. The one divergent input is a caller that supplies *both* an empty file map and an entry: Node reports `files is empty`, this reports success on the entry change. MCP arguments must be mapped accordingly.
+//! 2. **A bundle path that sanitizes to a trailing separator is an I/O failure, not a validated rejection.** `sanitizeRel("a/b/")` returns `"a/b/"` and Node then fails inside `writeFileSync` with `EISDIR`; Rust's `Path::join` would silently drop the separator and create a *file*. `StoreContext::stage_bundle_files` therefore refuses such a name so both runtimes fail the publish. Fixing it properly means rejecting the name in `sanitizeRel` on both sides.
+//! 3. **Lifecycle failures carry Node's `reason` token as their message** (`not_found`, `conflict`, `revision_not_found`, `type_mismatch`, `body_missing`). The HTTP restore route returns that token verbatim while the MCP tool renders a friendly sentence, so the token is the only shape both consumers can derive theirs from. The `AppError` variant already encodes the status Node uses.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -111,6 +86,9 @@ mod sql;
 mod trash;
 mod update;
 
+#[cfg(feature = "test-util")]
+pub mod testing;
+
 pub use faults::{FaultInjector, FaultPoint, InjectedFault, NoFaults, ScriptedFaults};
 pub(crate) use fs::{copy_recursive, io_failure, path_exists, rename, safe_remove};
 pub use normalize::normalize_category;
@@ -142,7 +120,16 @@ pub struct StoreContext {
 }
 
 /// The SQLite + filesystem [`ArtifactService`], mirroring `createArtifactStore`.
-/// [lib/store.js:92-102]
+///
+/// Raw metadata does not grant external callers access to artifact bodies.
+///
+/// ```compile_fail
+/// use artifact_mcp::artifacts::lifecycle::ArtifactStore;
+/// use artifact_mcp::model::ArtifactMeta;
+/// async fn bypass(store: &ArtifactStore, meta: &ArtifactMeta) {
+///     let _ = store.read_body_for(meta).await;
+/// }
+/// ```
 #[derive(Debug, Clone)]
 pub struct ArtifactStore {
     pool: DbPool,
@@ -175,7 +162,7 @@ impl ArtifactStore {
     }
 
     /// `files.mkdirSync(artifactDir, { recursive: true })` runs here, as Node does at store
-    /// construction. [lib/store.js:103]
+    /// construction.
     #[must_use]
     pub fn new_for_test(
         pool: DbPool,
@@ -318,21 +305,21 @@ impl ArtifactStore {
     }
 }
 
-/// Staged state for `publish`'s compensation. [lib/store.js:222-227]
+/// Staged state for `publish`'s compensation.
 #[derive(Debug)]
 struct PublishState {
     inserted: bool,
     final_durable: bool,
 }
 
-/// The body relocation `delete` may have to undo. [lib/store.js:503-514]
+/// The body relocation `delete` may have to undo.
 #[derive(Debug)]
 struct MovedBody {
     source: PathBuf,
     trash: PathBuf,
 }
 
-/// The outgoing body a successful `update` parked in `.history`. [lib/store.js:549-561]
+/// The outgoing body a successful `update` parked in `.history`.
 #[derive(Debug)]
 struct BodySnapshot {
     source: PathBuf,
@@ -340,7 +327,7 @@ struct BodySnapshot {
     moved: bool,
 }
 
-/// The pre-update metadata `update` reverts to when the swap fails. [lib/store.js:394-404]
+/// The pre-update metadata `update` reverts to when the swap fails.
 #[derive(Debug, Clone)]
 struct MetaBefore {
     title: String,
@@ -374,7 +361,7 @@ enum StagedBody {
     Bundle(Vec<(String, String)>),
 }
 
-/// The resolved shape of an update, computed before any side effect. [lib/store.js:331-372]
+/// The resolved shape of an update, computed before any side effect.
 #[derive(Debug)]
 struct UpdatePlan {
     title: String,

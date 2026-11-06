@@ -4,7 +4,7 @@ use rusqlite::Transaction;
 
 use super::MigrationContext;
 
-/// PBI-081 keeps bot credentials in a distinct encrypted-only table.  In particular it must not
+/// Organization policy keeps bot credentials in a distinct encrypted-only table.  In particular it must not
 /// reuse the URL display column or the global process token: a bot token has no safe masked form
 /// and is never a queue, audit, or settings value.
 pub(super) fn m030_discord_organization_threading_policy(

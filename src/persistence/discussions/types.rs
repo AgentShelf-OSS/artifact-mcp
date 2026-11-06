@@ -45,7 +45,7 @@ impl DiscussionState {
 /// How Discord discussion delivery is rooted.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DiscussionConnectionStrategy {
-    /// Legacy PBI-079 destination that creates a standalone Forum/Media post.
+    /// Legacy discussion destination that creates a standalone Forum/Media post.
     ForumWebhook,
     /// A public thread attached to the existing artifact-published notification.
     NotificationThread,

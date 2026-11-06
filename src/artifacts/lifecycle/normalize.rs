@@ -6,7 +6,7 @@ use super::*;
 // JavaScript string semantics
 // ---------------------------------------------------------------------------
 
-/// ECMAScript `\s` / `WhiteSpace` + `LineTerminator`, matching U07's private predicate in
+/// ECMAScript `\s` / `WhiteSpace` + `LineTerminator`, matching the private predicate in
 /// `validation.rs`. `String.prototype.trim` and the regex class cover the same set.
 const fn is_js_whitespace(value: char) -> bool {
     matches!(
@@ -43,21 +43,20 @@ fn js_slice(value: &str, max_units: usize) -> &str {
     value
 }
 
-/// `String(title || "Untitled artifact").slice(0, 200)` — [lib/store.js:196]
+/// `String(title || "Untitled artifact").slice(0, 200)`
 const TITLE_MAX_UNITS: usize = 200;
-/// `String(description || "").slice(0, 500)` — [lib/store.js:197]
+/// `String(description || "").slice(0, 500)`
 const DESCRIPTION_MAX_UNITS: usize = 500;
-/// `String(uploaderLabel || "").slice(0, 60)` — [lib/store.js:195]
+/// `String(uploaderLabel || "").slice(0, 60)`
 const LABEL_MAX_UNITS: usize = 60;
-/// `.slice(0, 60)` inside `normalizeCategory` — [lib/store.js:58]
+/// `.slice(0, 60)` inside `normalizeCategory`
 const CATEGORY_MAX_UNITS: usize = 60;
-/// `"Untitled artifact"` — [lib/store.js:196]
+/// `"Untitled artifact"`
 const DEFAULT_TITLE: &str = "Untitled artifact";
-/// `org || "default"` — [lib/store.js:193]
+/// `org || "default"`
 pub(super) const DEFAULT_ORG: &str = "default";
 
 /// `normalizeCategory(value)` = `String(value || "").trim().replace(/\s+/g, " ").slice(0, 60)`
-/// — [lib/store.js:57-59]
 #[must_use]
 pub fn normalize_category(value: &str) -> String {
     let trimmed = js_trim(value);
@@ -77,7 +76,7 @@ pub fn normalize_category(value: &str) -> String {
     js_slice(&collapsed, CATEGORY_MAX_UNITS).to_owned()
 }
 
-/// `String(title || "Untitled artifact").slice(0, 200)` — [lib/store.js:196]
+/// `String(title || "Untitled artifact").slice(0, 200)`
 pub(super) fn normalize_title(value: Option<&str>) -> String {
     let value = value
         .filter(|value| !value.is_empty())
@@ -85,12 +84,12 @@ pub(super) fn normalize_title(value: Option<&str>) -> String {
     js_slice(value, TITLE_MAX_UNITS).to_owned()
 }
 
-/// `String(description || "").slice(0, 500)` — [lib/store.js:197]
+/// `String(description || "").slice(0, 500)`
 pub(super) fn normalize_description(value: Option<&str>) -> String {
     js_slice(value.unwrap_or_default(), DESCRIPTION_MAX_UNITS).to_owned()
 }
 
-/// `String(uploaderLabel || "").slice(0, 60)` — [lib/store.js:195]
+/// `String(uploaderLabel || "").slice(0, 60)`
 pub(super) fn normalize_label(value: &str) -> String {
     js_slice(value, LABEL_MAX_UNITS).to_owned()
 }

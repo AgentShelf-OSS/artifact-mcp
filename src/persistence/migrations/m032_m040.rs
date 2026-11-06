@@ -5,7 +5,7 @@ use rusqlite::Transaction;
 
 use super::{MigrationContext, schema_helpers::ensure_column};
 
-/// Port of migration 32 (`feedback-anchor-v2`) in `lib/migrations.js`: the dense anchor-v2
+/// Migration 32 (`feedback-anchor-v2`) installs the dense anchor-v2
 /// metadata columns. Purely additive, idempotent `ALTER TABLE` statements, in Node's exact
 /// order; a NULL value retains the existing anchor semantics.
 pub(super) fn m32_feedback_anchor_v2(

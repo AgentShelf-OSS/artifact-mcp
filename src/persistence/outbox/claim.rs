@@ -1,7 +1,7 @@
 use crate::error::AppError;
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 
-use super::{DeliveryRecord, LEASE_MILLIS, MAX_ATTEMPTS, get, internal};
+use super::{DeliveryRecord, LEASE_MILLIS, MAX_ATTEMPTS, get};
 
 pub fn claim_next(
     conn: &mut Connection,
@@ -27,17 +27,19 @@ pub fn claim_next(
 
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(internal)?;
-    tx.execute("UPDATE provider_delivery_outbox SET state = CASE WHEN attempts >= ?1 THEN 'dead_letter' ELSE 'retry' END, lease_owner = NULL, lease_expires_at = NULL, lease_token = NULL, result_classification = CASE WHEN attempts >= ?1 THEN 'attempts_exhausted_after_worker_restart' ELSE 'ambiguous_worker_restart' END, duplicate_risk = 1, terminal_error = CASE WHEN attempts >= ?1 THEN 'delivery attempts exhausted after worker restart' ELSE '' END, next_attempt_at = ?2, updated_at = ?2, completed_at = CASE WHEN attempts >= ?1 THEN ?2 ELSE NULL END WHERE state = 'leased' AND lease_expires_at <= ?2", params![MAX_ATTEMPTS, now]).map_err(internal)?;
+        .map_err(|error| crate::error::internal("claim next", error))?;
+    tx.execute("UPDATE provider_delivery_outbox SET state = CASE WHEN attempts >= ?1 THEN 'dead_letter' ELSE 'retry' END, lease_owner = NULL, lease_expires_at = NULL, lease_token = NULL, result_classification = CASE WHEN attempts >= ?1 THEN 'attempts_exhausted_after_worker_restart' ELSE 'ambiguous_worker_restart' END, duplicate_risk = 1, terminal_error = CASE WHEN attempts >= ?1 THEN 'delivery attempts exhausted after worker restart' ELSE '' END, next_attempt_at = ?2, updated_at = ?2, completed_at = CASE WHEN attempts >= ?1 THEN ?2 ELSE NULL END WHERE state = 'leased' AND lease_expires_at <= ?2", params![MAX_ATTEMPTS, now]).map_err(|error| crate::error::internal("claim next", error))?;
     propagate_terminal_dependencies(&tx, now)?;
-    let id: Option<String> = tx.query_row("SELECT o.id FROM provider_delivery_outbox o WHERE o.state IN ('ready', 'retry') AND o.durability_intent_id IS NULL AND o.attempts < ?1 AND o.next_attempt_at <= ?2 AND (o.depends_on_outbox_id IS NULL OR EXISTS (SELECT 1 FROM provider_delivery_outbox predecessor WHERE predecessor.id = o.depends_on_outbox_id AND predecessor.state = 'accepted')) AND NOT EXISTS (SELECT 1 FROM provider_delivery_rate_limits r WHERE r.provider = o.provider AND r.blocked_until > ?2 AND (r.scope = 'global' OR (r.scope = 'target' AND r.target_key = o.target_key) OR (r.scope = 'bucket' AND r.bucket_id = o.bucket_id AND r.top_level_secret_ref = o.secret_ref))) AND NOT EXISTS (SELECT 1 FROM provider_delivery_outbox earlier WHERE earlier.ordering_key = o.ordering_key AND earlier.state IN ('blocked', 'ready', 'leased', 'retry') AND (earlier.created_at < o.created_at OR (earlier.created_at = o.created_at AND earlier.id < o.id))) ORDER BY o.created_at ASC, o.id ASC LIMIT 1", params![MAX_ATTEMPTS, now], |r| r.get(0)).optional().map_err(internal)?;
+    let id: Option<String> = tx.query_row("SELECT o.id FROM provider_delivery_outbox o WHERE o.state IN ('ready', 'retry') AND o.durability_intent_id IS NULL AND o.attempts < ?1 AND o.next_attempt_at <= ?2 AND (o.depends_on_outbox_id IS NULL OR EXISTS (SELECT 1 FROM provider_delivery_outbox predecessor WHERE predecessor.id = o.depends_on_outbox_id AND predecessor.state = 'accepted')) AND NOT EXISTS (SELECT 1 FROM provider_delivery_rate_limits r WHERE r.provider = o.provider AND r.blocked_until > ?2 AND (r.scope = 'global' OR (r.scope = 'target' AND r.target_key = o.target_key) OR (r.scope = 'bucket' AND r.bucket_id = o.bucket_id AND r.top_level_secret_ref = o.secret_ref))) AND NOT EXISTS (SELECT 1 FROM provider_delivery_outbox earlier WHERE earlier.ordering_key = o.ordering_key AND earlier.state IN ('blocked', 'ready', 'leased', 'retry') AND (earlier.created_at < o.created_at OR (earlier.created_at = o.created_at AND earlier.id < o.id))) ORDER BY o.created_at ASC, o.id ASC LIMIT 1", params![MAX_ATTEMPTS, now], |r| r.get(0)).optional().map_err(|error| crate::error::internal("claim next", error))?;
     let Some(id) = id else {
-        tx.commit().map_err(internal)?;
+        tx.commit()
+            .map_err(|error| crate::error::internal("claim next", error))?;
         return Ok(None);
     };
-    if tx.execute("UPDATE provider_delivery_outbox SET state = 'leased', attempts = attempts + 1, lease_owner = ?1, lease_expires_at = ?2, lease_token = ?3, lease_version = lease_version + 1, updated_at = ?4 WHERE id = ?5 AND state IN ('ready', 'retry') AND durability_intent_id IS NULL", params![worker, now + LEASE_MILLIS, token, now, id]).map_err(internal)? != 1 { return Err(AppError::Internal); }
+    if tx.execute("UPDATE provider_delivery_outbox SET state = 'leased', attempts = attempts + 1, lease_owner = ?1, lease_expires_at = ?2, lease_token = ?3, lease_version = lease_version + 1, updated_at = ?4 WHERE id = ?5 AND state IN ('ready', 'retry') AND durability_intent_id IS NULL", params![worker, now + LEASE_MILLIS, token, now, id]).map_err(|error| crate::error::internal("claim next", error))? != 1 { return Err(AppError::Internal); }
     let row = get(&tx, &id)?.ok_or(AppError::Internal)?;
-    tx.commit().map_err(internal)?;
+    tx.commit()
+        .map_err(|error| crate::error::internal("claim next", error))?;
     Ok(Some(row))
 }
 
@@ -107,7 +109,7 @@ fn has_claimable_work(conn: &Connection, now: i64) -> Result<bool, AppError> {
         params![now, MAX_ATTEMPTS],
         |row| row.get::<_, bool>(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("has claimable work", error))
 }
 
 /// A terminal predecessor is never silently bypassed.  Mark all currently runnable descendants
@@ -139,7 +141,7 @@ fn propagate_terminal_dependencies(tx: &Transaction<'_>, now: i64) -> Result<(),
                     )",
                 [now],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("propagate terminal dependencies", error))?;
         if changed == 0 {
             return Ok(());
         }

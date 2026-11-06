@@ -1,8 +1,8 @@
 //! Per-artifact binding manifests.
+use super::DataError;
 use super::{Binding, BindingManifest, DataBroker, SourceConfig, validate::validate_bindings};
 use crate::{
-    error::AppError,
-    persistence::db::interact,
+    data::error::interact,
     security::audit::{AuditEvent, MutationAudit, append_in_transaction},
 };
 use rusqlite::{OptionalExtension, TransactionBehavior};
@@ -11,18 +11,18 @@ impl DataBroker {
     pub(super) async fn load_bindings(
         &self,
         id: &str,
-    ) -> Result<(String, BindingManifest), String> {
+    ) -> Result<(String, BindingManifest), DataError> {
         if let Some(pool) = &self.pool {
             let id = id.to_owned();
-            let row=interact(pool,move|c| c.query_row("SELECT b.org,b.bindings,a.org FROM artifact_data_bindings b JOIN artifacts a ON a.id=b.artifact_id WHERE b.artifact_id=?1",[id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?))).optional().map_err(|_|AppError::Internal)).await.map_err(|_|"data_unavailable")?;
+            let row=interact(pool,move|c| c.query_row("SELECT b.org,b.bindings,a.org FROM artifact_data_bindings b JOIN artifacts a ON a.id=b.artifact_id WHERE b.artifact_id=?1",[id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?,r.get::<_,String>(2)?))).optional().map_err(|error| DataError::internal("load bindings", error))).await?;
             let Some((org, raw, current)) = row else {
                 return Ok((String::new(), BindingManifest::default()));
             };
             if org != current {
-                return Err("not_found".into());
+                return Err(DataError::NotFound);
             }
-            let manifest: BindingManifest =
-                serde_json::from_str(&raw).map_err(|_| "data_unavailable")?;
+            let manifest: BindingManifest = serde_json::from_str(&raw)
+                .map_err(|error| DataError::internal("load bindings", error))?;
             return Ok((org, manifest));
         }
         Ok(self
@@ -34,10 +34,10 @@ impl DataBroker {
             .cloned()
             .unwrap_or_default())
     }
-    pub async fn try_bindings(&self, id: &str) -> Result<BindingManifest, String> {
+    pub async fn try_bindings(&self, id: &str) -> Result<BindingManifest, DataError> {
         let (org, m) = self.load_bindings(id).await?;
         let sources = self.all_source_configs().await?;
-        validate_bindings(&m, &sources, &org).map_err(|_| "not_found")?;
+        validate_bindings(&m, &sources, &org).map_err(|_| DataError::NotFound)?;
         Ok(m)
     }
     pub async fn get_bindings(&self, id: &str) -> BindingManifest {
@@ -48,7 +48,7 @@ impl DataBroker {
         id: &str,
         manifest: BindingManifest,
         org: &str,
-    ) -> Result<(), String> {
+    ) -> Result<(), DataError> {
         self.set_bindings_inner(id, manifest, org, None).await
     }
     pub async fn set_bindings_audited(
@@ -57,10 +57,10 @@ impl DataBroker {
         manifest: BindingManifest,
         org: &str,
         audit: MutationAudit,
-    ) -> Result<(), String> {
+    ) -> Result<(), DataError> {
         let audit = audit
             .for_target_tenant(org)
-            .map_err(|_| "data_unavailable".to_owned())?;
+            .map_err(|error| DataError::internal("set bindings audited", error))?;
         self.set_bindings_inner(id, manifest, org, Some(audit))
             .await
     }
@@ -70,14 +70,14 @@ impl DataBroker {
         manifest: BindingManifest,
         org: &str,
         audit: Option<MutationAudit>,
-    ) -> Result<(), String> {
+    ) -> Result<(), DataError> {
         let _guard = self.writes.lock().await;
         let sources = self.all_source_configs().await?;
         validate_bindings(&manifest, &sources, org)?;
         if let Some(pool) = &self.pool {
             let id = id.to_owned();
             let org = org.to_owned();
-            let raw = serde_json::to_string(&manifest).map_err(|_| "bad_params")?;
+            let raw = serde_json::to_string(&manifest).map_err(|_| DataError::BadParams)?;
             let audit_key = if audit.is_some() {
                 Some(self.audit_key()?)
             } else {
@@ -85,25 +85,25 @@ impl DataBroker {
             };
             interact(pool,move|c|{
                 // Reserve the writer before reading so other WAL writers cannot stale our snapshot.
-                let t=c.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|_|AppError::Internal)?;
-                let previous=t.query_row("SELECT org,bindings FROM artifact_data_bindings WHERE artifact_id=?1",[&id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional().map_err(|_|AppError::Internal)?;
+                let t=c.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| DataError::internal("set bindings inner", error))?;
+                let previous=t.query_row("SELECT org,bindings FROM artifact_data_bindings WHERE artifact_id=?1",[&id],|r|Ok((r.get::<_,String>(0)?,r.get::<_,String>(1)?))).optional().map_err(|error| DataError::internal("set bindings inner", error))?;
                 let mut removed=Vec::new();
                 if let Some((previous_org,previous_raw))=previous {
-                    let old:BindingManifest=serde_json::from_str(&previous_raw).map_err(|_|AppError::Internal)?;
-                    let next:BindingManifest=serde_json::from_str(&raw).map_err(|_|AppError::Internal)?;
+                    let old:BindingManifest=serde_json::from_str(&previous_raw).map_err(|error| DataError::internal("set bindings inner", error))?;
+                    let next:BindingManifest=serde_json::from_str(&raw).map_err(|error| DataError::internal("set bindings inner", error))?;
                     removed=old.bindings.iter().filter(|(name,b)|previous_org!=org || next.bindings.get(*name)!=Some(*b)).map(|(n,_)|n.clone()).collect();
                 }
                 for binding in removed {
-                    t.execute("DELETE FROM artifact_data_snapshots WHERE artifact_id=?1 AND binding=?2",(&id,&binding)).map_err(|_|AppError::Internal)?;
-                    t.execute("DELETE FROM artifact_data_events WHERE artifact_id=?1 AND binding=?2",(&id,&binding)).map_err(|_|AppError::Internal)?;
+                    t.execute("DELETE FROM artifact_data_snapshots WHERE artifact_id=?1 AND binding=?2",(&id,&binding)).map_err(|error| DataError::internal("set bindings inner", error))?;
+                    t.execute("DELETE FROM artifact_data_events WHERE artifact_id=?1 AND binding=?2",(&id,&binding)).map_err(|error| DataError::internal("set bindings inner", error))?;
                 }
-                t.execute("INSERT INTO artifact_data_bindings(artifact_id,org,bindings,updated_at) VALUES(?1,?2,?3,datetime('now')) ON CONFLICT(artifact_id) DO UPDATE SET org=excluded.org,bindings=excluded.bindings,updated_at=excluded.updated_at",(&id,&org,&raw)).map_err(|_|AppError::Internal)?;
+                t.execute("INSERT INTO artifact_data_bindings(artifact_id,org,bindings,updated_at) VALUES(?1,?2,?3,datetime('now')) ON CONFLICT(artifact_id) DO UPDATE SET org=excluded.org,bindings=excluded.bindings,updated_at=excluded.updated_at",(&id,&org,&raw)).map_err(|error| DataError::internal("set bindings inner", error))?;
                 if let (Some(audit), Some(key)) = (audit, audit_key) {
                     let event = AuditEvent { operation: "data_bindings.update".into(), target_type: "artifact".into(), target_id: id.clone(), result: "success".into(), classification: "admin".into(), revision: None };
-                    append_in_transaction(&t, &key, &audit.event_id().map_err(|_| AppError::Internal)?, audit.context(), &event)?;
+                    append_in_transaction(&t, &key, &audit.event_id().map_err(|error| DataError::internal("set bindings inner", error))?, audit.context(), &event).map_err(|error| DataError::internal("append binding audit", error))?;
                 }
-                t.commit().map_err(|_|AppError::Internal)
-            }).await.map_err(|_|"data_unavailable")?;
+                t.commit().map_err(|error| DataError::internal("set bindings inner", error))
+            }).await?;
         } else {
             let mut memory = self.memory.write().await;
             let (old_org, old) = memory.bindings.get(id).cloned().unwrap_or_default();
@@ -128,15 +128,19 @@ impl DataBroker {
         &self,
         id: &str,
         binding: &str,
-    ) -> Result<(Binding, SourceConfig), String> {
+    ) -> Result<(Binding, SourceConfig), DataError> {
         let (org, manifest) = self.load_bindings(id).await?;
-        let b = manifest.bindings.get(binding).ok_or("not_found")?.clone();
+        let b = manifest
+            .bindings
+            .get(binding)
+            .ok_or(DataError::NotFound)?
+            .clone();
         let (s, enabled, _, _) = self.source_record(&b.source).await?;
         if s.org != org {
-            return Err("not_found".into());
+            return Err(DataError::NotFound);
         }
         if !enabled {
-            return Err("data_unavailable".into());
+            return Err(DataError::Unavailable);
         }
         Ok((b, s))
     }

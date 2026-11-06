@@ -69,10 +69,10 @@ pub(crate) fn sql_error(operation: &'static str, error: &rusqlite::Error) -> App
 }
 
 pub(super) fn as_i64(value: u64) -> Result<i64, AppError> {
-    i64::try_from(value).map_err(|_| AppError::Internal)
+    i64::try_from(value).map_err(|error| crate::error::internal("convert artifact integer", error))
 }
 
-/// `getMetaStmt.get(id)` — [lib/store.js:111]
+/// `getMetaStmt.get(id)`
 pub(super) fn load_meta(conn: &Connection, id: &str) -> Result<Option<ArtifactMeta>, AppError> {
     if durability_pending(conn, id)? {
         return Ok(None);
@@ -289,7 +289,7 @@ pub(super) fn record_legacy_revision_row(
     Ok(())
 }
 
-/// `getRevisionStmt.get(id, revision)` — [lib/store.js:163-165]
+/// `getRevisionStmt.get(id, revision)`
 pub(super) fn load_revision(
     conn: &Connection,
     id: &str,
@@ -308,10 +308,8 @@ pub(super) fn load_revision(
     .map_err(|error| sql_error("load revision row", &error))
 }
 
-/// `orgExists(name)` = `SELECT 1 FROM orgs WHERE name = ?` — [lib/orgs.js:17], [lib/orgs.js:53-55]
+/// `orgExists(name)` = `SELECT 1 FROM orgs WHERE name = ?`
 ///
-/// U09 owns `persistence/orgs.rs` and has not landed yet; this is the single read-only statement
-/// `store.js` needs, and it moves to U09's adapter when that unit lands.
 pub(super) fn org_exists(conn: &Connection, name: &str) -> Result<bool, AppError> {
     conn.query_row("SELECT 1 FROM orgs WHERE name = ?1", params![name], |_| {
         Ok(())

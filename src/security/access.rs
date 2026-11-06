@@ -1,11 +1,6 @@
-//! Owned by U06 (sol) — access policy; wrapper shapes are frozen by U01.
+//! Access policy and concealed-read decisions.
 //!
 //! # Invariant 3 lives here, once
-//!
-//! Node oracle: `lib/access.js` (`artifactAccess`, `concealedArtifactAccess`,
-//! `publisherOwnsArtifact`, `concealedPublisherRead`, `adminAccess`), consumed by
-//! `lib/app.js` (`artifactForViewer` / `artifactPageOr404` / `artifactApiOr404` /
-//! `sharedArtifactOr404`) and `lib/mcp.js` (`readArtifactOrConceal`, `owns`).
 //!
 //! A cross-organization read must be indistinguishable from a read of an id that does not
 //! exist. Returning `403` for a foreign-but-existing artifact would confirm that the id is
@@ -139,22 +134,22 @@ impl OwnedArtifact {
     }
 }
 
-/// `{ ok: false, status: 404, error: "Not found" }` — [lib/access.js:9].
+/// `{ ok: false, status: 404, error: "Not found" }`.
 ///
 /// Carried by [`AppError::ConcealedNotFound`], whose `Display` is exactly `Not found`.
 pub const NOT_FOUND_MESSAGE: &str = "Not found";
 
-/// `{ ok: false, status: 401, error: "Not signed in" }` — [lib/access.js:13].
+/// `{ ok: false, status: 401, error: "Not signed in" }`.
 pub const NOT_SIGNED_IN_MESSAGE: &str = "Not signed in";
 
-/// `{ ok: false, status: 403, error: "Forbidden" }` — [lib/access.js:18].
+/// `{ ok: false, status: 403, error: "Forbidden" }`.
 pub const FORBIDDEN_MESSAGE: &str = "Forbidden";
 
-/// `{ ok: false, status: 403, error: "Admins only" }` — [lib/access.js:50].
+/// `{ ok: false, status: 403, error: "Admins only" }`.
 pub const ADMINS_ONLY_MESSAGE: &str = "Admins only";
 
 /// The publisher org that Node treats as the administrator tenant — `auth.org === "admin"`
-/// ([lib/access.js:35], [lib/mcp.js]). Also the org `lib/identity.js:86` assigns to admin humans.
+/// This is also the organization assigned to administrator viewers.
 pub const ADMIN_ORG: &str = "admin";
 
 /// Explicit capability refusals. Tenancy denials use [`unknown_artifact_message`] instead.
@@ -166,7 +161,7 @@ pub const WRITE_PERMISSION_ERROR: &str =
 pub const DELETE_PERMISSION_ERROR: &str =
     "Permission denied: this API key cannot delete this artifact";
 
-/// `Unknown artifact: ${id}` — [lib/access.js:45].
+/// `Unknown artifact: ${id}`.
 #[must_use]
 pub fn unknown_artifact_message(id: &str) -> String {
     format!("Unknown artifact: {id}")
@@ -174,7 +169,7 @@ pub fn unknown_artifact_message(id: &str) -> String {
 
 /// Whether a denial is allowed to reveal that the artifact exists.
 ///
-/// Mirrors the `{ conceal }` option of `artifactAccess` ([lib/access.js:8]). Every
+/// Mirrors the `{ conceal }` option of `artifactAccess`. Every
 /// artifact-scoped human route uses [`Concealment::Conceal`]; [`Concealment::Reveal`] exists
 /// only because Node still exports the un-concealed decision and its parity is pinned.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -183,6 +178,17 @@ pub enum Concealment {
     Conceal,
     /// `{ conceal: false }` — the historical `401`/`403` answers.
     Reveal,
+}
+
+/// The artifact rows a publisher may list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListScope {
+    /// All organizations, for administrator keys.
+    All,
+    /// The publisher's whole organization, for reader and collaborator keys.
+    Org,
+    /// Only artifacts owned by the publisher in its organization, for author keys.
+    Own,
 }
 
 /// Pure access policy. Every function is a total, side-effect-free decision over values the
@@ -202,7 +208,7 @@ impl AccessPolicy {
     }
 
     /// JavaScript truthiness for `viewer.org` in `viewer.org && viewer.org === artifact.org`
-    /// ([lib/access.js:15]): an empty org never matches, not even another empty org.
+    /// An empty org never matches, not even another empty org.
     fn tenant_org(viewer: &Viewer) -> Option<&str> {
         viewer
             .org
@@ -217,7 +223,7 @@ impl AccessPolicy {
         Self::signed_in_email(viewer).is_some()
     }
 
-    /// `viewer.isAdmin || (viewer.org && viewer.org === artifact.org)` — [lib/access.js:15].
+    /// `viewer.isAdmin || (viewer.org && viewer.org === artifact.org)`.
     ///
     /// Assumes the viewer is signed in; callers go through [`Self::artifact_access`].
     #[must_use]
@@ -248,7 +254,7 @@ impl AccessPolicy {
             .is_some_and(|owner_email| owner_email.eq_ignore_ascii_case(viewer_email))
     }
 
-    /// `artifactAccess(viewer, artifact, { conceal })` — [lib/access.js:8-19].
+    /// `artifactAccess(viewer, artifact, { conceal })`.
     ///
     /// The missing-artifact branch is checked **first** and answers `404` under both
     /// concealment modes, which is what makes the concealed foreign answer identical to it.
@@ -282,7 +288,7 @@ impl AccessPolicy {
         })
     }
 
-    /// `concealedArtifactAccess` — [lib/access.js:27-29]. **The** decision every artifact-scoped
+    /// `concealedArtifactAccess`. **The** decision every artifact-scoped
     /// human route (read *and* mutation) must use, and the only viewer-side constructor of
     /// [`AuthorizedArtifact`].
     ///
@@ -305,7 +311,7 @@ impl AccessPolicy {
         })
     }
 
-    /// `artifacts.isReserved?.(id) ? null : …` — [lib/app.js:81], [lib/store.js:88-90].
+    /// `artifacts.isReserved?.(id) ? null : …`.
     ///
     /// Returns the id to look up, or `None` when the id can never address an artifact. Routes
     /// must feed `None` straight into [`Self::authorize_viewer`] instead of short-circuiting,
@@ -315,7 +321,7 @@ impl AccessPolicy {
         (!is_reserved_artifact_id(id)).then(|| ArtifactId(id.to_owned()))
     }
 
-    /// `adminAccess(viewer)` — [lib/access.js:48-52].
+    /// `adminAccess(viewer)`.
     ///
     /// Deliberately **not** concealed: both denials are `403` about the caller's role, and the
     /// routes that use it (`/settings*`, org registry, webhook admin) carry no artifact id, so
@@ -334,16 +340,35 @@ impl AccessPolicy {
         Ok(())
     }
 
-    /// `auth?.org === "admin"` — [lib/access.js:35].
+    /// `auth?.org === "admin"`.
     ///
     /// The publisher admin test is the **org**, exactly as in Node, not
-    /// `PublisherIdentity::is_admin`. `lib/auth.js:25` builds the identity from the `api_keys`
+    /// `PublisherIdentity::is_admin`. The authenticator builds the identity from the `api_keys`
     /// row (`client_id`, `org`, `label`) and has no admin flag at all, so the org is the only
     /// value with a Node-defined meaning. Using it keeps the Rust decision fail-closed if the
     /// derived flag were ever set from a wider rule.
     #[must_use]
     pub fn publisher_is_admin(auth: &PublisherIdentity) -> bool {
         auth.org.0 == ADMIN_ORG
+    }
+
+    /// Administrators list all artifacts; other keys list by their role.
+    #[must_use]
+    pub fn publisher_list_scope(publisher: &PublisherIdentity) -> ListScope {
+        if Self::publisher_is_admin(publisher) {
+            ListScope::All
+        } else {
+            match publisher.role {
+                crate::model::Role::Reader | crate::model::Role::Collaborator => ListScope::Org,
+                crate::model::Role::Author => ListScope::Own,
+            }
+        }
+    }
+
+    /// Administrators and author/collaborator keys may publish artifacts.
+    #[must_use]
+    pub fn publisher_can_publish(publisher: &PublisherIdentity) -> bool {
+        Self::publisher_is_admin(publisher) || publisher.role != crate::model::Role::Reader
     }
 
     fn publisher_owns(auth: &PublisherIdentity, artifact: &ArtifactMeta) -> bool {
@@ -357,12 +382,32 @@ impl AccessPolicy {
     /// Reader/collaborator keys read their organization; author keys read only their own rows.
     #[must_use]
     pub fn publisher_can_read(auth: &PublisherIdentity, artifact: &ArtifactMeta) -> bool {
-        if Self::publisher_is_admin(auth) {
-            return true;
-        }
-        Self::publisher_shares_org(auth, artifact)
-            && matches!(auth.role.as_str(), "reader" | "collaborator")
-            || (auth.role == "author" && Self::publisher_owns(auth, artifact))
+        Self::publisher_can_read_row(
+            Self::publisher_is_admin(auth),
+            &auth.org.0,
+            &auth.client_id.0,
+            auth.role,
+            &artifact.org.0,
+            &artifact.client_id.0,
+        )
+    }
+
+    /// Read policy over stored row facts, shared with collection membership checks.
+    #[must_use]
+    pub fn publisher_can_read_row(
+        is_admin: bool,
+        publisher_org: &str,
+        publisher_client_id: &str,
+        role: crate::model::Role,
+        artifact_org: &str,
+        artifact_client_id: &str,
+    ) -> bool {
+        is_admin
+            || (publisher_org == artifact_org
+                && match role {
+                    crate::model::Role::Reader | crate::model::Role::Collaborator => true,
+                    crate::model::Role::Author => publisher_client_id == artifact_client_id,
+                })
     }
 
     /// Collaborators write throughout their organization; authors write only their own rows.
@@ -372,19 +417,22 @@ impl AccessPolicy {
             return true;
         }
         Self::publisher_shares_org(auth, artifact)
-            && (auth.role == "collaborator"
-                || (auth.role == "author" && Self::publisher_owns(auth, artifact)))
+            && (auth.role == crate::model::Role::Collaborator
+                || (auth.role == crate::model::Role::Author
+                    && Self::publisher_owns(auth, artifact)))
     }
 
     /// Delete is irreversible, so non-reader keys may delete only owned rows.
     #[must_use]
     pub fn publisher_can_delete(auth: &PublisherIdentity, artifact: &ArtifactMeta) -> bool {
         Self::publisher_is_admin(auth)
-            || (matches!(auth.role.as_str(), "author" | "collaborator")
-                && Self::publisher_owns(auth, artifact))
+            || (matches!(
+                auth.role,
+                crate::model::Role::Author | crate::model::Role::Collaborator
+            ) && Self::publisher_owns(auth, artifact))
     }
 
-    /// `concealedPublisherRead(auth, artifact, id)` — [lib/access.js:42-46]. Invariant 3 on the
+    /// `concealedPublisherRead(auth, artifact, id)`. Invariant 3 on the
     /// MCP read path: an artifact outside the caller's organization reports the identical error
     /// as one that does not exist, so read tools cannot probe tenant membership.
     ///
@@ -453,8 +501,7 @@ impl AccessPolicy {
         }
     }
 
-    /// `!meta || meta.org !== share.org` — [lib/app.js:111], and the same check guarding
-    /// `revoke_share` in [lib/mcp.js].
+    /// Require artifact metadata in the same organization as the share before granting access.
     ///
     /// A share grant is scoped to the org it was minted in, so an artifact that has since been
     /// re-tenanted stops matching its old links.
@@ -463,7 +510,7 @@ impl AccessPolicy {
         grant.org == artifact.org
     }
 
-    /// `sharedArtifactOr404` — [lib/app.js:106-113]. The token itself is the authorization
+    /// `sharedArtifactOr404`. The token itself is the authorization
     /// boundary (Cloudflare Access bypasses `/s/*`), so no viewer is resolved here.
     ///
     /// A stale or re-tenanted row is kept indistinguishable from every other invalid token.
@@ -485,7 +532,7 @@ impl AccessPolicy {
     }
 }
 
-/// The composed human gate: `artifactForViewer` — [lib/app.js:79-89].
+/// The composed human gate: `artifactForViewer`.
 ///
 /// Reserved check, metadata lookup, then the concealed decision. Nothing subordinate — body
 /// bytes, thumbnail, feedback, shares, views, history — is read before the decision, so
@@ -546,6 +593,61 @@ mod tests {
     }
 
     #[test]
+    fn publisher_listing_and_publish_rights_follow_org_and_role() {
+        use crate::model::Role;
+
+        for (role, scope, can_publish) in [
+            (Role::Reader, ListScope::Org, false),
+            (Role::Collaborator, ListScope::Org, true),
+            (Role::Author, ListScope::Own, true),
+        ] {
+            for org in ["acme", "", "Admin", "admin "] {
+                let publisher = PublisherIdentity {
+                    client_id: ClientId::from("key"),
+                    org: OrgId::from(org),
+                    label: String::new(),
+                    role,
+                    scopes: None,
+                };
+                assert_eq!(AccessPolicy::publisher_list_scope(&publisher), scope);
+                assert_eq!(AccessPolicy::publisher_can_publish(&publisher), can_publish);
+            }
+            let admin = PublisherIdentity {
+                client_id: ClientId::from("key"),
+                org: OrgId::from("admin"),
+                label: String::new(),
+                role,
+                scopes: None,
+            };
+            assert_eq!(AccessPolicy::publisher_list_scope(&admin), ListScope::All);
+            assert!(AccessPolicy::publisher_can_publish(&admin));
+        }
+    }
+
+    #[test]
+    fn publisher_row_reads_preserve_collection_policy() {
+        use crate::model::Role;
+
+        for (role, owner, allowed) in [
+            (Role::Reader, "other", true),
+            (Role::Author, "key", true),
+            (Role::Author, "other", false),
+            (Role::Collaborator, "other", true),
+        ] {
+            assert_eq!(
+                AccessPolicy::publisher_can_read_row(false, "acme", "key", role, "acme", owner),
+                allowed
+            );
+            assert!(!AccessPolicy::publisher_can_read_row(
+                false, "acme", "key", role, "globex", owner
+            ));
+            assert!(AccessPolicy::publisher_can_read_row(
+                true, "admin", "key", role, "globex", owner
+            ));
+        }
+    }
+
+    #[test]
     fn empty_strings_are_falsy_like_javascript() {
         let blank_email = viewer(Some(""), Some("acme"), false);
         assert!(!AccessPolicy::is_signed_in(&blank_email));
@@ -592,7 +694,7 @@ mod tests {
             client_id: ClientId::from("acme-key"),
             org: OrgId::from("acme"),
             label: "acme".to_owned(),
-            role: "author".to_owned(),
+            role: crate::model::Role::Author,
             scopes: None,
         };
         assert!(AccessPolicy::publisher_can_read(
@@ -612,7 +714,7 @@ mod tests {
             client_id: ClientId::from("k"),
             org: OrgId::from("acme"),
             label: String::new(),
-            role: "author".to_owned(),
+            role: crate::model::Role::Author,
             scopes: None,
         };
         assert!(!AccessPolicy::publisher_is_admin(&flagged));

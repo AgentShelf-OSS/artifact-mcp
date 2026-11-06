@@ -193,7 +193,8 @@ async fn post_sends_typed_json_body_with_defaults_and_path_params() {
                 json!({"room":"r","msg":"x","n":9})
             )
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
 }
@@ -253,27 +254,32 @@ async fn stream_framing_errors_and_compatibility() {
         .await
         .unwrap();
     assert_eq!(bad.recv().await.unwrap().unwrap(), json!({"ok":true}));
-    assert_eq!(bad.recv().await.unwrap().unwrap_err(), "data_unavailable");
+    assert_eq!(
+        bad.recv().await.unwrap().unwrap_err().reason(),
+        "data_unavailable"
+    );
 
     let mut big = broker
         .query_stream("artifact", "concierge", "big", json!({}))
         .await
         .unwrap();
     assert!(big.recv().await.unwrap().is_ok());
-    assert_eq!(big.recv().await.unwrap().unwrap_err(), "too_large");
+    assert_eq!(big.recv().await.unwrap().unwrap_err().reason(), "too_large");
 
     assert_eq!(
         broker
             .query_stream("artifact", "concierge", "plain", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "data_unavailable"
     );
     assert_eq!(
         broker
             .query_stream("artifact", "concierge", "normal", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
     // Older clients calling /data/query on a streaming operation receive its last line.

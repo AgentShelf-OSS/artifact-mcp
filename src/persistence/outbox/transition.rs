@@ -2,7 +2,7 @@ use crate::error::AppError;
 use rusqlite::{Connection, Transaction, TransactionBehavior, params};
 
 use super::validation::{opaque_bucket_key, opaque_provider_secret_ref, opaque_target_key};
-use super::{DeadLetterTransition, DeliveryRecord, MAX_ATTEMPTS, RetryTransition, hash, internal};
+use super::{DeadLetterTransition, DeliveryRecord, MAX_ATTEMPTS, RetryTransition, hash};
 
 pub fn accepted(
     conn: &Connection,
@@ -97,7 +97,7 @@ pub fn retry(
                 lease_version
             ],
         )
-        .map_err(internal)?
+        .map_err(|error| crate::error::internal("retry", error))?
         == 1)
 }
 /// Persists global, target, or effective bucket throttling and bucket discovery atomically.
@@ -129,12 +129,13 @@ pub fn persist_rate_limit(
     }
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(internal)?;
-    tx.execute("INSERT INTO provider_delivery_rate_limits (provider,scope,target_key,bucket_id,top_level_secret_ref,blocked_until,updated_at) VALUES ('discord',?1,?2,?3,?4,?5,?6) ON CONFLICT(provider,scope,target_key,bucket_id,top_level_secret_ref) DO UPDATE SET blocked_until=MAX(provider_delivery_rate_limits.blocked_until,excluded.blocked_until),updated_at=CASE WHEN excluded.blocked_until >= provider_delivery_rate_limits.blocked_until THEN excluded.updated_at ELSE provider_delivery_rate_limits.updated_at END", params![scope,stored_target,stored_bucket,stored_secret,blocked_until,now]).map_err(internal)?;
+        .map_err(|error| crate::error::internal("persist rate limit", error))?;
+    tx.execute("INSERT INTO provider_delivery_rate_limits (provider,scope,target_key,bucket_id,top_level_secret_ref,blocked_until,updated_at) VALUES ('discord',?1,?2,?3,?4,?5,?6) ON CONFLICT(provider,scope,target_key,bucket_id,top_level_secret_ref) DO UPDATE SET blocked_until=MAX(provider_delivery_rate_limits.blocked_until,excluded.blocked_until),updated_at=CASE WHEN excluded.blocked_until >= provider_delivery_rate_limits.blocked_until THEN excluded.updated_at ELSE provider_delivery_rate_limits.updated_at END", params![scope,stored_target,stored_bucket,stored_secret,blocked_until,now]).map_err(|error| crate::error::internal("persist rate limit", error))?;
     if scope == "bucket" {
-        tx.execute("UPDATE provider_delivery_outbox SET bucket_id=?1,updated_at=?2 WHERE target_key=?3 AND secret_ref=?4 AND state IN ('blocked','ready','retry')", params![bucket,now,target,secret]).map_err(internal)?;
+        tx.execute("UPDATE provider_delivery_outbox SET bucket_id=?1,updated_at=?2 WHERE target_key=?3 AND secret_ref=?4 AND state IN ('blocked','ready','retry')", params![bucket,now,target,secret]).map_err(|error| crate::error::internal("persist rate limit", error))?;
     }
-    tx.commit().map_err(internal)?;
+    tx.commit()
+        .map_err(|error| crate::error::internal("persist rate limit", error))?;
     Ok(())
 }
 pub fn dead_letter(
@@ -221,7 +222,7 @@ fn transition(
             ));
         }
     };
-    Ok(conn.execute("UPDATE provider_delivery_outbox SET state = ?1, lease_owner = NULL, lease_expires_at = NULL, lease_token = NULL, next_attempt_at = ?2, result_classification = ?3, duplicate_risk = ?4, discord_message_id = CASE WHEN ?1 = 'accepted' THEN ?5 ELSE discord_message_id END, terminal_error = ?6, updated_at = ?7, completed_at = CASE WHEN ?1 IN ('accepted', 'dead_letter') THEN ?7 ELSE NULL END WHERE id = ?8 AND state = 'leased' AND lease_owner = ?9 AND lease_token = ?10 AND lease_version = ?11 AND (?12 = 0 OR attempts >= ?13)", params![update.state, update.next_attempt_at, classification, i64::from(update.duplicate_risk), update.message, redact_error(update.error), update.now, id, worker, token, lease_version, i64::from(update.requires_exhaustion), MAX_ATTEMPTS]).map_err(internal)? == 1)
+    Ok(conn.execute("UPDATE provider_delivery_outbox SET state = ?1, lease_owner = NULL, lease_expires_at = NULL, lease_token = NULL, next_attempt_at = ?2, result_classification = ?3, duplicate_risk = ?4, discord_message_id = CASE WHEN ?1 = 'accepted' THEN ?5 ELSE discord_message_id END, terminal_error = ?6, updated_at = ?7, completed_at = CASE WHEN ?1 IN ('accepted', 'dead_letter') THEN ?7 ELSE NULL END WHERE id = ?8 AND state = 'leased' AND lease_owner = ?9 AND lease_token = ?10 AND lease_version = ?11 AND (?12 = 0 OR attempts >= ?13)", params![update.state, update.next_attempt_at, classification, i64::from(update.duplicate_risk), update.message, redact_error(update.error), update.now, id, worker, token, lease_version, i64::from(update.requires_exhaustion), MAX_ATTEMPTS]).map_err(|error| crate::error::internal("transition", error))? == 1)
 }
 
 pub fn verify_payload_hash(record: &DeliveryRecord) -> bool {

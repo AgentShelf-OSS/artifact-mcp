@@ -11,8 +11,6 @@ use crate::{
     model::{ArtifactId, FeedbackAuthor, FeedbackId, OrgId},
 };
 
-use super::common::internal;
-
 pub(super) fn artifact_exists(
     conn: &Connection,
     artifact: &ArtifactId,
@@ -25,7 +23,7 @@ pub(super) fn artifact_exists(
     )
     .optional()
     .map(|row| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("artifact exists", error))
 }
 
 pub(super) fn connected_inbound_destination(
@@ -51,7 +49,7 @@ pub(super) fn connected_inbound_destination(
         params![artifact.0, org.0],
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("connected inbound destination", error))
 }
 
 pub(super) fn apply_in_transaction(
@@ -60,7 +58,7 @@ pub(super) fn apply_in_transaction(
 ) -> Result<InboundResult, AppError> {
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("apply in transaction", error))?;
 
     if event_exists(&tx, event)? {
         return Ok(InboundResult::Duplicate);
@@ -68,11 +66,10 @@ pub(super) fn apply_in_transaction(
 
     let binding = authorization_for_event(&tx, &event.org, &event.guild_id, &event.thread_id)?;
     if locally_moderated_message(&tx, event)? {
-        let result = InboundResult::Ignored(
-            crate::integrations::discord_inbound::IgnoreReason::UnknownMessage,
-        );
+        let result = InboundResult::Ignored(crate::model::discord::IgnoreReason::UnknownMessage);
         record_event(&tx, event, result)?;
-        tx.commit().map_err(internal)?;
+        tx.commit()
+            .map_err(|error| crate::error::internal("apply in transaction", error))?;
         return Ok(result);
     }
     let mut inbox = MemoryInbox::default();
@@ -82,7 +79,7 @@ pub(super) fn apply_in_transaction(
 
     let processor = InboundProcessor::new(InboundIntegrationState {
         enabled: true,
-        health: crate::integrations::discord_inbound::GatewayHealth::Ready,
+        health: crate::model::discord::GatewayHealth::Ready,
     });
     let result = processor.process(binding.as_ref(), event.clone(), &mut inbox, &NoFetchRest);
 
@@ -103,7 +100,8 @@ pub(super) fn apply_in_transaction(
     }
 
     record_event(&tx, event, result)?;
-    tx.commit().map_err(internal)?;
+    tx.commit()
+        .map_err(|error| crate::error::internal("apply in transaction", error))?;
     Ok(result)
 }
 
@@ -141,7 +139,7 @@ pub(super) fn exact_authorization(
         },
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("exact authorization", error))
 }
 
 fn authorization_for_event(
@@ -183,7 +181,7 @@ fn authorization_for_event(
         },
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("authorization for event", error))
 }
 
 fn locally_moderated_message(conn: &Connection, event: &InboundEvent) -> Result<bool, AppError> {
@@ -199,7 +197,7 @@ fn locally_moderated_message(conn: &Connection, event: &InboundEvent) -> Result<
     )
     .optional()
     .map(|row| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("locally moderated message", error))
 }
 
 fn event_exists(tx: &Transaction<'_>, event: &InboundEvent) -> Result<bool, AppError> {
@@ -212,7 +210,7 @@ fn event_exists(tx: &Transaction<'_>, event: &InboundEvent) -> Result<bool, AppE
     )
     .optional()
     .map(|row| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("event exists", error))
 }
 
 fn load_relevant_feedback(
@@ -273,13 +271,13 @@ fn load_message(
             },
         )
         .optional()
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("load message", error))?;
     if let Some(row) = row {
         inbox.put_feedback(row);
         return Ok(());
     }
 
-    // A Discord reply may reference an Artifact-origin comment that PBI-079 mirrored outward.
+    // A Discord reply may reference an Artifact-origin comment that the discussion mirror sent outward.
     // Load only its canonical thread identity; this is a read-only parent correlation and can
     // never make that Artifact row look externally authored.
     let mirrored = tx
@@ -323,7 +321,7 @@ fn load_message(
             },
         )
         .optional()
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("load message", error))?;
     if let Some(row) = mirrored {
         inbox.put_feedback(row);
     }
@@ -366,7 +364,7 @@ fn feedback_artifact_revision(
         params![feedback.artifact_id.0, feedback.org.0],
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("feedback artifact revision", error))
 }
 
 fn feedback_mapping_exists(
@@ -381,7 +379,7 @@ fn feedback_mapping_exists(
     )
     .optional()
     .map(|row| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("feedback mapping exists", error))
 }
 
 fn update_feedback_mapping(
@@ -402,7 +400,7 @@ fn update_feedback_mapping(
             feedback.org.0
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("update feedback mapping", error))?;
     tx.execute(
         "UPDATE discord_inbound_message_state \
             SET provider_version=?1, external_author_display=?2, external_edited_at=?3, \
@@ -420,7 +418,7 @@ fn update_feedback_mapping(
             thread_id
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("update feedback mapping", error))?;
     Ok(())
 }
 
@@ -452,7 +450,7 @@ fn insert_feedback_mapping(
             feedback.external_deleted_at
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("insert feedback mapping", error))?;
     tx.execute(
         "INSERT INTO discord_inbound_message_state \
          (provider, external_message_id, org, artifact_id, feedback_id, \
@@ -473,7 +471,7 @@ fn insert_feedback_mapping(
             feedback.external_deleted_at
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("insert feedback mapping", error))?;
     Ok(())
 }
 
@@ -488,7 +486,7 @@ fn mark_policy_degraded(
           WHERE artifact_id=?1 AND org=?2",
         params![binding.artifact_id.0, binding.org.0],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("mark policy degraded", error))?;
     tx.execute(
         "UPDATE artifact_discussions \
             SET state='failed', last_error='thread_unavailable', updated_at=datetime('now') \
@@ -497,7 +495,7 @@ fn mark_policy_degraded(
         params![binding.artifact_id.0, binding.org.0],
     )
     .map(|_| ())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("mark policy degraded", error))
 }
 
 fn record_event(
@@ -535,7 +533,7 @@ fn record_event(
         ],
     )
     .map(|_| ())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("record event", error))
 }
 
 fn event_projection(event: &InboundEvent) -> (&'static str, Option<i64>, Option<&str>) {

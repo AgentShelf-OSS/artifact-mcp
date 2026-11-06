@@ -8,7 +8,7 @@ pub(super) fn m028_discord_discussion_mirror(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-079: discussion mirroring is deliberately separate from event webhooks.  In
+    // discussion mirroring is deliberately separate from event webhooks.  In
     // particular, a normal `org_webhooks` row is not an implicit discussion destination.
     // Artifact rows are intentionally absent until an owner/admin opts in (or retains a paused
     // historical mirror), so every existing artifact stays local-only without a backfill.

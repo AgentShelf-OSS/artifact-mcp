@@ -14,7 +14,7 @@ use super::{
     apply::{
         apply_in_transaction, artifact_exists, connected_inbound_destination, exact_authorization,
     },
-    common::{MAX_FETCH_ATTEMPTS, internal},
+    common::MAX_FETCH_ATTEMPTS,
     validation::validate_event_envelope,
 };
 
@@ -122,7 +122,7 @@ impl DiscordInboundStore {
                     safe_error: String::new(),
                 })
             })
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("policy status", error))
         })
         .await
     }
@@ -145,7 +145,7 @@ impl DiscordInboundStore {
                         ) \
                       ORDER BY p.org",
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("gateway targets", error))?;
             let rows = statement
                 .query_map([], |row| {
                     Ok(GatewayOrganizationTarget {
@@ -155,8 +155,9 @@ impl DiscordInboundStore {
                         credential_version: row.get(3)?,
                     })
                 })
-                .map_err(internal)?;
-            rows.collect::<rusqlite::Result<Vec<_>>>().map_err(internal)
+                .map_err(|error| crate::error::internal("gateway targets", error))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(|error| crate::error::internal("gateway targets", error))
         })
         .await
     }
@@ -213,7 +214,7 @@ impl DiscordInboundStore {
                     safe_error
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("set gateway health", error))?;
             conn.execute(
                 "UPDATE artifact_discord_inbound_policies \
                     SET health=CASE \
@@ -230,7 +231,7 @@ impl DiscordInboundStore {
                   WHERE org=?1",
                 params![org.0, health, safe_error],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("set gateway health", error))?;
             Ok(())
         })
         .await
@@ -248,7 +249,7 @@ impl DiscordInboundStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("request gateway readiness", error))?;
             if !artifact_exists(&tx, &artifact, &org)? {
                 return Err(AppError::NotFound("Artifact not found.".to_owned()));
             }
@@ -260,7 +261,7 @@ impl DiscordInboundStore {
                     |row| row.get::<_, i64>(0),
                 )
                 .optional()
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("request gateway readiness", error))?
                 .ok_or_else(|| {
                     AppError::Conflict(
                         "No active organization Discord credential is configured.".to_owned(),
@@ -274,7 +275,7 @@ impl DiscordInboundStore {
                     |_| Ok(()),
                 )
                 .optional()
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("request gateway readiness", error))?
                 .is_some();
             tx.execute(
                 "INSERT INTO discord_gateway_sessions \
@@ -302,7 +303,7 @@ impl DiscordInboundStore {
                     if ready { "ready" } else { "connecting" }
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("request gateway readiness", error))?;
             tx.execute(
                 "INSERT INTO artifact_discord_inbound_policies \
                  (artifact_id, org, enabled, health, safe_error, updated_at) \
@@ -317,8 +318,9 @@ impl DiscordInboundStore {
                     if ready { "ready" } else { "connecting" }
                 ],
             )
-            .map_err(internal)?;
-            tx.commit().map_err(internal)?;
+            .map_err(|error| crate::error::internal("request gateway readiness", error))?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("request gateway readiness", error))?;
             Ok(ready)
         })
         .await
@@ -337,7 +339,7 @@ impl DiscordInboundStore {
             )
             .optional()
             .map(|row| row.is_some())
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("gateway ready", error))
         })
         .await
     }
@@ -368,7 +370,7 @@ impl DiscordInboundStore {
                 },
             )
             .optional()
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("gateway resume", error))
         })
         .await
     }
@@ -391,7 +393,7 @@ impl DiscordInboundStore {
                         AND (next_attempt_at IS NULL OR next_attempt_at <= datetime('now')) \
                       ORDER BY received_at, event_id LIMIT ?2",
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("pending updates", error))?;
             let rows = statement
                 .query_map(params![org.0, i64::from(limit)], |row| {
                     let guild_id: String = row.get(2)?;
@@ -405,7 +407,7 @@ impl DiscordInboundStore {
                             id: row.get(4)?,
                             guild_id: guild_id.clone(),
                             thread_id: thread_id.clone(),
-                            author: crate::integrations::discord_inbound::DiscordAuthor {
+                            author: crate::model::discord::DiscordAuthor {
                                 id: "deferred-author".to_owned(),
                                 display: "Deferred Discord author".to_owned(),
                                 is_bot: false,
@@ -423,8 +425,9 @@ impl DiscordInboundStore {
                         payload_fingerprint: row.get(6)?,
                     })
                 })
-                .map_err(internal)?;
-            rows.collect::<rusqlite::Result<Vec<_>>>().map_err(internal)
+                .map_err(|error| crate::error::internal("pending updates", error))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()
+                .map_err(|error| crate::error::internal("pending updates", error))
         })
         .await
     }
@@ -443,7 +446,7 @@ impl DiscordInboundStore {
                 params![event.org.0, event.gateway_session_id, event.event_id],
             )
             .map(|_| ())
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("complete missing update", error))
         })
         .await
     }
@@ -462,7 +465,7 @@ impl DiscordInboundStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("defer update retry", error))?;
             tx.execute(
                 "UPDATE discord_inbound_events \
                     SET attempts=MIN(attempts + 1, ?4), \
@@ -488,7 +491,7 @@ impl DiscordInboundStore {
                     format!("+{retry_after_seconds} seconds")
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("defer update retry", error))?;
             let terminal = tx
                 .query_row(
                     "SELECT result='failed' FROM discord_inbound_events \
@@ -498,7 +501,7 @@ impl DiscordInboundStore {
                     |row| row.get::<_, bool>(0),
                 )
                 .optional()
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("defer update retry", error))?
                 .unwrap_or(false);
             if terminal {
                 tx.execute(
@@ -511,9 +514,10 @@ impl DiscordInboundStore {
                       )",
                     params![event.org.0, event.thread_id],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("defer update retry", error))?;
             }
-            tx.commit().map_err(internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("defer update retry", error))?;
             Ok(terminal)
         })
         .await
@@ -538,7 +542,7 @@ impl DiscordInboundStore {
                     i64::from(limit.max(1))
                 ],
             )
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("cleanup processed events", error))
         })
         .await
     }
@@ -569,7 +573,7 @@ impl DiscordInboundStore {
                         ))
                     },
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("operational metrics", error))?;
             let inbox = conn
                 .query_row(
                     "SELECT \
@@ -593,7 +597,7 @@ impl DiscordInboundStore {
                         ))
                     },
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("operational metrics", error))?;
             let tombstones = conn
                 .query_row(
                     "SELECT COUNT(*) FROM discord_inbound_message_state \
@@ -601,7 +605,7 @@ impl DiscordInboundStore {
                     [],
                     |row| row.get::<_, i64>(0),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("operational metrics", error))?;
             Ok(DiscordInboundMetricsSnapshot {
                 gateway_disabled: gateway.0,
                 gateway_connecting: gateway.1,
@@ -625,13 +629,13 @@ impl DiscordInboundStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("disable gateway integration", error))?;
             tx.execute(
                 "UPDATE discord_gateway_sessions SET health='disabled', \
                  safe_error='', updated_at=datetime('now')",
                 [],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("disable gateway integration", error))?;
             tx.execute(
                 "UPDATE artifact_discord_inbound_policies \
                     SET health=CASE WHEN enabled=1 THEN 'failed' ELSE 'disabled' END, \
@@ -639,8 +643,9 @@ impl DiscordInboundStore {
                         updated_at=datetime('now')",
                 [],
             )
-            .map_err(internal)?;
-            tx.commit().map_err(internal)?;
+            .map_err(|error| crate::error::internal("disable gateway integration", error))?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("disable gateway integration", error))?;
             Ok(())
         })
         .await
@@ -648,7 +653,7 @@ impl DiscordInboundStore {
 
     /// Changes only the explicit inbound policy. Enabling additionally proves the exact
     /// organization-owned notification thread is already connected. Credential readiness is
-    /// checked through PBI-081 by the application service immediately before this call.
+    /// checked against organization policy by the application service immediately before this call.
     pub async fn set_policy_audited(
         &self,
         artifact: ArtifactId,
@@ -683,7 +688,7 @@ impl DiscordInboundStore {
                         if enabled { "connecting" } else { "disabled" }
                     ],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("set policy audited", error))?;
                 Ok((
                     (),
                     AuditEvent {

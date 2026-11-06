@@ -296,6 +296,7 @@ fn identity(org: &str) -> PublisherIdentity {
         label: String::new(),
         role: "author".to_owned(),
     })
+    .expect("valid fixture role")
 }
 
 #[test]
@@ -418,4 +419,18 @@ async fn no_rendering_of_a_key_or_its_hash_can_leak_it() {
     assert!(!rendered.contains(SECRET), "leaked the key: {rendered}");
     assert!(!rendered.contains(&digest), "leaked the hash: {rendered}");
     assert_eq!(error.to_string(), UNAUTHORIZED_MESSAGE);
+}
+
+#[test]
+fn unknown_stored_roles_fail_closed_at_identity_construction() {
+    for role in ["Author", "admin", ""] {
+        let error = identity_for(PublisherKeyRecord {
+            client_id: ClientId::from("key"),
+            org: OrgId::from("acme"),
+            label: String::new(),
+            role: role.to_owned(),
+        })
+        .expect_err("unknown role rejected");
+        assert_eq!(error, KeyAuthenticator::unauthorized());
+    }
 }

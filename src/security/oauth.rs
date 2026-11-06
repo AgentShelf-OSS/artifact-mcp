@@ -210,10 +210,11 @@ impl OAuthAuthenticator {
         let role = claims
             .get("role")
             .and_then(Value::as_str)
-            .unwrap_or("author");
-        if !matches!(role, "reader" | "author" | "collaborator") {
-            return Err(OAuthTokenRejection::InvalidClaim("role"));
-        }
+            .unwrap_or(crate::model::Role::Author.as_str());
+        let role = role.parse::<crate::model::Role>().map_err(|error| {
+            tracing::warn!(%error, "rejecting OAuth claim with invalid role");
+            OAuthTokenRejection::InvalidClaim("role")
+        })?;
         let label = claims
             .get("client_name")
             .and_then(Value::as_str)
@@ -228,7 +229,7 @@ impl OAuthAuthenticator {
             client_id: ClientId::from(client_id),
             org: OrgId::from(org),
             label,
-            role: role.to_owned(),
+            role,
             scopes: Some(scope_set(&claims)?),
         })
     }

@@ -4,6 +4,7 @@
 //! (`Database::open_with` then storage reconciliation then digest backfill), rather than a unit
 //! test that calls a migration function in isolation.
 
+use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
@@ -36,7 +37,7 @@ fn fixture_mutation_audit() -> MutationAudit {
         client_id: "fixture-key".into(),
         org: "fixture".into(),
         label: "Fixture key".to_owned(),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     })
     .expect("fixture audit context")
@@ -553,7 +554,7 @@ async fn every_frozen_historical_database_boots_recovers_and_serves_without_muta
             client_id: "fixture-key".into(),
             org: "fixture".into(),
             label: "Fixture key".to_owned(),
-            role: "author".to_owned(),
+            role: artifact_mcp::model::Role::Author,
             scopes: None,
         };
         let audit = MutationAudit::publisher(&publisher).expect("fixture audit context");

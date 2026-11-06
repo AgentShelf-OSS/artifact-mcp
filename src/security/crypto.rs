@@ -1,20 +1,19 @@
-//! Owned by U04 (sol) — webhook AES-GCM compatibility.
+//! Webhook AES-GCM compatibility.
 //!
-//! The at-rest format is not a design choice: production rows already exist in it, written by
-//! `lib/crypto.js`. This module is a byte-for-byte port of that reference.
+//! Existing production rows require byte-for-byte compatibility with this at-rest format.
 //!
-//! # At-rest format (authority: `lib/crypto.js`, `lib/webhooks.js:88-99`)
+//! # At-rest format
 //!
-//! | Property | Value | Node line |
-//! |---|---|---|
-//! | Algorithm | AES-256-GCM | `lib/crypto.js:5` |
-//! | Key | 32 bytes, from **canonical padded** standard Base64 | `lib/crypto.js:9-18` |
-//! | Nonce | 12 random bytes, fresh per encryption | `lib/crypto.js:6,33` |
-//! | Associated data | **none** (no AAD is ever passed to `createCipheriv`) | `lib/crypto.js:34` |
-//! | Plaintext | UTF-8 bytes of the URL | `lib/crypto.js:35` |
-//! | Tag | 16 bytes, stored detached | `lib/crypto.js:40` |
-//! | Encoding | ciphertext, nonce and tag are three separate standard Base64 strings | `lib/crypto.js:38-40` |
-//! | Columns | `url_cipher`, `url_nonce`, `url_tag` | `lib/webhooks.js:94-96` |
+//! | Property | Value |
+//! |---|---|
+//! | Algorithm | AES-256-GCM |
+//! | Key | 32 bytes, from **canonical padded** standard Base64 |
+//! | Nonce | 12 random bytes, fresh per encryption |
+//! | Associated data | **none** (no AAD is ever passed to `createCipheriv`) |
+//! | Plaintext | UTF-8 bytes of the URL |
+//! | Tag | 16 bytes, stored detached |
+//! | Encoding | ciphertext, nonce and tag are three separate standard Base64 strings |
+//! | Columns | `url_cipher`, `url_nonce`, `url_tag` |
 //!
 //! # Plaintext fallback
 //!
@@ -24,9 +23,7 @@
 //!
 //! # Secret containment
 //!
-//! Neither the key nor a decrypted URL is ever rendered by `Debug`/`Display`, placed in an
-//! [`AppError`] message, or logged. Authentication failure collapses to [`AppError::Internal`],
-//! which the frozen error table renders as exactly `internal error` with no source detail.
+//! Neither the key nor a decrypted URL is ever rendered by `Debug`/`Display`, placed in an [`AppError`] message, or logged. Authentication failure collapses to [`AppError::Internal`], which the frozen error table renders as exactly `internal error` with no source detail.
 
 use std::{
     fmt,
@@ -48,28 +45,27 @@ use crate::{
     persistence::migrations::{EncryptedUrl, WebhookUrlCipher, mask_webhook_url},
 };
 
-/// AES-256 key length in bytes. [lib/crypto.js:14]
+/// AES-256 key length in bytes.
 pub const KEY_BYTES: usize = 32;
-/// GCM nonce length in bytes — `const NONCE_BYTES = 12`. [lib/crypto.js:6]
+/// GCM nonce length in bytes — `const NONCE_BYTES = 12`.
 pub const NONCE_BYTES: usize = 12;
-/// GCM authentication tag length in bytes — Node's default `authTagLength`. [lib/crypto.js:40]
+/// GCM authentication tag length in bytes — Node's default `authTagLength`.
 pub const TAG_BYTES: usize = 16;
 
-/// Verbatim Node message for an unusable `WEBHOOK_ENC_KEY`. [lib/crypto.js:15,31]
+/// Verbatim Node message for an unusable `WEBHOOK_ENC_KEY`.
 pub const INVALID_KEY_MESSAGE: &str = "WEBHOOK_ENC_KEY must be a 32-byte base64 value.";
 
-/// Verbatim Node message for decrypting with no key configured. [lib/crypto.js:46]
+/// Verbatim Node message for decrypting with no key configured.
 ///
 /// It never reaches an HTTP body: the frozen error table maps this condition to
 /// [`AppError::Internal`], exactly as an uncaught throw becomes a 500 in the Node reference.
 pub const MISSING_KEY_MESSAGE: &str = "WEBHOOK_ENC_KEY is required to decrypt webhook URLs.";
 
-/// Verbatim Node startup warning for the plaintext fallback. [lib/crypto.js:23-26]
+/// Verbatim Node startup warning for the plaintext fallback.
 pub const PLAINTEXT_FALLBACK_WARNING: &str = "[artifact-mcp] WARNING: WEBHOOK_ENC_KEY is unset — Discord webhook URLs will be stored \
 in PLAINTEXT. Set a 32-byte base64 key to encrypt webhook credentials at rest.";
 
 /// `let warnedAboutPlaintextFallback = false` — the warning is emitted at most once per process.
-/// [lib/crypto.js:7,21-22]
 static WARNED_ABOUT_PLAINTEXT_FALLBACK: AtomicBool = AtomicBool::new(false);
 
 // ---------------------------------------------------------------------------
@@ -86,13 +82,13 @@ const fn is_js_whitespace(value: char) -> bool {
     matches!(value, '\u{feff}') || (value.is_whitespace() && !matches!(value, '\u{85}'))
 }
 
-/// `String.prototype.trim` — [lib/crypto.js:10]
+/// `String.prototype.trim`
 #[must_use]
 fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
 }
 
-/// Port of `parseEncryptionKey(value)` — [lib/crypto.js:9-18].
+/// Port of `parseEncryptionKey(value)`.
 ///
 /// Absent, or empty after trimming, yields `None` (the plaintext fallback). Otherwise the value
 /// must decode to exactly 32 bytes **and** re-encode to itself: Node's `Buffer.from(v, "base64")`
@@ -123,7 +119,7 @@ fn invalid_key() -> AppError {
     AppError::Validation(INVALID_KEY_MESSAGE.to_owned())
 }
 
-/// Port of `warnIfWebhookEncryptionDisabled(value)` — [lib/crypto.js:20-27].
+/// Port of `warnIfWebhookEncryptionDisabled(value)`.
 ///
 /// Returns `true` when this call emitted the warning, so the once-only behaviour is observable
 /// without capturing a `tracing` subscriber.
@@ -152,7 +148,7 @@ fn scrub(bytes: &mut [u8]) {
 // The cipher
 // ---------------------------------------------------------------------------
 
-/// AES-256-GCM webhook URL cipher, byte-compatible with `lib/crypto.js`.
+/// AES-256-GCM webhook URL cipher, compatible with the persisted format.
 ///
 /// Cloneable-by-`Arc` at the call site rather than by value: the key is not copied around.
 pub struct WebhookCipher {
@@ -183,7 +179,7 @@ impl WebhookCipher {
     }
 
     /// Port of `parseEncryptionKey` composed with cipher construction: `None` means "no key
-    /// configured", which is the plaintext fallback rather than an error. [lib/webhooks.js:88-89]
+    /// configured", which is the plaintext fallback rather than an error.
     ///
     /// # Errors
     /// Returns [`AppError::Validation`] carrying [`INVALID_KEY_MESSAGE`] when a value is present
@@ -205,7 +201,7 @@ impl WebhookCipher {
         Ok(Self { cipher, random })
     }
 
-    /// Port of `encrypt(plaintext, key)` — [lib/crypto.js:29-42].
+    /// Port of `encrypt(plaintext, key)`.
     ///
     /// A fresh 12-byte nonce is drawn per call, no associated data is bound, and the detached
     /// 16-byte tag is returned alongside the ciphertext, all Base64-encoded.
@@ -231,7 +227,7 @@ impl WebhookCipher {
         })
     }
 
-    /// Port of `decrypt(record, key)` — [lib/crypto.js:44-54].
+    /// Port of `decrypt(record, key)`.
     ///
     /// Any modification of the ciphertext, nonce or tag fails authentication; no plaintext is ever
     /// produced from an unauthenticated record.
@@ -299,7 +295,7 @@ fn aead_failure(reason: &'static str) -> AppError {
 // Plaintext fallback
 // ---------------------------------------------------------------------------
 
-/// The three at-rest columns of `org_webhooks` as a single value. [lib/webhooks.js:90-96]
+/// The three at-rest columns of `org_webhooks` as a single value.
 ///
 /// `url` is the *displayable* column: the masked form when encryption is on, and the real URL when
 /// the plaintext fallback is active — exactly what `create()` writes in the Node reference.
@@ -328,8 +324,7 @@ impl std::fmt::Debug for StoredWebhookUrl {
     }
 }
 
-/// Whether webhook URLs are encrypted at rest, mirroring `parseEncryptionKey()` returning a key or
-/// `undefined` in `lib/webhooks.js:88`.
+/// Whether webhook URLs are encrypted at rest, determined by the presence of a configured key.
 /// The cipher is boxed because an expanded AES-256 key schedule is roughly a kilobyte, and the
 /// plaintext variant — the current production configuration — must stay pointer-sized.
 pub enum WebhookUrlProtection {
@@ -370,7 +365,7 @@ impl WebhookUrlProtection {
         matches!(self, Self::Encrypted(_))
     }
 
-    /// The cipher, when one is configured — the value U03's conversion seam expects.
+    /// The configured cipher for migration-time URL conversion, if present.
     #[must_use]
     pub fn cipher(&self) -> Option<&WebhookCipher> {
         match self {
@@ -379,7 +374,7 @@ impl WebhookUrlProtection {
         }
     }
 
-    /// Port of the row construction in `create()` — [lib/webhooks.js:88-97].
+    /// Construct the at-rest URL columns.
     ///
     /// With a key: `url` becomes the masked display value and the three cipher columns are filled.
     /// Without one: `url` is the verbatim URL and the cipher columns stay `NULL`.
@@ -399,7 +394,7 @@ impl WebhookUrlProtection {
         }
     }
 
-    /// Port of `deliveryRow(row)` — [lib/webhooks.js:117-120].
+    /// Port of `deliveryRow(row)`.
     ///
     /// A row with no ciphertext is returned as-is (the legacy plaintext path, which Node does not
     /// gate on the key); a row with ciphertext requires the key.

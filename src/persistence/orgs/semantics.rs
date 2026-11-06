@@ -62,31 +62,31 @@ pub fn truncate_utf16(value: &str, max_units: usize) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Validation and normalization — [lib/orgs.js:29-51]
+// Validation and normalization
 // ---------------------------------------------------------------------------
 
-/// Longest accepted org id: `/^[a-z0-9][a-z0-9._-]{0,40}$/i` — [lib/orgs.js:29]
+/// Longest accepted org id: `/^[a-z0-9][a-z0-9._-]{0,40}$/i`
 pub const ORG_NAME_MAX_LENGTH: usize = 41;
 
-/// `label.trim().slice(0, 80)` — [lib/orgs.js:112]
+/// Maximum organization label length after trimming, in UTF-16 code units.
 pub const ORG_LABEL_MAX_LENGTH: usize = 80;
 
-/// `normCategory` truncation — [lib/orgs.js:50]
+/// `normCategory` truncation
 pub const CATEGORY_MAX_LENGTH: usize = 60;
 
-/// `email.length > 254` — [lib/orgs.js:40]
+/// `email.length > 254`
 pub const EMAIL_MAX_LENGTH: usize = 254;
 
-/// `local.length <= 64` — [lib/orgs.js:45]
+/// `local.length <= 64`
 pub const EMAIL_LOCAL_MAX_LENGTH: usize = 64;
 
-/// `domain.length <= 253` — [lib/orgs.js:47]
+/// `domain.length <= 253`
 pub const EMAIL_DOMAIN_MAX_LENGTH: usize = 253;
 
-/// The org id reserved for the administrator pseudo-tenant — [lib/orgs.js:114]
+/// The org id reserved for the administrator pseudo-tenant
 pub const RESERVED_ORG_NAME: &str = "admin";
 
-/// `ORG_RE = /^[a-z0-9][a-z0-9._-]{0,40}$/i` — [lib/orgs.js:29]
+/// `ORG_RE = /^[a-z0-9][a-z0-9._-]{0,40}$/i`
 #[must_use]
 pub fn is_valid_org_name(value: &str) -> bool {
     let mut characters = value.chars();
@@ -103,7 +103,6 @@ fn is_org_name_character(value: char) -> bool {
 }
 
 /// `DOMAIN_RE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i`
-/// — [lib/orgs.js:30]
 ///
 /// The trailing `+` makes at least one dot mandatory, so a bare host name is never a domain.
 #[must_use]
@@ -135,7 +134,7 @@ fn is_valid_domain_label(label: &str) -> bool {
     }
 }
 
-/// ``EMAIL_LOCAL_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i`` — [lib/orgs.js:31]
+/// ``EMAIL_LOCAL_RE = /^[a-z0-9!#$%&'*+/=?^_`{|}~.-]+$/i``
 fn is_valid_email_local(local: &str) -> bool {
     !local.is_empty()
         && local.chars().all(|character| {
@@ -165,7 +164,7 @@ fn is_valid_email_local(local: &str) -> bool {
         })
 }
 
-/// `validEmail(email)` — [lib/orgs.js:39-48]. Expects an already-normalized address.
+/// `validEmail(email)`. Expects an already-normalized address.
 #[must_use]
 pub fn is_valid_email(email: &str) -> bool {
     if email.is_empty() || utf16_len(email) > EMAIL_MAX_LENGTH {
@@ -191,7 +190,7 @@ pub fn is_valid_email(email: &str) -> bool {
         && is_valid_domain(domain)
 }
 
-/// `HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/` — [lib/orgs.js:10]
+/// `HEX_RE = /^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/`
 #[must_use]
 pub fn is_valid_color(value: &str) -> bool {
     let Some(digits) = value.strip_prefix('#') else {
@@ -200,26 +199,25 @@ pub fn is_valid_color(value: &str) -> bool {
     matches!(digits.len(), 3 | 6) && digits.bytes().all(|byte| byte.is_ascii_hexdigit())
 }
 
-/// `String(name || "").trim()` — the org id normalization used by every lookup
-/// ([lib/orgs.js:54] and friends). Deliberately does **not** lowercase.
+/// Trim organization IDs for every lookup without lowercasing them.
 #[must_use]
 pub fn norm_org(value: &str) -> String {
     js_trim(value).to_owned()
 }
 
-/// `normDomain` — [lib/orgs.js:33-35]
+/// `normDomain`
 #[must_use]
 pub fn norm_domain(value: &str) -> String {
     js_trim(value).to_lowercase()
 }
 
-/// `normEmail` — [lib/orgs.js:36-38]
+/// `normEmail`
 #[must_use]
 pub fn norm_email(value: &str) -> String {
     js_trim(value).to_lowercase()
 }
 
-/// `normCategory` — [lib/orgs.js:49-51]: trim, collapse whitespace runs to one space, cap at 60.
+/// `normCategory`: trim, collapse whitespace runs to one space, cap at 60.
 #[must_use]
 pub fn norm_category(value: &str) -> String {
     let trimmed = js_trim(value);
@@ -243,8 +241,7 @@ pub fn norm_category(value: &str) -> String {
 // Error messages — one helper per Node `throw`
 // ---------------------------------------------------------------------------
 
-/// `Unknown organization "<org>".` — [lib/orgs.js:102], [lib/orgs.js:136], [lib/orgs.js:153],
-/// [lib/orgs.js:172]
+/// `Unknown organization "<org>".`
 #[must_use]
 pub fn unknown_org_message(org: &str) -> String {
     format!("Unknown organization \"{org}\".")
@@ -254,12 +251,11 @@ pub(super) fn unknown_org(org: &str) -> AppError {
     AppError::Validation(unknown_org_message(org))
 }
 
-/// `"<domain>" is not a valid email domain.` — [lib/orgs.js:118], [lib/orgs.js:137]
+/// `"<domain>" is not a valid email domain.`
 pub(super) fn invalid_domain(domain: &str) -> AppError {
     AppError::Validation(format!("\"{domain}\" is not a valid email domain."))
 }
 
-/// [lib/orgs.js:140]
 pub(super) fn domain_taken(domain: &str, owner: &str, same_org: bool) -> AppError {
     AppError::Validation(if same_org {
         format!("\"{domain}\" is already on this org.")
@@ -268,7 +264,6 @@ pub(super) fn domain_taken(domain: &str, owner: &str, same_org: bool) -> AppErro
     })
 }
 
-/// [lib/orgs.js:157-159]
 pub(super) fn email_taken(email: &str, owner: &str, same_org: bool) -> AppError {
     AppError::Validation(if same_org {
         format!("\"{email}\" is already on this org.")

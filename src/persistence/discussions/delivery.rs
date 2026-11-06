@@ -6,7 +6,6 @@ use super::{
     DiscussionStore,
     discussion_rows::discussion_row,
     inputs::{AcceptedDiscussionDelivery, AcceptedDiscussionMarker, TerminalDiscussionDelivery},
-    internal,
     link_rows::{link_by_outbox, link_by_tombstone_outbox},
     planning::discussion_ordering_key,
     support::require_nonempty,
@@ -20,7 +19,7 @@ use crate::{
 };
 
 impl DiscussionStore {
-    /// Atomically accepts a claimed PBI-056 outbox row and writes the corresponding Discord IDs.
+    /// Atomically accepts a claimed outbox row and writes the corresponding Discord IDs.
     /// A stale lease changes neither side. APP1 can call this after validating Discord's response.
     pub async fn accept_delivery_and_record_message(
         &self,
@@ -28,13 +27,13 @@ impl DiscussionStore {
     ) -> Result<bool, AppError> {
         validate_accepted(&input)?;
         db::interact(&self.pool, move |conn| {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(internal)?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| crate::error::internal("accept delivery and record message", error))?;
             let link = link_by_outbox(&tx, &input.outbox_id)?.ok_or(AppError::Internal)?;
             let (kind, ordering_key): (String, String) = tx.query_row(
                 "SELECT delivery_kind, ordering_key FROM provider_delivery_outbox WHERE id = ?1",
                 [&input.outbox_id],
                 |row| Ok((row.get(0)?, row.get(1)?)),
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("accept delivery and record message", error))?;
             if !matches!(kind.as_str(), "discussion_thread" | "discussion_message")
                 || ordering_key != discussion_ordering_key(&link.artifact_id, link.generation)?
             {
@@ -66,7 +65,7 @@ impl DiscussionStore {
                  last_error = NULL, posted_at = datetime('now'), updated_at = datetime('now') \
                  WHERE provider = 'discord' AND outbox_id = ?3",
                 params![input.external_thread_id, input.external_message_id, input.outbox_id],
-            ).map_err(internal)? != 1 {
+            ).map_err(|error| crate::error::internal("accept delivery and record message", error))? != 1 {
                 return Err(AppError::Internal);
             }
             if kind == "discussion_thread" && current {
@@ -75,11 +74,11 @@ impl DiscussionStore {
                      state = CASE WHEN mode = 'discord_mirror' THEN 'connected' ELSE state END, \
                      last_synced_at = datetime('now'), last_error = NULL, updated_at = datetime('now') \
                      WHERE artifact_id = ?3 AND org = ?4 AND connection_id = ?5 AND generation = ?6",
-                    params![input.external_thread_id, input.external_message_id, link.artifact_id.0, link.org.0, link.connection_id, i64::try_from(link.generation).map_err(|_| AppError::Internal)?],
-                ).map_err(internal)?;
+                    params![input.external_thread_id, input.external_message_id, link.artifact_id.0, link.org.0, link.connection_id, i64::try_from(link.generation).map_err(|error| crate::error::internal("accept delivery and record message", error))?],
+                ).map_err(|error| crate::error::internal("accept delivery and record message", error))?;
                 if updated != 1 { return Err(AppError::Internal); }
             }
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("accept delivery and record message", error))?;
             Ok(true)
         }).await
     }
@@ -95,7 +94,7 @@ impl DiscussionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("accept tombstone delivery", error))?;
             let link = link_by_tombstone_outbox(&tx, &input.outbox_id)?.ok_or(AppError::Internal)?;
             let (kind, ordering_key): (String, String) = tx
                 .query_row(
@@ -103,7 +102,7 @@ impl DiscussionStore {
                     [&input.outbox_id],
                     |row| Ok((row.get(0)?, row.get(1)?)),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("accept tombstone delivery", error))?;
             if kind != "discussion_tombstone"
                 || ordering_key != discussion_ordering_key(&link.artifact_id, link.generation)?
                 || link.state != "tombstone_pending"
@@ -123,10 +122,10 @@ impl DiscussionStore {
                 "UPDATE discussion_message_links SET state = 'tombstoned', last_error = NULL, updated_at = datetime('now') \
                  WHERE provider = 'discord' AND tombstone_outbox_id = ?1 AND state = 'tombstone_pending'",
                 [&input.outbox_id],
-            ).map_err(internal)? != 1 {
+            ).map_err(|error| crate::error::internal("accept tombstone delivery", error))? != 1 {
                 return Err(AppError::Internal);
             }
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("accept tombstone delivery", error))?;
             Ok(true)
         }).await
     }
@@ -141,7 +140,7 @@ impl DiscussionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("accept marker delivery", error))?;
             let discussion = discussion_row(&tx, &input.artifact_id.0, &input.org.0)?
                 .ok_or(AppError::Conflict("discussion mirror is no longer active".to_owned()))?;
             let current = discussion.connection_id.as_deref() == Some(&input.connection_id)
@@ -155,7 +154,7 @@ impl DiscussionStore {
                     [&input.outbox_id],
                     |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?)),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("accept marker delivery", error))?;
             if kind != "discussion_message"
                 || tenant != input.org.0
                 || target != input.connection_id
@@ -180,11 +179,11 @@ impl DiscussionStore {
                 tx.execute(
                     "UPDATE artifact_discussions SET last_synced_at = datetime('now'), last_error = NULL, updated_at = datetime('now') \
                      WHERE artifact_id = ?1 AND org = ?2 AND connection_id = ?3 AND generation = ?4",
-                    params![input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|_| AppError::Internal)?],
+                    params![input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|error| crate::error::internal("accept marker delivery", error))?],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("accept marker delivery", error))?;
             }
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("accept marker delivery", error))?;
             Ok(true)
         })
         .await
@@ -201,7 +200,7 @@ impl DiscussionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("terminal delivery", error))?;
             let changed = dead_letter_in_transaction(
                 &tx,
                 &input.outbox_id,
@@ -229,8 +228,8 @@ impl DiscussionStore {
                         tx.execute(
                             "UPDATE artifact_discussions SET state = 'failed', last_error = ?1, updated_at = datetime('now') \
                              WHERE artifact_id = ?2 AND org = ?3 AND connection_id = ?4 AND generation = ?5",
-                            params![input.classification, input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|_| AppError::Internal)?],
-                        ).map_err(internal)?;
+                            params![input.classification, input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|error| crate::error::internal("terminal delivery", error))?],
+                        ).map_err(|error| crate::error::internal("terminal delivery", error))?;
                     }
                     "discussion_message" => {
                         if let Some(feedback_id) = &input.feedback_id {
@@ -238,14 +237,14 @@ impl DiscussionStore {
                                 "UPDATE discussion_message_links SET state = 'failed', last_error = ?1, updated_at = datetime('now') \
                                  WHERE provider = 'discord' AND artifact_id = ?2 AND org = ?3 AND feedback_id = ?4 \
                                    AND connection_id = ?5 AND generation = ?6 AND outbox_id = ?7",
-                                params![input.classification, input.artifact_id.0, input.org.0, feedback_id.0, input.connection_id, i64::try_from(input.generation).map_err(|_| AppError::Internal)?, input.outbox_id],
-                            ).map_err(internal)?;
+                                params![input.classification, input.artifact_id.0, input.org.0, feedback_id.0, input.connection_id, i64::try_from(input.generation).map_err(|error| crate::error::internal("terminal delivery", error))?, input.outbox_id],
+                            ).map_err(|error| crate::error::internal("terminal delivery", error))?;
                         } else {
                             tx.execute(
                                 "UPDATE artifact_discussions SET last_error = ?1, updated_at = datetime('now') \
                                  WHERE artifact_id = ?2 AND org = ?3 AND connection_id = ?4 AND generation = ?5",
-                                params![input.classification, input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|_| AppError::Internal)?],
-                            ).map_err(internal)?;
+                                params![input.classification, input.artifact_id.0, input.org.0, input.connection_id, i64::try_from(input.generation).map_err(|error| crate::error::internal("terminal delivery", error))?],
+                            ).map_err(|error| crate::error::internal("terminal delivery", error))?;
                         }
                     }
                     "discussion_tombstone" => {
@@ -254,14 +253,14 @@ impl DiscussionStore {
                                 "UPDATE discussion_message_links SET state = 'failed', last_error = ?1, updated_at = datetime('now') \
                                  WHERE provider = 'discord' AND artifact_id = ?2 AND org = ?3 AND feedback_id = ?4 \
                                    AND connection_id = ?5 AND generation = ?6 AND tombstone_outbox_id = ?7",
-                                params![input.classification, input.artifact_id.0, input.org.0, feedback_id.0, input.connection_id, i64::try_from(input.generation).map_err(|_| AppError::Internal)?, input.outbox_id],
-                            ).map_err(internal)?;
+                                params![input.classification, input.artifact_id.0, input.org.0, feedback_id.0, input.connection_id, i64::try_from(input.generation).map_err(|error| crate::error::internal("terminal delivery", error))?, input.outbox_id],
+                            ).map_err(|error| crate::error::internal("terminal delivery", error))?;
                         }
                     }
                     _ => return Err(AppError::Validation("invalid discussion delivery kind".to_owned())),
                 }
             }
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("terminal delivery", error))?;
             Ok(true)
         })
         .await
@@ -278,7 +277,7 @@ fn accept_outbox_in_transaction(
          discord_message_id = ?2, terminal_error = '', updated_at = ?1, completed_at = ?1 \
          WHERE id = ?3 AND state = 'leased' AND lease_owner = ?4 AND lease_token = ?5 AND lease_version = ?6",
         params![input.now_millis, input.external_message_id, input.outbox_id, input.worker, input.lease_token, input.lease_version],
-    ).map_err(internal)? == 1)
+    ).map_err(|error| crate::error::internal("accept outbox in transaction", error))? == 1)
 }
 
 fn accept_outbox_raw(
@@ -297,7 +296,7 @@ fn accept_outbox_raw(
          WHERE id = ?3 AND state = 'leased' AND lease_owner = ?4 AND lease_token = ?5 AND lease_version = ?6",
         params![now_millis, message_id, outbox_id, worker, lease_token, lease_version],
     )
-    .map_err(internal)? == 1)
+    .map_err(|error| crate::error::internal("accept outbox raw", error))? == 1)
 }
 
 fn validate_marker(input: &AcceptedDiscussionMarker) -> Result<(), AppError> {

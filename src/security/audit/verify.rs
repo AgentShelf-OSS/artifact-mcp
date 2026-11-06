@@ -30,7 +30,7 @@ fn verify_checkpoints(
     let mut previous_checkpoint = String::new();
     let mut expected_sequence = 1_u64;
     let mut bridge = String::new();
-    let mut checkpoints = conn.prepare("SELECT first_sequence,last_sequence,key_id,canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash FROM security_audit_checkpoints ORDER BY checkpoint_id").map_err(|_| AppError::Internal)?;
+    let mut checkpoints = conn.prepare("SELECT first_sequence,last_sequence,key_id,canonical_version,bridge_hash,prev_checkpoint_hash,checkpoint_hash FROM security_audit_checkpoints ORDER BY checkpoint_id").map_err(|error| crate::error::internal("prepare checkpoint verification query", error))?;
     let checkpoint_rows = checkpoints
         .query_map([], |row| {
             Ok((
@@ -43,13 +43,17 @@ fn verify_checkpoints(
                 row.get::<_, String>(6)?,
             ))
         })
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("query audit checkpoints", error))?;
     for checkpoint in checkpoint_rows {
         let (first, last, key_id, version, checkpoint_bridge, prior, stored) =
-            checkpoint.map_err(|_| AppError::Internal)?;
+            checkpoint.map_err(|error| crate::error::internal("read audit checkpoint", error))?;
         let (first, last) = (
-            u64::try_from(first).map_err(|_| AppError::Internal)?,
-            u64::try_from(last).map_err(|_| AppError::Internal)?,
+            u64::try_from(first).map_err(|error| {
+                crate::error::internal("convert first checkpoint sequence", error)
+            })?,
+            u64::try_from(last).map_err(|error| {
+                crate::error::internal("convert last checkpoint sequence", error)
+            })?,
         );
         if first != expected_sequence
             || last < first
@@ -78,7 +82,7 @@ fn verify_events(
     bridge: String,
 ) -> Result<Option<(u64, String)>, AppError> {
     let mut previous = bridge;
-    let mut statement = conn.prepare("SELECT sequence,event_id,key_id,canonical_version,tenant,actor_type,actor_id,actor_role,operation,target_type,target_id,result,classification,source,request_id,revision,occurred_at,canonical,prev_hash,event_hash FROM security_audit_events ORDER BY sequence").map_err(|_| AppError::Internal)?;
+    let mut statement = conn.prepare("SELECT sequence,event_id,key_id,canonical_version,tenant,actor_type,actor_id,actor_role,operation,target_type,target_id,result,classification,source,request_id,revision,occurred_at,canonical,prev_hash,event_hash FROM security_audit_events ORDER BY sequence").map_err(|error| crate::error::internal("prepare event verification query", error))?;
     let rows = statement
         .query_map([], |row| {
             Ok((
@@ -110,7 +114,7 @@ fn verify_events(
                 row.get::<_, String>(19)?,
             ))
         })
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("query audit events", error))?;
     for item in rows {
         let (
             sequence,
@@ -123,8 +127,9 @@ fn verify_events(
             stored,
             prev,
             stored_hash,
-        ) = item.map_err(|_| AppError::Internal)?;
-        let sequence = u64::try_from(sequence).map_err(|_| AppError::Internal)?;
+        ) = item.map_err(|error| crate::error::internal("read audit event", error))?;
+        let sequence = u64::try_from(sequence)
+            .map_err(|error| crate::error::internal("convert audit event sequence", error))?;
         if sequence != expected_sequence
             || key_id != KEY_ID
             || version != i64::from(VERSION)

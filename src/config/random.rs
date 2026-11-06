@@ -24,7 +24,7 @@ pub struct OsRandom;
 
 impl RandomSource for OsRandom {
     fn fill_bytes(&self, dest: &mut [u8]) -> Result<(), AppError> {
-        getrandom::fill(dest).map_err(|_| AppError::Internal)
+        getrandom::fill(dest).map_err(|error| crate::error::internal("fill random bytes", error))
     }
 }
 

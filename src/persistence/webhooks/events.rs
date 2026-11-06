@@ -4,7 +4,7 @@ use super::*;
 // Events
 // ---------------------------------------------------------------------------
 
-/// The wire/column name of an event, matching `EVENTS` in `lib/webhooks.js:9`.
+/// The wire and column name of an event.
 #[must_use]
 pub const fn event_name(event: &WebhookEvent) -> &'static str {
     match *event {
@@ -18,7 +18,6 @@ pub const fn event_name(event: &WebhookEvent) -> &'static str {
 }
 
 /// Inverse of [`event_name`]; unknown names are dropped, exactly as `rowEvents` filters them.
-/// [lib/webhooks.js:35-37]
 #[must_use]
 pub fn event_from_name(value: &str) -> Option<WebhookEvent> {
     match value {
@@ -33,13 +32,12 @@ pub fn event_from_name(value: &str) -> Option<WebhookEvent> {
 }
 
 /// Port of `rowEvents(row)` — split on `,` and drop anything not in `EVENTS`.
-/// [lib/webhooks.js:35-37]
 #[must_use]
 pub fn parse_stored_events(column: &str) -> Vec<WebhookEvent> {
     column.split(',').filter_map(event_from_name).collect()
 }
 
-/// Port of `parseEvents(value, { defaultAll })` — [lib/webhooks.js:25-33].
+/// Port of `parseEvents(value, { defaultAll })`.
 ///
 /// The typed model removes two of Node's four outcomes by construction: a non-array and an unknown
 /// event name cannot be represented by `Option<&[WebhookEvent]>`, so the

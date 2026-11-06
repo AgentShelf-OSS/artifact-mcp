@@ -1,40 +1,29 @@
-//! Owned by U12 (terra) — encrypted webhook persistence.
+//! Encrypted webhook persistence.
 //!
-//! Port of `lib/webhooks.js`. This module and [`crate::integrations::notify`] are the only two
+//! Webhook persistence and the notification adapter are the only two
 //! places a full Discord webhook URL is ever materialised; everything else sees the masked form.
 //!
-//! # At-rest layout (authority: `lib/webhooks.js:14-21`, migration v18)
+//! # At-rest layout, migration v18
 //!
 //! | Column | With a key | Without a key |
 //! |---|---|---|
 //! | `url` | masked display value (`storedMaskUrl`) | the URL **verbatim** |
 //! | `url_cipher`/`url_nonce`/`url_tag` | AES-256-GCM record | `NULL` |
 //!
-//! `WEBHOOK_ENC_KEY` is currently unset in production, so the plaintext column is a live
-//! configuration and not a legacy path. Both are modelled by U04's
-//! [`WebhookUrlProtection`], which this module consumes rather than reimplementing.
+//! `WEBHOOK_ENC_KEY` is currently unset in production, so the plaintext column is a live configuration and not a legacy path. Both are modelled by [`WebhookUrlProtection`], which this module consumes rather than reimplementing.
 //!
 //! # Two different masks
 //!
-//! `lib/webhooks.js` has *two* maskers and they differ by one character:
+//! The stored and public URL masks differ by one character:
 //!
-//! * `storedMaskUrl` — `{scheme}://{host}/…{last4}` — what is written to the `url` column when a
-//!   row is encrypted. Already ported as
-//!   [`mask_webhook_url`](crate::persistence::migrations::mask_webhook_url) (U03) and applied by
-//!   [`WebhookUrlProtection::protect`] (U04).
-//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is
-//!   applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored
-//!   `https://discord.com/…oken` renders as `https://discord.com…oken`. That is the Node
-//!   behaviour and the admin UI depends on it, so it is reproduced exactly.
+//! * `storedMaskUrl` — `{scheme}://{host}/…{last4}` — what is written to the `url` column when a row is encrypted. Already ported as [`mask_webhook_url`](crate::persistence::migrations::mask_webhook_url) and applied by [`WebhookUrlProtection::protect`].
+//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored `https://discord.com/…oken` renders as `https://discord.com…oken`. That is the Node behaviour and the admin UI depends on it, so it is reproduced exactly.
 //!
 //! # Secret containment
 //!
-//! * [`WebhookRow`] and [`WebhookStore`] have hand-written `Debug` impls that redact the URL, so
-//!   no accidental `{:?}` can print a token.
-//! * No error returned from this module embeds a URL: the reveal failure path collapses to
-//!   [`AppError::Internal`] inside U04's cipher.
-//! * [`WebhookSummary`] — the only shape that reaches an HTTP response — always carries the masked
-//!   value.
+//! * [`WebhookRow`] and [`WebhookStore`] have hand-written `Debug` impls that redact the URL, so no accidental `{:?}` can print a token.
+//! * No error returned from this module embeds a URL: the reveal failure path collapses to [`AppError::Internal`] inside the webhook cipher.
+//! * [`WebhookSummary`] — the only shape that reaches an HTTP response — always carries the masked value.
 
 use std::sync::Arc;
 
@@ -56,7 +45,7 @@ use crate::{
     security::crypto::{StoredWebhookUrl, WebhookUrlProtection},
 };
 
-/// Every webhook event, in the frozen `lib/webhooks.js:9` order.
+/// Every webhook event, in the frozen wire order.
 pub const EVENTS: [WebhookEvent; 6] = [
     WebhookEvent::Published,
     WebhookEvent::Updated,
@@ -66,16 +55,16 @@ pub const EVENTS: [WebhookEvent; 6] = [
     WebhookEvent::Resolved,
 ];
 
-/// Verbatim Node rejection for a URL outside the Discord allowlist. [lib/webhooks.js:87]
+/// Verbatim Node rejection for a URL outside the Discord allowlist.
 pub const INVALID_URL_MESSAGE: &str = "Webhook URL must be an HTTPS Discord webhook URL.";
 
-/// `String(label).trim().slice(0, 80)` — [lib/webhooks.js:97].
+/// Maximum webhook label length after trimming, in UTF-16 code units.
 pub const MAX_LABEL_UTF16: usize = 80;
 
-/// `String(error).slice(0, 500)` — [lib/webhooks.js:128].
+/// `String(error).slice(0, 500)`.
 pub const MAX_ERROR_UTF16: usize = 500;
 
-/// Default recorded failure text. [lib/webhooks.js:128]
+/// Default recorded failure text.
 pub const DEFAULT_DELIVERY_ERROR: &str = "Webhook delivery failed.";
 
 /// A deliberately data-free result for the durable worker's just-in-time webhook lookup.
@@ -99,7 +88,7 @@ pub enum WebhookDeliveryResolutionFailure {
 const ROW_COLUMNS: &str = "id, org, url, url_cipher, url_nonce, url_tag, label, events, \
                            created_at, last_ok_at, last_error";
 
-/// Frozen ordering from `listForOrgStmt`. [lib/webhooks.js:12]
+/// Frozen ordering from `listForOrgStmt`.
 const ORDER_BY: &str = "ORDER BY created_at ASC, id ASC";
 
 mod events;

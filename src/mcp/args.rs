@@ -38,7 +38,7 @@ pub(crate) async fn publisher_delete(
 }
 
 pub(crate) fn ensure_can_publish(auth: &PublisherIdentity) -> Result<(), McpError> {
-    if !auth.is_admin() && auth.role == "reader" {
+    if !AccessPolicy::publisher_can_publish(auth) {
         Err(AppError::Forbidden(PUBLISH_PERMISSION_ERROR.to_owned()).into())
     } else {
         Ok(())

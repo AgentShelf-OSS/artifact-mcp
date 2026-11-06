@@ -77,7 +77,7 @@ impl KeyStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("create key audited", error))?;
             let created = create_key(&tx, &request, random.as_ref())?;
             let audit = audit.for_target_tenant(&created.org.0)?;
             let event = AuditEvent {
@@ -95,7 +95,8 @@ impl KeyStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("create key audited", error))?;
             Ok(created)
         })
         .await
@@ -119,7 +120,7 @@ impl KeyStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("revoke key audited", error))?;
             let Some(org) = tx
                 .query_row(
                     "SELECT org FROM api_keys WHERE client_id=?1 AND revoked_at IS NULL",
@@ -129,12 +130,14 @@ impl KeyStore {
                 .optional()
                 .map_err(|error| database_failure("load key", &error))?
             else {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("revoke key audited", error))?;
                 return Ok(false);
             };
             let changed = revoke_key(&tx, &client_id.0)?;
             if !changed {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("revoke key audited", error))?;
                 return Ok(false);
             }
             let event = AuditEvent {
@@ -153,7 +156,8 @@ impl KeyStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("revoke key audited", error))?;
             Ok(true)
         })
         .await
@@ -180,9 +184,10 @@ impl KeyStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("update key audited", error))?;
             let Some((updated, changed)) = update_key_state(&tx, &client_id.0, &request)? else {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("update key audited", error))?;
                 return Ok(None);
             };
             if changed {
@@ -203,7 +208,8 @@ impl KeyStore {
                     &event,
                 )?;
             }
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("update key audited", error))?;
             Ok(Some(updated))
         })
         .await
@@ -230,7 +236,7 @@ impl KeyStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("set key owner audited", error))?;
             let Some(org) = tx
                 .query_row(
                     "SELECT org FROM api_keys WHERE client_id=?1",
@@ -240,7 +246,8 @@ impl KeyStore {
                 .optional()
                 .map_err(|error| database_failure("load key owner", &error))?
             else {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("set key owner audited", error))?;
                 return Ok(None);
             };
             let next = normalize_verified_owner(&tx, owner_email.as_deref(), &org)?;
@@ -257,7 +264,8 @@ impl KeyStore {
                 owner_email: next.clone(),
             };
             if current == next {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("set key owner audited", error))?;
                 return Ok(Some(updated));
             }
             tx.execute(
@@ -281,7 +289,8 @@ impl KeyStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("set key owner audited", error))?;
             Ok(Some(updated))
         })
         .await
@@ -313,14 +322,16 @@ impl KeyStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("backfill key owner audited", error))?;
             let result = backfill_key_owner_in_transaction(&tx, &client_id.0, &owner_email, true)?;
             let Some(result) = result else {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("backfill key owner audited", error))?;
                 return Ok(None);
             };
             if result.updated == 0 {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("backfill key owner audited", error))?;
                 return Ok(Some(result));
             }
             let audit = audit.for_target_tenant(&result.org.0)?;
@@ -339,7 +350,8 @@ impl KeyStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("backfill key owner audited", error))?;
             Ok(Some(result))
         })
         .await

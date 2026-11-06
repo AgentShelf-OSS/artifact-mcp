@@ -7,7 +7,7 @@ impl StoreContext {
     // metadata-only mutations
     // -----------------------------------------------------------------------
 
-    /// `setCategory(id, category)` — [lib/store.js:446-452]
+    /// `setCategory(id, category)`
     pub(super) fn set_category_sync(
         &self,
         conn: &mut Connection,
@@ -15,10 +15,9 @@ impl StoreContext {
         category: &str,
         audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|_| AppError::Internal)?;
+        let _gate = self.lifecycle_gate.write().map_err(|error| {
+            crate::error::internal("lock artifact lifecycle for metadata", error)
+        })?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -49,7 +48,6 @@ impl StoreContext {
     }
 
     /// `setHidden(id, hidden)` — hidden is an unlisted flag, never an access boundary.
-    /// [lib/store.js:455-461]
     pub(super) fn set_hidden_sync(
         &self,
         conn: &mut Connection,
@@ -57,10 +55,9 @@ impl StoreContext {
         hidden: bool,
         audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|_| AppError::Internal)?;
+        let _gate = self.lifecycle_gate.write().map_err(|error| {
+            crate::error::internal("lock artifact lifecycle for metadata", error)
+        })?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -97,7 +94,7 @@ impl StoreContext {
         load_meta(conn, id)?.ok_or(AppError::Internal)
     }
 
-    /// `listRevisions(id)` — [lib/store.js:577-581]
+    /// `listRevisions(id)`
     pub(super) fn list_revisions_sync(
         &self,
         conn: &Connection,

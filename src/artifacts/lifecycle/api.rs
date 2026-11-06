@@ -6,36 +6,28 @@ use super::*;
 // Metadata-addressed operations
 // ---------------------------------------------------------------------------
 
-/// The store's own API takes the artifact's [`ArtifactMeta`], not an [`AuthorizedArtifact`].
-///
-/// That mirrors the reference exactly — `lib/store.js` performs no authorization ("Authorization
-/// is the caller's responsibility (route uses artifactAccess)", [lib/store.js:445]) — and it keeps
-/// the wrapper what the contract says it is: a *caller-side* proof consumed by the frozen
-/// [`ArtifactService`] surface below, which is the only path routes and MCP tools use. It also
-/// lets U08's crash matrix drive every mutation before U06 lands the wrapper constructors.
+// Raw metadata operations are internal; external callers use the grant-bearing service.
 impl ArtifactStore {
-    /// The body half of `readArtifact(id)` — [lib/store.js:494-501]
+    /// The body half of `readArtifact(id)`
     ///
     /// # Errors
     /// Returns [`AppError::Internal`] when the blocking task fails.
-    pub async fn read_body_for(
+    pub(crate) async fn read_body_for(
         &self,
         meta: &ArtifactMeta,
     ) -> Result<Option<ArtifactFile>, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
         db::interact(&self.pool, move |conn| {
-            let _gate = context
-                .lifecycle_gate
-                .read()
-                .map_err(|_| AppError::Internal)?;
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for api", error)
+            })?;
             // Authorization may have resolved just before a lifecycle marker was created. Recheck
             // in the same blocking closure immediately before filesystem access.
             if load_meta(conn, &id)?.is_none() {
                 return Ok(None);
             }
             // `readArtifact` refuses a reserved id before touching the filesystem.
-            // [lib/store.js:495]
             let Some(id) = SafeArtifactId::addressable(&id) else {
                 return Ok(None);
             };
@@ -44,11 +36,11 @@ impl ArtifactStore {
         .await
     }
 
-    /// `readBundleFile(id, relPath)` — [lib/store.js:482-492]
+    /// `readBundleFile(id, relPath)`
     ///
     /// # Errors
     /// Returns [`AppError::Internal`] when the blocking task fails.
-    pub async fn read_bundle_file_for(
+    pub(crate) async fn read_bundle_file_for(
         &self,
         meta: &ArtifactMeta,
         relative_path: &str,
@@ -57,14 +49,13 @@ impl ArtifactStore {
         let meta = meta.clone();
         let relative_path = relative_path.to_owned();
         db::interact(&self.pool, move |conn| {
-            let _gate = context
-                .lifecycle_gate
-                .read()
-                .map_err(|_| AppError::Internal)?;
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for api", error)
+            })?;
             if load_meta(conn, &meta.id.0)?.is_none() {
                 return Ok(None);
             }
-            // `readBundleFile` returns null for a single-file artifact. [lib/store.js:484]
+            // `readBundleFile` returns null for a single-file artifact.
             if !meta.is_bundle {
                 return Ok(None);
             }
@@ -83,11 +74,10 @@ impl ArtifactStore {
 
     /// `readHistoryArtifact` (no path) versus `readHistoryBundleFile` (a path, possibly empty,
     /// which falls back to the revision's own entry).
-    /// [lib/store.js:583-601], [lib/app.js:434], [lib/app.js:445]
     ///
     /// # Errors
     /// Propagates a database failure as [`AppError::Internal`].
-    pub async fn read_revision_body_for(
+    pub(crate) async fn read_revision_body_for(
         &self,
         meta: &ArtifactMeta,
         revision: u64,
@@ -97,10 +87,9 @@ impl ArtifactStore {
         let id = meta.id.0.clone();
         let relative_path = relative_path.map(ToOwned::to_owned);
         db::interact(&self.pool, move |conn| {
-            let _gate = context
-                .lifecycle_gate
-                .read()
-                .map_err(|_| AppError::Internal)?;
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for api", error)
+            })?;
             if load_meta(conn, &id)?.is_none() {
                 return Ok(None);
             }
@@ -126,7 +115,7 @@ impl ArtifactStore {
         .await
     }
 
-    pub async fn list_bundle_files_for(
+    pub(crate) async fn list_bundle_files_for(
         &self,
         meta: &ArtifactMeta,
         revision: Option<u64>,
@@ -135,10 +124,9 @@ impl ArtifactStore {
         let id = meta.id.0.clone();
         let is_bundle = meta.is_bundle;
         db::interact(&self.pool, move |conn| {
-            let _gate = context
-                .lifecycle_gate
-                .read()
-                .map_err(|_| AppError::Internal)?;
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for api", error)
+            })?;
             if load_meta(conn, &id)?.is_none() {
                 return Ok(None);
             }
@@ -164,21 +152,20 @@ impl ArtifactStore {
         .await
     }
 
-    /// `listRevisions(id)` — [lib/store.js:577-581]
+    /// `listRevisions(id)`
     ///
     /// # Errors
     /// Propagates a database failure as [`AppError::Internal`].
-    pub async fn list_revisions_for(
+    pub(crate) async fn list_revisions_for(
         &self,
         meta: &ArtifactMeta,
     ) -> Result<RevisionHistory, AppError> {
         let context = self.context();
         let meta = meta.clone();
         db::interact(&self.pool, move |conn| {
-            let _gate = context
-                .lifecycle_gate
-                .read()
-                .map_err(|_| AppError::Internal)?;
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for api", error)
+            })?;
             if load_meta(conn, &meta.id.0)?.is_none() {
                 return Err(AppError::ConcealedNotFound);
             }
@@ -187,12 +174,12 @@ impl ArtifactStore {
         .await
     }
 
-    /// `update({ … })` — [lib/store.js:314-442]
+    /// `update({ … })`
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found`), [`AppError::Conflict`] (`conflict`),
     /// [`AppError::Validation`] with Node's message, or a propagated I/O failure.
-    pub async fn update_for(
+    pub(crate) async fn update_for(
         &self,
         meta: &ArtifactMeta,
         update: ArtifactUpdate,
@@ -217,12 +204,12 @@ impl ArtifactStore {
         Ok(updated)
     }
 
-    /// `restoreById(id, revision, …)` — [lib/store.js:605-624]
+    /// `restoreById(id, revision, …)`
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found` / `revision_not_found`), [`AppError::Conflict`]
     /// (`type_mismatch`), or [`AppError::Gone`] (`body_missing`).
-    pub async fn restore_for(
+    pub(crate) async fn restore_for(
         &self,
         meta: &ArtifactMeta,
         revision: u64,
@@ -239,11 +226,11 @@ impl ArtifactStore {
         Ok(restored)
     }
 
-    /// `removeById(id, …)` — [lib/store.js:626-644]
+    /// `removeById(id, …)`
     ///
     /// # Errors
     /// Propagates a database or filesystem failure after compensating.
-    pub async fn delete_for(
+    pub(crate) async fn delete_for(
         &self,
         meta: &ArtifactMeta,
         audit: MutationAudit,
@@ -256,11 +243,11 @@ impl ArtifactStore {
         .await
     }
 
-    /// `setCategory(id, category)` — [lib/store.js:446-452]
+    /// `setCategory(id, category)`
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found`) or a propagated database failure.
-    pub async fn set_category_for(
+    pub(crate) async fn set_category_for(
         &self,
         meta: &ArtifactMeta,
         category: &str,
@@ -275,11 +262,11 @@ impl ArtifactStore {
         .await
     }
 
-    /// `setHidden(id, hidden)` — [lib/store.js:455-461]
+    /// `setHidden(id, hidden)`
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found`) or a propagated database failure.
-    pub async fn set_hidden_for(
+    pub(crate) async fn set_hidden_for(
         &self,
         meta: &ArtifactMeta,
         hidden: bool,
@@ -293,12 +280,12 @@ impl ArtifactStore {
         .await
     }
 
-    /// `moveArtifactToOrg(id, targetOrg, category)` — [lib/store.js:463-480]
+    /// `moveArtifactToOrg(id, targetOrg, category)`
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found`) or [`AppError::Validation`] with Node's
     /// `Unknown organization "…".` message.
-    pub async fn move_to_org_for(
+    pub(crate) async fn move_to_org_for(
         &self,
         meta: &ArtifactMeta,
         target_org: &str,

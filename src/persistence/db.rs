@@ -1,4 +1,4 @@
-//! Owned by U03 (terra) — rusqlite bootstrap connection and r2d2 pool.
+//! Rusqlite bootstrap connection and r2d2 pool.
 //!
 //! Blueprint A4 startup order, implemented by [`Database::open`]:
 //!
@@ -10,23 +10,17 @@
 //! 6. build the r2d2 pool;
 //! 7. apply per-connection pragmas through the connection initializer.
 //!
-//! Steps 8 and 9 (storage reconciliation, then the listener) belong to U08/U20.
+//! Storage reconciliation and listener startup follow database bootstrap.
 //!
 //! # Blocking and checkout contract
 //!
 //! Everything in this module is synchronous SQLite work and must never run on a Tokio worker
 //! thread directly. The contract for callers is:
 //!
-//! * A database operation is *one* synchronous closure that checks a connection out of the pool,
-//!   does all of its SQL (and any coordinated filesystem work), and drops the connection before
-//!   returning. Use [`interact`], which wraps that closure in `tokio::task::spawn_blocking`.
-//! * A pooled connection or an open `Transaction` must never be held across an `.await`. The
-//!   borrow checker cannot enforce this on its own, so [`interact`] deliberately gives the closure
-//!   a `&mut Connection` that cannot escape: it is created and dropped inside the blocking task.
-//! * Checkout blocks for at most [`POOL_CHECKOUT_TIMEOUT`]. Exhausting the pool for that long is
-//!   reported as [`AppError::Unavailable`], never as a hang.
-//! * The pool holds at most [`POOL_MAX_SIZE`] connections. SQLite still has a single writer;
-//!   `busy_timeout` (5 s) absorbs writer contention inside the driver.
+//! * A database operation is *one* synchronous closure that checks a connection out of the pool, does all of its SQL (and any coordinated filesystem work), and drops the connection before returning. Use [`interact`], which wraps that closure in `tokio::task::spawn_blocking`.
+//! * A pooled connection or an open `Transaction` must never be held across an `.await`. The borrow checker cannot enforce this on its own, so [`interact`] deliberately gives the closure a `&mut Connection` that cannot escape: it is created and dropped inside the blocking task.
+//! * Checkout blocks for at most [`POOL_CHECKOUT_TIMEOUT`]. Exhausting the pool for that long is reported as [`AppError::Unavailable`], never as a hang.
+//! * The pool holds at most [`POOL_MAX_SIZE`] connections. SQLite still has a single writer; `busy_timeout` (5 s) absorbs writer contention inside the driver.
 
 use std::fmt::Display;
 use std::path::{Path, PathBuf};
@@ -74,10 +68,10 @@ pub enum PragmaValue {
     Int(i64),
 }
 
-/// SQLite database file name inside the data directory (`lib/db.js`).
+/// SQLite database file name inside the data directory.
 pub const DATABASE_FILE_NAME: &str = "artifacts.db";
 
-/// Artifact body directory name inside the data directory (`lib/db.js`).
+/// Artifact body directory name inside the data directory.
 pub const ARTIFACT_DIR_NAME: &str = "artifacts";
 
 /// Absolute path of the SQLite file for a data directory.
@@ -125,7 +119,7 @@ impl Database {
         ctx: &MigrationContext,
         cipher: Option<&dyn WebhookUrlCipher>,
     ) -> Result<DbPool, AppError> {
-        // `lib/db.js` creates <dataDir>/artifacts recursively, which also creates the data dir.
+        // Creating <dataDir>/artifacts recursively also creates the data directory.
         std::fs::create_dir_all(artifact_dir(data_dir))
             .map_err(|error| unavailable("create data directory", &error))?;
         let db_path = database_path(data_dir);

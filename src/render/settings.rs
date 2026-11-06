@@ -124,7 +124,9 @@ pub(super) fn render_settings(
         organizations,
     )
     .render()
-    .map_err(|_| AppError::Internal)
+    .map_err(|_error| {
+        crate::error::internal("render settings page", "serialization or rendering failed")
+    })
 }
 
 fn settings_colors(view: &SettingsView) -> BTreeMap<OrgId, Option<String>> {

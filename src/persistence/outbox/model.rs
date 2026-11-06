@@ -4,7 +4,7 @@ use rusqlite::TransactionBehavior;
 use std::sync::Arc;
 
 use super::{
-    accepted, claim_next, dead_letter, enqueue_many_in_transaction, internal, persist_rate_limit,
+    accepted, claim_next, dead_letter, enqueue_many_in_transaction, persist_rate_limit,
     queue_status, retry,
 };
 
@@ -34,7 +34,7 @@ pub struct EnqueueDelivery {
     pub payload: Vec<u8>,
     pub payload_sha256: Option<String>,
     pub durability_intent_id: Option<String>,
-    /// `event` preserves PBI-056 webhook behavior; discussion values are PBI-079 only.
+    /// `event` preserves webhook behavior; discussion values belong only to the discussion mirror.
     pub delivery_kind: String,
     /// Independent FIFO identity. Legacy event rows use their target key.
     pub ordering_key: String,
@@ -157,9 +157,10 @@ impl OutboxRepository {
         db::interact(&pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("enqueue", error))?;
             let mut rows = enqueue_many_in_transaction(&tx, &[(input, id)], now)?;
-            tx.commit().map_err(internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("enqueue", error))?;
             Ok(rows.remove(0))
         })
         .await

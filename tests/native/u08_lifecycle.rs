@@ -7,6 +7,7 @@
 //! digests and normalized metadata are pinned by frozen vectors captured from that runtime.
 
 use artifact_mcp::artifacts::digest::bundle_manifest_digest;
+use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use artifact_mcp::config::StorageLimits;
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{

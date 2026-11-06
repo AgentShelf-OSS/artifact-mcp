@@ -314,7 +314,7 @@ pub(super) const INSTALL_NAME_FALLBACK: &str = "Artifact";
 
 /// Remove control characters, trim, keep at most `limit` code points, and trim the end again.
 ///
-/// Mirrors Node's `installName` in `lib/portal.js`: `char::is_control` is the Unicode `Cc`
+/// `char::is_control` is the Unicode `Cc`
 /// category (U+0000-U+001F and U+007F-U+009F) and `char::is_whitespace` is `White_Space`,
 /// matching `\p{White_Space}`. Counting `char`s never splits a code point.
 #[derive(Template)]

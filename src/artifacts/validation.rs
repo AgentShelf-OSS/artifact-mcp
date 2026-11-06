@@ -1,36 +1,22 @@
-//! Owned by U07 (terra) — artifact input, bundle path, MIME, and limit validation.
+//! Artifact input, bundle path, MIME, and limit validation.
 //!
 //! Every rule here is a faithful port of the Node reference. The oracle is:
 //!
-//! - `sanitizeRel` — [lib/store.js:50-55]
-//! - `isReserved` / `RESERVED` — [lib/store.js:29], [lib/store.js:88-90]
-//! - `ARTIFACT_ID` / `SHA256` shape checks — [lib/thumbnails.js:19-33]
-//! - single-file body validation — [lib/store.js:206-211]
-//! - `validateBundle` (and its `publishBundle` twin) — [lib/store.js:230-310]
+//! - `sanitizeRel`
+//! - `isReserved` / `RESERVED`
+//! - `ARTIFACT_ID` / `SHA256` shape checks
+//! - single-file body validation
+//! - `validateBundle` (and its `publishBundle` twin)
 //!
 //! Where Node's behaviour is surprising it is reproduced anyway and called out in a comment:
 //! the conformance oracle diffs Rust against Node, so a unilateral "fix" is a failure, not an
 //! improvement. Open contract-delta requests are listed below.
 //!
-//! # Contract-delta requests raised by U07
+//! # Compatibility constraints
 //!
-//! 1. `RESERVED` is a hand-maintained list that has drifted from the real route table.
-//!    `lib/app.js` registers top-level `/thumbnails/:id` ([lib/app.js:176]) and
-//!    `/notifications/seen` ([lib/app.js:245]) before the `/:id` artifact routes, but neither
-//!    `thumbnails` nor `notifications` is in `RESERVED` ([lib/store.js:29]). Both are valid
-//!    artifact-id shapes under `/^[0-9a-z]{6,24}$/`. Ported faithfully; see
-//!    [`is_reserved_artifact_id`].
-//! 2. Node accepts drive-qualified and UNC-looking paths as *literal relative names* — `C:\x`
-//!    normalises to `C:/x` and `\\srv\share\x` to `srv/share/x`. Neither escapes the bundle
-//!    root on a POSIX host, so this is a naming oddity rather than a traversal hole, but it is
-//!    not what a reader of the sanitizer expects. Ported faithfully; see
-//!    [`sanitize_relative_path`].
-//! 3. `ArtifactContent::Bundle::files` is a `BTreeMap`, which discards the caller's ordering.
-//!    Node's entry auto-selection picks the *first* `.html` file in JSON key (insertion) order
-//!    ([lib/store.js:254]), so a bundle with `{"z.html": …, "a.html": …}` and no `index.html`
-//!    and no explicit entry resolves to `z.html` in Node and `a.html` through a `BTreeMap`.
-//!    [`validate_bundle`] therefore takes an ordered slice; the frozen model type needs an
-//!    order-preserving container for full parity.
+//! 1. `RESERVED` is a hand-maintained list that has drifted from the real route table. The router registers top-level `/thumbnails/:id` and `/notifications/seen` before the `/:id` artifact routes, but neither `thumbnails` nor `notifications` is in `RESERVED`. Both are valid artifact-id shapes under `/^[0-9a-z]{6,24}$/`. Ported faithfully; see [`is_reserved_artifact_id`].
+//! 2. Node accepts drive-qualified and UNC-looking paths as *literal relative names* — `C:\x` normalises to `C:/x` and `\\srv\share\x` to `srv/share/x`. Neither escapes the bundle root on a POSIX host, so this is a naming oddity rather than a traversal hole, but it is not what a reader of the sanitizer expects. Ported faithfully; see [`sanitize_relative_path`].
+//! 3. Entry auto-selection picks the first `.html` file in publisher order. A bundle with `{"z.html": …, "a.html": …}` and no `index.html` or explicit entry must resolve to `z.html`. Both `ArtifactContent::Bundle::files` and [`validate_bundle`] preserve that order; a sorted container would select `a.html` and break compatibility.
 
 use std::path::{Path, PathBuf};
 
@@ -39,18 +25,16 @@ use crate::error::AppError;
 use crate::model::ArtifactId;
 
 /// The bundle entry Node falls back to before scanning for any `.html` file.
-/// [lib/store.js:254]
 pub const DEFAULT_BUNDLE_ENTRY: &str = "index.html";
 
 /// Length of a lowercase hex SHA-256 digest — `const SHA256 = /^[a-f0-9]{64}$/`.
-/// [lib/thumbnails.js:20]
 pub const DIGEST_HEX_LENGTH: usize = 64;
 
 // ---------------------------------------------------------------------------
 // Identifiers
 // ---------------------------------------------------------------------------
 
-/// `RESERVED.has(id) || !/^[0-9a-z]{6,24}$/.test(id)` — [lib/store.js:88-90]
+/// `RESERVED.has(id) || !/^[0-9a-z]{6,24}$/.test(id)`
 ///
 /// Node's `RESERVED` set also contains the empty string; an empty id already fails the shape
 /// test, so `RESERVED_ARTIFACT_IDS` omits it without changing the answer.
@@ -63,8 +47,7 @@ pub fn is_reserved_artifact_id(id: &str) -> bool {
 }
 
 /// An artifact id that has passed `/^[0-9a-z]{6,24}$/` — the only value a filesystem path may
-/// be built from. [lib/thumbnails.js:3-4] states the same rule for the preview store; U07
-/// applies it to every path in the frozen layout.
+/// be built from, including paths in the preview store.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SafeArtifactId(String);
 
@@ -72,8 +55,8 @@ impl SafeArtifactId {
     /// Accepts any id with a valid *shape*, including the reserved names.
     ///
     /// This mirrors Node, where `filePath`/`bundleDir` are reached with whatever id the caller
-    /// holds ([lib/store.js:170-176]); only the higher-level `readArtifact`/`getArtifactMeta`
-    /// entry points consult `isReserved` ([lib/store.js:494], [lib/store.js:793]).
+    /// holds; only the higher-level `readArtifact`/`getArtifactMeta`
+    /// entry points consult `isReserved`.
     #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
         is_valid_artifact_id(value).then(|| Self(value.to_owned()))
@@ -100,7 +83,6 @@ impl TryFrom<&ArtifactId> for SafeArtifactId {
 }
 
 /// A validated lowercase hex SHA-256 digest — `const SHA256 = /^[a-f0-9]{64}$/`.
-/// [lib/thumbnails.js:20], [lib/thumbnails.js:31-33]
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct BodyDigest(String);
 
@@ -116,7 +98,7 @@ impl BodyDigest {
     }
 }
 
-/// `SHA256.test(String(value || ""))` — [lib/thumbnails.js:31-33]
+/// `SHA256.test(String(value || ""))`
 #[must_use]
 pub fn is_valid_digest(value: &str) -> bool {
     value.len() == DIGEST_HEX_LENGTH
@@ -163,7 +145,7 @@ pub fn posix_normalize_relative(value: &str) -> String {
     normalized
 }
 
-/// `sanitizeRel(value)` — [lib/store.js:50-55]
+/// `sanitizeRel(value)`
 ///
 /// ```text
 /// const normalized = path.posix.normalize(
@@ -205,7 +187,6 @@ pub fn sanitize_relative_path(value: &str) -> Option<String> {
 
 /// Node's `path.resolve` semantics: purely lexical, never touching the filesystem and never
 /// following symlinks. Used for the belt-and-braces containment check in `readBundleFile`
-/// ([lib/store.js:487-489]).
 #[must_use]
 pub fn lexically_resolve(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
@@ -228,7 +209,6 @@ pub fn lexically_resolve(path: &Path) -> PathBuf {
 
 /// `const base = path.resolve(dir); const full = path.resolve(path.join(base, rel));`
 /// `if (full !== base && !full.startsWith(base + path.sep)) return null;`
-/// — [lib/store.js:487-489], [lib/store.js:596-598]
 ///
 /// `rel` must already have passed [`sanitize_relative_path`]; this is the second, independent
 /// gate that keeps a sanitizer regression from becoming exploitable.
@@ -271,7 +251,7 @@ pub fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
 }
 
-/// A single-file body that passed `publish`'s guards. [lib/store.js:206-211]
+/// A single-file body that passed `publish`'s guards.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedSingleBody {
     /// `Buffer.byteLength(html, "utf8")`
@@ -286,7 +266,6 @@ pub struct ValidatedSingleBody {
 /// const bodySha256 = sha256(html);
 /// if (bytes > maxBytes) throw new Error(`html exceeds ${maxBytes} bytes (got ${bytes})`);
 /// ```
-/// — [lib/store.js:207-210]
 ///
 /// The order matters: a blank oversized body reports `html is required`, not the size error.
 /// The limit is exclusive — exactly `maxBytes` is accepted.
@@ -313,7 +292,7 @@ pub fn validate_single_body(
     })
 }
 
-/// A bundle snapshot that passed `validateBundle`. [lib/store.js:283-310]
+/// A bundle snapshot that passed `validateBundle`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidatedBundle {
     /// `clean` — sanitized relative path and content, in the caller's original order.
@@ -326,13 +305,13 @@ pub struct ValidatedBundle {
     pub entry: String,
 }
 
-/// `validateBundle(bundleFiles, entry, preferEntry)` — [lib/store.js:284-310]
+/// `validateBundle(bundleFiles, entry, preferEntry)`
 ///
 /// `files` is an ordered slice, not a map: Node iterates `Object.keys` (insertion order) and
 /// entry auto-selection depends on that order. See contract-delta request 3.
 ///
-/// `prefer_entry` is the existing `meta.entry` on an update ([lib/store.js:349]); pass `None`
-/// for a fresh publish, which is exactly what `publishBundle` does ([lib/store.js:252-255]).
+/// `prefer_entry` is the existing `meta.entry` on an update; pass `None`
+/// for a fresh publish, which is exactly what `publishBundle` does.
 ///
 /// # Errors
 /// [`AppError::Validation`] carrying Node's exact message, in Node's evaluation order:
@@ -387,7 +366,6 @@ pub fn validate_bundle(
 ///   : clean.map(([rel]) => rel).find((rel) => rel.endsWith(".html"));
 /// if (!selectedEntry) throw new Error("no HTML entry found — include index.html or pass an 'entry'");
 /// ```
-/// — [lib/store.js:304-308]
 ///
 /// Note the fall-through: a *requested* entry that fails `sanitizeRel` yields `null`, which is
 /// falsy, so Node silently auto-selects instead of reporting the bad entry. Reproduced.

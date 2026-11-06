@@ -6,7 +6,7 @@ use crate::error::AppError;
 
 use super::protocol::OrderedJson;
 
-/// Port of `validateSchemaInput` from `lib/contracts.js`.
+/// Validate input against the advertised schema.
 #[must_use]
 pub fn validate_schema_input(
     schema: &Value,

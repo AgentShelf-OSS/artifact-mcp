@@ -67,12 +67,15 @@ pub fn verify_pending_receipts(conn: &Connection, key: &[u8; 32]) -> Result<(), 
         .prepare(&format!(
             "{RECEIPT_SELECT} WHERE state='pending' ORDER BY correlation_id ASC"
         ))
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("prepare pending receipt verification", error))?;
     let receipts = statement
         .query_map([], receipt_from_row)
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("query pending receipts", error))?;
     for receipt in receipts {
-        verify_receipt_snapshot(key, &receipt.map_err(|_| AppError::Internal)?)?;
+        verify_receipt_snapshot(
+            key,
+            &receipt.map_err(|error| crate::error::internal("read pending receipt", error))?,
+        )?;
     }
     Ok(())
 }
@@ -97,7 +100,7 @@ fn refresh_pending_receipts_root(tx: &Transaction<'_>, key: &[u8; 32]) -> Result
                 head.pending_receipts_root
             ],
         )
-        .map_err(|_| AppError::Internal)?
+        .map_err(|error| crate::error::internal("update pending receipt root", error))?
         != 1
     {
         return Err(AppError::Internal);
@@ -128,7 +131,7 @@ impl PersistedReceipt {
                 .revision
                 .map(u64::try_from)
                 .transpose()
-                .map_err(|_| AppError::Internal)?,
+                .map_err(|error| crate::error::internal("convert receipt revision", error))?,
         })
     }
 }
@@ -175,14 +178,16 @@ fn verify_receipt_snapshot(key: &[u8; 32], receipt: &PersistedReceipt) -> Result
         key_id: &receipt.key_id,
         canonical_version: receipt.canonical_version,
     })
-    .map_err(|_| AppError::Internal)?;
-    let supplied = hex::decode(&receipt.receipt_mac).map_err(|_| AppError::Internal)?;
+    .map_err(|error| crate::error::internal("encode receipt snapshot", error))?;
+    let supplied = hex::decode(&receipt.receipt_mac)
+        .map_err(|error| crate::error::internal("decode receipt mac", error))?;
     if supplied.len() != 32 {
         return Err(AppError::Internal);
     }
     let mut mac = HmacSha256::new_from_slice(key).expect("HMAC accepts 32-byte key");
     mac.update(&message);
-    mac.verify_slice(&supplied).map_err(|_| AppError::Internal)
+    mac.verify_slice(&supplied)
+        .map_err(|error| crate::error::internal("verify receipt mac", error))
 }
 
 fn verify_finalized_event_projection(
@@ -216,7 +221,7 @@ fn verify_finalized_event_projection(
                 })
             },
         )
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("read finalized event projection", error))?;
     if persisted.event_id != event_id
         || persisted.key_id != receipt.key_id
         || persisted.tenant != receipt.tenant
@@ -248,7 +253,7 @@ fn receipt_by_correlation(
         receipt_from_row,
     )
     .optional()
-    .map_err(|_| AppError::Internal)
+    .map_err(|error| crate::error::internal("read receipt by correlation", error))
 }
 
 fn receipt_by_intent(
@@ -261,10 +266,10 @@ fn receipt_by_intent(
         receipt_from_row,
     )
     .optional()
-    .map_err(|_| AppError::Internal)
+    .map_err(|error| crate::error::internal("read receipt by intent", error))
 }
 
-/// Reserve a PBI-051 receipt in the exact same metadata transaction as its durability intent.
+/// Reserve a receipt in the exact same metadata transaction as its durability intent.
 pub fn reserve_receipt_in_transaction(
     tx: &Transaction<'_>,
     key: &[u8; 32],
@@ -282,14 +287,14 @@ pub fn reserve_receipt_in_transaction(
         .revision
         .map(i64::try_from)
         .transpose()
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("convert reserved receipt revision", error))?;
     let receipt_mac = receipt_mac(key, correlation, intent, "pending", "", context, event)?;
     // A pending receipt is evidence of an unresolved cross-resource mutation.  Retrying must
     // never rewrite its actor, target, or correlation: an ambiguous process death is resolved
     // only by reconciliation, which either finalizes the immutable snapshot or atomically
     // proves/release it.  In-process compensation deletes the receipt with its intent, so a
     // clean retry still inserts a fresh reservation.
-    let changes = tx.execute("INSERT INTO security_audit_receipts (correlation_id,durability_intent_id,state,operation,target_type,target_id,result,tenant,actor_type,actor_id,actor_role,source,request_id,revision,classification,key_id,canonical_version,receipt_mac) VALUES (?1,?2,'pending',?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'v1',1,?15) ON CONFLICT(durability_intent_id) DO NOTHING", params![correlation, intent, event.operation, event.target_type, event.target_id, event.result, context.tenant, context.actor_type, context.actor_id, context.actor_role, context.source, context.request_id, revision, event.classification, receipt_mac]).map_err(|_| AppError::Internal)?;
+    let changes = tx.execute("INSERT INTO security_audit_receipts (correlation_id,durability_intent_id,state,operation,target_type,target_id,result,tenant,actor_type,actor_id,actor_role,source,request_id,revision,classification,key_id,canonical_version,receipt_mac) VALUES (?1,?2,'pending',?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,'v1',1,?15) ON CONFLICT(durability_intent_id) DO NOTHING", params![correlation, intent, event.operation, event.target_type, event.target_id, event.result, context.tenant, context.actor_type, context.actor_id, context.actor_role, context.source, context.request_id, revision, event.classification, receipt_mac]).map_err(|error| crate::error::internal("insert audit receipt", error))?;
     if changes == 1 {
         refresh_pending_receipts_root(tx, key)?;
     }
@@ -320,7 +325,7 @@ pub fn finalize_receipt_in_transaction(
         .revision
         .map(i64::try_from)
         .transpose()
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("convert finalized receipt revision", error))?;
     if existing.tenant != context.tenant
         || existing.actor_type != context.actor_type
         || existing.actor_id != context.actor_id
@@ -341,7 +346,7 @@ pub fn finalize_receipt_in_transaction(
     if existing.state == "finalized" {
         verify_finalized_event_projection(tx, &existing)?;
         let id = existing.event_id.ok_or(AppError::Internal)?;
-        let row = tx.query_row("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE event_id=?1", [id], |row| Ok(AuditRow { sequence: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0), event_id: row.get(1)?, tenant: row.get(2)?, operation: row.get(3)?, target_type: row.get(4)?, target_id: row.get(5)?, result: row.get(6)?, classification: row.get(7)?, occurred_at: row.get(8)?, event_hash: row.get(9)? })).map_err(|_| AppError::Internal)?;
+        let row = tx.query_row("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE event_id=?1", [id], |row| Ok(AuditRow { sequence: u64::try_from(row.get::<_, i64>(0)?).unwrap_or(0), event_id: row.get(1)?, tenant: row.get(2)?, operation: row.get(3)?, target_type: row.get(4)?, target_id: row.get(5)?, result: row.get(6)?, classification: row.get(7)?, occurred_at: row.get(8)?, event_hash: row.get(9)? })).map_err(|error| crate::error::internal("read finalized audit event", error))?;
         return Ok((row, true));
     }
     if existing.state != "pending" {
@@ -357,7 +362,7 @@ pub fn finalize_receipt_in_transaction(
         context,
         event,
     )?;
-    if tx.execute("UPDATE security_audit_receipts SET event_id=?1,state='finalized',receipt_mac=?2,finalized_at=datetime('now') WHERE correlation_id=?3 AND state='pending' AND receipt_mac=?4", params![event_id, finalized_mac, correlation, existing.receipt_mac]).map_err(|_| AppError::Internal)? != 1 { return Err(AppError::Internal); }
+    if tx.execute("UPDATE security_audit_receipts SET event_id=?1,state='finalized',receipt_mac=?2,finalized_at=datetime('now') WHERE correlation_id=?3 AND state='pending' AND receipt_mac=?4", params![event_id, finalized_mac, correlation, existing.receipt_mac]).map_err(|error| crate::error::internal("finalize audit receipt", error))? != 1 { return Err(AppError::Internal); }
     refresh_pending_receipts_root(tx, key)?;
     Ok((row, false))
 }
@@ -422,7 +427,7 @@ pub fn finalize_reconciled_receipt_in_transaction(
             ],
         )
     }
-    .map_err(|_| AppError::Internal)?;
+    .map_err(|error| crate::error::internal("reconcile audit receipt", error))?;
     if changes != 1 {
         return Err(AppError::Internal);
     }
@@ -461,7 +466,7 @@ pub fn delete_pending_receipt_in_transaction(
              WHERE durability_intent_id=?1 AND state='pending' AND receipt_mac=?2",
             params![intent_id, receipt.receipt_mac],
         )
-        .map_err(|_| AppError::Internal)?
+        .map_err(|error| crate::error::internal("delete pending audit receipt", error))?
         != 1
     {
         return Err(AppError::Internal);

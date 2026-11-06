@@ -11,7 +11,6 @@ use super::{
         org_exists, valid_discord_id,
     },
     inputs::{CreateDiscussionConnection, CreateNotificationThreadConnection},
-    internal,
     support::{append_audit_then_commit, require_nonempty, trimmed},
     types::{DiscussionConnectionDelivery, DiscussionConnectionSummary},
 };
@@ -41,7 +40,7 @@ impl DiscussionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("upsert connection", error))?;
             if !org_exists(&tx, &org)? {
                 return Err(AppError::Validation(format!(
                     "Unknown organization \"{org}\"."
@@ -61,7 +60,7 @@ impl DiscussionStore {
                 "DELETE FROM org_discord_discussion_connections WHERE org = ?1",
                 [&org],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("upsert connection", error))?;
             tx.execute(
                 "INSERT INTO org_discord_discussion_connections \
                  (id, org, url, url_cipher, url_nonce, url_tag, label) \
@@ -76,11 +75,12 @@ impl DiscussionStore {
                     label,
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("upsert connection", error))?;
             let summary = connection_row(&tx, &org)?
                 .map(DiscussionConnectionRow::summary)
                 .ok_or(AppError::Internal)?;
-            tx.commit().map_err(internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("upsert connection", error))?;
             Ok(summary)
         })
         .await
@@ -111,11 +111,11 @@ impl DiscussionStore {
                 if has_bound_connection_authority(tx, &org)? {
                     return Err(AppError::Conflict("This connection is retained because Discord discussion history depends on it.".to_owned()));
                 }
-                tx.execute("DELETE FROM org_discord_discussion_connections WHERE org = ?1", [&org]).map_err(internal)?;
+                tx.execute("DELETE FROM org_discord_discussion_connections WHERE org = ?1", [&org]).map_err(|error| crate::error::internal("upsert connection audited", error))?;
                 tx.execute(
                     "INSERT INTO org_discord_discussion_connections (id, org, url, url_cipher, url_nonce, url_tag, label) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                     params![new_connection_id(), org, stored.url, stored.encrypted.as_ref().map(|value| &value.ciphertext), stored.encrypted.as_ref().map(|value| &value.nonce), stored.encrypted.as_ref().map(|value| &value.tag), label],
-                ).map_err(internal)?;
+                ).map_err(|error| crate::error::internal("upsert connection audited", error))?;
                 let summary = connection_row(tx, &org)?.map(DiscussionConnectionRow::summary).ok_or(AppError::Internal)?;
                 Ok((summary, AuditEvent {
                     operation: "discussion.connection.configure".to_owned(), target_type: "organization".to_owned(), target_id: target,
@@ -175,7 +175,7 @@ impl DiscussionStore {
                     "DELETE FROM org_discord_discussion_connections WHERE org = ?1",
                     [&org],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("upsert notification thread connection audited", error))?;
                 tx.execute(
                     "INSERT INTO org_discord_discussion_connections \
                      (id, org, url, label, strategy, notification_webhook_id, channel_id, guild_id, \
@@ -191,7 +191,7 @@ impl DiscussionStore {
                         provider_webhook_id
                     ],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("upsert notification thread connection audited", error))?;
                 let summary = connection_row(tx, &org)?
                     .map(DiscussionConnectionRow::summary)
                     .ok_or(AppError::Internal)?;
@@ -269,7 +269,7 @@ impl DiscussionStore {
                 "DELETE FROM org_discord_discussion_connections WHERE org = ?1",
                 [&org],
             )
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("remove connection", error))
             .map(|changed| changed > 0)
         })
         .await
@@ -287,7 +287,7 @@ impl DiscussionStore {
             let audit = audit.for_target_tenant(&org)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("remove connection audited", error))?;
             if has_bound_connection_authority(&tx, &org)? {
                 return Err(AppError::Conflict(
                     "This connection is retained because Discord discussion history depends on it."
@@ -299,11 +299,12 @@ impl DiscussionStore {
                     "DELETE FROM org_discord_discussion_connections WHERE org = ?1",
                     [&org],
                 )
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("remove connection audited", error))?
                 > 0;
             // An absent connection is an idempotent no-op and must not mint a misleading audit event.
             if !removed {
-                tx.commit().map_err(internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("remove connection audited", error))?;
                 return Ok(false);
             }
             append_audit_then_commit(
@@ -340,7 +341,7 @@ impl DiscussionStore {
             let audit = audit.for_target_tenant(&org)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("audit connection test", error))?;
             if outcome.is_none()
                 && connection_row_by_id(&tx, &connection_id, &org)?.is_none()
             {
@@ -352,7 +353,7 @@ impl DiscussionStore {
                 tx.execute(
                     "UPDATE org_discord_discussion_connections SET last_ok_at=CASE WHEN ?3 THEN datetime('now') ELSE last_ok_at END, last_error=CASE WHEN ?3 THEN NULL ELSE 'delivery_failed' END, updated_at=datetime('now') WHERE org=?1 AND id=?2",
                     params![org, connection_id, ok],
-                ).map_err(internal)? != 1
+                ).map_err(|error| crate::error::internal("audit connection test", error))? != 1
             } else {
                 false
             };
@@ -376,7 +377,7 @@ impl DiscussionStore {
                 revision: None,
             };
             append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("audit connection test", error))?;
             if detached {
                 return Err(AppError::Conflict(
                     "Discord discussion connection changed during testing.".to_owned(),

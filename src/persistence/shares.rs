@@ -1,7 +1,4 @@
-//! Owned by U11 (terra) — public-share expiry, resolution, listing, and revocation.
-//!
-//! Node oracle: `lib/shares.js` (whole file), plus the two compositions that consume it —
-//! `sharedArtifactOr404` [lib/app.js:106-113] and `revoke_share` [lib/mcp.js:488-498].
+//! Public-share expiry, resolution, listing, and revocation.
 //!
 //! # The one rule this module exists to enforce
 //!
@@ -16,14 +13,7 @@
 //! | revoked | `revoked_at` is set |
 //! | stale | the row survives but its artifact is gone or now belongs to another org |
 //!
-//! Node collapses invalid/expired/revoked in SQL [lib/shares.js:11-14] and stale in the route
-//! [lib/app.js:111]. Splitting the decision across two layers is what makes a leak possible: a
-//! route that forgets the second half turns a moved or deleted artifact into a distinguishable
-//! response. This port collapses all four **inside the persistence result shape**: [`resolve`] is
-//! the only function here that accepts a bare token, and it returns `Option<ShareGrant>` — there
-//! is no reason code for a caller to accidentally propagate. Conformance asserts the resulting
-//! 404s are byte-identical (`share.public-delivery` step 5, `sameAsStep: 3`) and carry
-//! `cache-control: no-store` + `x-robots-tag: noindex`.
+//! The original implementation collapsed invalid/expired/revoked in SQL and stale in the route. Splitting the decision across two layers is what makes a leak possible: a route that forgets the second half turns a moved or deleted artifact into a distinguishable response. This port collapses all four **inside the persistence result shape**: [`resolve`] is the only function here that accepts a bare token, and it returns `Option<ShareGrant>` — there is no reason code for a caller to accidentally propagate. Conformance asserts the resulting 404s are byte-identical (`share.public-delivery` step 5, `sameAsStep: 3`) and carry `cache-control: no-store` + `x-robots-tag: noindex`.
 //!
 //! [`revoke`] and [`list_for_artifact`] are artifact-scoped: their callers have already proven
 //! access to that artifact (`AuthorizedArtifact`), so their outputs are not a public oracle.
@@ -31,12 +21,7 @@
 //!
 //! # Timezone assumption
 //!
-//! `new Date("2026-05-01T10:00")` — an ISO date-time with **no** offset — is parsed in the
-//! *server's local zone* by JavaScript. `time` is compiled without `local-offset` (Cargo.toml is
-//! U01-owned), so [`expiry_for`] reads such an input as UTC. That is identical to Node whenever
-//! the process runs in UTC, which is what the container image and the conformance harness do.
-//! Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent and
-//! matches unconditionally. Recorded as a contract-delta request.
+//! `new Date("2026-05-01T10:00")` — an ISO date-time with **no** offset — is parsed in the *server's local zone* by JavaScript. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. That is identical to Node whenever the process runs in UTC, which is what the container image and the conformance harness do. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent and matches unconditionally. Recorded as a contract-delta request.
 
 use std::sync::Arc;
 
@@ -54,14 +39,14 @@ use crate::security::{
     audit::{AuditEvent, MutationAudit, append_in_transaction, mutate_in_transaction},
 };
 
-/// `expires` is neither keyword nor an ISO-shaped string — [lib/shares.js:29]
+/// `expires` is neither keyword nor an ISO-shaped string
 pub const EXPIRES_FORMAT_MESSAGE: &str = "expires must be '24h', 'never', or a future ISO date";
-/// `expires` parsed to an invalid instant, or to one that is not in the future — [lib/shares.js:33]
+/// `expires` parsed to an invalid instant, or to one that is not in the future
 pub const EXPIRES_FUTURE_MESSAGE: &str = "expires must be a valid future ISO date";
-/// `expires` was a date `Date` silently rolled over (`2027-02-31`) — [lib/shares.js:38]
+/// `expires` was a date `Date` silently rolled over (`2027-02-31`)
 pub const EXPIRES_CALENDAR_MESSAGE: &str = "expires is not a real calendar date";
 
-/// The `"24h"` keyword's offset — [lib/shares.js:26]
+/// The `"24h"` keyword's offset
 pub const TWENTY_FOUR_HOURS_MILLIS: i64 = 24 * 60 * 60 * 1000;
 
 /// Julian day number of 1970-01-01, used to convert a [`Date`] to a Unix day count.
@@ -69,36 +54,34 @@ const UNIX_EPOCH_JULIAN_DAY: i32 = 2_440_588;
 
 const MILLIS_PER_DAY: i64 = 86_400_000;
 
-/// `insertStmt` — [lib/shares.js:7-10]
+/// `insertStmt`
 const INSERT_SQL: &str = "INSERT INTO artifact_shares (token, artifact_id, org, created_by, expires_at) \
      VALUES (?1, ?2, ?3, ?4, ?5)";
 
-/// Node's `resolveStmt` [lib/shares.js:11-14] **inner-joined** with the artifact-existence and
-/// org-match test both Node call sites apply immediately afterwards ([lib/app.js:110-111],
-/// [lib/mcp.js:491-492]).
+/// Resolve a live share only when its artifact still exists in the share's organization.
 ///
-/// `getArtifactMeta` is `SELECT * FROM artifacts WHERE id = ?` [lib/store.js:111], so
+/// `getArtifactMeta` is `SELECT * FROM artifacts WHERE id = ?`, so
 /// `(!meta || meta.org !== share.org)` is exactly "no `artifacts` row with this `(id, org)`".
 const RESOLVE_SQL: &str = "SELECT s.artifact_id, s.org FROM artifact_shares s \
      JOIN artifacts a ON a.id = s.artifact_id AND a.org = s.org \
      WHERE s.token = ?1 AND s.revoked_at IS NULL \
        AND (s.expires_at IS NULL OR julianday(s.expires_at) > julianday('now'))";
 
-/// `listStmt` — [lib/shares.js:15-19]. The `ORDER BY` is frozen: HTTP/MCP conformance compares
+/// `listStmt`. The `ORDER BY` is frozen: HTTP/MCP conformance compares
 /// ordered JSON arrays.
 const LIST_SQL: &str = "SELECT token, expires_at, created_at, created_by FROM artifact_shares \
      WHERE artifact_id = ?1 AND revoked_at IS NULL \
        AND (expires_at IS NULL OR julianday(expires_at) > julianday('now')) \
      ORDER BY created_at DESC, token DESC";
 
-/// `revokeStmt` — [lib/shares.js:20-23]
+/// `revokeStmt`
 const REVOKE_SQL: &str = "UPDATE artifact_shares SET revoked_at = datetime('now') \
      WHERE artifact_id = ?1 AND token = ?2 AND revoked_at IS NULL";
 
-/// `dropSharesOnMoveStmt` — [lib/store.js:144], run inside the org move [lib/store.js:476].
+/// `dropSharesOnMoveStmt`, run inside the org move.
 const DROP_ON_MOVE_SQL: &str = "DELETE FROM artifact_shares WHERE artifact_id = ?1";
 
-/// `expiryFor(expires)` — [lib/shares.js:25-41].
+/// `expiryFor(expires)`.
 ///
 /// Returns the value stored in `artifact_shares.expires_at`: `None` for `"never"`, otherwise the
 /// `Date.prototype.toISOString()` rendering (`YYYY-MM-DDTHH:MM:SS.mmmZ`) of the requested instant.
@@ -109,7 +92,7 @@ const DROP_ON_MOVE_SQL: &str = "DELETE FROM artifact_shares WHERE artifact_id = 
 /// # Errors
 /// [`AppError::Validation`] carrying [`EXPIRES_FORMAT_MESSAGE`], [`EXPIRES_FUTURE_MESSAGE`], or
 /// [`EXPIRES_CALENDAR_MESSAGE`] — the exact strings the Node routes surface as a 400 body
-/// [lib/app.js:651] and as an MCP tool error [lib/mcp.js:478].
+/// and as an MCP tool error.
 pub fn expiry_for(clock: &dyn Clock, expires: &str) -> Result<Option<String>, AppError> {
     if expires == "24h" {
         let millis = clock
@@ -122,14 +105,14 @@ pub fn expiry_for(clock: &dyn Clock, expires: &str) -> Result<Option<String>, Ap
         return Ok(None);
     }
 
-    // `typeof expires !== "string" || !/…/.test(expires)` — [lib/shares.js:28]. A missing
+    // `typeof expires !== "string" || !/…/.test(expires)`. A missing
     // `expires` reaches Rust as an empty string, which fails the same shape test with the same
     // message, so the frozen `CreateShare { expires: String }` loses nothing.
     let parsed = parse_iso_shape(expires)
         .ok_or_else(|| AppError::Validation(EXPIRES_FORMAT_MESSAGE.to_owned()))?;
 
-    // `Number.isNaN(date.getTime()) || date.getTime() <= Date.now()` — [lib/shares.js:32]. Both
-    // failures share one message, so an unparseable value is not distinguishable from a past one.
+    // Invalid timestamps and timestamps at or before the current time share one message,
+    // so an unparseable value is not distinguishable from a past one.
     let millis = parsed
         .to_unix_millis()
         .filter(|millis| *millis > clock.now_unix_millis())
@@ -137,15 +120,15 @@ pub fn expiry_for(clock: &dyn Clock, expires: &str) -> Result<Option<String>, Ap
 
     let rendered = render_iso(millis)?;
 
-    // `2027-02-31` parses (Date rolls it into March) and would silently outlive the request —
-    // [lib/shares.js:37-39]. Only the date-only shape is checked, exactly as Node does.
+    // `2027-02-31` parses because Date rolls it into March and would silently outlive the request.
+    // Only the date-only shape is checked, preserving the original behavior.
     if parsed.date_only && rendered.get(..10) != Some(expires) {
         return Err(AppError::Validation(EXPIRES_CALENDAR_MESSAGE.to_owned()));
     }
     Ok(Some(rendered))
 }
 
-/// `create({ artifactId, org, createdBy, expires })` — [lib/shares.js:43-48].
+/// `create({ artifactId, org, createdBy, expires })`.
 ///
 /// `created_at` is left to the column default (`datetime('now')`), as in Node; the returned record
 /// carries only `token` + `expires_at`, which is what both call sites serialize.
@@ -201,7 +184,7 @@ pub fn resolve(conn: &Connection, token: &ShareToken) -> Result<Option<ShareGran
     .map_err(|error| failed("resolve share token", &error))
 }
 
-/// `listForArtifact(artifactId)` — [lib/shares.js:54-56]. Revoked and expired rows stay hidden.
+/// `listForArtifact(artifactId)`. Revoked and expired rows stay hidden.
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the query fails.
@@ -226,11 +209,11 @@ pub fn list_for_artifact(
         .map_err(|error| failed("read public shares", &error))
 }
 
-/// `revoke(artifactId, token)` — [lib/shares.js:58-60]. `true` when a live row was revoked.
+/// `revoke(artifactId, token)`. `true` when a live row was revoked.
 ///
 /// Artifact-scoped by design: an already-revoked token reports `false` while a merely expired one
 /// reports `true`, which is only safe because every caller has proven access to `artifact_id`
-/// first ([lib/app.js:663-666], [lib/mcp.js:490-497]).
+/// first.
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the update fails.
@@ -301,9 +284,10 @@ pub async fn revoke_audited_pooled(
         let audit = audit.for_target_tenant(&meta.org.0)?;
         let tx = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("revoke audited pooled", error))?;
         if !revoke(&tx, &meta.id, &token)? {
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("revoke audited pooled", error))?;
             return Ok(false);
         }
         let event = AuditEvent {
@@ -315,18 +299,19 @@ pub async fn revoke_audited_pooled(
             revision: None,
         };
         append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
-        tx.commit().map_err(|_| AppError::Internal)?;
+        tx.commit()
+            .map_err(|error| crate::error::internal("revoke audited pooled", error))?;
         Ok(true)
     })
     .await
 }
 
-/// `dropSharesOnMoveStmt.run(id)` — [lib/store.js:144,476].
+/// `dropSharesOnMoveStmt.run(id)`.
 ///
 /// An org move **destroys** every share link instead of carrying it into the new tenant: a link
 /// minted under the old org must not keep serving content that now belongs to somebody else. The
 /// composite FK `(artifact_id, org) REFERENCES artifacts(id, org)` would otherwise be violated by
-/// the move itself. U08 calls this inside the same transaction as the `artifacts` update.
+/// the move itself. The lifecycle module calls this inside the same transaction as the `artifacts` update.
 ///
 /// # Errors
 /// [`AppError::Unavailable`] if the delete fails.
@@ -342,7 +327,7 @@ pub fn revoke_all_for_artifact(
 // ECMAScript date subset
 // ---------------------------------------------------------------------------
 
-/// The pieces of an `expires` string that passed the [lib/shares.js:28] shape test.
+/// The pieces of an `expires` string that passed the shape test.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct IsoShape {
     year: i32,
@@ -413,7 +398,7 @@ impl IsoShape {
     }
 }
 
-/// The literal regular expression at [lib/shares.js:28], hand-rolled:
+/// Parse the accepted expiry shape with a hand-written equivalent of this regular expression:
 /// `^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$`
 ///
 /// Shape only — out-of-range field *values* are rejected later by [`IsoShape::to_unix_millis`],
@@ -547,7 +532,8 @@ pub fn render_iso(millis: i64) -> Result<String, AppError> {
         .ok()
         .and_then(|days| days.checked_add(UNIX_EPOCH_JULIAN_DAY))
         .ok_or(AppError::Internal)?;
-    let date = Date::from_julian_day(julian).map_err(|_| AppError::Internal)?;
+    let date = Date::from_julian_day(julian)
+        .map_err(|error| crate::error::internal("render iso", error))?;
     Ok(format!(
         "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
         date.year(),

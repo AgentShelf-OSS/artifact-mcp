@@ -1,4 +1,4 @@
-//! Guarded production Discord Gateway runtime for PBI-080.
+//! Guarded production Discord Gateway runtime.
 //!
 //! Twilight owns heartbeat, reconnect, resume, compression, and intent protocol behavior. This
 //! adapter owns only organization-scoped credential resolution, exact server-side routing, safe
