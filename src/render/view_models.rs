@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — frozen renderer input models.
+//! Frozen renderer input models.
 
 use std::collections::BTreeMap;
 

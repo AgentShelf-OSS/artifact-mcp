@@ -1,6 +1,6 @@
-//! Owned by U12 (terra) — Discord payloads and guarded webhook delivery.
+//! Discord payloads and guarded webhook delivery.
 //!
-//! Port of `lib/notify.js`. Three properties here are load-bearing and each is pinned by a test:
+//! Three properties here are load-bearing and each is pinned by a test:
 //!
 //! 1. **Byte-identical embeds.** Discord renders what it is sent, so the JSON must match
 //!    `JSON.stringify(buildEmbed(event, payload))` exactly — including key order, which is why the
@@ -40,13 +40,13 @@ use crate::{
     ports::{BoxFuture, NotificationSink},
 };
 
-/// `setTimeout(() => controller.abort(), 4000)` — [lib/notify.js:61].
+/// Delivery timeout is four seconds.
 pub const DELIVERY_TIMEOUT: Duration = Duration::from_millis(4000);
 
-/// Verbatim Node fallback when a delivery fails without a message. [lib/notify.js:88]
+/// Verbatim Node fallback when a delivery fails without a message.
 pub const GENERIC_FAILURE: &str = "Webhook delivery failed.";
 
-/// Verbatim Node result for `test()` on a webhook with no URL. [lib/notify.js:105]
+/// Verbatim Node result for `test()` on a webhook with no URL.
 pub const UNKNOWN_WEBHOOK: &str = "Unknown webhook.";
 
 /// Recorded when the endpoint answers with a 3xx. Node's `redirect: "error"` makes `fetch` reject
@@ -58,10 +58,10 @@ pub const REDIRECT_REFUSED: &str = "Discord returned a redirect, which is not fo
 /// operator sees the same sentence in both places.
 pub const URL_NOT_ALLOWED: &str = INVALID_URL_MESSAGE;
 
-/// Attachment file name for the optional preview image. [lib/notify.js:71]
+/// Attachment file name for the optional preview image.
 pub const PREVIEW_FILENAME: &str = "preview.png";
 
-/// `text(value, max)` limits — [lib/notify.js:30,39-54].
+/// Text fields are trimmed and limited to their field-specific maximum lengths.
 const TITLE_MAX: usize = 256;
 const AUTHOR_MAX: usize = 256;
 const DESCRIPTION_MAX: usize = 2048;
@@ -71,7 +71,7 @@ const FIELD_MAX: usize = 1024;
 // Embed construction
 // ---------------------------------------------------------------------------
 
-/// Port of `COLORS` — [lib/notify.js:6-13].
+/// Discord embed colors are fixed per event.
 #[must_use]
 pub const fn event_color(event: &WebhookEvent) -> u32 {
     match *event {
@@ -84,7 +84,7 @@ pub const fn event_color(event: &WebhookEvent) -> u32 {
     }
 }
 
-/// The top-level POST body: `{ embeds: [embed] }` — [lib/notify.js:56].
+/// The top-level POST body: The top-level POST body contains one embed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DiscordPayload {
@@ -94,7 +94,7 @@ pub struct DiscordPayload {
 
 /// One Discord embed.
 ///
-/// **Field order is the wire format.** `lib/notify.js` builds the object literal as
+/// **Field order is the wire format.** The payload fields are serialized in this order:
 /// `{color, author, title, url?, fields}` and then assigns `description` (and, for the preview
 /// path, `image`) afterwards, so both land *after* `fields` in `JSON.stringify` output. Reordering
 /// these declarations changes the bytes Discord receives.
@@ -107,19 +107,19 @@ pub struct Embed {
     pub author: EmbedAuthor,
     /// Truncated title.
     pub title: String,
-    /// Present only when the payload carries a non-empty URL. [lib/notify.js:35]
+    /// Present only when the payload carries a non-empty URL.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub url: Option<String>,
     /// Event-specific fields; may be empty.
     pub fields: Vec<EmbedField>,
     /// Assigned after `fields` in every branch of the reference.
     pub description: String,
-    /// Assigned last, only on the preview path. [lib/notify.js:68]
+    /// Assigned last, only on the preview path.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub image: Option<EmbedImage>,
 }
 
-/// `author: { name }` — [lib/notify.js:33].
+/// The embed author contains only a name.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmbedAuthor {
@@ -139,7 +139,7 @@ pub struct EmbedField {
     pub inline: bool,
 }
 
-/// `image: { url: "attachment://preview.png" }` — [lib/notify.js:68].
+/// The preview image uses the `attachment://preview.png` URL.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmbedImage {
@@ -147,7 +147,7 @@ pub struct EmbedImage {
     pub url: String,
 }
 
-/// Port of `text(value, max)` — [lib/notify.js:15-18].
+/// Text is trimmed and truncated to the requested UTF-16 length.
 ///
 /// Trim first, then truncate to `max` UTF-16 units by keeping `max - 1` and appending `…`.
 #[must_use]
@@ -159,7 +159,7 @@ pub fn text(value: &str, max: usize) -> String {
     format!("{}…", truncate_utf16(trimmed, max.saturating_sub(1)))
 }
 
-/// Port of `bytes(value)` — [lib/notify.js:20-26].
+/// Byte sizes use one decimal place and binary units.
 ///
 /// `toFixed(1)` is **not** `format!("{:.1}")`: ECMAScript rounds a tie to the larger integer
 /// (away from zero) while Rust rounds to even, so `1280` renders as `1.3 KB` in Node and would
@@ -189,7 +189,7 @@ fn to_fixed_one(numerator: u64, denominator: u64) -> String {
     format!("{}.{}", tenths / 10, tenths % 10)
 }
 
-/// Port of `buildEmbed(event, payload)` — [lib/notify.js:28-57].
+/// Build an embed from the event and payload.
 ///
 /// `org` is a separate argument because the reference injects it into the payload at the call site
 /// (`emit` does `{ ...payload, org }`, `test` passes `webhookRow.org`), and the frozen
@@ -264,7 +264,7 @@ pub fn build_embed(
     }
 }
 
-/// `["published","updated","restored"].includes(event)` — [lib/notify.js:64].
+/// Only published, updated, and restored events can include a preview.
 #[must_use]
 pub const fn accepts_preview(event: &WebhookEvent) -> bool {
     matches!(
@@ -274,7 +274,7 @@ pub const fn accepts_preview(event: &WebhookEvent) -> bool {
 }
 
 /// The `event === "feedback" ? … : event === "resolved" ? … : "Artifact"` ladder.
-/// [lib/notify.js:30]
+///
 const fn default_title(event: &WebhookEvent) -> &'static str {
     match *event {
         WebhookEvent::Feedback => "New feedback",
@@ -305,7 +305,7 @@ fn capitalize(word: &str) -> String {
 
 /// `text(value || fallback, 1024)` — the `||` is applied *before* trimming, so a whitespace-only
 /// value collapses to the empty string rather than to the fallback. That is the reference
-/// behaviour. [lib/notify.js:41-54]
+/// behaviour.
 fn or_default(value: &str, fallback: &str) -> String {
     text(if value.is_empty() { fallback } else { value }, FIELD_MAX)
 }
@@ -315,7 +315,7 @@ fn or_else(value: String, fallback: impl FnOnce() -> String) -> String {
     if value.is_empty() { fallback() } else { value }
 }
 
-/// `String(payload.revision || 1)` — [lib/notify.js:43].
+/// A missing or zero revision is reported as revision one.
 fn revision(value: u64) -> String {
     if value == 0 {
         "1".to_owned()
@@ -353,7 +353,7 @@ pub struct DeliveryResponse {
 }
 
 impl DeliveryResponse {
-    /// `response.ok` — a 2xx status. [lib/notify.js:84]
+    /// `response.ok` — a 2xx status.
     #[must_use]
     pub const fn ok(self) -> bool {
         self.status >= 200 && self.status < 300
@@ -366,7 +366,7 @@ impl DeliveryResponse {
     }
 }
 
-/// The `fetchImpl` seam of `lib/notify.js`, so delivery policy can be tested without a network.
+/// The injected fetch implementation lets tests exercise delivery policy without a network.
 ///
 /// Implementations **must not** log or otherwise reproduce `url`: it is the webhook secret.
 pub trait WebhookTransport: Send + Sync + fmt::Debug {
@@ -511,7 +511,7 @@ impl DiscordNotifier {
         }
     }
 
-    /// Port of `emit(event, org, payload, { preview })` — [lib/notify.js:96-101].
+    /// Emit an event for an organization, optionally with a preview.
     ///
     /// Returns as soon as the subscriber rows are known; every delivery runs on its own detached
     /// task. Nothing about a webhook — an unreachable host, a decryption failure, a database
@@ -558,7 +558,7 @@ impl DiscordNotifier {
         }
     }
 
-    /// Port of `deliver(row, event, payload, fetchImpl, preview)` — [lib/notify.js:59-94].
+    /// Deliver a webhook payload through the injected transport.
     ///
     /// Awaitable, unlike [`DiscordNotifier::emit_with_preview`]: `test()` and the unit tests need
     /// the outcome. The result is recorded on the row before it is returned.
@@ -632,7 +632,7 @@ impl DiscordNotifier {
         if response.ok() {
             Ok(())
         } else {
-            // `throw new Error(\`Discord returned HTTP ${response.status}\`)` — [lib/notify.js:84]
+            // `throw new Error(\`Discord returned HTTP ${response.status}\`)`
             Err(format!("Discord returned HTTP {}", response.status))
         }
     }
@@ -661,7 +661,7 @@ impl fmt::Debug for DiscordNotifier {
     }
 }
 
-/// Port of the `FormData` branch — [lib/notify.js:69-72].
+/// Multipart delivery includes the preview attachment.
 ///
 /// `undici` serializes `FormData` as RFC 7578 multipart with two parts: `payload_json` (the embed
 /// JSON) and `files[0]` (the PNG, filename `preview.png`, type `image/png`). The bytes are built
@@ -714,7 +714,7 @@ impl NotificationSink for DiscordNotifier {
                     error: Some(UNKNOWN_WEBHOOK.to_owned()),
                 });
             }
-            // The admin Test button deliberately awaits this one. [lib/notify.js:103-115]
+            // The admin Test button deliberately awaits this one.
             Ok(self
                 .deliver(
                     webhook,
@@ -728,7 +728,7 @@ impl NotificationSink for DiscordNotifier {
     }
 }
 
-/// The literal payload `test()` sends — [lib/notify.js:107-114].
+/// The admin test action sends a fixed payload.
 ///
 /// `url` is the hard-coded `http://localhost:3480`, not the configured public base URL; that is
 /// the reference behaviour and is ported verbatim.

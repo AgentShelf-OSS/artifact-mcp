@@ -143,6 +143,7 @@ async fn bootstrap(
     let port = config.port;
     let deps = AppDeps {
         data,
+        collections: services.collections,
         publisher_auth: auth.publisher_auth,
         viewer_identity: auth.viewer_identity,
         artifacts: content.artifacts,
@@ -164,7 +165,7 @@ async fn bootstrap(
         push: workers.push,
         config,
     };
-    artifact_mcp::mcp::tasks::resume_preview_tasks(deps.clone());
+    artifact_mcp::mcp::tasks::resume_preview_tasks(deps.clone()).await;
     let router = runtime_router(deps);
     Ok(Bootstrapped {
         router,
@@ -494,7 +495,7 @@ async fn main() -> ExitCode {
     if let [command, path] = args.as_slice()
         && command == "check-action-grants"
     {
-        return match artifact_mcp::actions::load_grants(Some(path)) {
+        return match artifact_mcp::integrations::actions::load_grants(Some(path)) {
             Ok(_) => {
                 println!("{{\"status\":\"ok\",\"check\":\"action-grants\"}}");
                 ExitCode::SUCCESS

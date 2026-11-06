@@ -2,7 +2,7 @@
 use super::artifact::authorize;
 use crate::{
     AppDeps,
-    actions::{ActionGrant, dispatch, valid_name},
+    integrations::actions::{ActionGrant, dispatch, valid_name},
     security::access::AccessPolicy,
 };
 use axum::{
@@ -98,10 +98,13 @@ async fn status(
     };
     match dispatch(&g, None).await {
         Ok(v) => response(StatusCode::OK, v),
-        Err(_) => response(
-            StatusCode::BAD_GATEWAY,
-            json!({"error":"action_unavailable"}),
-        ),
+        Err(error) => {
+            tracing::warn!(%error, "action dispatch failed");
+            response(
+                StatusCode::BAD_GATEWAY,
+                json!({"error":"action_unavailable"}),
+            )
+        }
     }
 }
 #[derive(Deserialize)]
@@ -177,9 +180,12 @@ async fn start(
     }
     match result {
         Ok(v) => response(StatusCode::ACCEPTED, v),
-        Err(_) => response(
-            StatusCode::BAD_GATEWAY,
-            json!({"error":"action_unavailable"}),
-        ),
+        Err(error) => {
+            tracing::warn!(%error, "action dispatch failed");
+            response(
+                StatusCode::BAD_GATEWAY,
+                json!({"error":"action_unavailable"}),
+            )
+        }
     }
 }

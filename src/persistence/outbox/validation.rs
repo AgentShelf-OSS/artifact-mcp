@@ -5,7 +5,7 @@ use super::{
     DELIVERY_KIND_DISCUSSION_MESSAGE, DELIVERY_KIND_DISCUSSION_THREAD,
     DELIVERY_KIND_DISCUSSION_TOMBSTONE, DELIVERY_KIND_EVENT, EnqueueDelivery, MAX_BUCKET_KEY_BYTES,
     MAX_DEPENDENCY_ID_BYTES, MAX_ORDERING_KEY_BYTES, MAX_PAYLOAD_BYTES, MAX_SECRET_REF_BYTES,
-    MAX_TARGET_KEY_BYTES, internal,
+    MAX_TARGET_KEY_BYTES,
 };
 
 pub(super) fn validate(input: &EnqueueDelivery) -> Result<(), AppError> {
@@ -96,7 +96,7 @@ pub(super) fn validate_dependency_contract(
                 params![dependency_id, input.tenant, input.target_key],
                 |row| row.get(0),
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("validate dependency contract", error))?;
         return if valid {
             Ok(())
         } else {
@@ -115,7 +115,7 @@ pub(super) fn validate_dependency_contract(
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .optional()
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("validate dependency contract", error))?;
     let Some((tenant, target, secret, ordering)) = predecessor else {
         return Err(AppError::Validation(
             "invalid discussion delivery dependency".into(),
@@ -142,7 +142,7 @@ fn opaque_discussion_ref(value: &str) -> bool {
     })
 }
 /// Rate-limit state is keyed by a non-secret provider reference. Event enqueue remains stricter:
-/// it accepts only `webhook:` references, while a PBI-079 discussion delivery uses its immutable
+/// it accepts only `webhook:` references, while a discussion delivery uses its immutable
 /// `discussion:<connection-id>` reference to retain bucket throttling across attempts.
 pub(super) fn opaque_provider_secret_ref(value: &str) -> bool {
     opaque_secret_ref(value) || opaque_discussion_ref(value)

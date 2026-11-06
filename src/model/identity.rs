@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — identity and tenant value types.
+//! Identity and tenant value types.
 
 use std::{collections::BTreeSet, fmt};
 
@@ -45,12 +45,65 @@ string_id!(WebhookId);
 #[serde(transparent)]
 pub struct Timestamp(pub String);
 
+/// The closed set of publisher-key capabilities, serialized as the stored lowercase value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Role {
+    Reader,
+    Author,
+    Collaborator,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, thiserror::Error)]
+#[error("invalid publisher role")]
+pub enum RoleParseError {
+    InvalidRole,
+}
+
+impl Role {
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Reader => "reader",
+            Self::Author => "author",
+            Self::Collaborator => "collaborator",
+        }
+    }
+}
+
+impl std::str::FromStr for Role {
+    type Err = RoleParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "reader" => Ok(Self::Reader),
+            "author" => Ok(Self::Author),
+            "collaborator" => Ok(Self::Collaborator),
+            _ => Err(RoleParseError::InvalidRole),
+        }
+    }
+}
+
+impl TryFrom<&str> for Role {
+    type Error = RoleParseError;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        value.parse()
+    }
+}
+
+impl fmt::Display for Role {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PublisherIdentity {
     pub client_id: ClientId,
     pub org: OrgId,
     pub label: String,
-    pub role: String,
+    pub role: Role,
     /// `None` identifies the legacy API-key path. OAuth service credentials always carry
     /// `Some`, including an empty set, so a token never inherits unrestricted API-key access.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -60,13 +113,9 @@ pub struct PublisherIdentity {
 impl PublisherIdentity {
     /// Whether this publisher key is the admin key.
     ///
-    /// DERIVED, never stored. Node has no admin column on `api_keys`; `auth.org === "admin"` is the
-    /// entire rule (`lib/access.js:35`, `lib/auth.js:25`). This was a settable `is_admin: bool`
-    /// field until U05 and U06 — the two security-critical units — independently reported that a
-    /// settable flag creates two sources of truth for an admin decision, and that a future unit
-    /// populating it from a wider rule would silently break the publisher tenant-lock (invariant 1).
-    /// U06's policy already ignored the field and pinned that with a test setting it wrongly on
-    /// purpose. Making it a method removes the possibility entirely.
+    /// Admin status is derived only from `org == "admin"`, never stored as a separate flag.
+    /// A settable flag would create two sources of truth and could break the publisher
+    /// tenant lock, invariant 1.
     #[must_use]
     pub fn is_admin(&self) -> bool {
         self.org.0 == "admin"
@@ -93,4 +142,36 @@ pub struct Viewer {
     pub email: Option<EmailAddress>,
     pub org: Option<OrgId>,
     pub is_admin: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn roles_round_trip_exact_wire_strings() {
+        for (role, value) in [
+            (Role::Reader, "reader"),
+            (Role::Author, "author"),
+            (Role::Collaborator, "collaborator"),
+        ] {
+            assert_eq!(role.as_str(), value);
+            assert_eq!(role.to_string(), value);
+            assert_eq!(value.parse::<Role>(), Ok(role));
+            assert_eq!(Role::try_from(value), Ok(role));
+            let json = format!("\"{value}\"");
+            assert_eq!(serde_json::to_string(&role).unwrap(), json);
+            assert_eq!(serde_json::from_str::<Role>(&json).unwrap(), role);
+        }
+    }
+
+    #[test]
+    fn roles_reject_noncanonical_values() {
+        for value in ["Author", "admin", "", " author", "author "] {
+            assert_eq!(value.parse::<Role>(), Err(RoleParseError::InvalidRole));
+            assert_eq!(Role::try_from(value), Err(RoleParseError::InvalidRole));
+            let json = serde_json::to_string(value).unwrap();
+            assert!(serde_json::from_str::<Role>(&json).is_err());
+        }
+    }
 }

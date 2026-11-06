@@ -88,7 +88,7 @@ pub fn sweep_due(
                 url: format!("{base}/{artifact_id}"),
                 tag: format!("{artifact_id}:{key}"),
             })
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("sweep due", error))?;
             for subscription in &recipients {
                 tx.execute(
                     "INSERT INTO push_deliveries (subscription_id, artifact_id, reminder_key, payload, state, attempts, next_attempt_at, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)",

@@ -1,9 +1,13 @@
-//! Owned by U01 (sol) — frozen domain model surface.
+//! Frozen domain model surface.
 
 pub mod admin;
 pub mod artifact;
+pub mod discord;
 pub mod engagement;
 pub mod identity;
+pub mod json;
+pub mod rendering;
+pub mod state;
 
 pub use admin::*;
 pub use artifact::*;

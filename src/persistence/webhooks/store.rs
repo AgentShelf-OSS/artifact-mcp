@@ -1,13 +1,11 @@
-use super::sql_helpers::{
-    discussion_anchor_exists, internal, org_exists, row_by_id, rows_for_org, trimmed,
-};
+use super::sql_helpers::{discussion_anchor_exists, org_exists, row_by_id, rows_for_org, trimmed};
 use super::*;
 
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
 
-/// Per-org Discord webhook persistence on U03's pool.
+/// Per-org Discord webhook persistence on the shared database pool.
 #[derive(Clone)]
 pub struct WebhookStore {
     pool: DbPool,
@@ -36,7 +34,7 @@ impl WebhookStore {
         &self.protection
     }
 
-    /// Port of `listForOrg(org)` — masked rows only. [lib/webhooks.js:71-73]
+    /// Port of `listForOrg(org)` — masked rows only.
     ///
     /// # Errors
     /// Returns [`AppError::Unavailable`] or [`AppError::Internal`] on a database fault.
@@ -47,7 +45,6 @@ impl WebhookStore {
     }
 
     /// Port of `forEvent(org, event)` — internal, returns **decrypted** URLs.
-    /// [lib/webhooks.js:76-81]
     ///
     /// Never hand the result to a renderer or an HTTP response.
     ///
@@ -67,7 +64,7 @@ impl WebhookStore {
             .collect()
     }
 
-    /// Port of `create({ org, url, label, events })` — [lib/webhooks.js:83-102].
+    /// Port of `create({ org, url, label, events })`.
     ///
     /// With a key the row stores the masked URL plus the three cipher columns; without one the URL
     /// is stored verbatim with NULL cipher columns. Both are handled by
@@ -159,7 +156,7 @@ impl WebhookStore {
             let audit = audit.for_target_tenant(&org)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("remove audited", error))?;
             if discussion_anchor_exists(&tx, &org, &id)? {
                 return Err(AppError::Conflict(
                     "Remove the Discord notification-thread connection before deleting this webhook."
@@ -171,10 +168,10 @@ impl WebhookStore {
                     "DELETE FROM org_webhooks WHERE org = ?1 AND id = ?2",
                     (&org, &id),
                 )
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("remove audited", error))?
                 > 0;
             if !changed {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit().map_err(|error| crate::error::internal("remove audited", error))?;
                 return Ok(false);
             }
             let event = AuditEvent {
@@ -186,7 +183,7 @@ impl WebhookStore {
                 revision: None,
             };
             append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit().map_err(|error| crate::error::internal("remove audited", error))?;
             Ok(true)
         })
         .await
@@ -208,9 +205,10 @@ impl WebhookStore {
             let audit = audit.for_target_tenant(&org)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("set events audited", error))?;
             let Some(current) = row_by_id(&tx, &id)?.filter(|row| row.org.0 == org) else {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("set events audited", error))?;
                 return Ok(None);
             };
             if !normalized.split(',').any(|event| event == "published")
@@ -223,14 +221,15 @@ impl WebhookStore {
             }
             if encode_events(&current.events) == normalized {
                 let row = current.public();
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("set events audited", error))?;
                 return Ok(Some(row));
             }
             tx.execute(
                 "UPDATE org_webhooks SET events = ?1 WHERE org = ?2 AND id = ?3",
                 (&normalized, &org, &id),
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("set events audited", error))?;
             let row = row_by_id(&tx, &id)?
                 .map(|row| row.public())
                 .ok_or(AppError::Internal)?;
@@ -243,7 +242,8 @@ impl WebhookStore {
                 revision: None,
             };
             append_in_transaction(&tx, &audit_key, &audit.event_id()?, audit.context(), &event)?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("set events audited", error))?;
             Ok(Some(row))
         })
         .await
@@ -311,7 +311,7 @@ impl WebhookStore {
                     "DELETE FROM org_webhooks WHERE org = ?1 AND id = ?2",
                     (&org, &id),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("remove", error))?;
             Ok(changed > 0)
         })
         .await
@@ -329,7 +329,7 @@ fn create_in(
     events: &str,
     stored: &StoredWebhookUrl,
 ) -> Result<WebhookSummary, AppError> {
-    // Node's order is unknown-organization first, then invalid-URL. [lib/webhooks.js:86-87]
+    // Node's order is unknown-organization first, then invalid-URL.
     if !org_exists(conn, org)? {
         return Err(AppError::Validation(format!(
             "Unknown organization \"{org}\"."
@@ -353,16 +353,15 @@ fn create_in(
             &events,
         ),
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("create in", error))?;
     // Node re-reads the row so database defaults (`created_at`) are authoritative.
-    // [lib/webhooks.js:101]
     row_by_id(conn, &id.0)?
         .map(|row| row.public())
         .ok_or(AppError::Internal)
 }
 
 impl WebhookStore {
-    /// Port of `setEvents(org, id, events)` — [lib/webhooks.js:108-114].
+    /// Port of `setEvents(org, id, events)`.
     ///
     /// `None` means no row matched; the parsed set defaults to **empty**, not to every event.
     ///
@@ -391,7 +390,7 @@ impl WebhookStore {
                     "UPDATE org_webhooks SET events = ?1 WHERE org = ?2 AND id = ?3",
                     (&normalized, &org, &id),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("set events", error))?;
             if changed == 0 {
                 return Ok(None);
             }
@@ -400,7 +399,7 @@ impl WebhookStore {
         .await
     }
 
-    /// Port of `get(id)` — internal, returns a **decrypted** URL. [lib/webhooks.js:117-119]
+    /// Port of `get(id)` — internal, returns a **decrypted** URL.
     ///
     /// # Errors
     /// Propagates a database fault, or [`AppError::Internal`] when an encrypted row cannot be
@@ -450,7 +449,7 @@ impl WebhookStore {
         Ok(row.map(|row| row.public()))
     }
 
-    /// Port of `recordResult(id, ok, error)` — [lib/webhooks.js:126-129].
+    /// Port of `recordResult(id, ok, error)`.
     ///
     /// Success clears `last_error` and stamps `last_ok_at`; failure records the message truncated
     /// to 500 UTF-16 units and leaves `last_ok_at` untouched.
@@ -483,7 +482,7 @@ impl WebhookStore {
                     )
                 }
             }
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("record result", error))?;
             Ok(())
         })
         .await

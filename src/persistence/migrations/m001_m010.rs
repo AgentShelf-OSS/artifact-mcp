@@ -101,7 +101,7 @@ pub(super) fn m004_artifact_revision(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-009: stable-URL replace-in-place. Each successful update bumps revision.
+    // stable-URL replace-in-place. Each successful update bumps revision.
     ensure_column(
         tx,
         "artifacts",
@@ -114,7 +114,7 @@ pub(super) fn m005_viewer_feedback(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-010: org-scoped viewer feedback threads. Composite FK ties feedback to the
+    // org-scoped viewer feedback threads. Composite FK ties feedback to the
     // artifact's immutable (id, org) so a viewer can never re-tenant a comment.
     tx.execute_batch(
         "

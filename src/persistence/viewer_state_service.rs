@@ -2,18 +2,28 @@
 
 use crate::{
     error::AppError,
-    mcp::protocol::OrderedJson,
     model::EmailAddress,
+    model::json::OrderedJson,
     persistence::{
         db::{self, DbPool},
         state::{self, StateError, StateKey, StateScope, StateValue},
     },
-    ports::{BoxFuture, state::ViewerStateService},
+    ports::{
+        BoxFuture,
+        state::{StateAudience, ViewerStateService},
+    },
     security::{
         access::AuthorizedArtifact,
         audit::{self, AuditEvent, MutationAudit},
     },
 };
+
+fn audience_parts(audience: StateAudience) -> (StateScope, Option<EmailAddress>) {
+    match audience {
+        StateAudience::Org => (StateScope::Org, None),
+        StateAudience::Viewer(viewer) => (StateScope::Viewer, Some(viewer)),
+    }
+}
 
 pub struct SqliteViewerState {
     pool: DbPool,
@@ -31,9 +41,9 @@ impl ViewerStateService for SqliteViewerState {
     fn list(
         &self,
         artifact: AuthorizedArtifact,
-        scope: StateScope,
-        viewer: Option<EmailAddress>,
+        audience: StateAudience,
     ) -> BoxFuture<'_, Result<Vec<StateKey>, AppError>> {
+        let (scope, viewer) = audience_parts(audience);
         Box::pin(state::list_pooled(
             &self.pool,
             artifact.into_meta().id,
@@ -46,9 +56,9 @@ impl ViewerStateService for SqliteViewerState {
         &self,
         artifact: AuthorizedArtifact,
         key: String,
-        scope: StateScope,
-        viewer: Option<EmailAddress>,
+        audience: StateAudience,
     ) -> BoxFuture<'_, Result<Option<StateValue>, AppError>> {
+        let (scope, viewer) = audience_parts(audience);
         Box::pin(state::get_pooled(
             &self.pool,
             artifact.into_meta().id,
@@ -65,8 +75,9 @@ impl ViewerStateService for SqliteViewerState {
         value: OrderedJson,
         if_revision: Option<u64>,
         writer: EmailAddress,
-        scope: StateScope,
+        audience: StateAudience,
     ) -> BoxFuture<'_, Result<StateValue, StateError>> {
+        let (scope, viewer) = audience_parts(audience);
         Box::pin(state::set_pooled(
             &self.pool,
             artifact.into_meta().id,
@@ -74,7 +85,7 @@ impl ViewerStateService for SqliteViewerState {
             value,
             if_revision,
             writer,
-            scope,
+            (scope, viewer),
         ))
     }
 
@@ -82,10 +93,10 @@ impl ViewerStateService for SqliteViewerState {
         &self,
         artifact: AuthorizedArtifact,
         key: String,
-        scope: StateScope,
-        viewer: Option<EmailAddress>,
+        audience: StateAudience,
         mutation: MutationAudit,
     ) -> BoxFuture<'_, Result<(), AppError>> {
+        let (scope, viewer) = audience_parts(audience);
         let meta = artifact.into_meta();
         let audit_key = self.audit_key;
         Box::pin(async move {
@@ -93,7 +104,7 @@ impl ViewerStateService for SqliteViewerState {
             db::interact(&self.pool, move |conn| {
                 let tx = conn
                     .transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)
-                    .map_err(|_| AppError::Internal)?;
+                    .map_err(|error| crate::error::internal("delete", error))?;
                 state::delete(
                     &tx,
                     &meta.id,
@@ -117,7 +128,8 @@ impl ViewerStateService for SqliteViewerState {
                         },
                     )?;
                 }
-                tx.commit().map_err(|_| AppError::Internal)
+                tx.commit()
+                    .map_err(|error| crate::error::internal("delete", error))
             })
             .await
         })

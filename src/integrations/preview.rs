@@ -1,4 +1,4 @@
-//! Owned by U16 (terra) — optional preview-renderer HTTP client.
+//! Optional preview-renderer HTTP client.
 //!
 //! This module is a **client of the preview-renderer sidecar** (`preview-renderer/`, the Rust
 //! `artifact-preview` service driving chrome-headless-shell); it does not render anything itself.
@@ -12,15 +12,15 @@
 //! | Aspect | Contract | Source |
 //! |---|---|---|
 //! | Endpoint | `POST <PREVIEW_RENDERER_URL>/render` | [preview-renderer/src/server.rs `handle`] |
-//! | Request | `content-type: application/json`, body `{"html":…,"width":…,"height":…}` | [lib/preview.js:57-63], [preview-renderer/src/server.rs `render_route`] |
+//! | Request | `content-type: application/json`, body `{"html":…,"width":…,"height":…}` | [preview-renderer/src/server.rs `render_route`] |
 //! | Token | `authorization: Bearer <PREVIEW_RENDERER_TOKEN>` when configured; a renderer with `RENDER_TOKEN` answers `401 {"error":"unauthorized"}` without it, and a renderer without one ignores it | [preview-renderer/src/server.rs `authorized`] |
 //! | Health | `GET /health` → `{"status":"ok"}` (not used by the client) | [preview-renderer/src/server.rs `handle`] |
 //! | Success | `200` + `content-type: image/png` + `content-length` + the PNG body | [preview-renderer/src/server.rs `respond`, `render_route`] |
 //! | Busy | `503 {"error":"renderer busy"}` — one render at a time, server side | [preview-renderer/src/server.rs `BusySlot`] |
 //! | Bad input | `400 {"error":"html must be a string"}`, `413 {"error":"request too large"}` | [preview-renderer/src/server.rs `render_route`, `read_body`] |
 //! | Failure | `500 {"error":"render failed"}` | [preview-renderer/src/server.rs `render_route`] |
-//! | Server timeout | `RENDER_TIMEOUT_MS` (default 7 s), below the client's 8 s | [preview-renderer/src/config.rs `DEFAULT_RENDER_TIMEOUT_MS`], [lib/preview.js:6] |
-//! | Redirects | never issued; a redirect is treated as a failure | [lib/preview.js:62] |
+//! | Server timeout | `RENDER_TIMEOUT_MS` (default 7 s), below the client's 8 s | [preview-renderer/src/config.rs `DEFAULT_RENDER_TIMEOUT_MS`] |
+//! | Redirects | never issued; a redirect is treated as a failure |
 //!
 //! Because the sidecar rejects concurrent renders with `503`, the client must not fan out. The
 //! serial lane that guarantees that lives in [`super::thumbnails::ThumbnailQueue`]; this module
@@ -31,22 +31,22 @@
 //!
 //! | Rust | Node |
 //! |---|---|
-//! | [`PreviewRenderer::new`] | `createPreviewRenderer({…})` — [lib/preview.js:37-49] |
-//! | [`PreviewRenderer::enabled`] | `enabled: !!endpoint` — [lib/preview.js:118] |
-//! | [`PreviewRenderer::render_preview`] | `renderPreview(html)` — [lib/preview.js:52-94] |
-//! | [`PreviewRenderer::render_revision_preview`] | `renderRevisionPreview(id, revision, html)` — [lib/preview.js:103-115] |
-//! | cache insert/refresh/evict | `remember(key, value)` — [lib/preview.js:96-101] |
+//! | [`PreviewRenderer::new`] | `createPreviewRenderer({…})` |
+//! | [`PreviewRenderer::enabled`] | `enabled: !!endpoint` |
+//! | [`PreviewRenderer::render_preview`] | `renderPreview(html)` |
+//! | [`PreviewRenderer::render_revision_preview`] | `renderRevisionPreview(id, revision, html)` |
+//! | cache insert/refresh/evict | `remember(key, value)` |
 //!
-//! Endpoint normalisation (`rendererEndpoint`, [lib/preview.js:25-36]) and the timeout, viewport,
-//! cache-size and byte-cap defaults are already parsed by U02 into
+//! Endpoint normalisation (`rendererEndpoint`) and the timeout, viewport,
+//! cache-size and byte-cap defaults are already parsed by the caller into
 //! [`crate::config::PreviewConfig`]; this module consumes them and never reads the environment.
 //!
 //! # Cache and coalescing semantics
 //!
-//! Node stores the **promise**, not the resolved buffer ([lib/preview.js:110]), which makes the
+//! Node stores the **promise**, not the resolved buffer, which makes the
 //! cache do double duty: concurrent callers with the same key await the same in-flight render, and
 //! a settled successful render is reused. A `null` or rejected result is evicted
-//! ([lib/preview.js:109-113]) so a transient renderer failure is retried rather than remembered.
+//! so a transient renderer failure is retried rather than remembered.
 //!
 //! The Rust port keeps a bounded insertion-ordered list of
 //! `Arc<tokio::sync::OnceCell<Option<Vec<u8>>>>` slots. `OnceCell::get_or_init` runs exactly one
@@ -64,10 +64,10 @@ use crate::config::{PreviewConfig, Secret};
 
 use super::thumbnails::valid_png;
 
-/// The only `content-type` a rendered response may carry. [lib/preview.js:66]
+/// The only `content-type` a rendered response may carry.
 pub const RENDERED_CONTENT_TYPE: &str = "image/png";
 
-/// `JSON.stringify({ html, ...dimensions })` — [lib/preview.js:60]
+/// `JSON.stringify({ html, ...dimensions })`
 ///
 /// Field order matches Node's object literal so a captured request body is byte-comparable.
 #[derive(Debug, Serialize)]
@@ -81,7 +81,7 @@ struct RenderRequest<'a> {
 type RenderSlot = Arc<OnceCell<Option<Vec<u8>>>>;
 
 /// Bounded, insertion-ordered render cache. `Map` iteration order is insertion order in
-/// JavaScript, which is what makes Node's delete-then-set an LRU refresh. [lib/preview.js:96-101]
+/// JavaScript, which is what makes Node's delete-then-set an LRU refresh.
 #[derive(Debug, Default)]
 struct RenderCache {
     entries: Vec<(String, RenderSlot)>,
@@ -90,7 +90,7 @@ struct RenderCache {
 /// HTTP client for the optional preview sidecar.
 ///
 /// Shared through an [`Arc`]; the cache is shared with it, matching Node's single module-level
-/// renderer ([lib/preview.js:124-139]).
+/// renderer.
 #[derive(Debug)]
 pub struct PreviewRenderer {
     endpoint: Option<String>,
@@ -115,7 +115,7 @@ impl PreviewRenderer {
     #[must_use]
     pub fn new(config: &PreviewConfig) -> Self {
         let client = reqwest::Client::builder()
-            // `redirect: "error"` — [lib/preview.js:62]. `Policy::none` surfaces the 3xx as a
+            // `redirect: "error"`. `Policy::none` surfaces the 3xx as a
             // non-success status instead of following it, so the outcome is identical.
             .redirect(reqwest::redirect::Policy::none())
             .timeout(Duration::from_millis(config.timeout_ms))
@@ -155,13 +155,13 @@ impl PreviewRenderer {
         Self::new(&PreviewConfig::default())
     }
 
-    /// `enabled: !!endpoint` — [lib/preview.js:118]
+    /// `enabled: !!endpoint`
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.endpoint.is_some()
     }
 
-    /// The byte cap applied to every rendered PNG. [lib/preview.js:49]
+    /// The byte cap applied to every rendered PNG.
     #[must_use]
     pub const fn max_png_bytes(&self) -> u64 {
         self.max_png_bytes
@@ -177,7 +177,7 @@ impl PreviewRenderer {
             .collect()
     }
 
-    /// `renderPreview(html)` — [lib/preview.js:52-94]
+    /// `renderPreview(html)`
     ///
     /// One uncached POST to the sidecar. Returns `None` for a disabled renderer, a transport or
     /// timeout failure, a non-2xx status, a non-`image/png` body, a declared or streamed length
@@ -188,7 +188,7 @@ impl PreviewRenderer {
 
         let mut request = client
             .post(endpoint)
-            // `setTimeout(() => controller.abort(…), timeout)` — [lib/preview.js:55]. reqwest's
+            // `setTimeout(() => controller.abort(…), timeout)`. reqwest's
             // request timeout also spans the body read, matching the abort signal's reach.
             .timeout(self.timeout)
             .json(&RenderRequest {
@@ -203,12 +203,12 @@ impl PreviewRenderer {
         }
         let mut response = request.send().await.ok()?;
 
-        // `if (!response?.ok) return null` — [lib/preview.js:64]
+        // `if (!response?.ok) return null`
         if !response.status().is_success() {
             return None;
         }
 
-        // `contentType.startsWith("image/png")` — [lib/preview.js:65-66]
+        // `contentType.startsWith("image/png")`
         let content_type = response
             .headers()
             .get(reqwest::header::CONTENT_TYPE)
@@ -219,7 +219,7 @@ impl PreviewRenderer {
             return None;
         }
 
-        // `declaredLength > maxBytes` — [lib/preview.js:67-68]. A missing or unparsable
+        // `declaredLength > maxBytes`. A missing or unparsable
         // `content-length` is `NaN` in Node and `None` here: both skip the pre-check and rely on
         // the streaming cap below.
         if response
@@ -229,7 +229,7 @@ impl PreviewRenderer {
             return None;
         }
 
-        // `reader.read()` loop with `total > maxBytes` cancellation — [lib/preview.js:70-84].
+        // `reader.read()` loop with `total > maxBytes` cancellation.
         // Streaming matters: a hostile or broken renderer must not be able to buffer an unbounded
         // body into this process before the cap is applied.
         let mut png: Vec<u8> = Vec::new();
@@ -248,11 +248,11 @@ impl PreviewRenderer {
             }
         }
 
-        // `validPng(png, maxBytes) ? png : null` — [lib/preview.js:88]
+        // `validPng(png, maxBytes) ? png : null`
         valid_png(&png, self.max_png_bytes).then_some(png)
     }
 
-    /// `renderRevisionPreview(artifactId, revision, html)` — [lib/preview.js:103-115]
+    /// `renderRevisionPreview(artifactId, revision, html)`
     ///
     /// Cached and coalesced by `<artifact-id>:<revision-or-digest>`. Concurrent callers with the
     /// same key share a single render; a `None` result is evicted so the next caller retries.
@@ -262,7 +262,7 @@ impl PreviewRenderer {
         revision: &str,
         html: &str,
     ) -> Option<Vec<u8>> {
-        // `if (!endpoint) return Promise.resolve(null)` — [lib/preview.js:104]
+        // `if (!endpoint) return Promise.resolve(null)`
         if !self.enabled() {
             return None;
         }
@@ -281,7 +281,6 @@ impl PreviewRenderer {
     }
 
     /// `cache.has(key) ? remember(key, cache.get(key)) : remember(key, pending)`
-    /// — [lib/preview.js:106-110]
     ///
     /// A hit is moved to the end (LRU refresh); a miss inserts and evicts from the front while
     /// over capacity. The guard is released before the caller awaits, so no lock is ever held
@@ -301,14 +300,14 @@ impl PreviewRenderer {
         let slot: RenderSlot = Arc::new(OnceCell::new());
         cache.entries.push((key.to_owned(), Arc::clone(&slot)));
         // `while (cache.size > maxCacheEntries) cache.delete(cache.keys().next().value)`
-        // — [lib/preview.js:99]
+        //
         while cache.entries.len() > self.cache_entries {
             cache.entries.remove(0);
         }
         slot
     }
 
-    /// `if (cache.get(key) === pending) cache.delete(key)` — [lib/preview.js:110-113]
+    /// `if (cache.get(key) === pending) cache.delete(key)`
     ///
     /// The pointer comparison is load bearing: between the failed render and this call another
     /// caller may already have installed a fresh slot for the same key, and evicting *that* would

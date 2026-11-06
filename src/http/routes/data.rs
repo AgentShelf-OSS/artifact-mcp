@@ -1,4 +1,5 @@
 //! Authenticated live-data queries and one multiplexed viewer event stream.
+use crate::ports::data::DataError;
 use crate::{AppDeps, data::RequestedSubscription, http::routes::artifact::authorize};
 use axum::{
     Json, Router,
@@ -26,12 +27,26 @@ pub(crate) fn router() -> Router<AppDeps> {
         .route("/{id}/data/stream", post(stream))
         .route("/{id}/data/events", get(events))
 }
-fn failure(reason: &str) -> Response {
+fn failure(reason: &DataError) -> Response {
     let (status, reason) = match reason {
-        "bad_params" => (StatusCode::BAD_REQUEST, "bad_params"),
-        "not_found" => (StatusCode::NOT_FOUND, "not_found"),
-        "too_large" => (StatusCode::PAYLOAD_TOO_LARGE, "too_large"),
-        _ => (StatusCode::BAD_GATEWAY, "data_unavailable"),
+        DataError::BadParams => (StatusCode::BAD_REQUEST, "bad_params"),
+        DataError::NotFound => (StatusCode::NOT_FOUND, "not_found"),
+        DataError::TooLarge => (StatusCode::PAYLOAD_TOO_LARGE, "too_large"),
+        DataError::StaleVersion
+        | DataError::SourceConflict
+        | DataError::SourceInUse
+        | DataError::BindingInUse
+        | DataError::OrgInUse
+        | DataError::OperatorReadOnly
+        | DataError::Unavailable
+        | DataError::TestUnavailable
+        | DataError::InvalidSource
+        | DataError::InvalidDataSources
+        | DataError::MissingReference
+        | DataError::CredentialReferenceNotAllowed
+        | DataError::UnknownOrg
+        | DataError::ConfigError
+        | DataError::Internal => (StatusCode::BAD_GATEWAY, "data_unavailable"),
     };
     (
         status,
@@ -69,10 +84,10 @@ async fn query(State(deps): State<AppDeps>, Path(id): Path<String>, request: Req
         return e.into_response();
     }
     let Ok(body) = axum::body::to_bytes(request.into_body(), 64 * 1024).await else {
-        return failure("too_large");
+        return failure(&DataError::TooLarge);
     };
     let Ok(input) = serde_json::from_slice::<QueryBody>(&body) else {
-        return failure("bad_params");
+        return failure(&DataError::BadParams);
     };
     match deps
         .data
@@ -94,10 +109,10 @@ async fn stream(State(deps): State<AppDeps>, Path(id): Path<String>, request: Re
         return e.into_response();
     }
     let Ok(body) = axum::body::to_bytes(request.into_body(), 64 * 1024).await else {
-        return failure("too_large");
+        return failure(&DataError::TooLarge);
     };
     let Ok(input) = serde_json::from_slice::<QueryBody>(&body) else {
-        return failure("bad_params");
+        return failure(&DataError::BadParams);
     };
     let receiver = match deps
         .data
@@ -112,11 +127,7 @@ async fn stream(State(deps): State<AppDeps>, Path(id): Path<String>, request: Re
         let (line, next) = match receiver.recv().await {
             Some(Ok(value)) => (json!({"chunk":value}), Some(receiver)),
             Some(Err(reason)) => {
-                let reason = if reason == "too_large" {
-                    "too_large"
-                } else {
-                    "data_unavailable"
-                };
+                let reason = reason.stream_reason();
                 (json!({"error":reason}), None)
             }
             None => (json!({"done":true}), None),
@@ -135,13 +146,15 @@ async fn stream(State(deps): State<AppDeps>, Path(id): Path<String>, request: Re
     )
         .into_response()
 }
-fn parse_cursor(raw: &str) -> Result<BTreeMap<String, String>, String> {
+fn parse_cursor(raw: &str) -> Result<BTreeMap<String, String>, DataError> {
     if raw.len() > 8192 {
-        return Err("bad_params".into());
+        return Err(DataError::BadParams);
     }
-    let bytes = URL_SAFE_NO_PAD.decode(raw).map_err(|_| "bad_params")?;
+    let bytes = URL_SAFE_NO_PAD
+        .decode(raw)
+        .map_err(|_| DataError::BadParams)?;
     let cursor: BTreeMap<String, String> =
-        serde_json::from_slice(&bytes).map_err(|_| "bad_params")?;
+        serde_json::from_slice(&bytes).map_err(|_| DataError::BadParams)?;
     if cursor.len() > 16
         || cursor.iter().any(|(k, v)| {
             k.len() > 129
@@ -150,7 +163,7 @@ fn parse_cursor(raw: &str) -> Result<BTreeMap<String, String>, String> {
                 || v.chars().any(char::is_control)
         })
     {
-        return Err("bad_params".into());
+        return Err(DataError::BadParams);
     }
     Ok(cursor)
 }
@@ -164,19 +177,19 @@ async fn events(State(deps): State<AppDeps>, Path(id): Path<String>, request: Re
     for (k, v) in url::form_urlencoded::parse(request.uri().query().unwrap_or_default().as_bytes())
     {
         if !seen.insert(k.to_string()) {
-            return failure("bad_params");
+            return failure(&DataError::BadParams);
         }
         match k.as_ref() {
             "subscriptions" => subscriptions = Some(v.to_string()),
             "cursor" => raw_cursor = Some(v.to_string()),
-            _ => return failure("bad_params"),
+            _ => return failure(&DataError::BadParams),
         }
     }
     let Some(raw) = subscriptions else {
-        return failure("bad_params");
+        return failure(&DataError::BadParams);
     };
     let Ok(topics) = serde_json::from_str::<Vec<RequestedSubscription>>(&raw) else {
-        return failure("bad_params");
+        return failure(&DataError::BadParams);
     };
     let raw_cursor = request
         .headers()
@@ -225,4 +238,31 @@ async fn events(State(deps): State<AppDeps>, Path(id): Path<String>, request: Re
         Sse::new(events).keep_alive(KeepAlive::new().interval(Duration::from_secs(15))),
     )
         .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[tokio::test]
+    async fn typed_errors_preserve_status_and_body() {
+        let statuses = [
+            404, 502, 502, 502, 502, 502, 502, 502, 502, 400, 413, 502, 502, 502, 502, 502, 502,
+            502,
+        ];
+        for ((error, token), status) in crate::data::error_cases().into_iter().zip(statuses) {
+            let response = failure(&error);
+            assert_eq!(response.status().as_u16(), status, "{token}");
+            assert_eq!(response.headers()[header::CACHE_CONTROL], "no-store");
+            let bytes = axum::body::to_bytes(response.into_body(), 4096)
+                .await
+                .unwrap();
+            let value: Value = serde_json::from_slice(&bytes).unwrap();
+            let expected_reason = if matches!(token, "bad_params" | "not_found" | "too_large") {
+                token
+            } else {
+                "data_unavailable"
+            };
+            assert_eq!(value, json!({"error":expected_reason}));
+        }
+    }
 }

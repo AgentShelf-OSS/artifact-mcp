@@ -37,7 +37,9 @@ pub fn parse_hmac_key(value: &str) -> Result<[u8; 32], AppError> {
                 .to_owned(),
         ));
     }
-    decoded.try_into().map_err(|_| AppError::Internal)
+    decoded
+        .try_into()
+        .map_err(|_| crate::error::internal("convert audit key", "invalid key length"))
 }
 
 pub(super) fn receipt_mac(
@@ -85,18 +87,18 @@ pub(super) fn pending_receipts_root(conn: &Connection) -> Result<String, AppErro
             "SELECT receipt_mac FROM security_audit_receipts \
              WHERE state='pending' ORDER BY receipt_mac ASC",
         )
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("prepare pending receipt query", error))?;
     let receipts = statement
         .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|_| AppError::Internal)?
+        .map_err(|error| crate::error::internal("query pending receipt hashes", error))?
         .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("read pending receipt hashes", error))?;
     let mut message = Vec::new();
     message.extend_from_slice(DOMAIN);
     message.extend_from_slice(b"pending-receipts\0");
     message.extend_from_slice(
         &u64::try_from(receipts.len())
-            .map_err(|_| AppError::Internal)?
+            .map_err(|error| crate::error::internal("convert pending receipt count", error))?
             .to_be_bytes(),
     );
     for receipt_mac in receipts {
@@ -135,11 +137,12 @@ pub(super) fn load_head(conn: &Connection) -> Result<PersistedHead, AppError> {
             })
         },
     )
-    .map_err(|_| AppError::Internal)
+    .map_err(|error| crate::error::internal("read audit chain head", error))
 }
 
 pub(super) fn verify_head_mac(key: &[u8; 32], head: &PersistedHead) -> Result<u64, AppError> {
-    let sequence = u64::try_from(head.sequence).map_err(|_| AppError::Internal)?;
+    let sequence = u64::try_from(head.sequence)
+        .map_err(|error| crate::error::internal("convert audit head sequence", error))?;
     if head.key_id != KEY_ID
         || head.canonical_version != i64::from(VERSION)
         || head.head_mac != head_mac(key, sequence, &head.head_hash, &head.pending_receipts_root)
@@ -183,7 +186,7 @@ pub fn initialize_head(conn: &Connection, key: &[u8; 32]) -> Result<(), AppError
            AND pending_receipts_root='' AND canonical_version=1",
             params![pending_root, initial_mac],
         )
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("initialize audit chain head", error))?;
     if changed > 1 {
         return Err(AppError::Internal);
     }

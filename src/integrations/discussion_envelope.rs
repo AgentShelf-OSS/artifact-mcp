@@ -1,4 +1,4 @@
-//! Canonical, secret-free PBI-079 discussion operations.
+//! Canonical, secret-free discussion operations.
 //!
 //! A delivery row carries this object and an opaque connection reference, never a Discord URL.
 //! Thread/message identifiers are intentionally resolved from durable discussion state only after
@@ -264,7 +264,12 @@ impl DiscordDiscussionEnvelopeV1 {
     }
 
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, AppError> {
-        serde_json::to_vec(self).map_err(|_| AppError::Internal)
+        serde_json::to_vec(self).map_err(|_error| {
+            crate::error::internal(
+                "serialize discussion envelope",
+                "serialization or rendering failed",
+            )
+        })
     }
 
     pub fn payload_sha256(&self) -> Result<String, AppError> {

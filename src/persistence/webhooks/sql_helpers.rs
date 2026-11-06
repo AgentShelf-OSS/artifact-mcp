@@ -9,13 +9,13 @@ pub(super) fn rows_for_org(conn: &Connection, org: &str) -> Result<Vec<WebhookRo
         .prepare(&format!(
             "SELECT {ROW_COLUMNS} FROM org_webhooks WHERE org = ?1 {ORDER_BY}"
         ))
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("rows for org", error))?;
     let mapped = stmt
         .query_map((org,), WebhookRow::from_row)
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("rows for org", error))?;
     mapped
         .collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(internal)
+        .map_err(|error| crate::error::internal("rows for org", error))
 }
 
 pub(super) fn row_by_id(conn: &Connection, id: &str) -> Result<Option<WebhookRow>, AppError> {
@@ -25,18 +25,18 @@ pub(super) fn row_by_id(conn: &Connection, id: &str) -> Result<Option<WebhookRow
         WebhookRow::from_row,
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("row by id", error))
 }
 
-/// Port of `orgExists(name)` — [lib/orgs.js:53-55].
+/// Port of `orgExists(name)`.
 ///
-/// Queried directly rather than through U09's `persistence::orgs`: `create()` needs the check
+/// Queried directly rather than through `persistence::orgs`: creation needs the check
 /// inside its own connection, and the two modules are owned by concurrent units.
 pub(super) fn org_exists(conn: &Connection, org: &str) -> Result<bool, AppError> {
     conn.query_row("SELECT 1 FROM orgs WHERE name = ?1", (org,), |_| Ok(()))
         .optional()
         .map(|found: Option<()>| found.is_some())
-        .map_err(internal)
+        .map_err(|error| crate::error::internal("org exists", error))
 }
 
 pub(super) fn discussion_anchor_exists(
@@ -51,16 +51,10 @@ pub(super) fn discussion_anchor_exists(
         (org, webhook_id),
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("discussion anchor exists", error))
 }
 
 /// `String(value || "").trim()` — the normalization every Node entry point applies.
 pub(super) fn trimmed(value: &str) -> String {
     value.trim().to_owned()
-}
-
-/// Database faults never leak SQL, row contents, or a URL.
-pub(super) fn internal(error: rusqlite::Error) -> AppError {
-    tracing::error!(error = %error, "webhook persistence query failed");
-    AppError::Internal
 }

@@ -2,7 +2,7 @@ use super::*;
 
 /// The HTML a queued job will render.
 ///
-/// `Deferred` is Node's `typeof job.html === "function"` ([lib/thumbnails.js:218]): the startup
+/// `Deferred` is Node's `typeof job.html === "function"`: the startup
 /// backfill re-reads the body *at execution time* and returns `None` when a concurrent update has
 /// moved the digest on, so a stale body can never overwrite the authoritative thumbnail
 /// ([server.js:138-143]).
@@ -46,7 +46,7 @@ struct QueueState {
     reserved_bytes: u64,
 }
 
-/// Pending job counts — `pending()` [lib/thumbnails.js:235]
+/// Pending job counts — `pending()`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct QueueDepth {
     pub high: usize,
@@ -55,7 +55,7 @@ pub struct QueueDepth {
     pub reserved_bytes: u64,
 }
 
-/// `createThumbnailQueue({ thumbnails })` — [lib/thumbnails.js:207-236]
+/// `createThumbnailQueue({ thumbnails })`
 ///
 /// One serial lane: exactly one render is in flight at a time, which is what the sidecar's
 /// single-render contract requires ([preview-renderer/src/server.rs]). Interactive mutation
@@ -135,7 +135,7 @@ impl ThumbnailQueue {
         self
     }
 
-    /// `pending()` — [lib/thumbnails.js:235]
+    /// `pending()`
     #[must_use]
     pub fn depth(&self) -> QueueDepth {
         let state = self.lock_state();
@@ -147,7 +147,7 @@ impl ThumbnailQueue {
         }
     }
 
-    /// `enqueue(meta, html, { priority })` — [lib/thumbnails.js:228-233]
+    /// `enqueue(meta, html, { priority })`
     ///
     /// The job is registered **before** this returns, so a caller that enqueues `A` then `B`
     /// establishes their relative order regardless of when the returned futures are awaited.
@@ -201,7 +201,7 @@ impl ThumbnailQueue {
             idle
         };
         if start {
-            // `queueMicrotask(drain)` — [lib/thumbnails.js:231]
+            // `queueMicrotask(drain)`
             let lane = Arc::clone(self);
             tokio::spawn(lane.drain());
         }
@@ -261,7 +261,7 @@ impl ThumbnailQueue {
         Box::pin(async move { receive.await.unwrap_or(None) })
     }
 
-    /// `drain()` — [lib/thumbnails.js:212-226]. `high.shift() || low.shift()`.
+    /// `drain()` selects `high.shift()` before `low.shift()`.
     async fn drain(self: Arc<Self>) {
         loop {
             let job = {

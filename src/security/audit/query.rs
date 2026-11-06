@@ -121,7 +121,7 @@ pub(super) fn cursor_for(
         tenant: tenant.to_owned(),
         last_sequence,
     })
-    .map_err(|_| AppError::Internal)?;
+    .map_err(|error| crate::error::internal("encode audit cursor", error))?;
     let payload = URL_SAFE_NO_PAD.encode(payload);
     Ok(format!("{payload}.{}", cursor_mac(key, &payload)))
 }
@@ -160,13 +160,17 @@ fn audit_rows(
     after: u64,
     limit: u64,
 ) -> Result<Vec<AuditRow>, AppError> {
-    let mut statement = conn.prepare("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE tenant=?1 AND sequence>?2 ORDER BY sequence ASC LIMIT ?3").map_err(|_| AppError::Internal)?;
+    let mut statement = conn.prepare("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE tenant=?1 AND sequence>?2 ORDER BY sequence ASC LIMIT ?3").map_err(|error| crate::error::internal("prepare audit page query", error))?;
     statement
         .query_map(
             params![
                 tenant,
-                i64::try_from(after).map_err(|_| AppError::Internal)?,
-                i64::try_from(limit).map_err(|_| AppError::Internal)?
+                i64::try_from(after).map_err(|error| crate::error::internal(
+                    "convert audit cursor sequence",
+                    error
+                ))?,
+                i64::try_from(limit)
+                    .map_err(|error| crate::error::internal("convert audit page limit", error))?
             ],
             |row| {
                 Ok(AuditRow {
@@ -183,9 +187,9 @@ fn audit_rows(
                 })
             },
         )
-        .map_err(|_| AppError::Internal)?
+        .map_err(|error| crate::error::internal("query audit page", error))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| AppError::Internal)
+        .map_err(|error| crate::error::internal("read audit page rows", error))
 }
 
 pub fn query_authorized(
@@ -238,7 +242,8 @@ pub fn export_authorized(
     {
         let line = format!(
             "{}\n",
-            serde_json::to_string(row).map_err(|_| AppError::Internal)?
+            serde_json::to_string(row)
+                .map_err(|error| crate::error::internal("encode audit export row", error))?
         );
         if ndjson.len().saturating_add(line.len()) > AUDIT_EXPORT_MAX_BYTES {
             break;
@@ -274,13 +279,17 @@ pub fn query_tenant(
     limit: u64,
 ) -> Result<Vec<AuditRow>, AppError> {
     let limit = limit.clamp(1, 500);
-    let mut statement = conn.prepare("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE tenant=?1 AND sequence>?2 ORDER BY sequence ASC LIMIT ?3").map_err(|_| AppError::Internal)?;
+    let mut statement = conn.prepare("SELECT sequence,event_id,tenant,operation,target_type,target_id,result,classification,occurred_at,event_hash FROM security_audit_events WHERE tenant=?1 AND sequence>?2 ORDER BY sequence ASC LIMIT ?3").map_err(|error| crate::error::internal("prepare audit export query", error))?;
     statement
         .query_map(
             params![
                 tenant,
-                i64::try_from(after).map_err(|_| AppError::Internal)?,
-                i64::try_from(limit).map_err(|_| AppError::Internal)?
+                i64::try_from(after).map_err(|error| crate::error::internal(
+                    "convert audit export cursor sequence",
+                    error
+                ))?,
+                i64::try_from(limit)
+                    .map_err(|error| crate::error::internal("convert audit export limit", error))?
             ],
             |row| {
                 Ok(AuditRow {
@@ -297,7 +306,7 @@ pub fn query_tenant(
                 })
             },
         )
-        .map_err(|_| AppError::Internal)?
+        .map_err(|error| crate::error::internal("query audit export", error))?
         .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| AppError::Internal)
+        .map_err(|error| crate::error::internal("read audit export rows", error))
 }

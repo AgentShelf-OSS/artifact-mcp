@@ -1,31 +1,17 @@
-//! Owned by U10 (terra) — reaction persistence.
+//! Reaction persistence.
 //!
-//! Port of `lib/reactions.js`: one row per `(email, artifact_id)` holding a viewer's *favorite*
-//! flag and their sentiment *vote*. Both are constrained by the v3 `reaction-integrity` migration
-//! (`favorite IN (0, 1)`, `vote IN (-1, 0, 1)`) and the row is deleted with its artifact by
-//! `FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE`
-//! (`lib/migrations.js:113-137`).
+//! One row per `(email, artifact_id)` holds a viewer's *favorite* flag and their sentiment *vote*. Both are constrained by the v3 `reaction-integrity` migration (`favorite IN (0, 1)`, `vote IN (-1, 0, 1)`) and the row is deleted with its artifact by `FOREIGN KEY (artifact_id) REFERENCES artifacts(id) ON DELETE CASCADE`.
 //!
 //! # Semantics preserved
 //!
-//! * **Absent row reads as neutral.** `lib/reactions.js:21-23` returns `{ favorite: 0, vote: 0 }`
-//!   when no row exists; there is no "unset" state visible to callers.
-//! * **Partial update.** `lib/reactions.js:26-32` reads the current row first and only replaces
-//!   the field(s) supplied, then upserts *both* columns. A missing field keeps its stored value.
-//! * **Upsert, never duplicate.** `ON CONFLICT(email, artifact_id) DO UPDATE` keeps exactly one
-//!   row per viewer per artifact (`lib/reactions.js:7-11`).
-//! * **Vote normalisation.** Node clamps (`vote > 0 ? 1 : vote < 0 ? -1 : 0`) *after* the route
-//!   has already rejected anything outside `{-1, 0, 1}` in `parseReactionInput`
-//!   (`lib/contracts.js:67-70`). Both layers are reproduced here: [`validate`] returns Node's exact
-//!   message and [`normalize_vote`] applies the same clamp, so no unchecked value can reach the
-//!   `CHECK` constraint.
+//! * **Absent row reads as neutral.** The result is `{ favorite: 0, vote: 0 }` when no row exists; there is no "unset" state visible to callers.
+//! * **Partial update.** Read the current row first and only replace the field(s) supplied, then upsert *both* columns. A missing field keeps its stored value.
+//! * **Upsert, never duplicate.** `ON CONFLICT(email, artifact_id) DO UPDATE` keeps exactly one row per viewer per artifact.
+//! * **Vote normalisation.** Node clamps (`vote > 0 ? 1 : vote < 0 ? -1 : 0`) *after* the route has already rejected anything outside `{-1, 0, 1}` in `parseReactionInput`. Both layers are reproduced here: [`validate`] returns Node's exact message and [`normalize_vote`] applies the same clamp, so no unchecked value can reach the `CHECK` constraint.
 //!
 //! # Concurrency note (difference in mechanism, not in behaviour)
 //!
-//! Node's read-modify-write runs on better-sqlite3's single process-wide connection, which
-//! serialises it implicitly. The Rust pool has up to four connections, so [`set`] performs the
-//! same read-then-upsert inside an `IMMEDIATE` transaction. The observable result is identical;
-//! without it two concurrent partial updates could interleave and lose a field.
+//! Node's read-modify-write runs on better-sqlite3's single process-wide connection, which serialises it implicitly. The Rust pool has up to four connections, so [`set`] performs the same read-then-upsert inside an `IMMEDIATE` transaction. The observable result is identical; without it two concurrent partial updates could interleave and lose a field.
 
 use std::collections::BTreeMap;
 
@@ -35,28 +21,24 @@ use crate::error::AppError;
 use crate::model::{ArtifactId, EmailAddress, Reaction, ReactionUpdate, Sentiment};
 use crate::persistence::db::{self, DbPool};
 
-/// Node's rejection message for an out-of-range `favorite` (`lib/contracts.js:62-64`).
+/// Node's rejection message for an out-of-range `favorite`.
 pub const FAVORITE_VALUE_MESSAGE: &str = "favorite must be true, false, 0, or 1.";
 
-/// Node's rejection message for an out-of-range `vote` (`lib/contracts.js:68`).
+/// Node's rejection message for an out-of-range `vote`.
 pub const VOTE_VALUE_MESSAGE: &str = "vote must be -1, 0, or 1.";
 
 /// The only vote values the v3 `CHECK` constraint accepts.
 pub const ALLOWED_VOTES: [i8; 3] = [-1, 0, 1];
 
-/// `lib/reactions.js:6`.
 const GET_SQL: &str = "SELECT favorite, vote FROM reactions WHERE email = ? AND artifact_id = ?";
 
-/// `lib/reactions.js:7-11`.
 const UPSERT_SQL: &str = "\
 INSERT INTO reactions (email, artifact_id, favorite, vote, updated_at)
 VALUES (?, ?, ?, ?, datetime('now'))
 ON CONFLICT(email, artifact_id) DO UPDATE SET favorite = excluded.favorite, vote = excluded.vote, updated_at = datetime('now')";
 
-/// `lib/reactions.js:12`.
 const MINE_SQL: &str = "SELECT artifact_id, favorite, vote FROM reactions WHERE email = ?";
 
-/// `lib/reactions.js:13-19`.
 const SENTIMENT_SQL: &str = "\
 SELECT artifact_id,
        SUM(CASE WHEN vote = 1 THEN 1 ELSE 0 END)  AS up,
@@ -67,7 +49,7 @@ FROM reactions GROUP BY artifact_id";
 /// Rejects an update Node's route would never have accepted.
 ///
 /// `favorite` is already a `bool` in [`ReactionUpdate`], so only `vote` can carry an illegal
-/// value; the message is byte-identical to `lib/contracts.js:68` so the HTTP envelope matches.
+/// value; preserve the validation message byte-for-byte so the HTTP envelope matches.
 ///
 /// # Errors
 /// Returns [`AppError::Validation`] when `vote` is outside `{-1, 0, 1}`.
@@ -80,7 +62,7 @@ pub fn validate(update: &ReactionUpdate) -> Result<(), AppError> {
     }
 }
 
-/// Node's clamp from `lib/reactions.js:29` (`vote > 0 ? 1 : vote < 0 ? -1 : 0`).
+/// Clamp a vote by its sign to -1, 0, or 1.
 #[must_use]
 pub const fn normalize_vote(vote: i8) -> i8 {
     if vote > 0 {
@@ -92,7 +74,7 @@ pub const fn normalize_vote(vote: i8) -> i8 {
     }
 }
 
-/// Node's clamp from `lib/reactions.js:28` (`favorite ? 1 : 0`).
+/// Normalize a favorite flag to 0 or 1.
 #[must_use]
 pub const fn normalize_favorite(favorite: bool) -> i8 {
     if favorite { 1 } else { 0 }
@@ -115,13 +97,13 @@ pub fn get(
             })
         })
         .optional()
-        .map_err(|error| internal("read reaction", &error))?;
+        .map_err(|error| crate::error::internal("read reaction", error))?;
     Ok(stored.unwrap_or_default())
 }
 
 /// Applies a partial reaction update and returns the stored result.
 ///
-/// Fields left as `None` keep their current value, exactly as `lib/reactions.js:26-32` does.
+/// Fields left as `None` keep their current value.
 ///
 /// # Errors
 /// Returns [`AppError::Validation`] for an out-of-range vote, or [`AppError::Internal`] if the
@@ -137,7 +119,7 @@ pub fn set(
 
     let tx = conn
         .transaction_with_behavior(TransactionBehavior::Immediate)
-        .map_err(|error| internal("begin reaction transaction", &error))?;
+        .map_err(|error| crate::error::internal("begin reaction transaction", error))?;
 
     let current = get(&tx, email, artifact_id)?;
     let next = Reaction {
@@ -148,16 +130,16 @@ pub fn set(
         UPSERT_SQL,
         (&email.0, &artifact_id.0, next.favorite, next.vote),
     )
-    .map_err(|error| internal("upsert reaction", &error))?;
+    .map_err(|error| crate::error::internal("upsert reaction", error))?;
     tx.commit()
-        .map_err(|error| internal("commit reaction", &error))?;
+        .map_err(|error| crate::error::internal("commit reaction", error))?;
 
     Ok(next)
 }
 
 /// Every reaction a single viewer has recorded, keyed by artifact.
 ///
-/// Node builds a `Map` in row order (`lib/reactions.js:35-39`); only keyed lookup is observable,
+/// Node builds a `Map` in row order; only keyed lookup is observable,
 /// so the frozen `BTreeMap` return type loses nothing.
 ///
 /// # Errors
@@ -168,7 +150,7 @@ pub fn for_viewer(
 ) -> Result<BTreeMap<ArtifactId, Reaction>, AppError> {
     let mut stmt = conn
         .prepare(MINE_SQL)
-        .map_err(|error| internal("prepare viewer reactions", &error))?;
+        .map_err(|error| crate::error::internal("prepare viewer reactions", error))?;
     let rows = stmt
         .query_map((&email.0,), |row| {
             Ok((
@@ -179,24 +161,25 @@ pub fn for_viewer(
                 },
             ))
         })
-        .map_err(|error| internal("query viewer reactions", &error))?;
+        .map_err(|error| crate::error::internal("query viewer reactions", error))?;
 
     let mut map = BTreeMap::new();
     for row in rows {
-        let (id, reaction) = row.map_err(|error| internal("read viewer reaction", &error))?;
+        let (id, reaction) =
+            row.map_err(|error| crate::error::internal("read viewer reaction", error))?;
         map.insert(id, reaction);
     }
     Ok(map)
 }
 
-/// Aggregate sentiment across every viewer (`lib/reactions.js:42-46`).
+/// Aggregate sentiment across every viewer.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the query fails.
 pub fn sentiment(conn: &Connection) -> Result<BTreeMap<ArtifactId, Sentiment>, AppError> {
     let mut stmt = conn
         .prepare(SENTIMENT_SQL)
-        .map_err(|error| internal("prepare sentiment", &error))?;
+        .map_err(|error| crate::error::internal("prepare sentiment", error))?;
     let rows = stmt
         .query_map([], |row| {
             Ok((
@@ -208,11 +191,12 @@ pub fn sentiment(conn: &Connection) -> Result<BTreeMap<ArtifactId, Sentiment>, A
                 },
             ))
         })
-        .map_err(|error| internal("query sentiment", &error))?;
+        .map_err(|error| crate::error::internal("query sentiment", error))?;
 
     let mut map = BTreeMap::new();
     for row in rows {
-        let (id, aggregate) = row.map_err(|error| internal("read sentiment", &error))?;
+        let (id, aggregate) =
+            row.map_err(|error| crate::error::internal("read sentiment", error))?;
         map.insert(id, aggregate);
     }
     Ok(map)
@@ -267,13 +251,6 @@ pub async fn sentiment_pooled(pool: &DbPool) -> Result<BTreeMap<ArtifactId, Sent
 /// negative value would mean a hand-corrupted row — reported as zero rather than a panic.
 const fn counter(value: i64) -> u64 {
     if value < 0 { 0 } else { value.unsigned_abs() }
-}
-
-/// SQL faults are logged and reported without leaking driver detail (`AppError::Internal` is
-/// rendered as exactly `internal error`).
-fn internal(operation: &str, error: &rusqlite::Error) -> AppError {
-    tracing::error!(operation, error = %error, "reaction persistence failed");
-    AppError::Internal
 }
 
 #[cfg(test)]

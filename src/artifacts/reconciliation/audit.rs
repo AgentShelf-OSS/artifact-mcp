@@ -17,7 +17,7 @@ use super::intents::{
 };
 use super::support::{BodyRow, into_error, load_body_rows, ranked_entries, staging_marker};
 
-/// `auditStorage({ cleanTransient })` — [lib/store.js:675-744]
+/// `auditStorage({ cleanTransient })`
 ///
 /// With `clean_transient = false` nothing is written: transient paths are listed and divergence is
 /// reported. With `true` (startup) the recoverable states above are repaired.
@@ -53,7 +53,7 @@ pub fn audit_storage(
     let expected: BTreeSet<String> = rows.iter().map(BodyRow::expected_name).collect();
 
     for name in ranked_entries(artifact_dir)? {
-        // The version-history store is not an orphan body. [lib/store.js:693]
+        // The version-history store is not an orphan body.
         if name == paths::HISTORY_DIR_NAME {
             continue;
         }
@@ -72,7 +72,7 @@ pub fn audit_storage(
     }
 
     // Both lists are computed AFTER recovery, so a body that was just reinstated is not reported
-    // as missing. [lib/store.js:734-742]
+    // as missing.
     for row in &rows {
         match row.body_path(artifact_dir) {
             Some(path) if path_exists(&path) => {
@@ -99,7 +99,7 @@ pub fn audit_storage(
 
     Ok(report)
 }
-/// The `cleanTransient` branch for one transient directory entry. [lib/store.js:695-716]
+/// The `cleanTransient` branch for one transient directory entry.
 fn reconcile_transient(
     conn: &Connection,
     artifact_dir: &Path,
@@ -113,7 +113,6 @@ fn reconcile_transient(
         .and_then(|id| rows.iter().find(|row| row.id == id.as_str()));
 
     // No live record owns this path, or its id cannot address one: unreferenced scratch.
-    // [lib/store.js:713-715]
     let Some(final_path) = owner.and_then(|row| row.body_path(artifact_dir)) else {
         if transient_is_recovery_evidence(conn, artifact_dir, name)? {
             return Ok(());
@@ -134,7 +133,6 @@ fn reconcile_transient(
     if !path_exists(&final_path) {
         // The interrupted body belongs at the (now-empty) final path. This covers an interrupted
         // publish, an interrupted update swap, and an interrupted delete whose row survived.
-        // [lib/store.js:701-704]
         // A truncated/corrupt transient is evidence, not a replacement for the committed body.
         if !transient_matches {
             return Ok(());
@@ -157,13 +155,12 @@ fn reconcile_transient(
             // The staged body is not the content named by committed metadata. Preserve both
             // paths; transient_paths already names staging, and the post-recovery scan reports
             // the installed body as divergent without destroying either copy.
-            // [lib/store.js:705-710]
             return Ok(());
         }
         // A staged body survived AND the installed body does not match the committed metadata
         // digest: the process crashed after committing the new revision but before swapping the
         // body in. Preserve the outgoing revision before installing the committed replacement,
-        // exactly as the uninterrupted update path does. [lib/store.js:705-714]
+        // exactly as the uninterrupted update path does.
         faults
             .check(FaultPoint::ReconcileRecover)
             .map_err(into_error)?;
@@ -238,7 +235,6 @@ fn preserve_outgoing_body(
 
 /// Reclaim history for artifacts that no longer exist (e.g. a crash between the row delete and
 /// `removeHistory`). The revision rows already cascade-deleted; this removes their bodies.
-/// [lib/store.js:722-733]
 fn reclaim_orphan_history(
     artifact_dir: &Path,
     rows: &[BodyRow],

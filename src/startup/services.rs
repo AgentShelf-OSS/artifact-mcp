@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use crate::{
     adapters::{
-        ProductionAdmin, ProductionDiscussions, ProductionEngagement, ProductionHealth,
-        ProductionShares,
+        ProductionAdmin, ProductionCollections, ProductionDiscussions, ProductionEngagement,
+        ProductionHealth, ProductionShares,
     },
     config::{AppConfig, IdSource, SystemClock},
     error::AppError,
@@ -15,8 +15,8 @@ use crate::{
         viewer_state_service::SqliteViewerState,
     },
     ports::{
-        AdminService, DiscussionService, EngagementService, HealthProbe, ShareService,
-        state::ViewerStateService,
+        AdminService, CollectionService, DiscussionService, EngagementService, HealthProbe,
+        ShareService, state::ViewerStateService,
     },
     security::audit::{AuditAccess, parse_hmac_key},
 };
@@ -26,6 +26,7 @@ use super::workers::IntegrationStores;
 /// Port adapters the router receives through `AppDeps`.
 pub struct PortServices {
     pub admin: Arc<dyn AdminService>,
+    pub collections: Arc<dyn CollectionService>,
     pub discussions: Arc<dyn DiscussionService>,
     pub engagement: Arc<dyn EngagementService>,
     pub shares: Arc<dyn ShareService>,
@@ -89,9 +90,11 @@ pub fn port_services(
         .as_ref()
         .map(|encoded| parse_hmac_key(encoded.expose()))
         .transpose()?
-        .map(|key| Arc::new(AuditAccess::new(pool, key)));
+        .map(|key| Arc::new(AuditAccess::new(pool.clone(), key)));
+    let collections = Arc::new(ProductionCollections::new(pool, audit_access.as_deref()));
     Ok(PortServices {
         admin,
+        collections,
         discussions,
         engagement,
         shares,

@@ -7,14 +7,13 @@ use super::*;
 // ---------------------------------------------------------------------------
 
 /// `files.existsSync(target)` — `stat`, so a broken symlink counts as absent.
-/// [lib/store.js:186]
 #[must_use]
 pub(crate) fn path_exists(target: &Path) -> bool {
     std::fs::metadata(target).is_ok()
 }
 
 /// `safeRemove(files, target)` = `rmSync(target, { recursive: true, force: true })` inside a
-/// swallowing `try`. [lib/store.js:71-75]
+/// swallowing `try`.
 pub(crate) fn safe_remove(target: &Path) {
     // Cleanup remains best-effort, but a successful cleanup gets a durable parent barrier.
     let _ = durable::remove(target);
@@ -25,7 +24,7 @@ pub(crate) fn rename(from: &Path, to: &Path) -> Result<(), AppError> {
     durable::rename(from, to)
 }
 
-/// `files.cpSync(src, dest, { recursive: true })` — [lib/store.js:559]
+/// `files.cpSync(src, dest, { recursive: true })`
 pub(crate) fn copy_recursive(source: &Path, destination: &Path) -> std::io::Result<()> {
     if std::fs::metadata(source)?.is_dir() {
         std::fs::create_dir_all(destination)?;

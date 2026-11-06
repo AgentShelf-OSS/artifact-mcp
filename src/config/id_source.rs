@@ -16,25 +16,25 @@ use super::{
 
 /// Injected identifier factory covering every generated id shape in the system.
 pub trait IdSource: Send + Sync + fmt::Debug {
-    /// A new 12-character artifact id. [lib/store.js:30]
+    /// A new 12-character artifact id.
     ///
     /// # Errors
     /// Propagates a [`RandomSource`] failure as [`AppError::Internal`].
     fn artifact_id(&self) -> Result<ArtifactId, AppError>;
 
-    /// A new 24-character public share token. [lib/shares.js:6]
+    /// A new 24-character public share token.
     ///
     /// # Errors
     /// Propagates a [`RandomSource`] failure as [`AppError::Internal`].
     fn share_token(&self) -> Result<ShareToken, AppError>;
 
-    /// A new 16-character feedback id. [lib/feedback.js:10]
+    /// A new 16-character feedback id.
     ///
     /// # Errors
     /// Propagates a [`RandomSource`] failure as [`AppError::Internal`].
     fn feedback_id(&self) -> Result<FeedbackId, AppError>;
 
-    /// A new 12-character webhook id. [lib/webhooks.js:11]
+    /// A new 12-character webhook id.
     ///
     /// # Errors
     /// Propagates a [`RandomSource`] failure as [`AppError::Internal`].
@@ -56,8 +56,8 @@ pub fn generate_id(
         return Err(AppError::Internal);
     }
     // nanoid derives its mask from the next power of two, then rejects out-of-range draws.
-    let mask =
-        u8::try_from(symbols.len().next_power_of_two() - 1).map_err(|_| AppError::Internal)?;
+    let mask = u8::try_from(symbols.len().next_power_of_two() - 1)
+        .map_err(|error| crate::error::internal("convert identifier mask", error))?;
     let mut out = String::with_capacity(length);
     let mut buffer = [0_u8; 64];
     while out.len() < length {
@@ -151,16 +151,20 @@ impl SequentialIdSource {
         let mut index = length;
         while index > 0 {
             index -= 1;
-            let symbol = *symbols
-                .get(usize::try_from(value % radix).map_err(|_| AppError::Internal)?)
-                .ok_or(AppError::Internal)?;
+            let symbol =
+                *symbols
+                    .get(usize::try_from(value % radix).map_err(|error| {
+                        crate::error::internal("convert identifier index", error)
+                    })?)
+                    .ok_or(AppError::Internal)?;
             digits[index] = symbol;
             value /= radix;
             if value == 0 {
                 break;
             }
         }
-        String::from_utf8(digits).map_err(|_| AppError::Internal)
+        String::from_utf8(digits)
+            .map_err(|error| crate::error::internal("encode identifier digits", error))
     }
 }
 

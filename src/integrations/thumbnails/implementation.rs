@@ -1,10 +1,10 @@
-//! Owned by U16 (terra) — PNG validation, cache, persistence, and serial priority queue.
+//! PNG validation, cache, persistence, and serial priority queue.
 //!
-//! Digest-addressed thumbnails at `/data/previews/<id>/<body_sha256>.png` (U07's
-//! [`crate::artifacts::paths::thumbnail_path`]). **Only validated server-owned artifact ids and
-//! SHA-256 digests ever reach a path segment**: every constructor here takes U07's
+//! Digest-addressed thumbnails use `/data/previews/<id>/<body_sha256>.png` through
+//! [`crate::artifacts::paths::thumbnail_path`]. **Only validated server-owned artifact ids and
+//! SHA-256 digests ever reach a path segment**: every constructor here takes an
 //! [`SafeArtifactId`]/[`BodyDigest`] newtypes, which are the Rust form of Node's
-//! `/^[0-9a-z]{6,24}$/` and `/^[a-f0-9]{64}$/` guards ([lib/thumbnails.js:19-33]).
+//! `/^[0-9a-z]{6,24}$/` and `/^[a-f0-9]{64}$/` guards.
 //!
 //! # Optional by design (blueprint risk #11)
 //!
@@ -19,28 +19,28 @@
 //! * a disabled renderer short-circuits to `None` before any network or filesystem work.
 //!
 //! This mirrors Node, where `createArtifactPreviewNotifier` delivers the notification with an
-//! `undefined`/`null` preview rather than propagating ([lib/preview.js:153-189]) and the startup
+//! `undefined`/`null` preview rather than propagating and the startup
 //! audit is wrapped in a bare `try/catch` ([server.js:112-122]).
 //!
-//! # Node oracle, function by function
+//! # Compatibility behavior, function by function
 //!
 //! | Rust | Node |
 //! |---|---|
-//! | [`valid_png`] | `validPng(value, maxBytes)` — [lib/thumbnails.js:35-38] |
-//! | [`thumbnail_placeholder`] | `thumbnailPlaceholder(meta, accent)` — [lib/thumbnails.js:52-63] |
-//! | [`safe_color`] | `safeColor(value, org)` — [lib/thumbnails.js:40-50] |
-//! | [`ThumbnailStore::read_thumbnail`] | `readThumbnail(meta, requestedDigest)` — [lib/thumbnails.js:90-100] |
-//! | [`ThumbnailStore::ensure_thumbnail`] | `ensureThumbnail(meta, html)` — [lib/thumbnails.js:142-151] |
-//! | `ThumbnailStore::generate` (private) | `generate(meta, html)` — [lib/thumbnails.js:112-140] |
-//! | [`ThumbnailStore::cleanup_obsolete`] | `cleanupObsolete(id, keepDigest)` — [lib/thumbnails.js:102-110] |
-//! | [`ThumbnailStore::remove_artifact`] | `removeArtifact(id)` — [lib/thumbnails.js:153-156] |
-//! | [`ThumbnailStore::audit`] | `audit(artifacts)` — [lib/thumbnails.js:158-193] |
-//! | [`ThumbnailQueue`] | `createThumbnailQueue({thumbnails})` — [lib/thumbnails.js:207-236] |
+//! | [`valid_png`] | `validPng(value, maxBytes)` — |
+//! | [`thumbnail_placeholder`] | `thumbnailPlaceholder(meta, accent)` — |
+//! | [`safe_color`] | `safeColor(value, org)` — |
+//! | [`ThumbnailStore::read_thumbnail`] | `readThumbnail(meta, requestedDigest)` — |
+//! | [`ThumbnailStore::ensure_thumbnail`] | `ensureThumbnail(meta, html)` — |
+//! | `ThumbnailStore::generate` (private) | `generate(meta, html)` — |
+//! | [`ThumbnailStore::cleanup_obsolete`] | `cleanupObsolete(id, keepDigest)` — |
+//! | [`ThumbnailStore::remove_artifact`] | `removeArtifact(id)` — |
+//! | [`ThumbnailStore::audit`] | `audit(artifacts)` — |
+//! | [`ThumbnailQueue`] | `createThumbnailQueue({thumbnails})` — |
 //!
 //! # Atomicity
 //!
 //! A thumbnail is written to `.<digest>.<random>.tmp` inside the artifact's preview directory
-//! with `O_EXCL` (Node's `{ flag: "wx" }`, [lib/thumbnails.js:131]) and then `rename`d over the
+//! with `O_EXCL` (exclusive creation with `{ flag: "wx" }`) and then `rename`d over the
 //! final name. Same-directory rename is atomic on POSIX, so a reader either sees no file or a
 //! complete one — never a truncated PNG. A failure at any step removes the temp file and reports
 //! `None`; the startup [`ThumbnailStore::audit`] sweeps anything a crash left behind.
@@ -50,15 +50,15 @@
 //! The sidecar renders one page at a time and answers `503 {"error":"renderer busy"}` to anything
 //! concurrent ([preview-renderer/src/server.rs]). [`ThumbnailQueue`] is the single lane that
 //! keeps the client inside that contract, with interactive (`High`) jobs always selected before
-//! startup backfill (`Low`) — [lib/thumbnails.js:216-217].
+//! startup backfill (`Low`).
 //!
 //! # Notes for the units that consume this
 //!
-//! * **U17** needs only the frozen port: [`PreviewService::read_thumbnail`] for `/thumbnails/:id`
-//!   and [`PreviewService::placeholder`] for the SVG fallback ([lib/app.js:176-196]).
-//! * **U20** owns startup. Two things are not reachable through the port and need the concrete
+//! * The HTTP layer needs only the preview port: [`PreviewService::read_thumbnail`] for `/thumbnails/:id`
+//!   and [`PreviewService::placeholder`] for the SVG fallback.
+//! * Startup owns the audit lifecycle. Two things are not reachable through the port and need the concrete
 //!   types: the audit needs an implementation of [`PreviewArtifactIndex`] over the artifact store
-//!   (Node passes `artifactStore`, whose `getArtifactMeta` the audit calls —
+//!   (Node passes `artifactStore`, whose `getArtifactMeta` the audit calls
 //!   [server.js:113]), and the low-priority backfill needs
 //!   [`ThumbnailQueue::enqueue`] with [`PreviewHtml::Deferred`], because the port's `html: &str`
 //!   cannot express Node's "re-read the body when the job runs, and skip it if the digest moved"
@@ -83,7 +83,7 @@ use crate::artifacts::{
 };
 use crate::config::{AppConfig, OsRandom, RandomSource};
 use crate::error::AppError;
-use crate::http::ingress::RenderQueuePressure;
+use crate::model::rendering::RenderQueuePressure;
 use crate::model::{ArtifactId, ArtifactMeta};
 use crate::ports::integrations::{PreviewPriority, PreviewService};
 use crate::ports::{ArtifactService, BoxFuture};
@@ -99,16 +99,16 @@ mod service;
 pub use queue::*;
 pub use service::*;
 
-/// `Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])` — [lib/thumbnails.js:16]
+/// `Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])`
 pub const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
 
-/// `export const DEFAULT_MAX_PNG_BYTES = 7_500_000` — [lib/thumbnails.js:17]
+/// `export const DEFAULT_MAX_PNG_BYTES = 7_500_000`
 pub const DEFAULT_MAX_PNG_BYTES: u64 = 7_500_000;
 
-/// Bytes of randomness in a temporary thumbnail name — `randomBytes(8)`. [lib/thumbnails.js:128]
+/// Bytes of randomness in a temporary thumbnail name — `randomBytes(8)`.
 const TEMP_TOKEN_BYTES: usize = 8;
 
-/// `validPng(value, maxBytes)` — [lib/thumbnails.js:35-38]
+/// `validPng(value, maxBytes)`
 ///
 /// Signature *and* both length bounds, in that order: at least the 8 signature bytes, at most
 /// `max_bytes`, and the exact PNG magic. An empty buffer, a JSON error page the sidecar mislabels
@@ -119,7 +119,7 @@ pub fn valid_png(value: &[u8], max_bytes: u64) -> bool {
     length >= PNG_SIGNATURE.len() as u64 && length <= max_bytes && value.starts_with(&PNG_SIGNATURE)
 }
 
-/// `safeColor(value, org)` — [lib/thumbnails.js:40-50]
+/// `safeColor(value, org)`
 ///
 /// An explicit `#rgb`/`#rrggbb` accent is honoured (three-digit form expanded); anything else
 /// derives a stable hue from the org name with FNV-1a.
@@ -132,7 +132,7 @@ pub fn valid_png(value: &[u8], max_bytes: u64) -> bool {
 /// 2. `for (const char of org)` iterates **code points**, but `char.charCodeAt(0)` then reads
 ///    only the **first UTF-16 code unit** of each one. For an astral character the trailing
 ///    surrogate is silently dropped: `"🎉"` contributes `0xD83C` alone. Iterating
-///    `str::encode_utf16` instead would feed both surrogates in and produce a different hue —
+///    `str::encode_utf16` instead would feed both surrogates in and produce a different hue
 ///    frozen from the retired Node runtime in
 ///    `tests/native/u16_thumbnails.rs` (`the_placeholder_matches_the_frozen_node_bytes`).
 #[must_use]
@@ -164,7 +164,7 @@ pub fn safe_color(accent: Option<&str>, org: &str) -> String {
     format!("hsl({} 68% 44%)", hash % 360)
 }
 
-/// `thumbnailPlaceholder(meta, accent)` — [lib/thumbnails.js:52-63]
+/// `thumbnailPlaceholder(meta, accent)`
 ///
 /// The SVG served whenever no PNG exists: renderer disabled, render still queued, or a bundle
 /// (which is never rendered). Byte-identical to Node's template literal, newlines included; the
@@ -201,9 +201,9 @@ pub struct PreviewArtifactRef {
     pub body_sha256: String,
 }
 
-/// `artifacts.getArtifactMeta(entry.name)` — [lib/thumbnails.js:165]
+/// `artifacts.getArtifactMeta(entry.name)`
 ///
-/// A read-only lookup seam so the audit does not depend on the artifact store. U08/U20 pass the
+/// A read-only lookup seam so the audit does not depend on the artifact store. Production passes the
 /// real store at startup; tests pass a map.
 pub trait PreviewArtifactIndex: Send + Sync {
     /// Current metadata for `id`, or `None` when no such artifact exists.
@@ -216,7 +216,7 @@ impl PreviewArtifactIndex for HashMap<String, PreviewArtifactRef> {
     }
 }
 
-/// `{ orphanDirs, partialFiles, invalidFiles }` — [lib/thumbnails.js:159]
+/// Audit counts for orphan directories, partial files, and invalid files.
 ///
 /// Every listed path has already been removed. Entries are sorted, unlike Node's raw `readdir`
 /// order, so the report is reproducible; the removals themselves are identical.
@@ -248,7 +248,7 @@ impl PreviewAuditReport {
 /// One in-flight `ensureThumbnail` shared by every caller of the same `<id>:<digest>` key.
 type PendingThumbnail = Arc<OnceCell<Option<Vec<u8>>>>;
 
-/// Digest-addressed thumbnail persistence. `createThumbnailStore({…})` — [lib/thumbnails.js:65-204]
+/// Digest-addressed thumbnail persistence. `createThumbnailStore({…})`
 #[derive(Debug)]
 pub struct ThumbnailStore {
     data_dir: PathBuf,
@@ -276,7 +276,7 @@ impl ThumbnailStore {
     }
 
     /// Construct from validated configuration — `DATA_DIR` and `PREVIEW_MAX_PNG_BYTES`.
-    /// [lib/thumbnails.js:66-72]
+    ///
     #[must_use]
     pub fn from_config(config: &AppConfig, renderer: Arc<PreviewRenderer>) -> Self {
         Self::new(
@@ -293,25 +293,25 @@ impl ThumbnailStore {
         self
     }
 
-    /// `enabled: !!renderer?.enabled` — [lib/thumbnails.js:196]
+    /// `enabled: !!renderer?.enabled`
     #[must_use]
     pub fn enabled(&self) -> bool {
         self.renderer.enabled()
     }
 
-    /// `maxPngBytes: maxBytes` — [lib/thumbnails.js:197]
+    /// `maxPngBytes: maxBytes`
     #[must_use]
     pub const fn max_png_bytes(&self) -> u64 {
         self.max_png_bytes
     }
 
-    /// `path.join(dataDir, "previews")` — [lib/thumbnails.js:71]
+    /// `path.join(dataDir, "previews")`
     #[must_use]
     pub fn preview_dir(&self) -> PathBuf {
         preview_dir(&self.data_dir)
     }
 
-    /// `readThumbnail(meta, requestedDigest)` — [lib/thumbnails.js:90-100]
+    /// `readThumbnail(meta, requestedDigest)`
     ///
     /// Serves only the *current* revision's digest: a stale `?v=` must fall through to the
     /// placeholder rather than reveal an older render. Bundles never have a thumbnail. A file
@@ -373,7 +373,7 @@ impl ThumbnailStore {
         None
     }
 
-    /// `ensureThumbnail(meta, html)` — [lib/thumbnails.js:142-151]
+    /// `ensureThumbnail(meta, html)`
     ///
     /// Returns the existing thumbnail, renders and persists a new one, or returns `None`. All
     /// concurrent callers for the same `<id>:<digest>` share one render and one write; unlike the
@@ -387,7 +387,7 @@ impl ThumbnailStore {
         meta: &ArtifactMeta,
         html: Option<&str>,
     ) -> Option<Vec<u8>> {
-        // `!validArtifactId(meta.id) || !validDigest(meta.body_sha256)` — [lib/thumbnails.js:143]
+        // `!validArtifactId(meta.id) || !validDigest(meta.body_sha256)`
         if meta.is_bundle {
             return None;
         }
@@ -400,12 +400,12 @@ impl ThumbnailStore {
             .get_or_init(|| self.generate(meta, &id, &digest, html))
             .await
             .clone();
-        // `.finally(() => inflight.delete(key))` — [lib/thumbnails.js:148]
+        // `.finally(() => inflight.delete(key))`
         self.release_slot(&key, &slot);
         generated
     }
 
-    /// `generate(meta, html)` — [lib/thumbnails.js:112-140]
+    /// `generate(meta, html)`
     async fn generate(
         &self,
         meta: &ArtifactMeta,
@@ -416,7 +416,7 @@ impl ThumbnailStore {
         if let Some(existing) = self.read_thumbnail(meta, &meta.body_sha256).await {
             return Some(existing);
         }
-        // `!renderer?.enabled || typeof html !== "string"` — [lib/thumbnails.js:115]
+        // `!renderer?.enabled || typeof html !== "string"`
         if !self.renderer.enabled() {
             return None;
         }
@@ -437,7 +437,7 @@ impl ThumbnailStore {
         }
     }
 
-    /// The temp-write, rename and obsolete sweep of `generate` — [lib/thumbnails.js:125-139]
+    /// The temp-write, rename and obsolete sweep of `generate`
     ///
     /// `false` means the bytes are not on disk; the caller reports no thumbnail rather than
     /// handing back a PNG a later read would not find.
@@ -451,13 +451,13 @@ impl ThumbnailStore {
             );
             return false;
         };
-        // `.${digest}.${randomBytes(8).toString("hex")}.tmp` — [lib/thumbnails.js:128]
+        // `.${digest}.${randomBytes(8).toString("hex")}.tmp`
         let temporary = dir.join(format!(".{}.{token}.tmp", digest.as_str()));
 
         let written = blocking(move || {
             let outcome = write_then_rename(&dir, &temporary, &target, &png);
             if let Err(error) = outcome {
-                // `await removePath(temporary)` — [lib/thumbnails.js:136]
+                // `await removePath(temporary)`
                 remove_file_quietly(&temporary);
                 return Err(error.to_string());
             }
@@ -472,7 +472,7 @@ impl ThumbnailStore {
             }
             Some(Err(error)) => {
                 // `logger.warn?.(…thumbnail persistence failed for ${meta.id}…)`
-                // — [lib/thumbnails.js:137]
+                //
                 tracing::warn!(
                     artifact = id.as_str(),
                     error = %error,
@@ -484,7 +484,7 @@ impl ThumbnailStore {
         }
     }
 
-    /// `cleanupObsolete(id, keepDigest)` — [lib/thumbnails.js:102-110]
+    /// `cleanupObsolete(id, keepDigest)`
     ///
     /// Everything in the artifact's preview directory except the current `<digest>.png` — older
     /// revisions and interrupted `.tmp` files alike.
@@ -504,7 +504,7 @@ impl ThumbnailStore {
         .await;
     }
 
-    /// `removeArtifact(id)` — [lib/thumbnails.js:153-156]
+    /// `removeArtifact(id)`
     ///
     /// Best effort by construction: a delete that cannot clean previews still succeeds.
     pub async fn remove_artifact(&self, id: &ArtifactId) {
@@ -515,7 +515,7 @@ impl ThumbnailStore {
         blocking(move || remove_any_quietly(&dir)).await;
     }
 
-    /// `audit(artifacts)` — [lib/thumbnails.js:158-193]
+    /// `audit(artifacts)`
     ///
     /// Startup sweep of `/data/previews`: removes directories with no artifact, files that are
     /// not the artifact's current `<digest>.png` (crash-interrupted temporaries included), and
@@ -575,14 +575,14 @@ impl ThumbnailStore {
         report
     }
 
-    /// `thumbnailPath(meta.id, digest)` — [lib/thumbnails.js:80-84], via U07's path builder.
+    /// Build the digest-addressed thumbnail path from the artifact ID and digest.
     fn thumbnail_path(&self, meta: &ArtifactMeta) -> Option<PathBuf> {
         let id = SafeArtifactId::parse(&meta.id.0)?;
         let digest = BodyDigest::parse(&meta.body_sha256)?;
         Some(thumbnail_path(&self.data_dir, &id, &digest))
     }
 
-    /// `randomBytes(8).toString("hex")` — [lib/thumbnails.js:128]
+    /// `randomBytes(8).toString("hex")`
     fn temp_token(&self) -> Option<String> {
         let mut bytes = [0_u8; TEMP_TOKEN_BYTES];
         self.random.fill_bytes(&mut bytes).ok()?;
@@ -593,7 +593,7 @@ impl ThumbnailStore {
         Some(token)
     }
 
-    /// `inflight.has(key) ? inflight.get(key) : …` — [lib/thumbnails.js:147-150]
+    /// `inflight.has(key) ? inflight.get(key) : …`
     fn pending_slot(&self, key: &str) -> PendingThumbnail {
         let mut inflight = self.lock_inflight();
         if let Some(existing) = inflight.get(key) {
@@ -604,7 +604,7 @@ impl ThumbnailStore {
         slot
     }
 
-    /// `.finally(() => inflight.delete(key))` — [lib/thumbnails.js:148]. Pointer-checked so a
+    /// Remove the pending entry only when it still points to this request, so a
     /// later caller's slot survives an earlier caller's cleanup.
     fn release_slot(&self, key: &str, slot: &PendingThumbnail) {
         let mut inflight = self.lock_inflight();
@@ -640,7 +640,6 @@ where
 }
 
 /// `mkdir(dir, {recursive}) → writeFile(temp, png, {flag:"wx"}) → rename(temp, target)`
-/// — [lib/thumbnails.js:130-132]
 ///
 /// `create_new` is Node's `wx`: it fails rather than overwriting a concurrent writer's temp file.
 /// The data is flushed before the rename so the swap publishes complete bytes.
@@ -661,12 +660,12 @@ fn write_then_rename(
     std::fs::rename(temporary, target)
 }
 
-/// `rm(target, { force: true })` — [lib/thumbnails.js:86-88]
+/// `rm(target, { force: true })`
 fn remove_file_quietly(target: &Path) {
     let _ = std::fs::remove_file(target);
 }
 
-/// `rm(target, { force: true, recursive: true })` — [lib/thumbnails.js:107], [lib/thumbnails.js:155]
+/// Remove a path recursively when it exists.
 fn remove_any_quietly(target: &Path) {
     if std::fs::remove_file(target).is_ok() {
         return;
@@ -692,7 +691,7 @@ async fn read_dir_names(dir: &Path) -> Vec<String> {
     .unwrap_or_default()
 }
 
-/// `entry.isDirectory()` — [lib/thumbnails.js:167]
+/// `entry.isDirectory()`
 async fn is_directory(path: &Path) -> bool {
     let path = path.to_path_buf();
     blocking(move || std::fs::metadata(&path).is_ok_and(|meta| meta.is_dir()))
@@ -700,7 +699,7 @@ async fn is_directory(path: &Path) -> bool {
         .unwrap_or(false)
 }
 
-/// `file.isFile()` — [lib/thumbnails.js:175]
+/// `file.isFile()`
 async fn is_file(path: &Path) -> bool {
     let path = path.to_path_buf();
     blocking(move || std::fs::metadata(&path).is_ok_and(|meta| meta.is_file()))

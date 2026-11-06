@@ -4,6 +4,7 @@ use std::{future::Future, pin::Pin};
 
 pub mod admin;
 pub mod artifacts;
+pub mod collections;
 pub mod data;
 pub mod discussions;
 pub mod engagement;
@@ -14,6 +15,7 @@ pub mod state;
 
 pub use admin::AdminService;
 pub use artifacts::ArtifactService;
+pub use collections::CollectionService;
 pub use data::DataService;
 pub use discussions::{
     ArtifactDiscussionOverrideView, ArtifactDiscussionView, DiscussionConnectionView,

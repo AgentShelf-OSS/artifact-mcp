@@ -18,7 +18,7 @@ use super::validation::{
 // Synchronous operations
 // ---------------------------------------------------------------------------
 
-/// `listKeys()` — [lib/keys.js:9-11], [lib/keys.js:21-23]
+/// List publisher keys.
 ///
 /// Active keys first, then by org, then by client id — the order the Settings page renders.
 ///
@@ -48,7 +48,7 @@ pub fn list_keys(conn: &Connection) -> Result<Vec<PublisherKeySummary>, AppError
         .map_err(|error| database_failure("list keys", &error))
 }
 
-/// `createKey({ clientId, org, label })` — [lib/keys.js:25-41]
+/// `createKey({ clientId, org, label })`
 ///
 /// The generated secret is returned once and never stored; `api_keys.key_hash` holds
 /// [`key_hash`] alone.
@@ -65,7 +65,7 @@ pub fn create_key(
     let org = js_trim(&request.org.0).to_owned();
     let label = truncate_utf16(js_trim(&request.label), KEY_LABEL_MAX_LENGTH);
     let role = match js_trim(&request.role) {
-        "" => "author".to_owned(),
+        "" => crate::model::Role::Author.as_str().to_owned(),
         value => value.to_owned(),
     };
     let owner_email = normalize_verified_owner(conn, request.owner_email.as_deref(), &org)?;
@@ -75,9 +75,14 @@ pub fn create_key(
     if !is_valid_key_org(&org) {
         return Err(AppError::Validation(INVALID_ORG_MESSAGE.to_owned()));
     }
-    if !matches!(role.as_str(), "reader" | "author" | "collaborator") {
-        return Err(AppError::Validation(INVALID_KEY_ROLE_MESSAGE.to_owned()));
-    }
+    let role = role
+        .parse::<crate::model::Role>()
+        .map_err(|error| {
+            tracing::warn!(%error, "invalid publisher key role");
+            AppError::Validation(INVALID_KEY_ROLE_MESSAGE.to_owned())
+        })?
+        .as_str()
+        .to_owned();
     if key_exists(conn, &client_id)? {
         return Err(AppError::Validation(duplicate_key_message(&client_id)));
     }
@@ -144,7 +149,7 @@ pub(super) fn normalize_verified_owner(
     Ok(Some(email))
 }
 
-/// `revokeKey(clientId)` — [lib/keys.js:43-45]
+/// `revokeKey(clientId)`
 ///
 /// Node passes the client id through untrimmed, so a padded id revokes nothing; preserved.
 /// Revoking an already-revoked key returns `false` because the statement requires
@@ -186,9 +191,14 @@ pub(super) fn update_key_state(
     };
     let label = truncate_utf16(js_trim(&request.label), KEY_LABEL_MAX_LENGTH);
     let role = js_trim(&request.role).to_owned();
-    if !matches!(role.as_str(), "reader" | "author" | "collaborator") {
-        return Err(AppError::Validation(INVALID_KEY_ROLE_MESSAGE.to_owned()));
-    }
+    let role = role
+        .parse::<crate::model::Role>()
+        .map_err(|error| {
+            tracing::warn!(%error, "invalid publisher key role");
+            AppError::Validation(INVALID_KEY_ROLE_MESSAGE.to_owned())
+        })?
+        .as_str()
+        .to_owned();
     let owner_email = normalize_verified_owner(conn, request.owner_email.as_deref(), &org)?;
     let changed = label != current_label || role != current_role || owner_email != current_owner;
     if changed {
@@ -319,7 +329,7 @@ pub(super) fn backfill_key_owner_in_transaction(
     }))
 }
 
-/// `seedKeysFromEnv(sha256Hex, raw)` — [lib/db.js:30-59]
+/// `seedKeysFromEnv(sha256Hex, raw)`
 ///
 /// Accepts `clientId:org:secret` and the two-part `clientId:secret` back-compat form (org
 /// `default`). Every part is trimmed individually *before* a three-or-more-part secret is
@@ -354,7 +364,7 @@ pub fn seed_keys_from_env(conn: &Connection, raw: &str) -> Result<u64, AppError>
             continue;
         }
         if PLACEHOLDER_SECRETS.contains(&secret.as_str()) {
-            // [lib/db.js:52] — same wording as the Node warning, and no secret in the log.
+            // Preserve the warning wording without logging the secret.
             tracing::warn!(
                 "[artifact-mcp] ignoring placeholder key secret for \"{client_id}\" — set a real ARTIFACT_API_KEYS value"
             );
@@ -374,7 +384,7 @@ pub fn seed_keys_from_env(conn: &Connection, raw: &str) -> Result<u64, AppError>
     Ok(u64::try_from(seeded).unwrap_or(u64::MAX))
 }
 
-/// `existsStmt` — [lib/keys.js:12]
+/// `existsStmt`
 fn key_exists(conn: &Connection, client_id: &str) -> Result<bool, AppError> {
     conn.query_row(
         "SELECT 1 FROM api_keys WHERE client_id = ?",

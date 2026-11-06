@@ -4,7 +4,7 @@
 use super::*;
 
 impl StoreContext {
-    /// `snapshotBody` then the staged rename. [lib/store.js:420-428]
+    /// `snapshotBody` then the staged rename.
     pub(super) fn swap_body(
         &self,
         id: &SafeArtifactId,
@@ -66,7 +66,7 @@ impl StoreContext {
         Ok(())
     }
 
-    /// `snapshotBody(id, meta, { moveBody })` — [lib/store.js:549-561]
+    /// `snapshotBody(id, meta, { moveBody })`
     ///
     /// `moveBody` relocates the live body (freeing the final path for the replacement);
     /// otherwise it is copied, because a metadata-only update keeps its body live.
@@ -159,7 +159,7 @@ impl StoreContext {
         Ok(())
     }
 
-    /// `restoreSnapshotBody(snap)` — only a *moved* snapshot is undone. [lib/store.js:562-565]
+    /// `restoreSnapshotBody(snap)` — only a *moved* snapshot is undone.
     pub(super) fn restore_snapshot_body(
         &self,
         snapshot: Option<&BodySnapshot>,
@@ -175,7 +175,7 @@ impl StoreContext {
     }
 
     /// `deleteRevisionStmt.run(id, meta.revision); restoreMetaStmt.run(before);` in one
-    /// transaction. [lib/store.js:432-435]
+    /// transaction.
     pub(super) fn revert_update(
         &self,
         conn: &mut Connection,
@@ -217,7 +217,6 @@ impl StoreContext {
     }
 
     /// `pruneHistory(id)` — best effort, exactly like Node's swallowing `try`.
-    /// [lib/store.js:568-575]
     pub(super) fn prune_history(&self, conn: &Connection, id: &SafeArtifactId) {
         let Ok(offset) = i64::try_from(self.limits.max_history) else {
             return;

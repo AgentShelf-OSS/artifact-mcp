@@ -13,39 +13,38 @@ use super::*;
 /// earlier fault, so a test can prove the double-failure path too.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum FaultPoint {
-    /// Before the staging body is written. [lib/store.js:217], [lib/store.js:263-267]
+    /// Before the staging body is written.
     PublishStageWrite,
     /// After a publish staging body is written, before its file durability barrier.
     PublishStageFileSync,
     /// After a publish staging body is file-durable, before its parent-directory barrier.
     PublishStageDirectorySync,
-    /// After staging, before `INSERT INTO artifacts`. [lib/store.js:218]
+    /// After staging, before `INSERT INTO artifacts`.
     PublishInsert,
-    /// After the insert, before `rename(staging → final)`. [lib/store.js:220]
+    /// After the insert, before `rename(staging → final)`.
     PublishRename,
     /// After the rename, before the metadata read-back.
     PublishComplete,
     /// Kernel publish rename completed; fail before parent directory sync.
     PublishRenameBarrier,
-    /// Compensation: before the inserted artifact row is deleted. [lib/store.js:223],
-    /// [lib/store.js:276]
+    /// Compensation: before the inserted artifact row is deleted.
     PublishDeleteRow,
-    /// Before the replacement body is staged. [lib/store.js:374-384]
+    /// Before the replacement body is staged.
     UpdateStageWrite,
     /// After an update staging body is written, before its file durability barrier.
     UpdateStageFileSync,
     /// After an update staging body is file-durable, before its parent-directory barrier.
     UpdateStageDirectorySync,
-    /// After staging, before the metadata transaction opens. [lib/store.js:406]
+    /// After staging, before the metadata transaction opens.
     UpdateCommit,
     /// Inside the metadata transaction, after the guarded UPDATE and the revision row, before
-    /// the commit. [lib/store.js:412-414]
+    /// the commit.
     UpdateCommitTransaction,
-    /// After the metadata commit, before the outgoing body is snapshotted. [lib/store.js:424]
+    /// After the metadata commit, before the outgoing body is snapshotted.
     UpdateSnapshot,
     /// After a metadata-only history copy is written, before its file durability barrier.
     UpdateSnapshotFileSync,
-    /// After the snapshot, before the staged body is swapped in. [lib/store.js:426]
+    /// After the snapshot, before the staged body is swapped in.
     UpdateSwap,
     /// Kernel update install rename completed; fail before parent directory sync.
     UpdateSwapBarrier,
@@ -53,41 +52,39 @@ pub enum FaultPoint {
     UpdateSnapshotBarrier,
     /// While creating the `.history/<artifact>` chain, before its first directory barrier.
     UpdateHistoryDirectorySync,
-    /// After the swap, before history pruning. [lib/store.js:438]
+    /// After the swap, before history pruning.
     UpdatePrune,
-    /// Compensation: before the snapshotted body is moved back. [lib/store.js:430]
+    /// Compensation: before the snapshotted body is moved back.
     UpdateRestoreSnapshot,
     /// Compensation: before the revision row is dropped and metadata reverted.
-    /// [lib/store.js:432-435]
     UpdateRevertMetadata,
     /// Compensation: before an owned metadata-only snapshot temporary is durably removed.
     UpdateSnapshotTempRemove,
     /// Kernel snapshot temporary removal completed; fail before its parent-directory barrier.
     UpdateSnapshotTempRemoveBarrier,
-    /// Before the live body is renamed into trash. [lib/store.js:503-509]
+    /// Before the live body is renamed into trash.
     DeleteTrashRename,
     /// Kernel delete-to-trash rename completed; fail before parent directory sync.
     DeleteTrashRenameBarrier,
-    /// After the body reached trash, before `DELETE FROM artifacts`. [lib/store.js:632]
+    /// After the body reached trash, before `DELETE FROM artifacts`.
     DeleteRow,
-    /// After the row is gone, before the trashed body is removed. [lib/store.js:637]
+    /// After the row is gone, before the trashed body is removed.
     DeleteTrashRemove,
-    /// After trash removal, before the history directory is removed. [lib/store.js:638]
+    /// After trash removal, before the history directory is removed.
     DeleteHistoryRemove,
-    /// Compensation: before the trashed body is moved back. [lib/store.js:635], [lib/store.js:642]
+    /// Compensation: before the trashed body is moved back.
     DeleteRestoreBody,
-    /// Before the re-tenant transaction runs. [lib/store.js:469-477]
+    /// Before the re-tenant transaction runs.
     MoveTransaction,
     /// Before a `set_category` / `set_hidden` write.
     MetadataWrite,
     /// Reconciliation: before an interrupted body is renamed to its final path.
-    /// [lib/store.js:702], [lib/store.js:711]
     ReconcileRecover,
-    /// Reconciliation: before an unreferenced transient path is removed. [lib/store.js:714]
+    /// Reconciliation: before an unreferenced transient path is removed.
     ReconcileDiscard,
-    /// Reconciliation: before an orphan history directory is removed. [lib/store.js:728]
+    /// Reconciliation: before an orphan history directory is removed.
     ReconcileOrphanHistory,
-    /// Before a backfilled digest is written. [lib/store.js:766]
+    /// Before a backfilled digest is written.
     BackfillWrite,
 }
 

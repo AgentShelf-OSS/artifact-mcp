@@ -6,7 +6,6 @@ use super::{
     DiscussionStore,
     discussion_rows::discussion_row,
     inputs::{BindDiscussionTombstone, CreateDiscussionMessageLink},
-    internal,
     link_rows::{
         link_by_feedback, link_by_feedback_generation, link_by_outbox, link_by_tombstone_outbox,
     },
@@ -51,13 +50,13 @@ impl DiscussionStore {
             &outbox_id,
         ])?;
         db::interact(&self.pool, move |conn| {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(internal)?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| crate::error::internal("create message link", error))?;
             tx.execute(
                 "INSERT OR IGNORE INTO discussion_message_links \
                  (provider, artifact_id, org, connection_id, feedback_id, delivery_event_id, outbox_id, external_thread_id, generation, state) \
                  VALUES ('discord', ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 'pending')",
                 params![artifact_id, org, connection_id, feedback_id, event_id, outbox_id, thread, generation],
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("create message link", error))?;
             let row = link_by_outbox(&tx, &outbox_id)?.ok_or(AppError::Internal)?;
             if row.artifact_id.0 != artifact_id
                 || row.org.0 != org
@@ -68,7 +67,7 @@ impl DiscussionStore {
             {
                 return Err(AppError::Conflict("discussion delivery idempotency conflict".to_owned()));
             }
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("create message link", error))?;
             Ok(row)
         }).await
     }
@@ -106,7 +105,7 @@ impl DiscussionStore {
                  WHERE provider = 'discord' AND artifact_id = ?1 AND org = ?2 AND feedback_id = ?3 AND local_deleted_at IS NULL",
                 params![artifact_id, org, feedback_id],
             )
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("mark feedback locally deleted", error))
             .map(|changed| changed > 0)
         })
         .await
@@ -135,11 +134,11 @@ impl DiscussionStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("bind tombstone delivery", error))?;
             let link = link_by_feedback_generation(&tx, &artifact_id, &org, &feedback_id, generation)?
                 .ok_or(AppError::NotFound("discussion message link not found".to_owned()))?;
             if link.connection_id != connection_id
-                || link.generation != u64::try_from(generation).map_err(|_| AppError::Internal)?
+                || link.generation != u64::try_from(generation).map_err(|error| crate::error::internal("bind tombstone delivery", error))?
                 || link.state != "tombstone_pending"
                 || link.external_thread_id.is_none()
                 || link.external_message_id.is_none()
@@ -169,7 +168,7 @@ impl DiscussionStore {
                         ))
                     },
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("bind tombstone delivery", error))?;
             if tenant != org
                 || target_key != connection_id
                 || secret_ref != format!("discussion:{connection_id}")
@@ -192,12 +191,12 @@ impl DiscussionStore {
                    AND connection_id = ?6 AND state = 'tombstone_pending' \
                    AND (tombstone_outbox_id IS NULL OR tombstone_outbox_id = ?1)",
                 params![outbox_id, artifact_id, org, feedback_id, generation, connection_id],
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("bind tombstone delivery", error))?;
             if changed != 1 {
                 return Err(AppError::Conflict("discussion tombstone idempotency conflict".to_owned()));
             }
             let link = link_by_tombstone_outbox(&tx, &outbox_id)?.ok_or(AppError::Internal)?;
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("bind tombstone delivery", error))?;
             Ok(link)
         }).await
     }

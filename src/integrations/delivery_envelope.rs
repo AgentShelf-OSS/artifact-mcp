@@ -174,11 +174,21 @@ impl DeliveryEnvelopeV1 {
         Ok(())
     }
     pub fn canonical_bytes(&self) -> Result<Vec<u8>, AppError> {
-        serde_json::to_vec(self).map_err(|_| AppError::Internal)
+        serde_json::to_vec(self).map_err(|_error| {
+            crate::error::internal(
+                "serialize delivery envelope",
+                "serialization or rendering failed",
+            )
+        })
     }
     /// Canonical HTTP request bytes: the nested Discord payload only, never envelope metadata.
     pub fn discord_request_body_bytes(&self) -> Result<Vec<u8>, AppError> {
-        serde_json::to_vec(&self.payload).map_err(|_| AppError::Internal)
+        serde_json::to_vec(&self.payload).map_err(|_error| {
+            crate::error::internal(
+                "serialize delivery payload",
+                "serialization or rendering failed",
+            )
+        })
     }
 
     /// Builds the JSON or multipart Discord request only after a worker has resolved an optional
@@ -198,7 +208,12 @@ impl DeliveryEnvelopeV1 {
         embed.image = Some(EmbedImage {
             url: format!("attachment://{PREVIEW_FILENAME}"),
         });
-        let json = serde_json::to_string(&payload).map_err(|_| AppError::Internal)?;
+        let json = serde_json::to_string(&payload).map_err(|_error| {
+            crate::error::internal(
+                "serialize preview payload",
+                "serialization or rendering failed",
+            )
+        })?;
         // This is deliberately deterministic: the durable provider request does not need the
         // legacy notifier's random boundary and tests can inspect only the content type/parts.
         let request = multipart_request(&json, preview, "artifactmcpdeliverypreviewv1");

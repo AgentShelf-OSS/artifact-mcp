@@ -17,7 +17,10 @@ use crate::{
         },
     },
     model::PublisherIdentity,
-    security::audit::MutationAudit,
+    security::{
+        access::{AccessPolicy, ListScope},
+        audit::MutationAudit,
+    },
 };
 
 struct ReadArtifactInput<'a> {
@@ -77,10 +80,9 @@ pub(crate) async fn list_artifacts(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
-    let rows = if !auth.is_admin() && matches!(auth.role.as_str(), "reader" | "collaborator") {
-        deps.artifacts.list_org_artifacts(&auth.org, true).await?
-    } else {
-        deps.artifacts.list_for_publisher(auth).await?
+    let rows = match AccessPolicy::publisher_list_scope(auth) {
+        ListScope::Org => deps.artifacts.list_org_artifacts(&auth.org, true).await?,
+        ListScope::All | ListScope::Own => deps.artifacts.list_for_publisher(auth).await?,
     };
     let count = u64::try_from(rows.len()).unwrap_or(u64::MAX);
     let artifacts = rows

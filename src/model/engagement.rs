@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — reactions, feedback, shares, views, and notifications.
+//! Reactions, feedback, shares, views, and notifications.
 
 use serde::{Deserialize, Serialize};
 

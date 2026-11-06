@@ -29,7 +29,7 @@ pub struct WebhookRow {
 }
 
 impl WebhookRow {
-    /// The three at-rest URL columns as U04's value type.
+    /// The three at-rest URL columns as the encryption value type.
     #[must_use]
     pub fn stored_url(&self) -> StoredWebhookUrl {
         StoredWebhookUrl {
@@ -45,7 +45,6 @@ impl WebhookRow {
     }
 
     /// Port of `publicRow(row)` — the only webhook shape allowed into an HTTP response.
-    /// [lib/webhooks.js:59-69]
     #[must_use]
     pub fn public(&self) -> WebhookSummary {
         WebhookSummary {
@@ -58,7 +57,7 @@ impl WebhookRow {
         }
     }
 
-    /// Port of `deliveryRow(row)` — [lib/webhooks.js:121-124].
+    /// Port of `deliveryRow(row)`.
     ///
     /// A row with no ciphertext is returned as-is (the live plaintext configuration). A row *with*
     /// ciphertext requires the key: with no key configured this fails closed rather than handing

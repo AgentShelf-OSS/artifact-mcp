@@ -5,7 +5,11 @@
 //! the push event store, and viewer streams. HTTP and MCP callers reach it through
 //! [`crate::ports::data::DataService`].
 mod bindings;
+mod error;
 mod events;
+pub use error::DataError;
+#[cfg(test)]
+pub(crate) use error::error_cases;
 mod managed;
 mod registry;
 mod service;
@@ -97,11 +101,11 @@ impl DataBroker {
         }
         self
     }
-    fn audit_key(&self) -> Result<[u8; 32], String> {
+    fn audit_key(&self) -> Result<[u8; 32], DataError> {
         self.audit_key
             .read()
             .ok()
             .and_then(|slot| *slot)
-            .ok_or_else(|| "data_unavailable".into())
+            .ok_or(DataError::Unavailable)
     }
 }

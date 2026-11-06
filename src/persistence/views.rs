@@ -1,35 +1,14 @@
-//! Owned by U10 (terra) — view analytics persistence.
+//! View analytics persistence.
 //!
-//! Port of `lib/views.js`: one `artifact_views` row per `(artifact_id, email)` with a hit counter
-//! and first/last timestamps (v10 `artifact-view-analytics`, `lib/migrations.js:288-304`). The
-//! composite foreign key `(artifact_id, org) REFERENCES artifacts(id, org) ON DELETE CASCADE`
-//! removes the analytics with the artifact.
+//! Each `artifact_views` row belongs to one `(artifact_id, email)` and holds a hit counter and first/last timestamps (v10 `artifact-view-analytics`). The composite foreign key `(artifact_id, org) REFERENCES artifacts(id, org) ON DELETE CASCADE` removes the analytics with the artifact.
 //!
 //! # Semantics preserved
 //!
-//! * **Recording is best-effort and must never fail the request.** `lib/views.js:40-46` swallows
-//!   every error from the upsert; `lib/app.js:494-501` then wraps the call in a *second*
-//!   `try`/`catch` that only logs. Both layers exist here: [`record`] cannot fail, and
-//!   [`shell_analytics`] mirrors the shell route's read-side `try`/`catch`
-//!   (`lib/app.js:503-510`), including the fact that a `counts` value already assigned before a
-//!   later failure is kept. [`gallery_analytics`] does the same for the gallery's per-org loop
-//!   (`lib/app.js:219-228`). The *read* side is best-effort too — every analytics query on a
-//!   route path is wrapped, so a broken `artifact_views` table degrades the page instead of
-//!   failing the request.
-//! * **The shell render is the single attribution point.** `lib/app.js:491-501` records a view
-//!   only from `GET /:id` and only when `!viewer.isAdmin && viewer.email`. Raw, thumbnail, and
-//!   bundle-subresource requests deliberately do not count, so a page with N iframes is still one
-//!   view. [`should_record`] is that predicate; route units must not call [`record`] anywhere else.
-//! * **Repeat views increment, they do not duplicate.**
-//!   `ON CONFLICT(artifact_id, email) DO UPDATE SET count = count + 1, last_viewed_at =
-//!   datetime('now')` (`lib/views.js:7-13`) keeps `unique_viewers` stable while `views` grows.
-//! * **Ordering is observable.** `viewersFor` is `ORDER BY last_viewed_at DESC` and `topForOrg` is
-//!   `ORDER BY views DESC, last_viewed_at DESC` (`lib/views.js:24-38`); both feed ordered JSON
-//!   arrays (`artifact_stats` in `lib/mcp.js:502`, the gallery in `lib/portal.js`). Neither query
-//!   gains a tiebreaker here — an extra sort key would diverge wherever Node's order is arbitrary.
-//! * **An artifact with no rows still reports zeroes.** The aggregate in `lib/views.js:14-19` has
-//!   no `GROUP BY`, so it always yields one row: `{ views: 0, unique_viewers: 0,
-//!   last_viewed_at: null }`.
+//! * **Recording is best-effort and must never fail the request.** [`record`] logs upsert errors without propagating them, and [`shell_analytics`] keeps a `counts` value already assigned before a later failure. [`gallery_analytics`] does the same for the gallery's per-org loop. The *read* side is best-effort too: every analytics query on a route path is wrapped, so a broken `artifact_views` table degrades the page instead of failing the request.
+//! * **The shell render is the single attribution point.** Record a view only from `GET /:id` and only when `!viewer.isAdmin && viewer.email`. Raw, thumbnail, and bundle-subresource requests deliberately do not count, so a page with N iframes is still one view. [`should_record`] is that predicate; route units must not call [`record`] anywhere else.
+//! * **Repeat views increment, they do not duplicate.** `ON CONFLICT(artifact_id, email) DO UPDATE SET count = count + 1, last_viewed_at = datetime('now')` keeps `unique_viewers` stable while `views` grows.
+//! * **Ordering is observable.** `viewersFor` is `ORDER BY last_viewed_at DESC` and `topForOrg` is `ORDER BY views DESC, last_viewed_at DESC`; both feed ordered JSON arrays (`artifact_stats`, the gallery). Neither query gains a tiebreaker here — an extra sort key would diverge wherever Node's order is arbitrary.
+//! * **An artifact with no rows still reports zeroes.** The aggregate has no `GROUP BY`, so it always yields one row: `{ views: 0, unique_viewers: 0, last_viewed_at: null }`.
 
 use std::collections::BTreeMap;
 
@@ -41,10 +20,9 @@ use crate::model::{
 };
 use crate::persistence::db::{self, DbPool};
 
-/// `topForOrg`'s default limit (`lib/views.js:64`).
+/// `topForOrg`'s default limit.
 pub const DEFAULT_TOP_LIMIT: usize = 10;
 
-/// `lib/views.js:7-13`.
 const RECORD_SQL: &str = "\
 INSERT INTO artifact_views (artifact_id, org, email)
 VALUES (?, ?, ?)
@@ -52,25 +30,21 @@ ON CONFLICT(artifact_id, email) DO UPDATE SET
   count = count + 1,
   last_viewed_at = datetime('now')";
 
-/// `lib/views.js:14-19`.
 const COUNTS_SQL: &str = "\
 SELECT COALESCE(SUM(count), 0) AS views,
        COUNT(*) AS unique_viewers,
        MAX(last_viewed_at) AS last_viewed_at
 FROM artifact_views WHERE artifact_id = ?";
 
-/// `lib/views.js:20-23`.
 const COUNTS_FOR_ORG_SQL: &str = "\
 SELECT artifact_id, SUM(count) AS views, COUNT(*) AS unique_viewers
 FROM artifact_views WHERE org = ? GROUP BY artifact_id";
 
-/// `lib/views.js:24-28`.
 const VIEWERS_SQL: &str = "\
 SELECT email, count, first_viewed_at, last_viewed_at
 FROM artifact_views WHERE artifact_id = ?
 ORDER BY last_viewed_at DESC";
 
-/// `lib/views.js:29-38`.
 const TOP_SQL: &str = "\
 SELECT a.id AS artifact_id, a.title, SUM(v.count) AS views, COUNT(*) AS unique_viewers,
        MAX(v.last_viewed_at) AS last_viewed_at
@@ -84,7 +58,7 @@ LIMIT ?";
 /// Read-side analytics for the artifact shell, with the route's best-effort contract baked in.
 ///
 /// `None` means "the read failed and the shell renders without it", exactly like the `null`
-/// initialisers in `lib/app.js:503-504`.
+/// initialisers.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ShellAnalytics {
     /// Aggregate counts, or `None` when the aggregate read failed.
@@ -95,7 +69,7 @@ pub struct ShellAnalytics {
 
 /// Read-side analytics for the gallery, with the route's per-org best-effort contract baked in.
 ///
-/// `lib/app.js:219-228` loops over the viewer's orgs and wraps *each* iteration in its own
+/// The gallery loops over the viewer's orgs and wraps *each* iteration in its own
 /// `try`/`catch`, so one failing tenant neither aborts the others nor discards the counts already
 /// merged for it.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -106,7 +80,7 @@ pub struct GalleryAnalytics {
     pub top_viewed: BTreeMap<OrgId, Vec<TopViewedArtifact>>,
 }
 
-/// Whether this viewer's shell render counts as a view (`lib/app.js:495`).
+/// Whether this viewer's shell render counts as a view.
 ///
 /// Admins are excluded so operator browsing does not inflate a tenant's analytics, and an
 /// unidentified viewer has no key to attribute the row to. JavaScript truthiness of
@@ -122,11 +96,11 @@ pub fn should_record(viewer: &Viewer) -> bool {
 
 /// Records one view. Never fails: analytics must not affect the artifact response path.
 ///
-/// This is `lib/views.js:40-46` — the `catch {}` is the contract, not an oversight. A missing
+/// Errors must not propagate to the caller. A missing
 /// artifact (foreign key), a locked database, or a read-only file all end here silently.
 pub fn record(conn: &Connection, artifact_id: &ArtifactId, org: &OrgId, email: &EmailAddress) {
     if let Err(error) = record_strict(conn, artifact_id, org, email) {
-        // Logged, never propagated: `lib/app.js:498-500` does the same with logger.error.
+        // Log the cause without failing the page request.
         tracing::warn!(
             artifact_id = %artifact_id,
             error = %error,
@@ -161,10 +135,10 @@ pub fn counts_for(conn: &Connection, artifact_id: &ArtifactId) -> Result<ViewCou
             last_viewed_at: row.get::<_, Option<String>>(2)?.map(Timestamp),
         })
     })
-    .map_err(|error| internal("read view counts", &error))
+    .map_err(|error| crate::error::internal("read view counts", error))
 }
 
-/// Per-artifact counts for one tenant (`lib/views.js:52-58`).
+/// Per-artifact counts for one tenant.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the query fails.
@@ -174,7 +148,7 @@ pub fn counts_for_org(
 ) -> Result<BTreeMap<ArtifactId, ViewCounts>, AppError> {
     let mut stmt = conn
         .prepare(COUNTS_FOR_ORG_SQL)
-        .map_err(|error| internal("prepare org view counts", &error))?;
+        .map_err(|error| crate::error::internal("prepare org view counts", error))?;
     let rows = stmt
         .query_map((&org.0,), |row| {
             Ok((
@@ -182,23 +156,24 @@ pub fn counts_for_org(
                 ViewCounts {
                     views: counter(row.get(1)?),
                     unique_viewers: counter(row.get(2)?),
-                    // The org projection deliberately omits last_viewed_at (`lib/views.js:21`);
+                    // The org projection deliberately omits last_viewed_at;
                     // the gallery badge only renders views/unique_viewers.
                     last_viewed_at: None,
                 },
             ))
         })
-        .map_err(|error| internal("query org view counts", &error))?;
+        .map_err(|error| crate::error::internal("query org view counts", error))?;
 
     let mut map = BTreeMap::new();
     for row in rows {
-        let (id, counts) = row.map_err(|error| internal("read org view counts", &error))?;
+        let (id, counts) =
+            row.map_err(|error| crate::error::internal("read org view counts", error))?;
         map.insert(id, counts);
     }
     Ok(map)
 }
 
-/// Named viewers of one artifact, newest visit first (`lib/views.js:24-28`).
+/// Named viewers of one artifact, newest visit first.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the query fails.
@@ -208,7 +183,7 @@ pub fn viewers_for(
 ) -> Result<Vec<ViewerView>, AppError> {
     let mut stmt = conn
         .prepare(VIEWERS_SQL)
-        .map_err(|error| internal("prepare viewers", &error))?;
+        .map_err(|error| crate::error::internal("prepare viewers", error))?;
     let rows = stmt
         .query_map((&artifact_id.0,), |row| {
             Ok(ViewerView {
@@ -218,12 +193,12 @@ pub fn viewers_for(
                 last_viewed_at: Timestamp(row.get(3)?),
             })
         })
-        .map_err(|error| internal("query viewers", &error))?;
+        .map_err(|error| crate::error::internal("query viewers", error))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|error| internal("read viewers", &error))
+        .map_err(|error| crate::error::internal("read viewers", error))
 }
 
-/// `Math.max(1, Number(limit) || 10)` from `lib/views.js:65`.
+/// `Math.max(1, Number(limit) || 10)`.
 ///
 /// `0` is falsy in JavaScript, so it becomes the default rather than an empty result; `usize`
 /// cannot be negative, so the `max(1, …)` clamp only matters for that zero case.
@@ -232,7 +207,7 @@ pub const fn normalize_top_limit(limit: usize) -> usize {
     if limit == 0 { DEFAULT_TOP_LIMIT } else { limit }
 }
 
-/// Most-viewed artifacts in one tenant (`lib/views.js:29-38`, `64-66`).
+/// Most-viewed artifacts in one tenant.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the query fails.
@@ -244,7 +219,7 @@ pub fn top_for_org(
     let effective = i64::try_from(normalize_top_limit(limit)).unwrap_or(i64::MAX);
     let mut stmt = conn
         .prepare(TOP_SQL)
-        .map_err(|error| internal("prepare top viewed", &error))?;
+        .map_err(|error| crate::error::internal("prepare top viewed", error))?;
     let rows = stmt
         .query_map((&org.0, effective), |row| {
             Ok(TopViewedArtifact {
@@ -255,13 +230,12 @@ pub fn top_for_org(
                 last_viewed_at: Timestamp(row.get(4)?),
             })
         })
-        .map_err(|error| internal("query top viewed", &error))?;
+        .map_err(|error| crate::error::internal("query top viewed", error))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|error| internal("read top viewed", &error))
+        .map_err(|error| crate::error::internal("read top viewed", error))
 }
 
 /// The shell route's read-side analytics, best-effort in the same shape as
-/// `lib/app.js:503-510`.
 ///
 /// A failure of the aggregate read leaves both fields `None`; a failure of the viewer read keeps
 /// an aggregate that was already loaded, because Node assigns `counts` before it can throw on
@@ -297,7 +271,7 @@ pub fn shell_analytics(
     analytics
 }
 
-/// The gallery route's analytics, best-effort per org (`lib/app.js:219-228`).
+/// The gallery route's analytics, best-effort per org.
 ///
 /// A tenant whose read fails is logged and skipped; the remaining tenants still render, and a
 /// tenant whose counts merged before its `top_for_org` failed keeps those counts.
@@ -419,12 +393,6 @@ pub async fn shell_analytics_pooled(
 /// hand-corrupted row — reported as zero rather than a panic.
 const fn counter(value: i64) -> u64 {
     if value < 0 { 0 } else { value.unsigned_abs() }
-}
-
-/// SQL faults are logged and reported without leaking driver detail.
-fn internal(operation: &str, error: &rusqlite::Error) -> AppError {
-    tracing::error!(operation, error = %error, "view analytics query failed");
-    AppError::Internal
 }
 
 #[cfg(test)]

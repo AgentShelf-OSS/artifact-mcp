@@ -131,7 +131,7 @@ fn output_schemas() -> Result<serde_json::Map<String, Value>, serde_json::Error>
     ))
 }
 
-/// Root property traversal order from the Node object literals in `lib/mcp.js`.
+/// Root property traversal order follows the insertion order of the declared object fields.
 ///
 /// The frozen golden is canonicalized, so its object keys are sorted; validation instead walks
 /// the live JavaScript schema in declaration order. Keeping this small order table separate avoids

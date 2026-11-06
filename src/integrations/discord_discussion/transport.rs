@@ -27,7 +27,7 @@ pub struct DiscordDiscussionTransport {
 }
 
 impl DiscordDiscussionTransport {
-    /// Build the production transport with PBI-056's four-second end-to-end deadline.
+    /// Build the production transport with a four-second end-to-end deadline.
     ///
     /// # Errors
     /// Returns an opaque availability error when the HTTP client cannot be initialized.

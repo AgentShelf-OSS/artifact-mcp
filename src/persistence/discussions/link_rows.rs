@@ -2,7 +2,7 @@
 
 use rusqlite::{Connection, OptionalExtension, Row, params};
 
-use super::{internal, types::DiscussionMessageLink};
+use super::types::DiscussionMessageLink;
 use crate::{
     error::AppError,
     model::{ArtifactId, FeedbackId, OrgId, Timestamp},
@@ -30,7 +30,7 @@ pub(super) fn link_by_feedback(
             created_at: Timestamp(row.get(15)?), updated_at: Timestamp(row.get(16)?),
             posted_at: row.get::<_, Option<String>>(17)?.map(Timestamp),
         }),
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("link by feedback", error))
 }
 
 pub(super) fn link_by_outbox(
@@ -49,7 +49,7 @@ pub(super) fn link_by_outbox(
             created_at: Timestamp(row.get(15)?), updated_at: Timestamp(row.get(16)?),
             posted_at: row.get::<_, Option<String>>(17)?.map(Timestamp),
         }),
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("link by outbox", error))
 }
 
 pub(super) fn link_by_feedback_generation(
@@ -63,7 +63,7 @@ pub(super) fn link_by_feedback_generation(
         &format!("SELECT {LINK_COLUMNS} FROM discussion_message_links WHERE provider = 'discord' AND artifact_id = ?1 AND org = ?2 AND feedback_id = ?3 AND generation = ?4"),
         params![artifact_id, org, feedback_id, generation],
         discussion_link_row,
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("link by feedback generation", error))
 }
 
 pub(super) fn link_by_tombstone_outbox(
@@ -74,7 +74,7 @@ pub(super) fn link_by_tombstone_outbox(
         &format!("SELECT {LINK_COLUMNS} FROM discussion_message_links WHERE provider = 'discord' AND tombstone_outbox_id = ?1"),
         [outbox_id],
         discussion_link_row,
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("link by tombstone outbox", error))
 }
 
 pub(super) fn discussion_link_row(row: &Row<'_>) -> rusqlite::Result<DiscussionMessageLink> {

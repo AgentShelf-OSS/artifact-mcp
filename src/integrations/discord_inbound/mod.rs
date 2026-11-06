@@ -1,10 +1,12 @@
-//! Provider-neutral PBI-080 Discord inbound synchronization core.
+//! Provider-neutral Discord inbound synchronization core.
 //!
 //! This is intentionally a provider-neutral state machine with deterministic fakes, not a
 //! running Gateway client.  It accepts only server-side, already-authorized organization/thread
 //! bindings and therefore cannot turn browser-provided Discord identifiers into access control.
-//! PBI-081 supplies the credential and effective policy before the guarded production runtime can
+//! The application supplies the credential and effective policy before the guarded production runtime can
 //! start an organization Gateway task.
+
+pub use crate::model::discord::{DiscordAuthor, GatewayHealth, IgnoreReason};
 
 use crate::model::{ArtifactId, FeedbackAuthor, FeedbackId, OrgId};
 
@@ -13,7 +15,7 @@ pub const MAX_INBOUND_BODY_BYTES: usize = 4_000;
 /// The literal replaces a deleted remote body.  The original body is not retained in this core.
 pub const DELETION_TOMBSTONE: &str = "This Discord message was deleted.";
 
-/// PBI-081 plus artifact-level authorization resolved on the server, never from a Gateway frame.
+/// Artifact-level authorization resolved on the server, never from a Gateway frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TwoWayThreadAuthorization {
     pub org: OrgId,
@@ -23,15 +25,6 @@ pub struct TwoWayThreadAuthorization {
     pub enabled: bool,
     pub configured_bot_user_id: String,
     pub configured_webhook_id: Option<String>,
-}
-
-/// A normalized Discord author.  Its id/display are opaque provider identifiers, never emails.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct DiscordAuthor {
-    pub id: String,
-    pub display: String,
-    pub is_bot: bool,
-    pub webhook_id: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -86,18 +79,6 @@ pub enum InboundResult {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum IgnoreReason {
-    Disabled,
-    Unmapped,
-    Bot,
-    Webhook,
-    Unsupported,
-    EmptyContent,
-    Stale,
-    UnknownMessage,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RejectReason {
     CrossTenant,
     WrongGuild,
@@ -109,18 +90,6 @@ pub enum RejectReason {
 pub enum ThreadDegradedReason {
     Deleted,
     ArchivedOrLocked,
-}
-
-/// Optional integration health, deliberately distinct from process liveness.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum GatewayHealth {
-    Disabled,
-    Connecting,
-    Ready,
-    Reconnecting,
-    Degraded,
-    Failed,
-    Shutdown,
 }
 
 /// A kill switch stops only inbound consumption.  Local feedback and the outbound durable outbox

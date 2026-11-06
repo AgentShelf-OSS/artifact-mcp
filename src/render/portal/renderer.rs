@@ -69,7 +69,12 @@ pub(super) fn site_host(public_base_url: &str) -> String {
         .unwrap_or_else(|| "localhost:3480".to_owned())
 }
 pub(super) fn render<T: Template>(template: &T) -> Result<String, AppError> {
-    template.render().map_err(|_| AppError::Internal)
+    template.render().map_err(|_error| {
+        crate::error::internal(
+            "render portal template",
+            "serialization or rendering failed",
+        )
+    })
 }
 
 impl PageRenderer for AskamaPageRenderer {

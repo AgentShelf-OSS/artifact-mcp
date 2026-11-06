@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — frozen domain, HTTP, and JSON-RPC error mappings.
+//! Frozen domain, HTTP, and JSON-RPC error mappings.
 
 use axum::{
     Json,
@@ -165,6 +165,12 @@ impl McpError {
             Self::Tool(_) => StatusCode::OK,
         }
     }
+}
+
+/// Log an internal failure without exposing its cause to clients.
+pub(crate) fn internal(operation: &'static str, error: impl std::fmt::Display) -> AppError {
+    tracing::error!(operation, error = %error, "internal operation failed");
+    AppError::Internal
 }
 
 #[cfg(test)]

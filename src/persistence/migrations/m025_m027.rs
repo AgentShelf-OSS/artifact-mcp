@@ -100,7 +100,7 @@ pub(super) fn m027_provider_delivery_outbox(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
 ) -> rusqlite::Result<()> {
-    // PBI-056: delivery data is deliberately independent from `org_webhooks`.  A webhook can be
+    // delivery data is deliberately independent from `org_webhooks`.  A webhook can be
     // deleted or rotated after an intent was accepted; the worker resolves `secret_ref` through
     // the secret boundary at send time, and no URL/token is ever copied into this durable queue.
     tx.execute_batch(

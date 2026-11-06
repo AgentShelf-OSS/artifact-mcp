@@ -116,7 +116,7 @@ pub(crate) async fn publish_bundle(
     })
 }
 
-/// ADR-0015 artifact key grammar: `^[a-z0-9][a-z0-9._/-]{0,127}$`, as in `lib/mcp.js`.
+/// ADR-0015 artifact key grammar: `^[a-z0-9][a-z0-9._/-]{0,127}$`.
 pub const ARTIFACT_KEY_INVALID: &str = "artifact_key must be 1-128 characters of a-z, 0-9, '.', '_', '/', or '-', starting with a letter or digit";
 pub(crate) const UPDATE_CONFLICT_ERROR: &str =
     "Artifact changed during update; fetch its current revision and retry";

@@ -1581,10 +1581,11 @@ async fn durable_preview_tasks_recover_after_restart_and_enforce_ownership() {
                 client_id: ClientId::from("publisher"),
                 org: OrgId::from("acme"),
                 label: "Publisher".to_owned(),
-                role: "author".to_owned(),
+                role: artifact_mcp::model::Role::Author,
                 scopes: None,
             },
         )
+        .await
         .expect("durable task before restart");
     drop(store);
 

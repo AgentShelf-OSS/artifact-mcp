@@ -21,7 +21,7 @@ pub(super) fn credential_active(conn: &Connection, org: &str) -> Result<Option<b
     )
     .optional()
     .map(|active| active.map(|value| value != 0))
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("credential active", error))
 }
 
 pub(super) fn readiness_in_transaction(
@@ -51,7 +51,7 @@ pub(super) fn status_in_transaction(
             |row| row.get::<_, i64>(0),
         )
         .optional()
-        .map_err(internal)?
+        .map_err(|error| crate::error::internal("status in transaction", error))?
         .unwrap_or(0)
         != 0;
     let (pending, failed): (i64, i64) = conn
@@ -63,7 +63,7 @@ pub(super) fn status_in_transaction(
             [org],
             |row| Ok((row.get(0)?, row.get(1)?)),
         )
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("status in transaction", error))?;
     let recovery_state = if pending > 0 {
         "recovering"
     } else if failed > 0 {
@@ -93,7 +93,7 @@ pub(super) fn recovery_record(
             attempts: row.get::<_, i64>(2)?.unsigned_abs(),
             last_error: row.get(3)?,
         }),
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("recovery record", error))
 }
 
 pub(super) fn parse_recovery_state(value: String) -> rusqlite::Result<RecoveryState> {
@@ -130,7 +130,7 @@ pub(super) fn destination_matches(
         ],
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("destination matches", error))
 }
 
 pub(super) fn destination_matches_preflight(destination: &RecoveryDestination) -> bool {
@@ -153,18 +153,18 @@ pub(super) fn artifact_exists(
     )
     .optional()
     .map(|row: Option<()>| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("artifact exists", error))
 }
 
 pub(super) fn org_exists(conn: &Connection, org: &str) -> Result<bool, AppError> {
     conn.query_row("SELECT 1 FROM orgs WHERE name=?1", [org], |_| Ok(()))
         .optional()
         .map(|row: Option<()>| row.is_some())
-        .map_err(internal)
+        .map_err(|error| crate::error::internal("org exists", error))
 }
 
 /// The process-level token exists only to carry forward a deployment that already used a
-/// PBI-079 discussion connection. It is never offered to an unrelated organization merely
+/// discussion connection. It is never offered to an unrelated organization merely
 /// because the deployment has a fallback configured.
 pub(super) fn has_legacy_discussion_connection(
     conn: &Connection,
@@ -175,7 +175,7 @@ pub(super) fn has_legacy_discussion_connection(
         [org],
         |row| row.get(0),
     )
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("has legacy discussion connection", error))
 }
 
 pub(super) fn is_canonical_url(value: &str) -> bool {
@@ -191,8 +191,4 @@ pub(super) fn valid_discord_id(value: &str) -> bool {
 }
 pub(super) fn trimmed(value: &str) -> String {
     value.trim().to_owned()
-}
-pub(super) fn internal(error: rusqlite::Error) -> AppError {
-    tracing::error!(error = %error, "organization Discord persistence failed");
-    AppError::Internal
 }

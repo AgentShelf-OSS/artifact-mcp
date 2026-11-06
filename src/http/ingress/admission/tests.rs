@@ -282,7 +282,7 @@ fn weighted_mcp_reservations_are_atomic_when_a_batch_exceeds_remaining_budget() 
         client_id: crate::model::ClientId::from("publisher"),
         org: crate::model::OrgId::from("acme"),
         label: "Publisher".to_owned(),
-        role: "writer".to_owned(),
+        role: crate::model::Role::Author,
         scopes: None,
     };
     let headers = HeaderMap::new();
@@ -319,7 +319,7 @@ fn verified_upload_budget_is_scoped_to_the_verified_publisher_and_source() {
         client_id: crate::model::ClientId("client-a".to_owned()),
         org: crate::model::OrgId("org-a".to_owned()),
         label: "test".to_owned(),
-        role: "author".to_owned(),
+        role: crate::model::Role::Author,
         scopes: None,
     };
     let headers = HeaderMap::new();

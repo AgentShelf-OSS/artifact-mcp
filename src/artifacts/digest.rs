@@ -1,4 +1,4 @@
-//! Owned by U07 (terra) — canonical body and bundle digests.
+//! Canonical body and bundle digests.
 //!
 //! Node oracle:
 //!
@@ -13,15 +13,8 @@
 //!   return sha256(JSON.stringify(manifest));
 //! }
 //! ```
-//! — [lib/store.js:77-86]
 //!
-//! and `bodyDigestAtPath` / `bodyDigestOnDisk` — [lib/store.js:649-673].
-//!
-//! This value is load bearing beyond display: it addresses the preview file
-//! (`/data/previews/<id>/<body_sha256>.png`, [lib/thumbnails.js:80-84]), it is the durable
-//! commit marker crash recovery compares against ([lib/store.js:705]), and the v17
-//! `artifact-body-digest` migration backfills it ([lib/store.js:755-770]). It must stay byte
-//! identical to Node's.
+//! This value is load bearing beyond display: it addresses the preview file (`/data/previews/<id>/<body_sha256>.png`), it is the durable commit marker crash recovery compares against, and the v17 `artifact-body-digest` migration backfills it. It must stay byte identical to Node's.
 
 use std::cmp::Ordering;
 use std::io;
@@ -32,7 +25,7 @@ use sha2::{Digest, Sha256};
 
 const HEX: [u8; 16] = *b"0123456789abcdef";
 
-/// `createHash("sha256").update(content).digest("hex")` — [lib/store.js:77-79]
+/// `createHash("sha256").update(content).digest("hex")`
 ///
 /// Node hashes a JS string as UTF-8, so `sha256_hex(text.as_bytes())` is the same digest.
 #[must_use]
@@ -46,7 +39,7 @@ pub fn sha256_hex(content: &[u8]) -> String {
     out
 }
 
-/// The digest of a single-file body. [lib/store.js:209], [lib/store.js:651]
+/// The digest of a single-file body.
 #[must_use]
 pub fn single_body_digest(content: &[u8]) -> String {
     sha256_hex(content)
@@ -61,7 +54,7 @@ fn utf16_cmp(left: &str, right: &str) -> Ordering {
     left.encode_utf16().cmp(right.encode_utf16())
 }
 
-/// `bundleManifestDigest(entries)` — [lib/store.js:81-86]
+/// `bundleManifestDigest(entries)`
 ///
 /// Order independent by construction: the caller may pass entries in filesystem enumeration
 /// order (as the storage audit does) or in publish order, and the sort makes the result the
@@ -94,7 +87,7 @@ where
     sha256_hex(json.as_bytes())
 }
 
-/// `bodyDigestAtPath(target, isBundle)` — [lib/store.js:649-669]
+/// `bodyDigestAtPath(target, isBundle)`
 ///
 /// Returns `None` where Node's `try { … } catch { return null; }` would: a missing body, an
 /// unreadable file, or `readdirSync` on something that is not a directory.
@@ -110,7 +103,6 @@ pub fn body_digest_at_path(target: &Path, is_bundle: bool) -> Option<String> {
 
 /// The `walk` closure inside `bodyDigestAtPath`: every regular file under `root`, keyed by its
 /// `/`-joined path relative to `root`. Directories contribute nothing on their own.
-/// [lib/store.js:653-664]
 fn collect_bundle_entries(
     root: &Path,
     dir: &Path,
@@ -132,7 +124,7 @@ fn collect_bundle_entries(
     Ok(())
 }
 
-/// `path.relative(base, full).split(path.sep).join("/")` — [lib/store.js:660]
+/// `path.relative(base, full).split(path.sep).join("/")`
 fn relative_key(rel: &Path) -> String {
     rel.components()
         .map(|component| component.as_os_str().to_string_lossy().into_owned())

@@ -35,7 +35,7 @@ pub struct PreviewTask {
     pub artifact_id: ArtifactId,
     pub client_id: ClientId,
     pub org: OrgId,
-    pub role: String,
+    pub role: crate::model::Role,
     pub status: TaskStatus,
     pub status_message: String,
     pub created_at: String,
@@ -56,7 +56,7 @@ impl PreviewTask {
             client_id: self.client_id.clone(),
             org: self.org.clone(),
             label: "durable-preview-task".to_owned(),
-            role: self.role.clone(),
+            role: self.role,
             scopes: None,
         }
     }
@@ -114,7 +114,77 @@ pub struct PreviewTaskStore {
     lock: Mutex<()>,
 }
 
+pub struct WorkingTasks {
+    pub tasks: Vec<PreviewTask>,
+    pub skipped: usize,
+}
+
 impl PreviewTaskStore {
+    async fn blocking<T: Send + 'static>(
+        self: &Arc<Self>,
+        operation: impl FnOnce(&Self) -> Result<T, AppError> + Send + 'static,
+    ) -> Result<T, AppError> {
+        let store = Arc::clone(self);
+        tokio::task::spawn_blocking(move || operation(&store))
+            .await
+            .map_err(|error| task_io_error("blocking", error))?
+    }
+
+    pub async fn create(
+        self: &Arc<Self>,
+        artifact_id: ArtifactId,
+        publisher: &PublisherIdentity,
+    ) -> Result<PreviewTask, AppError> {
+        let publisher = publisher.clone();
+        self.blocking(move |store| store.create_locked(artifact_id, &publisher))
+            .await
+    }
+
+    pub async fn get(self: &Arc<Self>, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
+        let task_id = task_id.to_owned();
+        self.blocking(move |store| store.get_locked(&task_id)).await
+    }
+
+    pub async fn working(self: &Arc<Self>) -> Result<WorkingTasks, AppError> {
+        self.blocking(Self::working_locked).await
+    }
+
+    pub async fn mark_running(
+        self: &Arc<Self>,
+        task_id: &str,
+    ) -> Result<Option<PreviewTask>, AppError> {
+        let task_id = task_id.to_owned();
+        self.blocking(move |store| store.mark_running_locked(&task_id))
+            .await
+    }
+
+    pub async fn complete(
+        self: &Arc<Self>,
+        task_id: &str,
+        result: Value,
+    ) -> Result<Option<PreviewTask>, AppError> {
+        let task_id = task_id.to_owned();
+        self.blocking(move |store| store.complete_locked(&task_id, result))
+            .await
+    }
+
+    pub async fn fail(
+        self: &Arc<Self>,
+        task_id: &str,
+        message: &str,
+    ) -> Result<Option<PreviewTask>, AppError> {
+        let task_id = task_id.to_owned();
+        let message = message.to_owned();
+        self.blocking(move |store| store.fail_locked(&task_id, &message))
+            .await
+    }
+
+    pub async fn cancel(self: &Arc<Self>, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
+        let task_id = task_id.to_owned();
+        self.blocking(move |store| store.cancel_locked(&task_id))
+            .await
+    }
+
     pub fn new(data_dir: impl AsRef<Path>) -> Arc<Self> {
         Arc::new(Self {
             root: data_dir.as_ref().join("tasks"),
@@ -122,13 +192,14 @@ impl PreviewTaskStore {
         })
     }
 
-    pub fn create(
+    fn create_locked(
         &self,
         artifact_id: ArtifactId,
         publisher: &PublisherIdentity,
     ) -> Result<PreviewTask, AppError> {
         let _guard = self.lock.lock().unwrap_or_else(|error| error.into_inner());
-        std::fs::create_dir_all(&self.root).map_err(task_io_error)?;
+        std::fs::create_dir_all(&self.root)
+            .map_err(|error| task_io_error("create locked", error))?;
         for _ in 0..16 {
             let now = timestamp();
             let task = PreviewTask {
@@ -136,7 +207,7 @@ impl PreviewTaskStore {
                 artifact_id: artifact_id.clone(),
                 client_id: publisher.client_id.clone(),
                 org: publisher.org.clone(),
-                role: publisher.role.clone(),
+                role: publisher.role,
                 status: TaskStatus::Working,
                 status_message: "Preview regeneration queued".to_owned(),
                 created_at: now.clone(),
@@ -156,7 +227,7 @@ impl PreviewTaskStore {
         Err(AppError::Internal)
     }
 
-    pub fn get(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
+    fn get_locked(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
         if !valid_task_id(task_id) {
             return Ok(None);
         }
@@ -164,24 +235,52 @@ impl PreviewTaskStore {
         self.read_locked(task_id)
     }
 
-    pub fn working(&self) -> Result<Vec<PreviewTask>, AppError> {
+    fn working_locked(&self) -> Result<WorkingTasks, AppError> {
         let _guard = self.lock.lock().unwrap_or_else(|error| error.into_inner());
-        let Ok(entries) = std::fs::read_dir(&self.root) else {
-            return Ok(Vec::new());
+        let entries = match std::fs::read_dir(&self.root) {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Ok(WorkingTasks {
+                    tasks: Vec::new(),
+                    skipped: 0,
+                });
+            }
+            Err(error) => return Err(task_io_error("working locked", error)),
         };
-        let mut tasks = entries
-            .flatten()
-            .filter_map(|entry| entry.file_name().into_string().ok())
-            .filter_map(|name| name.strip_suffix(".json").map(ToOwned::to_owned))
-            .filter(|task_id| valid_task_id(task_id))
-            .filter_map(|task_id| self.read_locked(&task_id).ok().flatten())
-            .filter(|task| !task.is_terminal())
-            .collect::<Vec<_>>();
+        let mut tasks = Vec::new();
+        let mut skipped = 0;
+        for entry in entries {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    tracing::warn!(error = %error, "could not read preview task directory entry");
+                    skipped += 1;
+                    continue;
+                }
+            };
+            let name = entry.file_name();
+            let Some(task_id) = name.to_str().and_then(|name| name.strip_suffix(".json")) else {
+                continue;
+            };
+            if !valid_task_id(task_id) {
+                continue;
+            }
+            match std::fs::read(entry.path()).and_then(|bytes| {
+                serde_json::from_slice::<PreviewTask>(&bytes).map_err(std::io::Error::other)
+            }) {
+                Ok(task) if !task.is_terminal() => tasks.push(task),
+                Ok(_) => {}
+                Err(error) => {
+                    tracing::warn!(file = %name.to_string_lossy(), error = %error, "could not recover preview task");
+                    skipped += 1;
+                }
+            }
+        }
         tasks.sort_by(|left, right| left.created_at.cmp(&right.created_at));
-        Ok(tasks)
+        Ok(WorkingTasks { tasks, skipped })
     }
 
-    pub fn mark_running(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
+    fn mark_running_locked(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
         self.transition(task_id, |task| {
             if !task.is_terminal() {
                 task.status_message = "Rendering artifact preview".to_owned();
@@ -190,7 +289,11 @@ impl PreviewTaskStore {
         })
     }
 
-    pub fn complete(&self, task_id: &str, result: Value) -> Result<Option<PreviewTask>, AppError> {
+    fn complete_locked(
+        &self,
+        task_id: &str,
+        result: Value,
+    ) -> Result<Option<PreviewTask>, AppError> {
         self.transition(task_id, |task| {
             if !task.is_terminal() {
                 task.status = TaskStatus::Completed;
@@ -202,7 +305,7 @@ impl PreviewTaskStore {
         })
     }
 
-    pub fn fail(&self, task_id: &str, message: &str) -> Result<Option<PreviewTask>, AppError> {
+    fn fail_locked(&self, task_id: &str, message: &str) -> Result<Option<PreviewTask>, AppError> {
         self.transition(task_id, |task| {
             if !task.is_terminal() {
                 task.status = TaskStatus::Failed;
@@ -216,7 +319,7 @@ impl PreviewTaskStore {
         })
     }
 
-    pub fn cancel(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
+    fn cancel_locked(&self, task_id: &str) -> Result<Option<PreviewTask>, AppError> {
         self.transition(task_id, |task| {
             if !task.is_terminal() {
                 task.status = TaskStatus::Cancelled;
@@ -249,14 +352,15 @@ impl PreviewTaskStore {
         match std::fs::read(self.path(task_id)) {
             Ok(bytes) => serde_json::from_slice(&bytes)
                 .map(Some)
-                .map_err(task_io_error),
+                .map_err(|error| task_io_error("read locked", error)),
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-            Err(error) => Err(task_io_error(error)),
+            Err(error) => Err(task_io_error("read locked", error)),
         }
     }
 
     fn write_locked(&self, task: &PreviewTask) -> Result<(), AppError> {
-        let bytes = serde_json::to_vec(task).map_err(task_io_error)?;
+        let bytes =
+            serde_json::to_vec(task).map_err(|error| task_io_error("write locked", error))?;
         let temporary = self
             .root
             .join(format!(".{}.{}.tmp", task.task_id, nanoid!(10)));
@@ -275,7 +379,7 @@ impl PreviewTaskStore {
         if result.is_err() {
             let _ = std::fs::remove_file(&temporary);
         }
-        result.map_err(task_io_error)
+        result.map_err(|error| task_io_error("write locked", error))
     }
 
     fn path(&self, task_id: &str) -> PathBuf {
@@ -318,15 +422,22 @@ pub async fn create_preview_task(
     let _ = preview_source(artifact_id, publisher, deps).await?;
     let task = deps
         .preview_tasks
-        .create(ArtifactId::from(artifact_id), publisher)?;
+        .create(ArtifactId::from(artifact_id), publisher)
+        .await?;
     spawn_preview_task(task.task_id.clone(), deps.clone());
     Ok(task.wire(true))
 }
 
-pub fn resume_preview_tasks(deps: AppDeps) {
-    match deps.preview_tasks.working() {
-        Ok(tasks) => {
-            for task in tasks {
+pub async fn resume_preview_tasks(deps: AppDeps) {
+    match deps.preview_tasks.working().await {
+        Ok(recovery) => {
+            if recovery.skipped > 0 {
+                tracing::warn!(
+                    skipped = recovery.skipped,
+                    "preview task recovery skipped entries"
+                );
+            }
+            for task in recovery.tasks {
                 spawn_preview_task(task.task_id, deps.clone());
             }
         }
@@ -336,7 +447,7 @@ pub fn resume_preview_tasks(deps: AppDeps) {
     }
 }
 
-pub fn dispatch_task_method(
+pub async fn dispatch_task_method(
     message: &super::protocol::OrderedJson,
     publisher: &PublisherIdentity,
     deps: &AppDeps,
@@ -350,7 +461,7 @@ pub fn dispatch_task_method(
         .and_then(|params| params.get("taskId"))
         .and_then(super::protocol::OrderedJson::as_str)
         .ok_or_else(|| JsonRpcError::InvalidParams("taskId is required".to_owned()))?;
-    let task = authorized_task(task_id, publisher, deps)?;
+    let task = authorized_task(task_id, publisher, deps).await?;
     match method {
         "tasks/get" => Ok(task.wire(false)),
         "tasks/update" => {
@@ -367,21 +478,22 @@ pub fn dispatch_task_method(
             Ok(json!({ "resultType": "complete" }))
         }
         "tasks/cancel" => {
-            let _ = deps.preview_tasks.cancel(task_id)?;
+            let _ = deps.preview_tasks.cancel(task_id).await?;
             Ok(json!({ "resultType": "complete" }))
         }
         _ => Err(JsonRpcError::MethodNotFound(method.to_owned()).into()),
     }
 }
 
-fn authorized_task(
+async fn authorized_task(
     task_id: &str,
     publisher: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<PreviewTask, McpError> {
     let task = deps
         .preview_tasks
-        .get(task_id)?
+        .get(task_id)
+        .await?
         .filter(|task| task.accessible_to(publisher))
         .ok_or_else(|| JsonRpcError::InvalidParams(format!("Unknown task: {task_id}")))?;
     Ok(task)
@@ -389,7 +501,13 @@ fn authorized_task(
 
 fn spawn_preview_task(task_id: String, deps: AppDeps) {
     tokio::spawn(async move {
-        let Some(task) = deps.preview_tasks.mark_running(&task_id).ok().flatten() else {
+        let Some(task) = deps
+            .preview_tasks
+            .mark_running(&task_id)
+            .await
+            .ok()
+            .flatten()
+        else {
             return;
         };
         if task.is_terminal() {
@@ -397,7 +515,7 @@ fn spawn_preview_task(task_id: String, deps: AppDeps) {
         }
         match regenerate(&task.artifact_id.0, &task.publisher(), &deps).await {
             Ok(result) => {
-                let _ = deps.preview_tasks.complete(&task_id, result);
+                let _ = deps.preview_tasks.complete(&task_id, result).await;
             }
             Err(error) => {
                 tracing::warn!(
@@ -407,7 +525,8 @@ fn spawn_preview_task(task_id: String, deps: AppDeps) {
                 );
                 let _ = deps
                     .preview_tasks
-                    .fail(&task_id, &preview_failure_message(&error));
+                    .fail(&task_id, &preview_failure_message(&error))
+                    .await;
             }
         }
     });
@@ -508,8 +627,8 @@ fn timestamp() -> String {
         .unwrap_or_else(|_| "1970-01-01T00:00:00Z".to_owned())
 }
 
-fn task_io_error(error: impl std::fmt::Display) -> AppError {
-    tracing::error!(error = %error, "durable preview task persistence failed");
+fn task_io_error(operation: &'static str, error: impl std::fmt::Display) -> AppError {
+    tracing::error!(operation, error = %error, "durable preview task persistence failed");
     AppError::Internal
 }
 
@@ -517,31 +636,69 @@ fn task_io_error(error: impl std::fmt::Display) -> AppError {
 mod tests {
     use super::*;
 
-    #[test]
-    fn task_state_round_trips_and_terminal_transitions_are_monotonic() {
+    #[tokio::test]
+    async fn task_state_round_trips_and_terminal_transitions_are_monotonic() {
         let root = std::env::temp_dir().join(format!("artifact-mcp-tasks-{}", nanoid!(10)));
         let store = PreviewTaskStore::new(&root);
         let publisher = PublisherIdentity {
             client_id: ClientId::from("owner"),
             org: OrgId::from("acme"),
             label: "Owner".to_owned(),
-            role: "author".to_owned(),
+            role: crate::model::Role::Author,
             scopes: None,
         };
         let created = store
             .create(ArtifactId::from("abc123"), &publisher)
+            .await
             .expect("create");
-        assert_eq!(store.working().expect("working").len(), 1);
-        store.cancel(&created.task_id).expect("cancel");
+        assert_eq!(store.working().await.expect("working").tasks.len(), 1);
+        store.cancel(&created.task_id).await.expect("cancel");
         store
             .complete(&created.task_id, json!({"unexpected": true}))
+            .await
             .expect("late completion");
         let reloaded = PreviewTaskStore::new(&root)
             .get(&created.task_id)
+            .await
             .expect("read")
             .expect("task");
         assert!(matches!(reloaded.status, TaskStatus::Cancelled));
         assert!(reloaded.result.is_none());
+        let _ = std::fs::remove_dir_all(root);
+    }
+    #[tokio::test]
+    async fn recovery_reports_errors_and_keeps_readable_tasks() {
+        let root = std::env::temp_dir().join(format!("artifact-mcp-recovery-{}", nanoid!(10)));
+        let store = PreviewTaskStore::new(&root);
+        let missing = store.working().await.expect("missing directory");
+        assert!(missing.tasks.is_empty());
+        assert_eq!(missing.skipped, 0);
+
+        std::fs::create_dir_all(&root).expect("create root");
+        std::fs::write(root.join("tasks"), b"not a directory").expect("create file");
+        assert!(store.working().await.is_err());
+        std::fs::remove_file(root.join("tasks")).expect("remove file");
+
+        let publisher = PublisherIdentity {
+            client_id: ClientId::from("owner"),
+            org: OrgId::from("acme"),
+            label: "Owner".to_owned(),
+            role: crate::model::Role::Author,
+            scopes: None,
+        };
+        let task = store
+            .create(ArtifactId::from("abc123"), &publisher)
+            .await
+            .expect("create");
+        std::fs::write(
+            root.join("tasks/task_abcdefghijklmnopqrst.json"),
+            b"invalid json",
+        )
+        .expect("corrupt file");
+        let recovery = store.working().await.expect("recover");
+        assert_eq!(recovery.skipped, 1);
+        assert_eq!(recovery.tasks.len(), 1);
+        assert_eq!(recovery.tasks[0].task_id, task.task_id);
         let _ = std::fs::remove_dir_all(root);
     }
 }

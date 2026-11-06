@@ -19,6 +19,7 @@
 //!    pre-operation content or the committed replacement, never absent and never truncated.
 //! 3. **Startup converges** — a second audit is a no-op.
 
+use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use std::sync::{
     Arc, Barrier,
     atomic::{AtomicBool, Ordering},

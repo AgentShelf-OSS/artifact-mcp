@@ -14,7 +14,7 @@ use super::{
     parse::{invalid, positive_integer, present},
 };
 
-/// Optional HTML preview renderer configuration. [lib/preview.js:38-49], [lib/thumbnails.js:66-72]
+/// Optional HTML preview renderer configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PreviewConfig {
     /// `PREVIEW_RENDERER_URL` normalized to the `render` endpoint, or `None` when disabled.
@@ -25,7 +25,7 @@ pub struct PreviewConfig {
     pub viewport_width: u64,
     /// `PREVIEW_VIEWPORT` height component.
     pub viewport_height: u64,
-    /// In-process render cache entries (not environment-driven). [lib/preview.js:8]
+    /// In-process render cache entries (not environment-driven).
     pub cache_entries: u64,
     /// `PREVIEW_MAX_PNG_BYTES`
     pub max_png_bytes: u64,
@@ -50,7 +50,7 @@ impl Default for PreviewConfig {
 }
 
 impl PreviewConfig {
-    /// `true` once a usable renderer endpoint is configured. [lib/preview.js:53]
+    /// `true` once a usable renderer endpoint is configured.
     #[must_use]
     pub const fn enabled(&self) -> bool {
         self.renderer_endpoint.is_some()
@@ -133,7 +133,7 @@ fn read_preview_renderer_token_file(key: &str, path: &str) -> Result<Vec<u8>, Ap
     Ok(bytes)
 }
 
-/// Port of `rendererEndpoint(value)` — [lib/preview.js:25-36]
+/// Port of `rendererEndpoint(value)`
 fn renderer_endpoint(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
     let with_slash = if trimmed.ends_with('/') {
@@ -151,7 +151,7 @@ fn renderer_endpoint(raw: &str) -> Result<String, AppError> {
         .map_err(|_| invalid("PREVIEW_RENDERER_URL", trimmed, "an http(s) URL"))
 }
 
-/// Port of `parseViewport(value)` — [lib/preview.js:16-23]
+/// Port of `parseViewport(value)`
 ///
 /// Node silently falls back to `1200x630` for a malformed value; a present but malformed
 /// value fails closed here instead.

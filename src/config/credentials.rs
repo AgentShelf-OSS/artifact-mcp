@@ -6,7 +6,7 @@ use crate::error::AppError;
 
 use super::env::Secret;
 
-/// Port of `parseEncryptionKey(value)` — [lib/crypto.js:9-18].
+/// Port of `parseEncryptionKey(value)`.
 ///
 /// The canonical re-encode check rejects non-canonical base64 exactly as Node does.
 pub(super) fn parse_webhook_enc_key(value: Option<&str>) -> Result<Option<Secret>, AppError> {

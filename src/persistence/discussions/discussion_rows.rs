@@ -4,7 +4,6 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use super::{
     connection_rows::connection_row,
-    internal,
     types::{ArtifactDiscussion, DiscussionConnectionStrategy, DiscussionMode, DiscussionState},
 };
 use crate::{
@@ -52,7 +51,7 @@ pub(super) fn mirror_authority(
                 |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
             )
             .optional()
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("mirror authority", error))?;
         match anchor {
             Some((_, state)) if state == "dead_letter" => {
                 return Err(AppError::Conflict(
@@ -86,7 +85,7 @@ pub(super) fn mirror_authority(
                         ],
                         |row| row.get(0),
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| crate::error::internal("mirror authority", error))?;
                 if !recovered {
                     return Err(AppError::Conflict(
                         "The original publication notification is unavailable. Historical recovery must find one exact selected-webhook match before Discord threading can start."
@@ -128,7 +127,7 @@ pub(super) fn discussion_row(
             updated_at: row.get::<_, Option<String>>(16)?.map(Timestamp),
             anchor_outbox_id: row.get(17)?,
         }),
-    ).optional().map_err(internal)
+    ).optional().map_err(|error| crate::error::internal("discussion row", error))
 }
 
 pub(super) fn artifact_exists(
@@ -143,5 +142,5 @@ pub(super) fn artifact_exists(
     )
     .optional()
     .map(|row: Option<()>| row.is_some())
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("artifact exists", error))
 }

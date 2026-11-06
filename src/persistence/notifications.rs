@@ -1,44 +1,21 @@
-//! Owned by U10 (terra) — viewer notification projections and read watermarks.
+//! Viewer notification projections and read watermarks.
 //!
-//! Port of `lib/notifications.js`. Notifications are not a stored feed: they are a projection of
-//! tenant-scoped viewer feedback joined against one durable per-viewer watermark row in
-//! `notification_reads` (v20 `notification-read-watermarks`, `lib/migrations.js:402-413`).
+//! Notifications are a projection of tenant-scoped viewer feedback joined against one durable per-viewer watermark row in `notification_reads` (v20 `notification-read-watermarks`).
 //!
 //! # Semantics preserved
 //!
-//! * **Two queries, not one with a predicate.** `lib/notifications.js:9-50` prepares separate
-//!   admin and member statements. The member statement adds `a.org = @org`; the admin statement
-//!   has no org filter at all, so an admin sees every tenant. [`recent_for_viewer`] and
-//!   [`unread_count`] select between them on [`Viewer::is_admin`], exactly as
-//!   `lib/notifications.js:66-74` does.
-//! * **Self-authored feedback is never a notification.** `f.viewer_email <> @email` in all four
-//!   statements.
-//! * **`unread` is computed against the watermark, not stored.**
-//!   `f.created_at > COALESCE(r.seen_at, @epoch)` with [`EPOCH`] as the never-seen default
-//!   (`lib/notifications.js:6`). The join `LEFT JOIN notification_reads r ON r.viewer_email =
-//!   @email` is deliberately uncorrelated with `f` — one watermark applies to every row.
-//! * **Ordering is observable.** `ORDER BY f.created_at DESC, f.id DESC` feeds an ordered JSON
-//!   array into the gallery (`lib/app.js:229-232`), so the tiebreaker on `f.id` is load-bearing
-//!   whenever two comments share a second.
-//! * **The watermark only moves forward.** `SET seen_at = MAX(notification_reads.seen_at,
-//!   excluded.seen_at)` (`lib/notifications.js:51-55`) — a clock that jumps backwards, or a
-//!   late-arriving request, cannot resurrect notifications the viewer already dismissed.
-//! * **Missing identity degrades to the empty string**, not to an error:
-//!   `String(viewer.email || "")` / `String(viewer.org || "")` (`lib/notifications.js:57-64`).
-//!   An empty email matches no feedback author, so every row stays "not mine" and unread.
+//! * **Separate admin and member queries.** The module prepares separate admin and member statements. The member statement adds `a.org = @org`; the admin statement has no org filter at all, so an admin sees every tenant. [`recent_for_viewer`] and [`unread_count`] select between them on [`Viewer::is_admin`].
+//! * **Self-authored feedback is never a notification.** `f.viewer_email <> @email` in all four statements.
+//! * **`unread` is computed against the watermark, not stored.** `f.created_at > COALESCE(r.seen_at, @epoch)` with [`EPOCH`] as the never-seen default. The join `LEFT JOIN notification_reads r ON r.viewer_email = @email` is deliberately uncorrelated with `f` — one watermark applies to every row.
+//! * **Ordering is observable.** `ORDER BY f.created_at DESC, f.id DESC` feeds an ordered JSON array into the gallery, so the tiebreaker on `f.id` is load-bearing whenever two comments share a second.
+//! * **The watermark only moves forward.** `SET seen_at = MAX(notification_reads.seen_at, excluded.seen_at)` — a clock that jumps backwards, or a late-arriving request, cannot resurrect notifications the viewer already dismissed.
+//! * **Missing identity degrades to the empty string**, not to an error: `String(viewer.email || "")` / `String(viewer.org || "")`. An empty email matches no feedback author, so every row stays "not mine" and unread.
 //!
 //! # Not best-effort
 //!
-//! Unlike the view analytics next door, the notification projection is **not** wrapped in a
-//! `try`/`catch` by its caller: `lib/app.js:229-232` builds `notificationState` outside the
-//! guarded per-org loop above it, so a failure here fails the gallery request. That asymmetry is
-//! deliberate in the reference (an empty badge would silently hide feedback), and it is why these
-//! functions return `Result` instead of degrading like [`crate::persistence::views`].
+//! Unlike the view analytics next door, the notification projection is **not** wrapped in an error guard by its caller. The gallery builds `notificationState` outside the guarded per-org loop above it, so a failure here fails the gallery request. That asymmetry is deliberate in the reference (an empty badge would silently hide feedback), and it is why these functions return `Result` instead of degrading like [`crate::persistence::views`].
 //!
-//! One mechanical difference: Node passes `@limit` to the counting statements too
-//! (`lib/notifications.js:72`), where the SQL does not use it. better-sqlite3 ignores the extra
-//! named value; rusqlite rejects an unknown parameter name, so the count path binds only the
-//! parameters its statement declares. No observable difference.
+//! One mechanical difference: Node passes `@limit` to the counting statements too, where the SQL does not use it. better-sqlite3 ignores the extra named value; rusqlite rejects an unknown parameter name, so the count path binds only the parameters its statement declares. No observable difference.
 
 use rusqlite::Connection;
 
@@ -49,16 +26,15 @@ use crate::model::{
 };
 use crate::persistence::db::{self, DbPool};
 
-/// The "never seen anything" watermark (`lib/notifications.js:6`).
+/// The "never seen anything" watermark.
 pub const EPOCH: &str = "1970-01-01 00:00:00";
 
-/// `recentForViewer`'s default page size (`lib/notifications.js:66`).
+/// `recentForViewer`'s default page size.
 pub const DEFAULT_LIMIT: usize = 30;
 
-/// Upper clamp applied to any requested limit (`lib/notifications.js:62`).
+/// Upper clamp applied to any requested limit.
 pub const MAX_LIMIT: usize = 100;
 
-/// `lib/notifications.js:9-21`.
 const RECENT_ADMIN_SQL: &str = "\
 SELECT f.id, f.artifact_id, a.title AS artifact_title, a.org,
        f.body, f.viewer_email, f.author_source, f.external_author_id,
@@ -73,7 +49,6 @@ WHERE (f.viewer_email IS NULL OR f.viewer_email <> @email)
 ORDER BY f.created_at DESC, f.id DESC
 LIMIT @limit";
 
-/// `lib/notifications.js:22-34`.
 const RECENT_MEMBER_SQL: &str = "\
 SELECT f.id, f.artifact_id, a.title AS artifact_title, a.org,
        f.body, f.viewer_email, f.author_source, f.external_author_id,
@@ -88,7 +63,6 @@ WHERE a.org = @org AND (f.viewer_email IS NULL OR f.viewer_email <> @email)
 ORDER BY f.created_at DESC, f.id DESC
 LIMIT @limit";
 
-/// `lib/notifications.js:35-42`.
 const COUNT_ADMIN_SQL: &str = "\
 SELECT COUNT(*) AS count
 FROM feedback f
@@ -97,7 +71,6 @@ LEFT JOIN notification_reads r ON r.viewer_email = @email
 WHERE (f.viewer_email IS NULL OR f.viewer_email <> @email)
   AND f.created_at > COALESCE(r.seen_at, @epoch)";
 
-/// `lib/notifications.js:43-50`.
 const COUNT_MEMBER_SQL: &str = "\
 SELECT COUNT(*) AS count
 FROM feedback f
@@ -106,13 +79,12 @@ LEFT JOIN notification_reads r ON r.viewer_email = @email
 WHERE a.org = @org AND (f.viewer_email IS NULL OR f.viewer_email <> @email)
   AND f.created_at > COALESCE(r.seen_at, @epoch)";
 
-/// `lib/notifications.js:51-55`.
 const MARK_SEEN_SQL: &str = "\
 INSERT INTO notification_reads (viewer_email, seen_at) VALUES (?, datetime('now'))
 ON CONFLICT(viewer_email) DO UPDATE
 SET seen_at = MAX(notification_reads.seen_at, excluded.seen_at)";
 
-/// `Math.max(1, Math.min(100, Number(limit) || 30))` from `lib/notifications.js:62`.
+/// `Math.max(1, Math.min(100, Number(limit) || 30))`.
 ///
 /// `0` is falsy in JavaScript and becomes the default; anything above [`MAX_LIMIT`] is clamped.
 #[must_use]
@@ -126,7 +98,7 @@ pub const fn normalize_limit(limit: usize) -> usize {
     }
 }
 
-/// `String(viewer.email || "")` (`lib/notifications.js:59`).
+/// `String(viewer.email || "")`.
 fn viewer_email(viewer: &Viewer) -> String {
     viewer
         .email
@@ -134,7 +106,7 @@ fn viewer_email(viewer: &Viewer) -> String {
         .map_or_else(String::new, |email| email.0.clone())
 }
 
-/// `String(viewer.org || "")` (`lib/notifications.js:60`).
+/// `String(viewer.org || "")`.
 fn viewer_org(viewer: &Viewer) -> String {
     viewer
         .org
@@ -162,7 +134,7 @@ pub fn recent_for_viewer(
     };
     let mut stmt = conn
         .prepare(sql)
-        .map_err(|error| internal("prepare notifications", &error))?;
+        .map_err(|error| crate::error::internal("prepare notifications", error))?;
 
     // The admin statement has no @org placeholder; binding one would be an unknown-parameter error.
     let mut params: Vec<(&str, &dyn rusqlite::ToSql)> =
@@ -218,12 +190,12 @@ pub fn recent_for_viewer(
                 unread: row.get::<_, i64>(13)? != 0,
             })
         })
-        .map_err(|error| internal("query notifications", &error))?;
+        .map_err(|error| crate::error::internal("query notifications", error))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|error| internal("read notifications", &error))
+        .map_err(|error| crate::error::internal("read notifications", error))
 }
 
-/// How many notifications sit above the viewer's watermark (`lib/notifications.js:71-74`).
+/// How many notifications sit above the viewer's watermark.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the count query fails.
@@ -244,7 +216,7 @@ pub fn unread_count(conn: &Connection, viewer: &Viewer) -> Result<u64, AppError>
 
     conn.query_row(sql, &params[..], |row| row.get::<_, i64>(0))
         .map(|count| u64::try_from(count).unwrap_or(0))
-        .map_err(|error| internal("count notifications", &error))
+        .map_err(|error| crate::error::internal("count notifications", error))
 }
 
 /// Advances the viewer's read watermark to now, never backwards.
@@ -253,7 +225,7 @@ pub fn unread_count(conn: &Connection, viewer: &Viewer) -> Result<u64, AppError>
 /// Returns [`AppError::Internal`] if the upsert fails.
 pub fn mark_seen(conn: &Connection, email: &EmailAddress) -> Result<(), AppError> {
     conn.execute(MARK_SEEN_SQL, (&email.0,))
-        .map_err(|error| internal("mark notifications seen", &error))?;
+        .map_err(|error| crate::error::internal("mark notifications seen", error))?;
     Ok(())
 }
 
@@ -271,7 +243,7 @@ pub fn watermark(conn: &Connection, email: &EmailAddress) -> Result<Option<Times
     )
     .optional()
     .map(|value| value.map(Timestamp))
-    .map_err(|error| internal("read notification watermark", &error))
+    .map_err(|error| crate::error::internal("read notification watermark", error))
 }
 
 /// Pooled [`recent_for_viewer`].
@@ -300,12 +272,6 @@ pub async fn unread_count_pooled(pool: &DbPool, viewer: Viewer) -> Result<u64, A
 /// See [`mark_seen`]; also [`AppError::Unavailable`] when no connection is available.
 pub async fn mark_seen_pooled(pool: &DbPool, email: EmailAddress) -> Result<(), AppError> {
     db::interact(pool, move |conn| mark_seen(conn, &email)).await
-}
-
-/// SQL faults are logged and reported without leaking driver detail.
-fn internal(operation: &str, error: &rusqlite::Error) -> AppError {
-    tracing::error!(operation, error = %error, "notification query failed");
-    AppError::Internal
 }
 
 #[cfg(test)]

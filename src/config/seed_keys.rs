@@ -7,14 +7,14 @@ use super::{
     env::Secret,
 };
 
-/// One parsed `ARTIFACT_API_KEYS` entry. [lib/db.js:30-58]
+/// One parsed `ARTIFACT_API_KEYS` entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SeedKey {
     /// `clientId` component.
     pub client_id: ClientId,
     /// `org` component, defaulting to `default` for two-part entries.
     pub org: OrgId,
-    /// The shared secret; hashed by U04/U09 before it reaches the database.
+    /// The shared secret; hashed before it reaches the database.
     pub secret: Secret,
 }
 
@@ -24,12 +24,11 @@ pub struct SeedKeys {
     /// Entries eligible for bootstrap insertion, in declaration order.
     pub entries: Vec<SeedKey>,
     /// Client ids skipped because they used a documented placeholder secret.
-    /// [lib/db.js:38,51-54]
     pub ignored_placeholders: Vec<ClientId>,
 }
 
 impl SeedKeys {
-    /// Port of the `ARTIFACT_API_KEYS` parsing half of `seedKeysFromEnv`. [lib/db.js:30-58]
+    /// Port of the `ARTIFACT_API_KEYS` parsing half of `seedKeysFromEnv`.
     #[must_use]
     pub fn parse(raw: &str) -> Self {
         let mut parsed = Self::default();

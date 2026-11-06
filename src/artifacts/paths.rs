@@ -1,4 +1,4 @@
-//! Owned by U07 (terra) — artifact, history, and preview paths.
+//! Artifact, history, and preview paths.
 //!
 //! The on-disk layout is frozen by the rebuild blueprint §D2 and must not change; bodies do
 //! not move during cutover, and Node and Rust have to alternate against the same directory.
@@ -17,48 +17,41 @@
 //!
 //! | Rust | Node |
 //! |---|---|
-//! | [`artifact_dir`] | `path.join(dataDir, "artifacts")` — [lib/db.js:9] |
-//! | [`single_body_path`] | `filePath(id)` — [lib/store.js:170-172] |
-//! | [`bundle_dir`] | `bundleDir(id)` — [lib/store.js:174-176] |
-//! | [`transient_path`] | `transientPath(id, kind)` — [lib/store.js:178-180] |
-//! | [`history_root`] / [`history_dir`] | `HISTORY_DIR`, `historyDir(id)` — [lib/store.js:44], [lib/store.js:517-519] |
-//! | [`history_body_path`] | `historyBodyPath(id, revision, isBundle)` — [lib/store.js:520-522] |
-//! | [`preview_dir`] | `path.join(dataDir, "previews")` — [lib/thumbnails.js:71] |
-//! | [`preview_artifact_dir`] | `artifactDir(id)` — [lib/thumbnails.js:75-78] |
-//! | [`thumbnail_path`] | `thumbnailPath(id, digest)` — [lib/thumbnails.js:80-84] |
+//! | [`artifact_dir`] | `path.join(dataDir, "artifacts")` |
+//! | [`single_body_path`] | `filePath(id)` |
+//! | [`bundle_dir`] | `bundleDir(id)` |
+//! | [`transient_path`] | `transientPath(id, kind)` |
+//! | [`history_root`] / [`history_dir`] | `HISTORY_DIR`, `historyDir(id)` |
+//! | [`history_body_path`] | `historyBodyPath(id, revision, isBundle)` |
+//! | [`preview_dir`] | `path.join(dataDir, "previews")` |
+//! | [`preview_artifact_dir`] | `artifactDir(id)` |
+//! | [`thumbnail_path`] | `thumbnailPath(id, digest)` |
 //!
-//! Every constructor takes an already-validated [`SafeArtifactId`] / [`BodyDigest`], so no
-//! caller-supplied string ever reaches a path segment unchecked. That is stricter than Node,
-//! which only guards the preview paths ([lib/thumbnails.js:3-4]); it cannot change behaviour
-//! for real artifacts because every generated id satisfies `/^[0-9a-z]{6,24}$/`
-//! ([lib/store.js:30]).
+//! Every constructor takes an already-validated [`SafeArtifactId`] / [`BodyDigest`], so no caller-supplied string ever reaches a path segment unchecked. That is stricter than Node, which only guards the preview paths; it cannot change behaviour for real artifacts because every generated id satisfies `/^[0-9a-z]{6,24}$/`.
 
 use std::path::{Path, PathBuf};
 
 pub use super::validation::{BodyDigest, SafeArtifactId};
 pub use crate::persistence::db::{ARTIFACT_DIR_NAME, artifact_dir};
 
-/// `const HISTORY_DIR = ".history"` — [lib/store.js:44]
+/// `const HISTORY_DIR = ".history"`
 pub const HISTORY_DIR_NAME: &str = ".history";
 
-/// `path.join(dataDir, "previews")` — [lib/thumbnails.js:71]
+/// `path.join(dataDir, "previews")`
 pub const PREVIEW_DIR_NAME: &str = "previews";
 
 /// Extension of a single-file body and of a single-file history snapshot.
-/// [lib/store.js:171], [lib/store.js:521]
 pub const SINGLE_BODY_EXTENSION: &str = "html";
 
-/// Extension of a persisted thumbnail. [lib/thumbnails.js:83]
+/// Extension of a persisted thumbnail.
 pub const THUMBNAIL_EXTENSION: &str = "png";
 
-/// The two transient path kinds in `transientPath(id, kind)`. [lib/store.js:178-180]
+/// The two transient path kinds in `transientPath(id, kind)`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TransientKind {
     /// A body written before the metadata commit, swapped in afterwards.
-    /// [lib/store.js:213], [lib/store.js:375]
     Staging,
     /// A body moved aside before a delete, discarded once the row is gone.
-    /// [lib/store.js:503-509]
     Trash,
 }
 
@@ -76,20 +69,19 @@ impl TransientKind {
 // Live bodies
 // ---------------------------------------------------------------------------
 
-/// ``filePath(id) = path.join(artifactDir, `<id>.html`)`` — [lib/store.js:170-172]
+/// ``filePath(id) = path.join(artifactDir, `<id>.html`)``
 #[must_use]
 pub fn single_body_path(artifact_dir: &Path, id: &SafeArtifactId) -> PathBuf {
     artifact_dir.join(format!("{}.{SINGLE_BODY_EXTENSION}", id.as_str()))
 }
 
-/// `bundleDir(id) = path.join(artifactDir, id)` — [lib/store.js:174-176]
+/// `bundleDir(id) = path.join(artifactDir, id)`
 #[must_use]
 pub fn bundle_dir(artifact_dir: &Path, id: &SafeArtifactId) -> PathBuf {
     artifact_dir.join(id.as_str())
 }
 
 /// The live body path for an artifact of either shape.
-/// [lib/store.js:426], [lib/store.js:504], [lib/store.js:672]
 #[must_use]
 pub fn body_path(artifact_dir: &Path, id: &SafeArtifactId, is_bundle: bool) -> PathBuf {
     if is_bundle {
@@ -104,11 +96,9 @@ pub fn body_path(artifact_dir: &Path, id: &SafeArtifactId, is_bundle: bool) -> P
 // ---------------------------------------------------------------------------
 
 /// ``transientPath(id, kind) = path.join(artifactDir, `.${id}.${kind}-${generateId()}`)``
-/// — [lib/store.js:178-180]
 ///
-/// `token` is Node's `generateId()`, a 12-character nanoid over the artifact alphabet; U08 owns
-/// the generator, so it is passed in. Returns `None` for a token that could not have come from
-/// that generator, which keeps the random suffix from becoming an injection point.
+/// `token` is a caller-supplied 12-character nanoid over the artifact alphabet.
+/// Returns `None` for a token outside that format, so the suffix cannot become an injection point.
 #[must_use]
 pub fn transient_path(
     artifact_dir: &Path,
@@ -126,13 +116,12 @@ pub fn transient_path(
 }
 
 /// `name.startsWith(".") && (name.includes(".staging-") || name.includes(".trash-"))`
-/// — [lib/store.js:694]
 #[must_use]
 pub fn is_transient_name(name: &str) -> bool {
     name.starts_with('.') && (name.contains(".staging-") || name.contains(".trash-"))
 }
 
-/// ``name.match(/^\.([0-9a-z]{6,24})\.(?:staging|trash)-/)`` — [lib/store.js:695]
+/// ``name.match(/^\.([0-9a-z]{6,24})\.(?:staging|trash)-/)``
 ///
 /// Recovers the owning artifact id from a transient directory entry so the storage audit can
 /// decide whether the interrupted body still belongs at the final path.
@@ -151,13 +140,13 @@ pub fn transient_name_artifact_id(name: &str) -> Option<SafeArtifactId> {
 // Version history
 // ---------------------------------------------------------------------------
 
-/// `path.join(artifactDir, HISTORY_DIR)` — [lib/store.js:518], [lib/store.js:724]
+/// `path.join(artifactDir, HISTORY_DIR)`
 #[must_use]
 pub fn history_root(artifact_dir: &Path) -> PathBuf {
     artifact_dir.join(HISTORY_DIR_NAME)
 }
 
-/// `historyDir(id) = path.join(artifactDir, HISTORY_DIR, id)` — [lib/store.js:517-519]
+/// `historyDir(id) = path.join(artifactDir, HISTORY_DIR, id)`
 #[must_use]
 pub fn history_dir(artifact_dir: &Path, id: &SafeArtifactId) -> PathBuf {
     history_root(artifact_dir).join(id.as_str())
@@ -165,7 +154,6 @@ pub fn history_dir(artifact_dir: &Path, id: &SafeArtifactId) -> PathBuf {
 
 /// ``historyBodyPath(id, revision, isBundle) =
 /// path.join(historyDir(id), isBundle ? String(revision) : `${revision}.html`)``
-/// — [lib/store.js:520-522]
 #[must_use]
 pub fn history_body_path(
     artifact_dir: &Path,
@@ -199,20 +187,19 @@ pub fn history_snapshot_temp_path(
 // Previews
 // ---------------------------------------------------------------------------
 
-/// `const previewDir = path.join(dataDir, "previews")` — [lib/thumbnails.js:71]
+/// `const previewDir = path.join(dataDir, "previews")`
 #[must_use]
 pub fn preview_dir(data_dir: &Path) -> PathBuf {
     data_dir.join(PREVIEW_DIR_NAME)
 }
 
-/// `artifactDir(id)` in the thumbnail store — [lib/thumbnails.js:75-78]
+/// `artifactDir(id)` in the thumbnail store
 #[must_use]
 pub fn preview_artifact_dir(data_dir: &Path, id: &SafeArtifactId) -> PathBuf {
     preview_dir(data_dir).join(id.as_str())
 }
 
 /// ``thumbnailPath(id, digest) = path.join(artifactDir(id), `${digest}.png`)``
-/// — [lib/thumbnails.js:80-84]
 #[must_use]
 pub fn thumbnail_path(data_dir: &Path, id: &SafeArtifactId, digest: &BodyDigest) -> PathBuf {
     preview_artifact_dir(data_dir, id).join(format!("{}.{THUMBNAIL_EXTENSION}", digest.as_str()))

@@ -432,8 +432,12 @@ fn check_surface_into(root: &Path, base: Option<&str>, errors: &mut Errors) -> R
     let dispatch_tools = tool_names_from_dispatch(&dispatch, errors);
     let resource_methods =
         methods_from_dispatch(&resources, "pub async fn dispatch(", "resources", errors)?;
-    let task_methods =
-        methods_from_dispatch(&tasks, "pub fn dispatch_task_method(", "tasks", errors)?;
+    let task_methods = methods_from_dispatch(
+        &tasks,
+        "pub async fn dispatch_task_method(",
+        "tasks",
+        errors,
+    )?;
     let protocol_versions = protocol_versions_from_dispatch(&dispatch);
     let rejected_duplicates = [
         ("legacyTools", duplicates(&legacy_tools)),

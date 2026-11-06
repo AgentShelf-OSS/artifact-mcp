@@ -1,10 +1,8 @@
-//! Owned by U05 (sol) — viewer identity and Cloudflare JWT verification.
+//! Viewer identity and Cloudflare JWT verification.
 //!
-//! Authority: `lib/identity.js`. The claim-validation semantics it delegates to come from
-//! `jose@5.10.0` (`node_modules/jose/dist/node/esm/lib/jwt_claims_set.js`), which is why the
-//! boundary conditions below are quoted from that file rather than paraphrased.
+//! Claim-validation boundary conditions preserve compatibility with `jose@5.10.0`.
 //!
-//! # Startup modes — `ACCESS_IDENTITY_MODE` [lib/identity.js:49-55]
+//! # Startup modes — `ACCESS_IDENTITY_MODE`
 //!
 //! | Mode | Selected when | Identity source |
 //! |---|---|---|
@@ -12,13 +10,9 @@
 //! | `header-trust` | neither, but `TRUST_ACCESS_HEADERS=1` | the *unverified* `Cf-Access-Authenticated-User-Email` header |
 //! | `disabled` | neither | nothing — every request is anonymous |
 //!
-//! `header-trust` never reads a JWT and `jwt` never reads the email header: a spoofed email
-//! header cannot bypass verification, and a JWT cannot smuggle an identity into a dev box.
-//! [`assert_ready`] is the startup gate: `REQUIRE_ACCESS_JWT=1` without a usable JWT
-//! configuration refuses to boot, and `header-trust` on a non-loopback bind refuses to boot
-//! unless `HEADER_TRUST_ALLOW_INSECURE=1` acknowledges it. [lib/identity.js:56-76]
+//! `header-trust` never reads a JWT and `jwt` never reads the email header: a spoofed email header cannot bypass verification, and a JWT cannot smuggle an identity into a dev box. [`assert_ready`] is the startup gate: `REQUIRE_ACCESS_JWT=1` without a usable JWT configuration refuses to boot, and `header-trust` on a non-loopback bind refuses to boot unless `HEADER_TRUST_ALLOW_INSECURE=1` acknowledges it.
 //!
-//! # Token source and precedence [lib/identity.js:117-119]
+//! # Token source and precedence
 //!
 //! `Cf-Access-Jwt-Assertion` is preferred; the `CF_Authorization` cookie is the fallback. The
 //! header wins *even when it is unusable* — Node evaluates `headerToken || readAccessCookie(req)`,
@@ -26,7 +20,7 @@
 //! load-bearing: `access_retry.rs` exists precisely because Cloudflare sometimes sends the cookie
 //! without the header.
 //!
-//! # Claim validation, with a 60-second leeway [lib/identity.js:22,122-126]
+//! # Claim validation, with a 60-second leeway
 //!
 //! `clockTolerance` defaults to 60 seconds (`Number(ACCESS_CLOCK_TOLERANCE_S) || 60`, so `0` and
 //! unparsable values both select 60). `jose` applies it asymmetrically, and the asymmetry is
@@ -43,16 +37,11 @@
 //!
 //! # Fail-closed
 //!
-//! Every verification failure — no token, malformed compact form, unknown `kid`, bad signature,
-//! wrong `iss`/`aud`, expired or not-yet-valid beyond the leeway, malformed cookie, unusable
-//! JWKS — collapses to an anonymous [`Viewer`]. Node's `catch { return {email:null, …} }`
-//! ([lib/identity.js:128-130]) makes that the contract, and it is what
-//! `human-concealment.invariant3` depends on.
+//! Every verification failure — no token, malformed compact form, unknown `kid`, bad signature, wrong `iss`/`aud`, expired or not-yet-valid beyond the leeway, malformed cookie, unusable JWKS — collapses to an anonymous [`Viewer`]. Node's `catch { return {email:null, …} }` makes that the contract, and it is what `human-concealment.invariant3` depends on.
 //!
 //! # Secret containment
 //!
-//! [`AccessToken`] redacts itself in `Debug`/`Display`. No token, claim set, or signature is ever
-//! placed in an [`AppError`] or a log line; failures are reported as the anonymous viewer.
+//! [`AccessToken`] redacts itself in `Debug`/`Display`. No token, claim set, or signature is ever placed in an [`AppError`] or a log line; failures are reported as the anonymous viewer.
 
 use hmac::{Hmac, KeyInit as _, Mac};
 use sha2::Sha256;
@@ -111,11 +100,11 @@ pub fn viewer_display_name(email: &str) -> String {
     result.chars().take(40).collect()
 }
 
-/// The header Cloudflare Access sets with the signed assertion. [lib/identity.js:117]
+/// The header Cloudflare Access sets with the signed assertion.
 pub const ACCESS_JWT_HEADER: &str = "cf-access-jwt-assertion";
-/// The header Cloudflare Access sets with the authenticated email. [lib/identity.js:132]
+/// The header Cloudflare Access sets with the authenticated email.
 pub const ACCESS_EMAIL_HEADER: &str = "cf-access-authenticated-user-email";
-/// The session cookie carrying the same assertion. [lib/identity.js:103]
+/// The session cookie carrying the same assertion.
 pub const ACCESS_COOKIE_NAME: &str = "CF_Authorization";
 
 /// A Cloudflare Access assertion.
@@ -157,7 +146,7 @@ impl fmt::Display for AccessToken {
 
 /// The first value of a header, or `""` when absent or not valid UTF-8.
 ///
-/// Node normalises a repeated header to a single joined string and `lib/identity.js` additionally
+/// The original implementation normalises repeated headers to a single joined string and also
 /// guards with `Array.isArray(h) ? h[0] : h`; taking the first value reproduces that guard.
 fn first_header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
     headers
@@ -166,7 +155,7 @@ fn first_header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
         .unwrap_or_default()
 }
 
-/// `readAccessCookie(req)` — the `CF_Authorization` value. [lib/identity.js:96-109]
+/// `readAccessCookie(req)` — the `CF_Authorization` value.
 ///
 /// Cookie values legitimately contain `=` (a JWT does not, but the parser must not assume it), so
 /// the split is on the **first** separator only and the name is compared exactly after trimming.
@@ -192,14 +181,14 @@ pub fn read_access_cookie(headers: &HeaderMap) -> Option<AccessToken> {
     None
 }
 
-/// The `Cf-Access-Jwt-Assertion` header, when present and non-empty. [lib/identity.js:117-118]
+/// The `Cf-Access-Jwt-Assertion` header, when present and non-empty.
 #[must_use]
 pub fn access_assertion_header(headers: &HeaderMap) -> Option<AccessToken> {
     let value = first_header(headers, ACCESS_JWT_HEADER);
     (!value.is_empty()).then(|| AccessToken::new(value))
 }
 
-/// `headerToken || readAccessCookie(req)` — header first, cookie second. [lib/identity.js:119]
+/// `headerToken || readAccessCookie(req)` — header first, cookie second.
 #[must_use]
 pub fn access_token(headers: &HeaderMap) -> Option<AccessToken> {
     access_assertion_header(headers).or_else(|| read_access_cookie(headers))
@@ -209,16 +198,16 @@ pub fn access_token(headers: &HeaderMap) -> Option<AccessToken> {
 // Org directory
 // ---------------------------------------------------------------------------
 
-/// The database-backed half of `orgForEmail`. [lib/orgs.js:58-67]
+/// The database-backed half of `orgForEmail`.
 ///
-/// `ViewerIdentity::resolve` needs two org lookups that live in tables U09 owns. Declaring them
+/// `ViewerIdentity::resolve` needs two database organization lookups. Declaring them
 /// as their own narrow port keeps this unit testable without a database and keeps the frozen
 /// `AdminService` surface out of the identity path.
 pub trait OrgDirectory: Send + Sync + fmt::Debug {
     /// `orgForEmail(email)` — the org from the v21 `org_email_members` table.
     ///
-    /// That table's primary key is `TEXT PRIMARY KEY COLLATE NOCASE`
-    /// ([lib/migrations.js:419-421]), so the match is case-insensitive **in SQLite**, on top of
+    /// That table's primary key is `TEXT PRIMARY KEY COLLATE NOCASE`,
+    /// so the match is case-insensitive **in SQLite**, on top of
     /// the caller's own lowercasing. Implementations backed by anything other than that table
     /// must reproduce the case-insensitive match themselves.
     ///
@@ -229,7 +218,7 @@ pub trait OrgDirectory: Send + Sync + fmt::Debug {
         email: &'a EmailAddress,
     ) -> BoxFuture<'a, Result<Option<OrgId>, AppError>>;
 
-    /// `orgForDomain(domain)` — the org from the `org_domains` table. [lib/orgs.js:58-61]
+    /// `orgForDomain(domain)` — the org from the `org_domains` table.
     ///
     /// # Errors
     /// Returns [`AppError`] when the lookup fails; a missing row is `Ok(None)`.
@@ -265,7 +254,6 @@ impl OrgDirectory for NoOrgDirectory {
 // ---------------------------------------------------------------------------
 
 /// `domainOf(email)` — the part after the **last** `@`, lowercased, or `""`.
-/// [lib/identity.js:78-81]
 ///
 /// `lastIndexOf` (not `indexOf`) is deliberate in Node and reproduced here: it is what makes a
 /// local part containing `@` resolve to the real domain.
@@ -276,7 +264,7 @@ pub fn domain_of(email: &str) -> String {
         .map_or_else(String::new, |at| email[at + 1..].to_lowercase())
 }
 
-/// `ADMIN_EMAILS.has(email.toLowerCase()) || ADMIN_DOMAINS.has(domain)` — [lib/identity.js:85]
+/// Match the normalized email or domain against the configured administrator allowlists.
 ///
 /// Admin status is decided **before** any mapping is consulted, so no org mapping can demote a
 /// configured admin.
@@ -286,7 +274,7 @@ pub fn is_admin_email(access: &AccessConfig, email: &str) -> bool {
     access.admin_emails.contains(&lowered) || access.admin_email_domains.contains(&domain_of(email))
 }
 
-/// `explicit || orgForDomain(domain) || DOMAIN_ORG.get(domain) || domain` — [lib/identity.js:89]
+/// `explicit || orgForDomain(domain) || DOMAIN_ORG.get(domain) || domain`
 ///
 /// JavaScript's `||` skips the empty string as well as `null`, so an org column that is present
 /// but blank falls through to the next source. Filtering empties reproduces that.
@@ -353,7 +341,7 @@ pub enum TokenRejection {
 /// The verified claims a caller is allowed to see.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct VerifiedAccessToken {
-    /// The `email` claim, trimmed and lowercased. [lib/identity.js:127]
+    /// The `email` claim, trimmed and lowercased.
     pub email: String,
 }
 
@@ -404,13 +392,13 @@ const fn is_js_whitespace(value: char) -> bool {
     matches!(value, '\u{feff}') || (value.is_whitespace() && !matches!(value, '\u{85}'))
 }
 
-/// `String.prototype.trim` — [lib/identity.js:127]
+/// `String.prototype.trim`
 #[must_use]
 fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
 }
 
-/// `checkAudiencePresence(payload.aud, [AUD])` — [jose `lib/jwt_claims_set.js`]
+/// Check the presence and value of the expected audience claim.
 fn audience_matches(claim: Option<&Value>, expected: &str) -> bool {
     match claim {
         Some(Value::String(single)) => single == expected,
@@ -442,7 +430,7 @@ fn critical_headers_ok(header: &Map<String, Value>) -> bool {
 // Viewer identity
 // ---------------------------------------------------------------------------
 
-/// `createViewerResolver()` as the frozen [`ViewerIdentity`] port. [lib/identity.js:112-142]
+/// Viewer resolution through the frozen [`ViewerIdentity`] port.
 #[derive(Clone, Debug)]
 pub struct AccessViewerIdentity {
     config: Arc<AppConfig>,
@@ -490,13 +478,13 @@ impl AccessViewerIdentity {
         )
     }
 
-    /// The active identity mode. [lib/identity.js:50-55]
+    /// The active identity mode.
     #[must_use]
     pub fn mode(&self) -> AccessIdentityMode {
         self.config.access.identity_mode()
     }
 
-    /// `https://${TEAM_DOMAIN}` — the only accepted issuer. [lib/identity.js:123]
+    /// `https://${TEAM_DOMAIN}` — the only accepted issuer.
     #[must_use]
     pub fn expected_issuer(&self) -> String {
         format!("https://{}", self.config.access.team_domain)
@@ -661,10 +649,10 @@ impl ViewerIdentity for AccessViewerIdentity {
     }
 }
 
-/// `assertReady()` — the startup gate for the configured identity mode. [lib/identity.js:56-76]
+/// Check startup readiness for the configured identity mode.
 ///
-/// The checks themselves live in `AppConfig::validate_startup`, which U02 ported together with
-/// the environment parsing; this is the security layer's named entry point so a bootstrap does
+/// The checks live in `AppConfig::validate_startup` alongside environment parsing.
+/// This is the security layer's named entry point so a bootstrap does
 /// not have to know that. Re-parsing the environment here would risk the two drifting apart.
 ///
 /// # Errors

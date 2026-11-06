@@ -18,19 +18,19 @@ pub(super) const JOINED_COLUMNS: &str = "f.id, f.artifact_id, f.org, f.viewer_em
      f.external_edited_at, f.external_deleted_at, f.anchor_kind, f.anchor_node_id, \
      f.anchor_quote";
 
-/// `insertStmt` — [lib/feedback.js:45-48]
+/// `insertStmt`
 pub(super) const INSERT_SQL: &str = "INSERT INTO feedback (id, artifact_id, org, viewer_email, body, \
      artifact_revision, parent_id, anchor_path, anchor_x, anchor_y, anchor_w, anchor_h, \
      anchor_approx, anchor_page, anchor_kind, anchor_node_id, anchor_quote) \
      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)";
 
-/// `resolveStmt` — [lib/feedback.js:53-55]
+/// `resolveStmt`
 pub(super) const RESOLVE_SQL: &str = "UPDATE feedback SET resolved_at = datetime('now'), resolved_by = ?1 \
      WHERE id = ?2 AND resolved_at IS NULL";
 
-/// `reopenStmt` — [lib/feedback.js:56-58]
+/// `reopenStmt`
 pub(super) const REOPEN_SQL: &str = "UPDATE feedback SET resolved_at = NULL, resolved_by = NULL \
      WHERE id = ?1 AND resolved_at IS NOT NULL";
 
-/// `deleteStmt` — [lib/feedback.js:59]. Replies cascade via the migration-13 self FK.
+/// `deleteStmt`. Replies cascade via the migration-13 self FK.
 pub(super) const DELETE_SQL: &str = "DELETE FROM feedback WHERE id = ?1";

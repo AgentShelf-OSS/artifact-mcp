@@ -5,7 +5,6 @@ use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use super::{
     DiscussionStore,
     discussion_rows::{artifact_exists, discussion_row, mirror_authority},
-    internal,
     support::{append_audit_then_commit, trimmed},
     types::{ArtifactDiscussion, DiscussionMode, DiscussionState},
 };
@@ -29,7 +28,7 @@ impl DiscussionStore {
         let org = trimmed(&org.0);
         let enabled_by = truncate_utf16(&trimmed(enabled_by), 320);
         db::interact(&self.pool, move |conn| {
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(internal)?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| crate::error::internal("enable mirror", error))?;
             let authority = mirror_authority(&tx, &artifact_id, &org)?;
             tx.execute(
                 "INSERT INTO artifact_discussions (artifact_id, org, provider, mode, connection_org, connection_id, state, generation, enabled_by, enabled_at, anchor_outbox_id) \
@@ -47,9 +46,9 @@ impl DiscussionStore {
                     authority.anchor_outbox_id
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("enable mirror", error))?;
             let row = discussion_row(&tx, &artifact_id, &org)?.ok_or(AppError::NotFound("Artifact not found.".to_owned()))?;
-            tx.commit().map_err(internal)?;
+            tx.commit().map_err(|error| crate::error::internal("enable mirror", error))?;
             Ok(row)
         })
         .await
@@ -71,7 +70,7 @@ impl DiscussionStore {
                  WHERE artifact_id = ?1 AND org = ?2",
                     params![artifact_id, org],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("disable mirror", error))?;
             if changed == 0 {
                 return artifact_exists(conn, &artifact_id, &org)?
                     .then(|| ArtifactDiscussion::local_only(ArtifactId(artifact_id), OrgId(org)))
@@ -116,7 +115,8 @@ impl DiscussionStore {
         let subject = format!("artifact:{artifact_id}:1");
         let expected_event_id =
             stable_delivery_event_id(&OrgId(org.clone()), &WebhookEvent::Published, &subject);
-        let generation = i64::try_from(generation).map_err(|_| AppError::Internal)?;
+        let generation = i64::try_from(generation)
+            .map_err(|error| crate::error::internal("notification anchor message", error))?;
         db::interact(&self.pool, move |conn| {
             if outbox_id.is_empty() {
                 return conn
@@ -137,7 +137,7 @@ impl DiscussionStore {
                         |row| row.get::<_, String>(0),
                     )
                     .optional()
-                    .map_err(internal);
+                    .map_err(|error| crate::error::internal("notification anchor message", error));
             }
             conn.query_row(
                 "SELECT o.discord_message_id \
@@ -164,7 +164,7 @@ impl DiscussionStore {
             )
             .optional()
             .map(|value| value.flatten())
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("notification anchor message", error))
         })
         .await
     }
@@ -187,14 +187,14 @@ impl DiscussionStore {
         let target = artifact_id.clone();
         db::interact(&self.pool, move |conn| {
             let audit = audit.for_target_tenant(&org)?;
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(internal)?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| crate::error::internal("set mode audited", error))?;
             let current = discussion_row(&tx, &artifact_id, &org)?;
             let unchanged = matches!((mode, current.as_ref().map(|row| row.mode)),
                 (DiscussionMode::ArtifactMcpOnly, None | Some(DiscussionMode::ArtifactMcpOnly)) |
                 (DiscussionMode::DiscordMirror, Some(DiscussionMode::DiscordMirror)));
             if unchanged {
                 let value = current.unwrap_or_else(|| ArtifactDiscussion::local_only(ArtifactId(artifact_id), OrgId(org)));
-                tx.commit().map_err(internal)?;
+                tx.commit().map_err(|error| crate::error::internal("set mode audited", error))?;
                 return Ok(value);
             }
             let value = match mode {
@@ -202,7 +202,7 @@ impl DiscussionStore {
                     tx.execute(
                         "UPDATE artifact_discussions SET mode='artifact_only', state='paused', disabled_at=datetime('now'), updated_at=datetime('now') WHERE artifact_id=?1 AND org=?2",
                         params![artifact_id, org],
-                    ).map_err(internal)?;
+                    ).map_err(|error| crate::error::internal("set mode audited", error))?;
                     discussion_row(&tx, &artifact_id, &org)?.ok_or(AppError::Internal)?
                 }
                 DiscussionMode::DiscordMirror => {
@@ -210,7 +210,7 @@ impl DiscussionStore {
                     tx.execute(
                         "INSERT INTO artifact_discussions (artifact_id, org, provider, mode, connection_org, connection_id, state, generation, enabled_by, enabled_at, anchor_outbox_id) VALUES (?1, ?2, 'discord', 'discord_mirror', ?2, ?3, 'pending', 1, ?4, datetime('now'), ?5) ON CONFLICT(artifact_id) DO UPDATE SET org=excluded.org, provider='discord', mode='discord_mirror', connection_org=excluded.connection_org, connection_id=excluded.connection_id, state='pending', generation=artifact_discussions.generation+1, enabled_by=excluded.enabled_by, enabled_at=datetime('now'), disabled_at=NULL, thread_id=NULL, root_message_id=NULL, last_synced_at=NULL, last_error=NULL, anchor_outbox_id=excluded.anchor_outbox_id, updated_at=datetime('now')",
                         params![artifact_id, org, authority.connection_id, enabled_by, authority.anchor_outbox_id],
-                    ).map_err(internal)?;
+                    ).map_err(|error| crate::error::internal("set mode audited", error))?;
                     discussion_row(&tx, &artifact_id, &org)?.ok_or(AppError::Internal)?
                 }
             };
@@ -238,14 +238,14 @@ impl DiscussionStore {
         let target = artifact_id.clone();
         db::interact(&self.pool, move |conn| {
             let audit = audit.for_target_tenant(&org)?;
-            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(internal)?;
+            let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate).map_err(|error| crate::error::internal("retry audited", error))?;
             let current = discussion_row(&tx, &artifact_id, &org)?
                 .ok_or_else(|| AppError::Conflict("Discord discussion mirroring is not enabled.".to_owned()))?;
             if current.mode != DiscussionMode::DiscordMirror {
                 return Err(AppError::Conflict("Discord discussion mirroring is not enabled.".to_owned()));
             }
             if current.state != DiscussionState::Failed {
-                tx.commit().map_err(internal)?;
+                tx.commit().map_err(|error| crate::error::internal("retry audited", error))?;
                 return Ok(current);
             }
             let authority = mirror_authority(&tx, &artifact_id, &org)?;
@@ -258,7 +258,7 @@ impl DiscussionStore {
                     enabled_by,
                     authority.anchor_outbox_id
                 ],
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("retry audited", error))?;
             let value = discussion_row(&tx, &artifact_id, &org)?.ok_or(AppError::Internal)?;
             let event = AuditEvent {
                 operation: "discussion.mode.retry".to_owned(), target_type: "artifact".to_owned(), target_id: target,

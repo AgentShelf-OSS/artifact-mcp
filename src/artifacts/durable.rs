@@ -73,7 +73,9 @@ pub fn create_dir_all_with_barrier(
     path: &Path,
     before_first_sync: impl FnOnce() -> Result<(), AppError>,
 ) -> Result<(), AppError> {
-    let relative = path.strip_prefix(root).map_err(|_| AppError::Internal)?;
+    let relative = path
+        .strip_prefix(root)
+        .map_err(|error| crate::error::internal("resolve path beneath storage root", error))?;
     if !root.is_dir() {
         return Err(AppError::Internal);
     }

@@ -246,14 +246,16 @@ async fn push_snapshots_revision_and_key_validation() {
         broker
             .query("artifact", "reviews", "status", json!({"extra":true}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
     assert_eq!(
         broker
             .set_snapshot("artifact", "reviews", "unknown", json!(1))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "not_found"
     );
 }
@@ -281,7 +283,8 @@ async fn event_batches_are_atomic_and_ids_are_idempotent() {
         broker
             .append_events("artifact", "reviews", "events", invalid)
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
     let valid = vec![Event {
@@ -324,7 +327,8 @@ async fn replacing_bindings_clears_changed_data_and_retains_unchanged() {
         broker
             .query("artifact", "reviews", "status", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "not_found"
     );
     broker
@@ -486,7 +490,8 @@ async fn http_queries_bound_responses_and_encode_paths_and_queries() {
         broker
             .query("artifact", "reviews", "item", json!({"item":"a/b"}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
     assert_eq!(
@@ -498,21 +503,24 @@ async fn http_queries_bound_responses_and_encode_paths_and_queries() {
                 json!({"item":"run-1","extra":1})
             )
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "bad_params"
     );
     assert_eq!(
         broker
             .query("artifact", "reviews", "redirect", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "data_unavailable"
     );
     assert_eq!(
         broker
             .query("artifact", "reviews", "large", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "too_large"
     );
     drop(server);
@@ -717,7 +725,8 @@ async fn persisted_events_and_mapped_snapshot_keys_are_tenant_scoped() {
         second
             .query("mapped", "reviews", "latest", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "not_found"
     );
     second
@@ -728,7 +737,8 @@ async fn persisted_events_and_mapped_snapshot_keys_are_tenant_scoped() {
         second
             .query("mapped", "reviews", "latest", json!({}))
             .await
-            .unwrap_err(),
+            .unwrap_err()
+            .reason(),
         "not_found"
     );
     let remaining=artifact_mcp::persistence::db::interact(&pool,|conn|{

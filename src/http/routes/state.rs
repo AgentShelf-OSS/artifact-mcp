@@ -14,7 +14,9 @@ use crate::{
     error::AppError,
     http::routes::artifact::{authorize, json_error, parse_json_request},
     mcp::protocol::OrderedJson,
+    model::EmailAddress,
     persistence::state::{self, StateError, StateScope, StateValue},
+    ports::state::StateAudience,
     security::audit::{AuditRequestId, MutationAudit},
 };
 
@@ -48,6 +50,15 @@ pub(crate) fn scope_query(uri: &axum::http::Uri) -> Result<StateScope, &'static 
         "org" => Ok(StateScope::Org),
         "viewer" => Ok(StateScope::Viewer),
         _ => Err("bad_scope"),
+    }
+}
+
+fn audience(scope: StateScope, viewer: Option<EmailAddress>) -> Result<StateAudience, AppError> {
+    match scope {
+        StateScope::Org => Ok(StateAudience::Org),
+        StateScope::Viewer => viewer
+            .map(StateAudience::Viewer)
+            .ok_or(AppError::ConcealedNotFound),
     }
 }
 
@@ -91,11 +102,11 @@ async fn list_state(
         Ok(s) => s,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
-    let owner = viewer.email.clone();
-    if scope == StateScope::Viewer && owner.is_none() {
-        return AppError::ConcealedNotFound.into_response();
-    }
-    match deps.viewer_state.list(artifact, scope, owner).await {
+    let audience = match audience(scope, viewer.email.clone()) {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
+    match deps.viewer_state.list(artifact, audience).await {
         Ok(keys) => no_store(
             Json(
                 serde_json::json!({ "keys": keys.into_iter().map(|key| KeyResponse {
@@ -124,11 +135,11 @@ async fn get_state(
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
-    let owner = viewer.email.clone();
-    if scope == StateScope::Viewer && owner.is_none() {
-        return AppError::ConcealedNotFound.into_response();
-    }
-    match deps.viewer_state.get(artifact, key, scope, owner).await {
+    let audience = match audience(scope, viewer.email.clone()) {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
+    match deps.viewer_state.get(artifact, key, audience).await {
         Ok(Some(value)) => no_store(
             Json(ValueResponse {
                 key: value.key,
@@ -157,9 +168,10 @@ async fn put_state(
         Ok(s) => s,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
-    if scope == StateScope::Viewer && viewer.email.is_none() {
-        return AppError::ConcealedNotFound.into_response();
-    }
+    let audience = match audience(scope, viewer.email.clone()) {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
@@ -206,7 +218,7 @@ async fn put_state(
     };
     match deps
         .viewer_state
-        .put(artifact, key, value.clone(), if_revision, writer, scope)
+        .put(artifact, key, value.clone(), if_revision, writer, audience)
         .await
     {
         Ok(value) => Json(KeyResponse::from(value)).into_response(),
@@ -239,9 +251,10 @@ async fn delete_state(
         Ok(s) => s,
         Err(error) => return json_error(StatusCode::BAD_REQUEST, error),
     };
-    if scope == StateScope::Viewer && viewer.email.is_none() {
-        return AppError::ConcealedNotFound.into_response();
-    }
+    let audience = match audience(scope, viewer.email.clone()) {
+        Ok(value) => value,
+        Err(error) => return error.into_response(),
+    };
     if !state::valid_key(&key) {
         return json_error(StatusCode::BAD_REQUEST, "bad_key");
     }
@@ -252,7 +265,7 @@ async fn delete_state(
         };
     match deps
         .viewer_state
-        .delete(artifact, key, scope, viewer.email, audit)
+        .delete(artifact, key, audience, audit)
         .await
     {
         Ok(()) => StatusCode::NO_CONTENT.into_response(),

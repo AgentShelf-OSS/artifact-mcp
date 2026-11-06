@@ -6,7 +6,6 @@ use super::{
     connection_rows::connection_row_by_id,
     discussion_rows::{discussion_row, mirror_authority},
     inputs::CreateDiscussionMessageLink,
-    internal,
     link_rows::{link_by_feedback, link_by_feedback_generation},
     support::trimmed,
     types::{DiscussionConnectionStrategy, DiscussionMessageLink, DiscussionMode},
@@ -62,7 +61,7 @@ pub(crate) fn active_plan_in_transaction(
             params![artifact_id.0, org.0],
             |row| row.get(0),
         )
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("active plan in transaction", error))?;
     if explicit_local {
         return Ok(None);
     }
@@ -73,9 +72,9 @@ pub(crate) fn active_plan_in_transaction(
             |row| row.get::<_, i64>(0),
         )
         .optional()
-        .map_err(internal)?;
+        .map_err(|error| crate::error::internal("active plan in transaction", error))?;
     let current = discussion_row(tx, &artifact_id.0, &org.0)?;
-    // A migrated PBI-079 mirror remains authoritative while no PBI-081 policy row exists.
+    // A migrated discussion mirror remains authoritative while no organization policy row exists.
     // Once an administrator saves an explicit policy, disabling it is a hard planning boundary.
     if policy == Some(0) {
         return Ok(None);
@@ -108,11 +107,14 @@ pub(crate) fn active_plan_in_transaction(
                     artifact_id.0,
                     org.0,
                     authority.connection_id,
-                    i64::try_from(generation).map_err(|_| AppError::Internal)?,
+                    i64::try_from(generation).map_err(|error| crate::error::internal(
+                        "active plan in transaction",
+                        error
+                    ))?,
                     authority.anchor_outbox_id
                 ],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("active plan in transaction", error))?;
             discussion_row(tx, &artifact_id.0, &org.0)?.ok_or(AppError::Internal)?
         }
         _ => return Ok(None),
@@ -163,7 +165,7 @@ pub(crate) fn root_outbox_in_transaction(
         |row| row.get(0),
     )
     .optional()
-    .map_err(internal)
+    .map_err(|error| crate::error::internal("root outbox in transaction", error))
 }
 
 pub(crate) fn link_for_feedback_generation_in_transaction(
@@ -248,7 +250,7 @@ pub(crate) fn create_link_in_transaction(
             generation,
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("create link in transaction", error))?;
     let row = link_by_feedback_generation(
         tx,
         &input.artifact_id.0,
@@ -289,11 +291,11 @@ pub(crate) fn mark_deleted_and_bind_tombstone_in_transaction(
             link.artifact_id.0,
             link.org.0,
             link.feedback_id.0,
-            i64::try_from(link.generation).map_err(|_| AppError::Internal)?,
+            i64::try_from(link.generation).map_err(|error| crate::error::internal("mark deleted and bind tombstone in transaction", error))?,
             link.connection_id,
         ],
     )
-    .map_err(internal)?;
+    .map_err(|error| crate::error::internal("mark deleted and bind tombstone in transaction", error))?;
     if changed != 1 {
         return Err(AppError::Conflict(
             "discussion tombstone idempotency conflict".to_owned(),

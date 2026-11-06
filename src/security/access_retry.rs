@@ -1,6 +1,4 @@
-//! Owned by U05 (sol) — Cloudflare Access retry decisions.
-//!
-//! Authority: `lib/access-retry.js`, wired at `server.js:29,196-208`.
+//! Cloudflare Access retry decisions.
 //!
 //! # Why this exists
 //!
@@ -10,7 +8,7 @@
 //! answers 404; a manual reload then works. This turns exactly that state — cookie present,
 //! assertion absent — into one automatic, once-only reload of the same URL.
 //!
-//! # Guards, all of which must hold [lib/access-retry.js:14-22]
+//! # Guards, all of which must hold
 //!
 //! | Guard | Reason |
 //! |---|---|
@@ -21,9 +19,7 @@
 //! | the path is `/` or a single non-reserved artifact id | never a raw, share, thumbnail, or sub-resource route |
 //! | the retry parameter is not already set | once only, so a persistent failure cannot loop |
 //!
-//! Only a path plus query is ever returned, so a protocol-relative request target such as
-//! `//evil.example/abcdef123456` yields `/abcdef123456?cf_access_retry=1` and cannot become an
-//! open redirect.
+//! Only a path plus query is ever returned, so a protocol-relative request target such as `//evil.example/abcdef123456` yields `/abcdef123456?cf_access_retry=1` and cannot become an open redirect.
 
 use axum::http::{HeaderMap, Method, Uri};
 use url::{Url, form_urlencoded};
@@ -35,14 +31,12 @@ use crate::{
 };
 
 /// `ACCESS_RETRY_PARAM` — the query parameter marking a request as already retried.
-/// [server.js:29]
 pub const ACCESS_RETRY_PARAM: &str = "cf_access_retry";
 
-/// The synthetic origin `lib/access-retry.js` resolves the request target against.
-/// [lib/access-retry.js:19]
+/// The synthetic origin used to resolve a request target.
 const REQUEST_TARGET_BASE: &str = "http://artifact-mcp.local";
 
-/// `isRetryablePath(pathname)` — [lib/access-retry.js:6-11]
+/// `isRetryablePath(pathname)`
 ///
 /// `/` is the gallery. Otherwise the path must be exactly one segment that could name an
 /// artifact: any nested path (`/raw/…`, `/abcdef123456/history`) and every reserved or malformed
@@ -59,7 +53,6 @@ pub fn is_retryable_path(pathname: &str) -> bool {
 }
 
 /// `accessRetryTarget(req, { mode, param })` — the URL to reload, or `None`.
-/// [lib/access-retry.js:13-25]
 ///
 /// `target` is the raw request target (`req.url`), i.e. path plus query.
 #[must_use]

@@ -1,7 +1,6 @@
-//! Owned by U05 (sol) — JWKS retrieval, caching, and rotation.
+//! JWKS retrieval, caching, and rotation.
 //!
-//! Authority: `lib/identity.js:42-47` chooses `jose`'s `createRemoteJWKSet`, so the *behaviour*
-//! this module must reproduce lives in `jose@5.10.0`:
+//! This module preserves the remote key-set behavior of `jose@5.10.0`:
 //!
 //! * `node_modules/jose/dist/node/esm/jwks/remote.js` — cache freshness, cooldown, rotation.
 //! * `node_modules/jose/dist/node/esm/jwks/local.js` — candidate filtering and key import.
@@ -10,7 +9,7 @@
 //!
 //! | Behaviour | Value | jose authority |
 //! |---|---|---|
-//! | Endpoint | `https://<team>/cdn-cgi/access/certs` | `lib/identity.js:44` |
+//! | Endpoint | `https://<team>/cdn-cgi/access/certs` | Cloudflare Access |
 //! | Cache max age | 600 000 ms | `remote.js` constructor |
 //! | Refetch cooldown | 30 000 ms | `remote.js` constructor |
 //! | Fetch timeout | 5 000 ms | `remote.js` constructor |
@@ -26,9 +25,7 @@
 //!
 //! # Deliberate hardening
 //!
-//! `jose` reads the JWKS response body without a size limit. [`HttpJwksSource`] caps it at
-//! [`MAX_JWKS_BYTES`]. A real Cloudflare Access JWKS is a few hundred bytes, so the cap cannot
-//! change any accept/reject decision; it only bounds memory if the endpoint is hostile.
+//! `jose` reads the JWKS response body without a size limit. [`HttpJwksSource`] caps it at [`MAX_JWKS_BYTES`]. A real Cloudflare Access JWKS is a few hundred bytes, so the cap cannot change any accept/reject decision; it only bounds memory if the endpoint is hostile.
 
 use std::{fmt, sync::Arc, time::Duration};
 
@@ -339,7 +336,7 @@ pub trait JwksSource: Send + Sync + fmt::Debug {
 // HTTP source
 // ---------------------------------------------------------------------------
 
-/// The real Cloudflare Access endpoint. [lib/identity.js:44]
+/// The real Cloudflare Access endpoint.
 #[derive(Debug)]
 pub struct HttpJwksSource {
     client: reqwest::Client,
@@ -362,7 +359,7 @@ impl HttpJwksSource {
     pub fn new(url: impl Into<String>) -> Result<Self, AppError> {
         let client = Self::client_builder()
             .build()
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("build JWKS HTTP client", error))?;
         Ok(Self {
             client,
             url: url.into(),

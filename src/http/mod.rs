@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — frozen route aggregation; route files are independently owned.
+//! Route aggregation; route files are independently defined.
 
 use axum::{Router, middleware as axum_middleware};
 

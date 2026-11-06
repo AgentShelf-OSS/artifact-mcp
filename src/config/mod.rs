@@ -1,18 +1,11 @@
-//! Owned by U02 (terra) — typed environment, limits, clocks, IDs, and random sources.
+//! Typed environment, limits, clocks, IDs, and random sources.
 //!
-//! Every default in this module is transcribed from the Node reference, which is the
-//! behavioural oracle for the rebuild. Each constant cites the `file:line` it came from.
+//! Defaults preserve the original implementation's behavior.
 //!
 //! Parsing policy (fail-closed):
 //!
-//! * An **absent** variable, or one whose value is empty after trimming, uses the Node
-//!   default. Node reaches the same result because `Number("")` is `0` (not `> 0`) and
-//!   `"" || fallback` yields the fallback, so this is behaviour-preserving.
-//! * A **present, non-empty** variable that Node would silently discard (`NaN`, negative,
-//!   zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`]
-//!   instead of silently falling back. This is the one deliberate hardening over Node:
-//!   it never changes the result for an input Node accepts, and no conformance case
-//!   supplies an input Node would discard.
+//! * An **absent** variable, or one whose value is empty after trimming, uses the Node default. Node reaches the same result because `Number("")` is `0` (not `> 0`) and `"" || fallback` yields the fallback, so this is behaviour-preserving.
+//! * A **present, non-empty** variable that Node would silently discard (`NaN`, negative, zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`] instead of silently falling back. This is the one deliberate hardening over Node: it never changes the result for an input Node accepts, and no conformance case supplies an input Node would discard.
 //! * Nothing in this module panics, and the crate forbids `unsafe`.
 
 mod access;
@@ -30,6 +23,7 @@ mod parse;
 mod preview;
 mod random;
 mod seed_keys;
+pub(crate) mod speech;
 mod stale_guard;
 #[cfg(any(test, feature = "test-util"))]
 mod testkit;
@@ -88,18 +82,18 @@ use parse::{disabled_unless_one, invalid, non_empty_string, present, raw_string}
 /// build an `AppDeps` without touching the process environment.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AppConfig {
-    pub action_grants: Vec<crate::actions::ActionGrant>,
-    /// `PORT` — [server.js:27]
+    pub action_grants: Vec<crate::integrations::actions::ActionGrant>,
+    /// `PORT`
     pub port: u16,
-    /// `LISTEN_HOST` — [server.js:190]
+    /// `LISTEN_HOST`
     pub listen_host: String,
-    /// `PUBLIC_BASE_URL` — [server.js:28]
+    /// `PUBLIC_BASE_URL`
     pub public_base_url: String,
-    /// `DATA_DIR` — [lib/db.js:8]
+    /// `DATA_DIR`
     pub data_dir: PathBuf,
-    /// `APP_NAME` — [lib/config.js:19]
+    /// `APP_NAME`
     pub app_name: String,
-    /// `APP_BRAND` — [lib/config.js:20]
+    /// `APP_BRAND`
     pub app_brand: String,
     /// Upload/storage limits.
     pub storage: StorageLimits,
@@ -115,7 +109,7 @@ pub struct AppConfig {
     pub access_sync: Option<crate::integrations::access_sync::AccessSyncConfig>,
     /// Optional OAuth service-credential resource-server configuration.
     pub oauth: OAuthConfig,
-    /// `WEBHOOK_ENC_KEY`, validated as canonical 32-byte base64. [lib/crypto.js:9-18]
+    /// `WEBHOOK_ENC_KEY`, validated as canonical 32-byte base64.
     pub webhook_enc_key: Option<Secret>,
     /// `DISCORD_BOT_TOKEN`, used only for Discord's authenticated thread-management REST calls.
     /// The token is never rendered, logged, or persisted.
@@ -126,7 +120,7 @@ pub struct AppConfig {
     /// `AUDIT_LEDGER_HMAC_KEY`, a canonical base64 HMAC key. The executable refuses to serve
     /// without it; keeping this optional here preserves deterministic route/unit fixtures.
     pub audit_ledger_hmac_key: Option<Secret>,
-    /// `ARTIFACT_API_KEYS` bootstrap entries. [lib/db.js:30]
+    /// `ARTIFACT_API_KEYS` bootstrap entries.
     pub seed_keys: SeedKeys,
     /// Exact artifact ID and current revision grants for the trusted casting integration.
     pub cast_ids: BTreeSet<(String, u64)>,
@@ -192,7 +186,7 @@ impl AppConfig {
         let body = BodyLimits::from_source(env, storage.max_bundle_bytes)?;
         // The speech module reads this lazily; reject invalid values at startup instead.
         if let Some(raw) = present(env, "TTS_WORKER_CONCURRENCY") {
-            crate::http::routes::speech::parse_worker_concurrency(Some(&raw)).map_err(|_| {
+            speech::parse_worker_concurrency(Some(&raw)).map_err(|_| {
                 invalid(
                     "TTS_WORKER_CONCURRENCY",
                     raw.trim(),
@@ -201,7 +195,7 @@ impl AppConfig {
             })?;
         }
         if let Some(raw) = present(env, "POCKET_TTS_EXTRA_VOICES") {
-            crate::http::routes::speech::parse_extra_pocket_voices(Some(&raw)).map_err(|_| {
+            speech::parse_extra_pocket_voices(Some(&raw)).map_err(|_| {
                 invalid(
                     "POCKET_TTS_EXTRA_VOICES",
                     "<invalid>",
@@ -228,7 +222,7 @@ impl AppConfig {
         validate_public_base_url(&public_base_url)?;
 
         Ok(Self {
-            action_grants: crate::actions::load_grants(
+            action_grants: crate::integrations::actions::load_grants(
                 present(env, "ARTIFACT_ACTIONS_FILE").as_deref(),
             )?,
             port,
@@ -260,37 +254,37 @@ impl AppConfig {
     }
 
     /// Web Push reminders are enabled only with a valid VAPID identity **and** `WEBHOOK_ENC_KEY`,
-    /// which encrypts subscription endpoints at rest. [lib/config.js] `parseWebPushConfig`.
+    /// which encrypts subscription endpoints at rest.
     #[must_use]
     pub fn web_push_enabled(&self) -> bool {
         self.web_push.vapid.is_some() && self.webhook_enc_key.is_some()
     }
 
-    /// `path.join(dataDir, "artifacts")` — [lib/db.js:9]
+    /// `path.join(dataDir, "artifacts")`
     #[must_use]
     pub fn artifact_dir(&self) -> PathBuf {
         self.data_dir.join("artifacts")
     }
 
-    /// `path.join(dataDir, "artifacts.db")` — [lib/db.js:10]
+    /// `path.join(dataDir, "artifacts.db")`
     #[must_use]
     pub fn database_path(&self) -> PathBuf {
         self.data_dir.join("artifacts.db")
     }
 
-    /// `path.join(dataDir, "previews")` — [lib/thumbnails.js:70]
+    /// `path.join(dataDir, "previews")`
     #[must_use]
     pub fn preview_dir(&self) -> PathBuf {
         self.data_dir.join("previews")
     }
 
-    /// `${PUBLIC_BASE}/${id}` — [server.js:28], [lib/app.js:741]
+    /// `${PUBLIC_BASE}/${id}`
     #[must_use]
     pub fn artifact_url(&self, id: &ArtifactId) -> String {
         format!("{}/{id}", self.public_base_url.trim_end_matches('/'))
     }
 
-    /// Port of `assertReady()` — [lib/identity.js:56-77].
+    /// Validate configuration before startup.
     ///
     /// # Errors
     /// Returns [`AppError::Validation`] carrying the Node message verbatim when the

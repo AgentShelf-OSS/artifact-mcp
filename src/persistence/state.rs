@@ -1,11 +1,10 @@
 //! Organization and per-viewer state persistence.
 
 use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
-use serde::{Deserialize, Serialize};
 
 use crate::{
     error::AppError,
-    mcp::protocol::OrderedJson,
+    model::json::OrderedJson,
     model::{ArtifactId, EmailAddress, Timestamp},
     persistence::db::{self, DbPool},
 };
@@ -15,59 +14,10 @@ pub use crate::config::{
     STATE_MAX_VALUE_BYTES as MAX_VALUE_BYTES,
 };
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct StateValue {
-    pub artifact_id: ArtifactId,
-    pub key: String,
-    pub value: OrderedJson,
-    pub revision: u64,
-    pub updated_at: Timestamp,
-    pub updated_by: EmailAddress,
-    pub scope: StateScope,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum StateScope {
-    #[default]
-    Org,
-    Viewer,
-}
-
-impl StateScope {
-    pub fn as_str(self) -> &'static str {
-        match self {
-            Self::Org => "org",
-            Self::Viewer => "viewer",
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StateKey {
-    pub key: String,
-    pub revision: u64,
-    pub updated_at: Timestamp,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Conflict {
-    pub value: OrderedJson,
-    pub revision: u64,
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum StateError {
-    #[error("{0}")]
-    App(#[from] AppError),
-    #[error("state conflict")]
-    Conflict(Conflict),
-    #[error("too many state keys")]
-    TooManyKeys,
-}
+pub use crate::model::state::{Conflict, StateError, StateKey, StateScope, StateValue};
 
 fn internal(context: &str, error: impl std::fmt::Display) -> StateError {
-    let _ = (context, error);
+    tracing::error!(operation = context, error = %error, "state persistence failed");
     StateError::App(AppError::Internal)
 }
 
@@ -116,7 +66,7 @@ pub fn list(
     viewer: Option<&str>,
 ) -> Result<Vec<StateKey>, AppError> {
     let mut stmt = conn.prepare("SELECT key, revision, updated_at FROM artifact_state WHERE artifact_id = ? AND scope = ? AND viewer = ? ORDER BY key")
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("list", error))?;
     let rows = stmt
         .query_map(
             params![&artifact_id.0, scope.as_str(), state_owner(scope, viewer)],
@@ -128,9 +78,9 @@ pub fn list(
                 })
             },
         )
-        .map_err(|_| AppError::Internal)?;
+        .map_err(|error| crate::error::internal("list", error))?;
     rows.collect::<rusqlite::Result<Vec<_>>>()
-        .map_err(|_| AppError::Internal)
+        .map_err(|error| crate::error::internal("list", error))
 }
 
 pub fn get(
@@ -141,7 +91,7 @@ pub fn get(
     viewer: Option<&str>,
 ) -> Result<Option<StateValue>, AppError> {
     conn.query_row("SELECT artifact_id,key,value,revision,updated_at,updated_by FROM artifact_state WHERE artifact_id=? AND scope=? AND viewer=? AND key=?", params![artifact_id.0, scope.as_str(), state_owner(scope, viewer), key], |row| decode(row, artifact_id, scope))
-        .optional().map_err(|_| AppError::Internal)
+        .optional().map_err(|error| crate::error::internal("get", error))
 }
 
 pub fn set(
@@ -153,6 +103,27 @@ pub fn set(
     updated_by: &EmailAddress,
     scope: StateScope,
 ) -> Result<StateValue, StateError> {
+    set_for_viewer(
+        conn,
+        artifact_id,
+        key,
+        value,
+        if_revision,
+        updated_by,
+        (scope, Some(updated_by)),
+    )
+}
+
+fn set_for_viewer(
+    conn: &mut Connection,
+    artifact_id: &ArtifactId,
+    key: &str,
+    value: &OrderedJson,
+    if_revision: Option<u64>,
+    updated_by: &EmailAddress,
+    audience: (StateScope, Option<&EmailAddress>),
+) -> Result<StateValue, StateError> {
+    let (scope, viewer) = audience;
     if !valid_key(key) {
         return Err(StateError::App(AppError::Validation("bad key".into())));
     }
@@ -166,7 +137,7 @@ pub fn set(
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|e| internal("begin state transaction", e))?;
     let viewer = if scope == StateScope::Viewer {
-        updated_by.0.to_lowercase()
+        viewer.map_or_else(String::new, |viewer| viewer.0.to_lowercase())
     } else {
         String::new()
     };
@@ -237,7 +208,7 @@ pub fn delete(
         ],
     )
     .map(|n| n != 0)
-    .map_err(|_| AppError::Internal)
+    .map_err(|error| crate::error::internal("delete", error))
 }
 
 pub fn valid_key(key: &str) -> bool {
@@ -275,15 +246,23 @@ pub async fn set_pooled(
     value: OrderedJson,
     if_revision: Option<u64>,
     writer: EmailAddress,
-    scope: StateScope,
+    audience: (StateScope, Option<EmailAddress>),
 ) -> Result<StateValue, StateError> {
     let pool = pool.clone();
     tokio::task::spawn_blocking(move || {
         let mut conn = db::checkout(&pool).map_err(StateError::App)?;
-        set(&mut conn, &id, &key, &value, if_revision, &writer, scope)
+        set_for_viewer(
+            &mut conn,
+            &id,
+            &key,
+            &value,
+            if_revision,
+            &writer,
+            (audience.0, audience.1.as_ref()),
+        )
     })
     .await
-    .map_err(|_| StateError::App(AppError::Internal))?
+    .map_err(|error| internal("join set state task", error))?
 }
 pub async fn delete_pooled(
     pool: &DbPool,

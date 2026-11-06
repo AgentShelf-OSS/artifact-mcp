@@ -1,4 +1,4 @@
-//! Owned by U01 (sol) — artifact metadata, lifecycle commands, and storage reports.
+//! Artifact metadata, lifecycle commands, and storage reports.
 
 use serde::{Deserialize, Serialize};
 
@@ -35,14 +35,9 @@ pub enum ArtifactContent {
     Bundle {
         /// Ordered `(relative_path, contents)` pairs — **caller order is load-bearing**.
         ///
-        /// Entry auto-selection picks the FIRST `.html` in the order the publisher supplied
-        /// (`lib/store.js:254`: `clean.map(([rel]) => rel).find((rel) => rel.endsWith(".html"))`,
-        /// where `clean` derives from `Object.entries` insertion order). A sorted container
-        /// diverges: for `{"z.html", "a.html"}` with no `index.html` and no explicit entry, Node
-        /// selects `z.html` while a `BTreeMap` would select `a.html`.
-        ///
-        /// This was a `BTreeMap<String, String>` until U07 proved the divergence against the
-        /// Node oracle; changed while `ArtifactContent` still had no consumers.
+        /// Entry auto-selection picks the first `.html` in publisher order.
+        /// For `{"z.html", "a.html"}` with no `index.html` and no explicit entry, this selects
+        /// `z.html`; a sorted container such as `BTreeMap` would incorrectly select `a.html`.
         files: Vec<(String, String)>,
         entry: Option<String>,
     },

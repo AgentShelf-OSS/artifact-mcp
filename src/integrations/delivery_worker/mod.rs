@@ -109,7 +109,7 @@ impl DeliveryWorker {
         self
     }
 
-    /// Adds the generation-scoped PBI-079 worker adapters. Existing PBI-056 constructors keep
+    /// Adds generation-scoped worker adapters. The original constructors keep
     /// discussion rows terminal rather than silently attempting an unconfigured destination.
     #[must_use]
     pub fn with_discussion_adapters(

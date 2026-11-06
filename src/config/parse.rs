@@ -16,19 +16,19 @@ pub(super) fn present(env: &dyn EnvSource, key: &str) -> Option<String> {
     env.get(key).filter(|value| !value.trim().is_empty())
 }
 
-/// Port of `nonEmptyString(value, fallback)` — [lib/config.js:8-11]
+/// Port of `nonEmptyString(value, fallback)`
 pub(super) fn non_empty_string(env: &dyn EnvSource, key: &str, default: &str) -> String {
     present(env, key).map_or_else(|| default.to_owned(), |value| value.trim().to_owned())
 }
 
-/// Port of `value || fallback` for strings Node does **not** trim. [server.js:28], [lib/db.js:8]
+/// Port of `value || fallback` for strings Node does **not** trim.
 pub(super) fn raw_string(env: &dyn EnvSource, key: &str, default: &str) -> String {
     env.get(key)
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| default.to_owned())
 }
 
-/// Port of `positiveInteger(value, fallback)` — [lib/config.js:3-6]
+/// Port of `positiveInteger(value, fallback)`
 ///
 /// Accepts exactly the decimal integers Node accepts; rejects (rather than silently
 /// discarding) anything else that is actually present.
@@ -50,7 +50,7 @@ pub(super) fn positive_integer(
     Ok(parsed)
 }
 
-/// Port of `process.env.X === "1"` — [lib/identity.js:16,57,68]
+/// Port of `process.env.X === "1"`
 pub(super) fn flag(env: &dyn EnvSource, key: &str) -> bool {
     env.get(key).is_some_and(|value| value == "1")
 }

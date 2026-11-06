@@ -71,7 +71,7 @@ impl RecoveryState {
     }
 }
 
-/// Destination dimensions established by the selected PBI-079 connection.  No browser-supplied
+/// Destination dimensions established by the selected discussion connection.  No browser-supplied
 /// guild/channel/webhook is trusted; callers obtain these from the server-side connection row.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RecoveryDestination {
@@ -98,7 +98,7 @@ pub struct RecoveryJob {
     pub canonical_artifact_url: String,
 }
 
-/// SQLite implementation of the credential/policy ports shared by outbound delivery and PBI-080.
+/// SQLite implementation of the credential/policy ports shared by outbound delivery and inbound event application.
 #[derive(Clone)]
 pub struct OrganizationDiscordStore {
     pub(super) pool: DbPool,

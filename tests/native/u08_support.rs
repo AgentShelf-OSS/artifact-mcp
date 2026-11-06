@@ -280,7 +280,7 @@ pub fn publisher() -> PublisherIdentity {
         client_id: TEST_CLIENT.into(),
         org: TEST_ORG.into(),
         label: "Fixture publisher".to_owned(),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     }
 }

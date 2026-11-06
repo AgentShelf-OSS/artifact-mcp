@@ -14,7 +14,7 @@ pub(super) const fn is_js_whitespace(value: char) -> bool {
     matches!(value, '\u{feff}') || (value.is_whitespace() && !matches!(value, '\u{85}'))
 }
 
-/// `String.prototype.trim` — [lib/migrations.js:225]
+/// `String.prototype.trim`
 #[must_use]
 pub(super) fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
@@ -29,7 +29,7 @@ pub(super) fn table_exists(conn: &Connection, table: &str) -> rusqlite::Result<b
     Ok(count > 0)
 }
 
-/// Port of `hasColumn` in `lib/migrations.js`.
+/// Check whether a table has the named column.
 pub(super) fn has_column(conn: &Connection, table: &str, column: &str) -> rusqlite::Result<bool> {
     let mut stmt = conn.prepare(&format!("PRAGMA table_info({table})"))?;
     let mut rows = stmt.query([])?;
@@ -42,7 +42,7 @@ pub(super) fn has_column(conn: &Connection, table: &str, column: &str) -> rusqli
     Ok(false)
 }
 
-/// Port of `ensureColumn` in `lib/migrations.js`: additive, idempotent `ALTER TABLE`.
+/// Add a missing column with an idempotent `ALTER TABLE`.
 pub(super) fn ensure_column(
     tx: &Transaction<'_>,
     table: &str,

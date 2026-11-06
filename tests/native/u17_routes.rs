@@ -994,6 +994,7 @@ fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
     let fake = Arc::new(fake.clone());
     AppDeps {
         data: Arc::new(artifact_mcp::data::DataBroker::empty()),
+        collections: Arc::new(artifact_mcp::ports::collections::InertCollections),
         publisher_auth: fake.clone(),
         viewer_identity: fake.clone(),
         artifacts: fake.clone(),
@@ -1839,7 +1840,7 @@ async fn live_actions_are_owner_and_revision_pinned_with_csrf_and_fixed_body() {
     let mut config = AppConfig::default();
     config
         .action_grants
-        .push(artifact_mcp::actions::ActionGrant {
+        .push(artifact_mcp::integrations::actions::ActionGrant {
             artifact_id: ID.into(),
             org: "acme".into(),
             revision: fake.lock().meta.as_ref().unwrap().revision,
@@ -1927,7 +1928,7 @@ async fn live_action_start_reaches_only_reviewed_loopback_worker() {
     let mut config = AppConfig::default();
     config
         .action_grants
-        .push(artifact_mcp::actions::ActionGrant {
+        .push(artifact_mcp::integrations::actions::ActionGrant {
             artifact_id: ID.into(),
             org: "acme".into(),
             revision: fake.lock().meta.as_ref().unwrap().revision,
@@ -1968,7 +1969,7 @@ async fn advisory_start_reaches_only_fixed_advisory_path() {
     let mut config = AppConfig::default();
     config
         .action_grants
-        .push(artifact_mcp::actions::ActionGrant {
+        .push(artifact_mcp::integrations::actions::ActionGrant {
             artifact_id: ID.into(),
             org: "acme".into(),
             revision: fake.lock().meta.as_ref().unwrap().revision,
@@ -1998,7 +1999,7 @@ async fn advisory_actions_preserve_owner_revision_csrf_and_fixed_body() {
     let mut config = AppConfig::default();
     config
         .action_grants
-        .push(artifact_mcp::actions::ActionGrant {
+        .push(artifact_mcp::integrations::actions::ActionGrant {
             artifact_id: ID.into(),
             org: "acme".into(),
             revision: fake.lock().meta.as_ref().unwrap().revision,
@@ -2092,7 +2093,7 @@ async fn investigation_action_reaches_only_literal_ticket_worker_path() {
     let mut config = AppConfig::default();
     config
         .action_grants
-        .push(artifact_mcp::actions::ActionGrant {
+        .push(artifact_mcp::integrations::actions::ActionGrant {
             artifact_id: ID.into(),
             org: "acme".into(),
             revision: fake.lock().meta.as_ref().unwrap().revision,

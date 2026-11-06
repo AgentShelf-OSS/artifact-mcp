@@ -13,7 +13,7 @@ use super::{
     parse::{parse_byte_size, positive_integer, present},
 };
 
-/// Upload/storage limits shared by the store and the MCP tools. [lib/config.js:21-27]
+/// Upload/storage limits shared by the store and the MCP tools.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct StorageLimits {
     /// `FEEDBACK_MAX_BODY` — maximum feedback body characters.
@@ -63,17 +63,17 @@ impl StorageLimits {
 /// Per-route JSON body limits in bytes, mirroring every `express.json({ limit })` call.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BodyLimits {
-    /// `POST /mcp` — [lib/app.js:152], supplied by [server.js:186]
+    /// `POST /mcp`.
     pub mcp_json: u64,
-    /// `/settings/keys`, `/settings/orgs/**` — [lib/app.js:261,302,322,341,362,373,380,392,409]
+    /// `/settings/keys`, `/settings/orgs/**`
     pub key_json: u64,
-    /// `POST /:id/react` — [lib/app.js:545]
+    /// `POST /:id/react`
     pub reaction_json: u64,
-    /// `POST /:id/feedback` — [lib/app.js:563]
+    /// `POST /:id/feedback`
     pub feedback_json: u64,
     /// `PUT /:id/state/:key` — serialized value cap plus envelope overhead.
     pub state_json: u64,
-    /// `POST /:id/{category,share,visibility,move,restore}` — [lib/app.js:634,643,669,679,708]
+    /// `POST /:id/{category,share,visibility,move,restore}`
     pub category_json: u64,
 }
 
@@ -96,7 +96,7 @@ impl BodyLimits {
         max_bundle_bytes: u64,
     ) -> Result<Self, AppError> {
         // `MCP_JSON_LIMIT` is the only limit express receives as a raw string, so it is the
-        // only one parsed with the `bytes` grammar. [lib/config.js:27], [lib/app.js:152]
+        // only one parsed with the `bytes` grammar.
         let mcp_json = match present(env, "MCP_JSON_LIMIT") {
             Some(raw) => parse_byte_size("MCP_JSON_LIMIT", &raw)?,
             None => mcp_json_limit_for(max_bundle_bytes),

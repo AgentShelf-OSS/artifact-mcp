@@ -20,7 +20,7 @@ use crate::{
 use super::{
     helpers::{
         ENCRYPTION_REQUIRED, INVALID_CREDENTIAL, artifact_exists, credential_active,
-        has_legacy_discussion_connection, internal, org_exists, readiness_in_transaction,
+        has_legacy_discussion_connection, org_exists, readiness_in_transaction,
         status_in_transaction, trimmed,
     },
     types::{
@@ -63,7 +63,7 @@ impl OrganizationDiscordStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("save validated credential", error))?;
             if !org_exists(&tx, &org)? {
                 return Err(AppError::Validation(format!("Unknown organization \"{org}\".")));
             }
@@ -76,8 +76,8 @@ impl OrganizationDiscordStore {
                    deactivated_at=NULL, updated_at=datetime('now')",
                 params![org, encrypted.ciphertext, encrypted.nonce, encrypted.tag],
             )
-            .map_err(internal)?;
-            tx.commit().map_err(internal)?;
+            .map_err(|error| crate::error::internal("save validated credential", error))?;
+            tx.commit().map_err(|error| crate::error::internal("save validated credential", error))?;
             Ok(DiscordCredentialReadiness::Configured)
         })
         .await
@@ -93,7 +93,7 @@ impl OrganizationDiscordStore {
                 [org],
             )
             .map(|count| count == 1)
-            .map_err(internal)
+            .map_err(|error| crate::error::internal("deactivate credential", error))
         })
         .await
     }
@@ -128,7 +128,7 @@ impl OrganizationDiscordStore {
                  ON CONFLICT(org) DO UPDATE SET outbound_enabled=excluded.outbound_enabled, updated_at=datetime('now')",
                 params![org, i64::from(enabled)],
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("set outbound enabled", error))?;
             Ok(())
         })
         .await
@@ -192,7 +192,12 @@ impl OrganizationDiscordStore {
                             encrypted.tag
                         ],
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| {
+                        crate::error::internal(
+                            "save validated credential and policy audited",
+                            error,
+                        )
+                    })?;
                 }
                 tx.execute(
                     "INSERT INTO org_discord_threading_policies \
@@ -201,7 +206,9 @@ impl OrganizationDiscordStore {
                        updated_at=datetime('now')",
                     params![org_name, i64::from(enabled)],
                 )
-                .map_err(internal)?;
+                .map_err(|error| {
+                    crate::error::internal("save validated credential and policy audited", error)
+                })?;
                 let readiness = readiness_in_transaction(tx, &org_name, fallback_available)?;
                 let status = status_in_transaction(tx, &org_name, readiness)?;
                 let classification = if encrypted.is_some() {
@@ -254,15 +261,16 @@ impl OrganizationDiscordStore {
                 if !org_exists(tx, &org_name)? {
                     return Err(AppError::NotFound("Organization not found.".to_owned()));
                 }
-                let changed = tx
-                    .execute(
+                let changed =
+                    tx.execute(
                         "UPDATE org_discord_bot_credentials SET active=0, \
                          deactivated_at=datetime('now'), updated_at=datetime('now') \
                          WHERE org=?1 AND active=1",
                         [&org_name],
                     )
-                    .map_err(internal)?
-                    == 1;
+                    .map_err(|error| {
+                        crate::error::internal("deactivate credential audited", error)
+                    })? == 1;
                 tx.execute(
                     "INSERT INTO org_discord_threading_policies \
                      (org, outbound_enabled, updated_at) VALUES (?1, 0, datetime('now')) \
@@ -270,7 +278,7 @@ impl OrganizationDiscordStore {
                        updated_at=datetime('now')",
                     [&org_name],
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("deactivate credential audited", error))?;
                 Ok((
                     changed,
                     AuditEvent {
@@ -310,7 +318,9 @@ impl OrganizationDiscordStore {
                              WHERE artifact_id=?1 AND org=?2",
                             params![artifact_id, org_name],
                         )
-                        .map_err(internal)?;
+                        .map_err(|error| {
+                            crate::error::internal("set artifact override audited", error)
+                        })?;
                     }
                     ArtifactDiscussionOverride::ArtifactOnly => {
                         tx.execute(
@@ -321,14 +331,18 @@ impl OrganizationDiscordStore {
                                updated_at=datetime('now')",
                             params![artifact_id, org_name],
                         )
-                        .map_err(internal)?;
+                        .map_err(|error| {
+                            crate::error::internal("set artifact override audited", error)
+                        })?;
                         tx.execute(
                             "UPDATE artifact_discussions SET mode='artifact_only', state='paused', \
                              disabled_at=datetime('now'), updated_at=datetime('now') \
                              WHERE artifact_id=?1 AND org=?2",
                             params![artifact_id, org_name],
                         )
-                        .map_err(internal)?;
+                        .map_err(|error| {
+                            crate::error::internal("set artifact override audited", error)
+                        })?;
                     }
                 }
                 Ok((
@@ -373,7 +387,7 @@ impl OrganizationDiscordStore {
                         "DELETE FROM artifact_discussion_overrides WHERE artifact_id=?1 AND org=?2",
                         params![artifact, org],
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| crate::error::internal("set artifact override", error))?;
                 }
                 ArtifactDiscussionOverride::ArtifactOnly => {
                     conn.execute(
@@ -382,7 +396,7 @@ impl OrganizationDiscordStore {
                          ON CONFLICT(artifact_id, org) DO UPDATE SET updated_at=datetime('now')",
                         params![artifact, org],
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| crate::error::internal("set artifact override", error))?;
                 }
             }
             Ok(())
@@ -409,7 +423,7 @@ impl OrganizationDiscordStore {
                     |row| row.get::<_, String>(0),
                 )
                 .optional()
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("effective policy", error))?
                 .as_deref()
             {
                 Some("artifact_only") => ArtifactDiscussionOverride::ArtifactOnly,
@@ -422,7 +436,7 @@ impl OrganizationDiscordStore {
                     |row| row.get::<_, i64>(0),
                 )
                 .optional()
-                .map_err(internal)?
+                .map_err(|error| crate::error::internal("effective policy", error))?
                 .unwrap_or(0)
                 != 0;
             let readiness = match credential_active(conn, &org)? {
@@ -441,7 +455,7 @@ impl OrganizationDiscordStore {
                     [&org],
                     |row| row.get(0),
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("effective policy", error))?;
             Ok(EffectiveDiscussionPolicy {
                 outbound_enabled,
                 artifact_override: override_mode,
@@ -479,7 +493,7 @@ impl OrganizationDiscordCredentialService for OrganizationDiscordStore {
                             row.get::<_, i64>(3)? != 0,
                         ))
                     },
-                ).optional().map_err(internal)?;
+                ).optional().map_err(|error| crate::error::internal("credential for provider", error))?;
                 match row {
                     Some((_, false)) => Ok(None),
                     Some((encrypted, true)) => {

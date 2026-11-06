@@ -5,28 +5,20 @@ use crate::model::{FeedbackAnchor, FeedbackAnchorV2};
 // Frozen message strings
 // ---------------------------------------------------------------------------
 
-/// [lib/feedback.js:86]. The apostrophe is U+2019, not U+0027.
+/// Empty-body validation message. The apostrophe is U+2019, not U+0027.
 pub const EMPTY_BODY_MESSAGE: &str = "Feedback can\u{2019}t be empty.";
-/// [lib/feedback.js:92]
 pub const PARENT_NOT_FOUND_MESSAGE: &str = "Reply parent not found.";
-/// [lib/feedback.js:93]
 pub const PARENT_OTHER_ARTIFACT_MESSAGE: &str = "Reply parent belongs to a different artifact.";
-/// [lib/feedback.js:94]
 pub const PARENT_NOT_TOP_LEVEL_MESSAGE: &str = "Replies can only be added to top-level feedback.";
-/// [lib/feedback.js:14] — unrepresentable in Rust's typed anchor, exported for U13/U19 decoding.
+/// Invalid anchor type, unrepresentable in Rust's typed anchor but used during input decoding.
 pub const ANCHOR_NOT_OBJECT_MESSAGE: &str = "Anchor must be an object.";
-/// [lib/feedback.js:16]
 pub const ANCHOR_POINT_MESSAGE: &str = "Anchor x and y must be finite numbers between 0 and 1.";
-/// [lib/feedback.js:20]
 pub const ANCHOR_BOX_PAIR_MESSAGE: &str =
     "Anchor w and h must either both be supplied or both omitted.";
-/// [lib/feedback.js:25]
 pub const ANCHOR_BOX_RANGE_MESSAGE: &str = "Anchor w and h must be finite numbers between 0 and 1.";
-/// [lib/feedback.js:27]
 pub const ANCHOR_BOX_POSITIVE_MESSAGE: &str = "Box anchor w and h must be greater than 0.";
-/// [lib/feedback.js:32]
 pub const ANCHOR_BOX_BOUNDS_MESSAGE: &str = "Box anchor must fit within document bounds.";
-/// PBI-084 v2 structured-anchor validation messages. These are intentionally distinct from the
+/// Version 2 structured-anchor validation messages. These are intentionally distinct from the
 /// legacy geometry errors: a malformed v2 envelope must fail rather than silently persist as v1.
 pub const ANCHOR_VERSION_MESSAGE: &str = "Anchor version must be 2.";
 pub const ANCHOR_KIND_MESSAGE: &str = "Anchor kind must be \"element\" or \"region\".";
@@ -34,35 +26,29 @@ pub const ANCHOR_PATH_V2_MESSAGE: &str = "Anchor path must be a string for versi
 pub const ANCHOR_NODE_ID_MESSAGE: &str = "Anchor nodeId must be a string or null.";
 pub const ANCHOR_QUOTE_MESSAGE: &str = "Anchor quote must be a string or null.";
 pub const ANCHOR_APPROX_V2_MESSAGE: &str = "Anchor approx must be a boolean for version 2 anchors.";
-/// [lib/app.js:15]
 pub const ANCHOR_PAGE_UNANCHORED_MESSAGE: &str =
     "anchor_page is only valid for anchored bundle feedback.";
-/// [lib/app.js:19]
 pub const ANCHOR_PAGE_NOT_BUNDLE_MESSAGE: &str = "anchor_page is only valid for bundle feedback.";
-/// [lib/app.js:23]
 pub const ANCHOR_PAGE_REQUIRED_MESSAGE: &str =
     "anchor_page is required for anchored bundle feedback.";
-/// [lib/app.js:27]
 pub const ANCHOR_PAGE_TRAVERSAL_MESSAGE: &str =
     "anchor_page must be a bundle-relative path without traversal.";
-/// [lib/app.js:30]
 pub const ANCHOR_PAGE_NOT_A_FILE_MESSAGE: &str = "anchor_page must identify a bundle HTML file.";
-/// [lib/app.js:33]
 pub const ANCHOR_PAGE_MISSING_MESSAGE: &str =
     "anchor_page must identify an existing bundle HTML file.";
-/// The 404 body both viewer mutations produce — [lib/app.js:611], [lib/app.js:625].
+/// The 404 body both viewer mutations produce.
 pub const NOT_FOUND_MESSAGE: &str = "Not found";
-/// The 403 body both viewer mutations produce — [lib/app.js:611], [lib/app.js:625].
+/// The 403 body both viewer mutations produce.
 pub const FORBIDDEN_MESSAGE: &str = "Forbidden";
 
-/// `String(anchor.path).slice(0, 512)` — [lib/feedback.js:35]
+/// `String(anchor.path).slice(0, 512)`
 pub const ANCHOR_PATH_MAX_UTF16: usize = 512;
-/// PBI-083 bridge cap for `data-artifact-node`.
+/// Bridge cap for `data-artifact-node`.
 pub const ANCHOR_NODE_ID_MAX_UTF16: usize = 128;
-/// PBI-083 bridge cap for a normalized text quote.
+/// Bridge cap for a normalized text quote.
 pub const ANCHOR_QUOTE_MAX_UTF16: usize = 240;
 
-/// `Feedback is too long (max ${FEEDBACK_MAX_BODY} characters).` — [lib/feedback.js:87]
+/// `Feedback is too long (max ${FEEDBACK_MAX_BODY} characters).`
 #[must_use]
 pub fn too_long_message(max_body: u64) -> String {
     format!("Feedback is too long (max {max_body} characters).")
@@ -82,7 +68,7 @@ pub const fn is_js_whitespace(value: char) -> bool {
     matches!(value, '\u{feff}') || (value.is_whitespace() && !matches!(value, '\u{85}'))
 }
 
-/// `String.prototype.trim` — [lib/feedback.js:85]
+/// `String.prototype.trim`
 #[must_use]
 pub fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
@@ -118,7 +104,7 @@ pub fn slice_utf16(value: &str, limit: usize) -> String {
 // Anchors
 // ---------------------------------------------------------------------------
 
-/// The persisted anchor columns produced by `normalizeAnchor` — [lib/feedback.js:12-42].
+/// The persisted anchor columns produced by `normalizeAnchor`.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct NormalizedAnchor {
     pub anchor_path: Option<String>,
@@ -134,15 +120,14 @@ pub struct NormalizedAnchor {
 
 type NormalizedAnchorV2 = (Option<String>, Option<String>, Option<String>);
 
-/// `normalizeAnchor(anchor)` — [lib/feedback.js:12-42].
+/// `normalizeAnchor(anchor)`.
 ///
 /// `path` is `anchor.path` in Node, which lives inside the anchor object; the frozen
 /// `SubmitFeedback` carries it beside the anchor, so an unanchored submission discards it exactly
 /// as `normalizeAnchor(null)` does.
 ///
-/// An over-hanging box is **trimmed** to the document edge rather than rejected
-/// ([lib/feedback.js:30-31]); only a box that starts on the far edge — and therefore trims to zero
-/// area — is an error.
+/// Trim an over-hanging box to the document edge rather than rejecting it.
+/// A box that starts on the far edge has zero area after trimming and is an error.
 ///
 /// # Errors
 /// [`AppError::Validation`] carrying [`ANCHOR_POINT_MESSAGE`], [`ANCHOR_BOX_PAIR_MESSAGE`],
@@ -249,11 +234,11 @@ fn unit_interval(value: f64) -> bool {
     value.is_finite() && (0.0..=1.0).contains(&value)
 }
 
-/// `validateAnchorPage(artifacts, meta, anchor, value)` — [lib/app.js:13-36].
+/// `validateAnchorPage(artifacts, meta, anchor, value)`.
 ///
 /// `html_page_exists` is the caller's `readBundleFile(meta.id, normalized)` +
-/// `isHtmlContentType(file.contentType)` composition [lib/app.js:31-34]; keeping it as a predicate
-/// leaves U07's bundle reads and U19's wiring where they belong while the *rules* stay here.
+/// `isHtmlContentType(file.contentType)` composition; keeping it as a predicate
+/// keeps bundle reads and route wiring separate from these validation rules.
 ///
 /// `None` and `Some("")` both mean "absent", matching `value != null && value !== ""`.
 ///
@@ -314,7 +299,7 @@ pub fn validate_anchor_page(
     Ok(Some(normalized))
 }
 
-/// `/^[A-Za-z]:\//` — [lib/app.js:26]
+/// `/^[A-Za-z]:\//`
 fn is_drive_qualified(raw: &str) -> bool {
     let bytes = raw.as_bytes();
     bytes.len() >= 3 && bytes[0].is_ascii_alphabetic() && bytes[1] == b':' && bytes[2] == b'/'

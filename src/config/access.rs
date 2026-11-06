@@ -13,7 +13,7 @@ use super::{
     parse::{disabled_unless_one, flag, invalid, non_empty_string, present, raw_string},
 };
 
-/// `ACCESS_IDENTITY_MODE` — [lib/identity.js:50-55]
+/// `ACCESS_IDENTITY_MODE`
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AccessIdentityMode {
     /// Both `CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` are set: JWT-verified identity.
@@ -43,37 +43,37 @@ impl fmt::Display for AccessIdentityMode {
     }
 }
 
-/// Cloudflare Access environment surface. [lib/identity.js:14-38,57-77]
+/// Cloudflare Access environment surface.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct AccessConfig {
-    /// `CF_ACCESS_TEAM_DOMAIN`, trimmed. [lib/identity.js:14]
+    /// `CF_ACCESS_TEAM_DOMAIN`, trimmed.
     pub team_domain: String,
-    /// `CF_ACCESS_AUD`, trimmed. [lib/identity.js:15]
+    /// `CF_ACCESS_AUD`, trimmed.
     pub aud: String,
-    /// `TRUST_ACCESS_HEADERS === "1"`. [lib/identity.js:16]
+    /// `TRUST_ACCESS_HEADERS === "1"`.
     pub trust_headers: bool,
-    /// `REQUIRE_ACCESS_JWT === "1"`. [lib/identity.js:57]
+    /// `REQUIRE_ACCESS_JWT === "1"`.
     pub require_jwt: bool,
-    /// `HEADER_TRUST_ALLOW_INSECURE === "1"`. [lib/identity.js:68]
+    /// `HEADER_TRUST_ALLOW_INSECURE === "1"`.
     pub header_trust_allow_insecure: bool,
-    /// `Number(ACCESS_CLOCK_TOLERANCE_S) || 60`. [lib/identity.js:22]
+    /// `Number(ACCESS_CLOCK_TOLERANCE_S) || 60`.
     pub clock_tolerance_seconds: u64,
-    /// `ORG_EMAIL_DOMAINS` as `domain(lowercased) -> org`. [lib/identity.js:25-31]
+    /// `ORG_EMAIL_DOMAINS` as `domain(lowercased) -> org`.
     pub domain_orgs: BTreeMap<String, String>,
-    /// `ADMIN_EMAILS`, trimmed and lowercased. [lib/identity.js:34-36]
+    /// `ADMIN_EMAILS`, trimmed and lowercased.
     pub admin_emails: BTreeSet<String>,
-    /// `ADMIN_EMAIL_DOMAINS`, trimmed and lowercased. [lib/identity.js:37-39]
+    /// `ADMIN_EMAIL_DOMAINS`, trimmed and lowercased.
     pub admin_email_domains: BTreeSet<String>,
 }
 
 impl AccessConfig {
-    /// `JWT_VERIFICATION_ON = Boolean(TEAM_DOMAIN && AUD)` — [lib/identity.js:50]
+    /// `JWT_VERIFICATION_ON = Boolean(TEAM_DOMAIN && AUD)`
     #[must_use]
     pub fn jwt_verification_on(&self) -> bool {
         !self.team_domain.is_empty() && !self.aud.is_empty()
     }
 
-    /// `ACCESS_IDENTITY_MODE` — [lib/identity.js:51-55]
+    /// `ACCESS_IDENTITY_MODE`
     #[must_use]
     pub fn identity_mode(&self) -> AccessIdentityMode {
         if self.jwt_verification_on() {
@@ -85,7 +85,7 @@ impl AccessConfig {
         }
     }
 
-    /// The Access JWKS endpoint. [lib/identity.js:43]
+    /// The Access JWKS endpoint.
     #[must_use]
     pub fn jwks_url(&self) -> Option<String> {
         (!self.team_domain.is_empty()).then(|| {
@@ -131,7 +131,7 @@ impl AccessConfig {
     }
 }
 
-/// Port of the `DOMAIN_ORG` map builder — [lib/identity.js:25-31]
+/// Port of the `DOMAIN_ORG` map builder
 fn parse_domain_orgs(raw: Option<&str>) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     for pair in raw.unwrap_or_default().split(',') {
@@ -148,7 +148,7 @@ fn parse_domain_orgs(raw: Option<&str>) -> BTreeMap<String, String> {
     map
 }
 
-/// Port of the `ADMIN_EMAILS`/`ADMIN_DOMAINS` set builders — [lib/identity.js:34-39]
+/// Port of the `ADMIN_EMAILS`/`ADMIN_DOMAINS` set builders
 fn parse_lowercase_list(raw: Option<&str>) -> BTreeSet<String> {
     raw.unwrap_or_default()
         .split(',')

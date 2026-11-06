@@ -35,6 +35,7 @@ cargo test --manifest-path browser-tests/Cargo.toml --locked
   (`--test e2e`) and reader regressions (`--test reader`) also need `ARTIFACT_MCP_BIN`.
 - Changed browser JavaScript in `assets/` needs a test in `browser-tests/js/` when its behaviour
   changes; `browser-assets-parse` checks that every asset still parses.
+- The layering test guards dependency direction; add a file, module, and reason to its allowlist only for an accepted exception.
 - Match the surrounding style: small modules behind the traits in `src/ports/`, and production or
   test adapters passed to `build_router()` through `AppDeps`.
 - Add or update tests for any behavior change. Prefer the deterministic adapters in `tests/native/`

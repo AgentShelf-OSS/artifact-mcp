@@ -1,4 +1,6 @@
 //! Source registry loading, lookup, and the public source catalog.
+use super::DataError;
+use super::error::interact;
 use super::{
     DataBroker, MAX_SOURCES, ParamConfig, PublicSource, SourceConfig,
     validate::{
@@ -6,7 +8,6 @@ use super::{
         validate_managed_credentials, validate_source,
     },
 };
-use crate::{error::AppError, persistence::db::interact};
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 use rusqlite::OptionalExtension;
 use serde::Deserialize;
@@ -17,23 +18,28 @@ use std::{
 };
 
 impl DataBroker {
+    // Startup's composition entrypoint still accepts reason strings outside this port.
     pub fn from_env() -> Result<Self, String> {
+        Self::load_from_env().map_err(|error| error.to_string())
+    }
+    fn load_from_env() -> Result<Self, DataError> {
         let Some(path) = std::env::var_os("ARTIFACT_DATA_SOURCES_FILE").filter(|p| !p.is_empty())
         else {
             return Ok(Self::empty());
         };
-        let raw = std::fs::read_to_string(path).map_err(|_| "invalid_data_sources")?;
+        let raw = std::fs::read_to_string(path).map_err(|_| DataError::InvalidDataSources)?;
         Self::from_json(&raw)
     }
-    pub fn from_json(raw: &str) -> Result<Self, String> {
+    pub fn from_json(raw: &str) -> Result<Self, DataError> {
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Config {
             sources: Vec<SourceConfig>,
         }
-        let config: Config = serde_json::from_str(raw).map_err(|_| "invalid_data_sources")?;
+        let config: Config =
+            serde_json::from_str(raw).map_err(|_| DataError::InvalidDataSources)?;
         if config.sources.len() > MAX_SOURCES {
-            return Err("invalid_data_sources".into());
+            return Err(DataError::InvalidDataSources);
         }
         let mut broker = Self::empty();
         let mut sources = BTreeMap::new();
@@ -41,18 +47,18 @@ impl DataBroker {
         for source in config.sources {
             validate_source(&source)?;
             if sources.contains_key(&source.id) {
-                return Err("invalid_data_sources".into());
+                return Err(DataError::InvalidDataSources);
             }
             let mut resolved = HeaderMap::new();
             for (name, env) in &source.headers_env {
-                let name =
-                    HeaderName::from_bytes(name.as_bytes()).map_err(|_| "invalid_data_sources")?;
+                let name = HeaderName::from_bytes(name.as_bytes())
+                    .map_err(|_| DataError::InvalidDataSources)?;
                 if RESERVED_CREDENTIAL_HEADERS.contains(&name.as_str()) {
-                    return Err("invalid_data_sources".into());
+                    return Err(DataError::InvalidDataSources);
                 }
-                let value = std::env::var(env).map_err(|_| "invalid_data_sources")?;
+                let value = std::env::var(env).map_err(|_| DataError::InvalidDataSources)?;
                 let mut value =
-                    HeaderValue::from_str(&value).map_err(|_| "invalid_data_sources")?;
+                    HeaderValue::from_str(&value).map_err(|_| DataError::InvalidDataSources)?;
                 value.set_sensitive(true);
                 resolved.insert(name, value);
             }
@@ -63,14 +69,14 @@ impl DataBroker {
         broker.headers = Arc::new(headers);
         Ok(broker)
     }
-    pub(super) async fn managed_rows(&self) -> Result<Vec<(SourceConfig, bool, u64)>, String> {
+    pub(super) async fn managed_rows(&self) -> Result<Vec<(SourceConfig, bool, u64)>, DataError> {
         let Some(pool) = &self.pool else {
             return Ok(Vec::new());
         };
         let rows = interact(pool, |c| {
             let mut stmt = c
                 .prepare("SELECT definition,enabled,version FROM data_sources ORDER BY id")
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| DataError::internal("managed rows", error))?;
             let mapped = stmt
                 .query_map([], |row| {
                     let raw: String = row.get(0)?;
@@ -82,24 +88,23 @@ impl DataBroker {
                         row.get::<_, i64>(2)? as u64,
                     ))
                 })
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| DataError::internal("managed rows", error))?;
             mapped
                 .collect::<Result<Vec<_>, _>>()
-                .map_err(|_| AppError::Internal)
+                .map_err(|error| DataError::internal("managed rows", error))
         })
-        .await
-        .map_err(|_| "data_unavailable".to_owned())?;
+        .await?;
         Ok(rows)
     }
     pub(super) async fn source_record(
         &self,
         id: &str,
-    ) -> Result<(SourceConfig, bool, u64, String), String> {
+    ) -> Result<(SourceConfig, bool, u64, String), DataError> {
         if let Some(source) = self.sources.get(id) {
             return Ok((source.clone(), true, 0, "operator".into()));
         }
         let Some(pool) = &self.pool else {
-            return Err("not_found".into());
+            return Err(DataError::NotFound);
         };
         let id_owned = id.to_owned();
         interact(pool, move |c| {
@@ -119,11 +124,10 @@ impl DataBroker {
                 },
             )
             .optional()
-            .map_err(|_| AppError::Internal)
+            .map_err(|error| DataError::internal("source record", error))
         })
-        .await
-        .map_err(|_| "data_unavailable".to_owned())?
-        .ok_or_else(|| "not_found".into())
+        .await?
+        .ok_or(DataError::NotFound)
     }
     /// Whether `source` comes from the operator's `ARTIFACT_DATA_SOURCES_FILE`. Source ids are
     /// unique across that file and the database (`validate_registry`), so the id decides.
@@ -147,15 +151,16 @@ impl DataBroker {
             .map(|(_, env)| env.clone())
             .collect()
     }
-    pub(super) fn resolved_headers(&self, source: &SourceConfig) -> Result<HeaderMap, String> {
+    pub(super) fn resolved_headers(&self, source: &SourceConfig) -> Result<HeaderMap, DataError> {
         let mut headers = HeaderMap::new();
         for (name, env) in &source.headers_env {
             if !self.reference_allowed(source, name, env) {
-                return Err("config_error".into());
+                return Err(DataError::ConfigError);
             }
-            let name = HeaderName::from_bytes(name.as_bytes()).map_err(|_| "config_error")?;
-            let raw = std::env::var(env).map_err(|_| "config_error")?;
-            let mut value = HeaderValue::from_str(&raw).map_err(|_| "config_error")?;
+            let name =
+                HeaderName::from_bytes(name.as_bytes()).map_err(|_| DataError::ConfigError)?;
+            let raw = std::env::var(env).map_err(|_| DataError::ConfigError)?;
+            let mut value = HeaderValue::from_str(&raw).map_err(|_| DataError::ConfigError)?;
             value.set_sensitive(true);
             headers.insert(name, value);
         }
@@ -205,11 +210,11 @@ impl DataBroker {
     }
     pub(super) async fn all_source_configs(
         &self,
-    ) -> Result<BTreeMap<String, SourceConfig>, String> {
+    ) -> Result<BTreeMap<String, SourceConfig>, DataError> {
         let mut map = (*self.sources).clone();
         for (source, _, _) in self.managed_rows().await? {
             if map.contains_key(&source.id) {
-                return Err("source_conflict".into());
+                return Err(DataError::SourceConflict);
             }
             map.insert(source.id.clone(), source);
         }
@@ -223,7 +228,7 @@ impl DataBroker {
     /// Ids of managed connections whose credential references break the managed-credential
     /// rule. Such a connection was saved before the rule; it loads and reports `config_error`
     /// until an administrator renames its references.
-    pub async fn managed_credential_violations(&self) -> Result<Vec<String>, String> {
+    pub async fn managed_credential_violations(&self) -> Result<Vec<String>, DataError> {
         Ok(self
             .managed_rows()
             .await?
@@ -232,7 +237,13 @@ impl DataBroker {
             .map(|(source, _, _)| source.id)
             .collect())
     }
+    // Retain the startup entrypoint while live-data callers use the typed check.
     pub async fn validate_registry(&self) -> Result<(), String> {
+        self.check_registry()
+            .await
+            .map_err(|error| error.to_string())
+    }
+    pub(super) async fn check_registry(&self) -> Result<(), DataError> {
         let mut ids = HashSet::new();
         for source in self.sources.values() {
             validate_source(source)?;
@@ -240,12 +251,12 @@ impl DataBroker {
         }
         let rows = self.managed_rows().await?;
         if self.sources.len() + rows.len() > MAX_SOURCES {
-            return Err("invalid_data_sources".into());
+            return Err(DataError::InvalidDataSources);
         }
         for (source, _, _) in rows {
             validate_source(&source)?;
             if !ids.insert(source.id) {
-                return Err("source_conflict".into());
+                return Err(DataError::SourceConflict);
             }
         }
         Ok(())

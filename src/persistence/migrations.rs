@@ -1,16 +1,8 @@
-//! Owned by U03 (terra) — append-only version/name-compatible SQLite migrations.
+//! Append-only version/name-compatible SQLite migrations.
 //!
-//! The Node reference `lib/migrations.js` is the behavioural oracle for this module. Every
-//! statement below is a verbatim copy of the SQL it executes so that `sqlite_master.sql` text,
-//! column order, index names, check constraints, and composite foreign keys are identical
-//! between a Node-created and a Rust-created database. Do not "tidy" the SQL: the schema
-//! comparison in `tests/native/u03_migrations.rs` checks normalised statement text against a
-//! database the Node runtime wrote, and a reformatted statement is a real divergence in a shared
-//! production database.
+//! Every statement below is a verbatim copy of the SQL it executes so that `sqlite_master.sql` text, column order, index names, check constraints, and composite foreign keys are identical between a Node-created and a Rust-created database. Do not "tidy" the SQL: the schema comparison in `tests/native/u03_migrations.rs` checks normalised statement text against a database the Node runtime wrote, and a reformatted statement is a real divergence in a shared production database.
 //!
-//! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run
-//! them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no
-//! function in this module may be awaited or called while a transaction is held across `.await`.
+//! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no function in this module may be awaited or called while a transaction is held across `.await`.
 
 mod m001_m010;
 mod m011_m024;
@@ -57,8 +49,8 @@ pub const LATEST_SCHEMA_VERSION: i64 = 40;
 
 /// Environment-derived inputs consumed by migrations with programmatic side effects.
 ///
-/// Migration 7 (`org-registry`) seeds `orgs`/`org_domains` from `ORG_EMAIL_DOMAINS`, exactly as
-/// `lib/migrations.js` does. Capturing that value in an explicit context keeps migrations
+/// Migration 7 (`org-registry`) seeds `orgs`/`org_domains` from `ORG_EMAIL_DOMAINS`.
+/// Capturing that value in an explicit context keeps migrations
 /// deterministic and testable instead of reading process state deep inside the ladder.
 #[derive(Clone, Debug, Default)]
 pub struct MigrationContext {
@@ -315,8 +307,8 @@ pub static MIGRATIONS: &[Migration] = &[
 
 /// Creates `schema_migrations` if needed and applies every unrecorded migration in order.
 ///
-/// Each migration runs in its own transaction together with its `schema_migrations` row, exactly
-/// like `db.transaction(...)` in `lib/migrations.js`: a failing migration leaves neither partial
+/// Each migration runs in its own transaction together with its `schema_migrations` row.
+/// A failing migration leaves neither partial
 /// DDL nor a bookkeeping row behind. Reopening an up-to-date database applies nothing and returns
 /// an empty vector.
 ///

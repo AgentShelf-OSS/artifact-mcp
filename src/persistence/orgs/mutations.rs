@@ -10,7 +10,7 @@ use super::{is_valid_color, is_valid_domain, org_exists};
 use crate::error::AppError;
 use crate::model::{CreateOrganization, OrgId, Organization};
 
-/// `setColor(name, color)` — [lib/orgs.js:99-106]
+/// `setColor(name, color)`
 ///
 /// # Errors
 /// [`AppError::Validation`] for an unknown org or a non-hex color; [`AppError::Internal`] when
@@ -26,7 +26,6 @@ pub fn set_color(
         return Err(unknown_org(&name));
     }
     if !color.is_empty() && !is_valid_color(&color) {
-        // [lib/orgs.js:103]
         return Err(AppError::Validation(
             "Color must be a hex value like #356B9F.".to_owned(),
         ));
@@ -40,7 +39,7 @@ pub fn set_color(
     Ok(stored)
 }
 
-/// `createOrg({ name, label, domain })` — [lib/orgs.js:108-127]
+/// `createOrg({ name, label, domain })`
 ///
 /// # Errors
 /// [`AppError::Validation`] for a malformed/reserved/duplicate org id or a malformed/taken
@@ -50,11 +49,10 @@ pub fn create_org(
     request: &CreateOrganization,
 ) -> Result<Organization, AppError> {
     // Case-folded on purpose: authorization compares org strings exactly, so accepting "Acme"
-    // alongside "acme" would silently split one tenant in two. [lib/orgs.js:109-111]
+    // alongside "acme" would silently split one tenant in two.
     let name = js_trim(&request.name.0).to_lowercase();
     let label = truncate_utf16(js_trim(&request.label), ORG_LABEL_MAX_LENGTH);
     if !is_valid_org_name(&name) {
-        // [lib/orgs.js:113]
         return Err(AppError::Validation(
             "Org name must be letters, numbers, dot, dash, or underscore (max 41).".to_owned(),
         ));
@@ -66,19 +64,17 @@ pub fn create_org(
         ));
     }
     if name == RESERVED_ORG_NAME {
-        // [lib/orgs.js:114]
         return Err(AppError::Validation(
             "\"admin\" is a reserved org name.".to_owned(),
         ));
     }
     if org_exists(conn, &name)? {
-        // [lib/orgs.js:115]
         return Err(AppError::Validation(format!(
             "Organization \"{name}\" already exists."
         )));
     }
     // `const dom = domain ? normDomain(domain) : ""` — a missing, empty, or all-whitespace
-    // domain is simply absent. [lib/orgs.js:116-117]
+    // domain is simply absent.
     let domain = request
         .domain
         .as_deref()
@@ -90,7 +86,7 @@ pub fn create_org(
             return Err(invalid_domain(domain));
         }
         if let Some(owner) = domain_owner(conn, domain)? {
-            // [lib/orgs.js:120]: the create path always reports the cross-org form.
+            // The create path always reports the cross-org form.
             return Err(AppError::Validation(format!(
                 "Domain \"{domain}\" is already mapped to \"{owner}\"."
             )));
@@ -119,7 +115,7 @@ fn create_org_in_transaction(
     }
 
     // Node returns a literal rather than re-reading the row, so `color` and `created_at` are
-    // absent. [lib/orgs.js:126]
+    // absent.
     Ok(Organization {
         name: OrgId(name.to_owned()),
         label: label.to_owned(),
@@ -134,7 +130,7 @@ fn create_org_in_transaction(
     })
 }
 
-/// `deleteOrg(name)` — [lib/orgs.js:129-131]
+/// `deleteOrg(name)`
 ///
 /// Deletion is deliberately application-level because the frozen v21 schema has no foreign key
 /// from artifacts or API keys to `orgs`. Owned artifacts refuse deletion so tenant content is not
@@ -189,7 +185,7 @@ pub(super) fn delete_org_in_transaction(
     Ok(removed)
 }
 
-/// `addDomain(org, domain)` — [lib/orgs.js:133-144]
+/// `addDomain(org, domain)`
 ///
 /// # Errors
 /// [`AppError::Validation`] for an unknown org, malformed domain, or a domain already mapped;
@@ -210,7 +206,7 @@ pub fn add_domain(conn: &Connection, org: &str, domain: &str) -> Result<String, 
     Ok(domain)
 }
 
-/// `removeDomain(org, domain)` — [lib/orgs.js:146-148]
+/// `removeDomain(org, domain)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the delete fails.
@@ -230,7 +226,7 @@ pub fn remove_domain(conn: &Connection, org: &str, domain: &str) -> Result<bool,
     .map_err(|error| database_failure("remove domain", &error))
 }
 
-/// `addEmailMember(org, email)` — [lib/orgs.js:150-163]
+/// `addEmailMember(org, email)`
 ///
 /// # Errors
 /// [`AppError::Validation`] for an unknown org, invalid address, or an address already mapped;
@@ -242,7 +238,6 @@ pub fn add_email_member(conn: &Connection, org: &str, email: &str) -> Result<Str
         return Err(unknown_org(&org));
     }
     if !is_valid_email(&email) {
-        // [lib/orgs.js:154]
         return Err(AppError::Validation(format!(
             "\"{email}\" is not a valid email address."
         )));
@@ -311,7 +306,7 @@ pub fn email_display_name(conn: &Connection, email: &str) -> Result<Option<Strin
     .map_err(|error| database_failure("read email display name", &error))
 }
 
-/// `removeEmailMember(org, email)` — [lib/orgs.js:165-167]
+/// `removeEmailMember(org, email)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the delete fails.
@@ -324,7 +319,7 @@ pub fn remove_email_member(conn: &Connection, org: &str, email: &str) -> Result<
     .map_err(|error| database_failure("remove email member", &error))
 }
 
-/// `addCategory(org, name)` — [lib/orgs.js:169-176]
+/// `addCategory(org, name)`
 ///
 /// `INSERT OR IGNORE`, so re-adding an existing category succeeds, exactly as in Node.
 ///
@@ -338,7 +333,6 @@ pub fn add_category(conn: &Connection, org: &str, name: &str) -> Result<String, 
         return Err(unknown_org(&org));
     }
     if category.is_empty() {
-        // [lib/orgs.js:173]
         return Err(AppError::Validation(
             "Category name is required.".to_owned(),
         ));
@@ -351,7 +345,7 @@ pub fn add_category(conn: &Connection, org: &str, name: &str) -> Result<String, 
     Ok(category)
 }
 
-/// `removeCategory(org, name)` — [lib/orgs.js:178-180]
+/// `removeCategory(org, name)`
 ///
 /// # Errors
 /// [`AppError::Internal`] when the delete fails.

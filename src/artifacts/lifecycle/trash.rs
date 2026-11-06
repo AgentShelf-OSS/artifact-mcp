@@ -8,7 +8,6 @@ impl StoreContext {
     // -----------------------------------------------------------------------
 
     /// `restoreById(id, revision, …)` — replay a past revision as a NEW revision.
-    /// [lib/store.js:605-624]
     ///
     /// `update` snapshots the *current* revision first, so a restore is itself undoable.
     pub(super) fn restore_sync(
@@ -22,7 +21,7 @@ impl StoreContext {
         let _gate = self
             .lifecycle_gate
             .write()
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("lock artifact lifecycle for trash", error))?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -41,7 +40,7 @@ impl StoreContext {
 
         let content = if row.is_bundle {
             // `readTree` returns the snapshot and the entry is supplied explicitly, so the map's
-            // ordering never reaches entry auto-selection. [lib/store.js:617-618]
+            // ordering never reaches entry auto-selection.
             let files = read::read_tree(&body_path)?.into_iter().collect();
             ArtifactContent::Bundle {
                 files,
@@ -73,7 +72,7 @@ impl StoreContext {
     // delete
     // -----------------------------------------------------------------------
 
-    /// `removeById(id, …)` — [lib/store.js:626-644]
+    /// `removeById(id, …)`
     pub(super) fn delete_sync(
         &self,
         conn: &mut Connection,
@@ -83,7 +82,7 @@ impl StoreContext {
         let _gate = self
             .lifecycle_gate
             .write()
-            .map_err(|_| AppError::Internal)?;
+            .map_err(|error| crate::error::internal("lock artifact lifecycle for trash", error))?;
         let Some(meta) = load_meta(conn, id)? else {
             return Ok(false);
         };
@@ -119,7 +118,6 @@ impl StoreContext {
             .map_err(|error| sql_error("commit delete audit reservation", &error))?;
 
         // `moveBodyToTrash` runs OUTSIDE the try: a failure here has nothing to compensate.
-        // [lib/store.js:503-509], [lib/store.js:630]
         let move_handle = MovedBody {
             source: self.body_path(&safe_id, meta.is_bundle),
             trash: trash.clone(),
@@ -184,7 +182,7 @@ impl StoreContext {
     ) -> Result<bool, Interrupt> {
         self.fault(FaultPoint::DeleteRow)?;
         // Reactions cascade on `artifacts(id)`; feedback, revisions, views, and shares cascade on
-        // the composite `artifacts(id, org)`. [lib/migrations.js:124,167,261,299,357]
+        // the composite `artifacts(id, org)`.
         let transaction = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| {
@@ -246,7 +244,6 @@ impl StoreContext {
             });
         }
         // Revision rows cascade through the composite FK; this removes their bodies.
-        // [lib/store.js:638]
         durable::remove(&paths::history_dir(&self.artifact_dir, id)).map_err(|error| {
             Interrupt {
                 error,
@@ -257,7 +254,7 @@ impl StoreContext {
         Ok(true)
     }
 
-    /// `moveBodyToTrash(id, meta)` — [lib/store.js:503-509]
+    /// `moveBodyToTrash(id, meta)`
     fn move_body_to_trash(
         &self,
         id: &SafeArtifactId,
@@ -273,7 +270,7 @@ impl StoreContext {
         Ok(Some(MovedBody { source, trash }))
     }
 
-    /// `restoreBody(moved)` — [lib/store.js:511-514]
+    /// `restoreBody(moved)`
     fn restore_body(&self, moved: Option<&MovedBody>) -> Result<(), AppError> {
         self.bare_fault(FaultPoint::DeleteRestoreBody)?;
         let Some(moved) = moved else {

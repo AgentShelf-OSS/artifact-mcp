@@ -48,7 +48,8 @@ impl AuditRequestId {
 impl MutationAudit {
     fn request_id(source: &str) -> Result<String, AppError> {
         let mut random = [0_u8; 16];
-        getrandom::fill(&mut random).map_err(|_| AppError::Internal)?;
+        getrandom::fill(&mut random)
+            .map_err(|error| crate::error::internal("generate audit request id", error))?;
         Ok(format!("{source}-{}", hex::encode(random)))
     }
 
@@ -62,7 +63,7 @@ impl MutationAudit {
                 tenant: publisher.org.0.clone(),
                 actor_type: "api_key".to_owned(),
                 actor_id: publisher.client_id.0.clone(),
-                actor_role: publisher.role.clone(),
+                actor_role: publisher.role.as_str().to_owned(),
                 source: "mcp".to_owned(),
                 request_id: request_id.clone(),
             },

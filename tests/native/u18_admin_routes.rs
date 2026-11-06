@@ -120,6 +120,7 @@ impl Harness {
         });
         AppDeps {
             data: Arc::new(artifact_mcp::data::DataBroker::empty()),
+            collections: Arc::new(artifact_mcp::ports::collections::InertCollections),
             publisher_auth: self.clone(),
             viewer_identity: self.clone(),
             artifacts: self.clone(),
@@ -2164,7 +2165,7 @@ fn oauth_publisher(org: &str, scopes: &[&str]) -> PublisherIdentity {
         client_id: ClientId::from("audit-reader"),
         org: OrgId::from(org),
         label: "Audit reader".to_owned(),
-        role: "reader".to_owned(),
+        role: artifact_mcp::model::Role::Reader,
         scopes: Some(scopes.iter().map(|scope| (*scope).to_owned()).collect()),
     }
 }
@@ -2264,7 +2265,7 @@ async fn audit_routes_require_scoped_oauth_and_preserve_tenant_boundaries() {
         client_id: ClientId::from("legacy"),
         org: OrgId::from("acme"),
         label: "Legacy key".to_owned(),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     }));
     assert_eq!(

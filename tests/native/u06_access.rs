@@ -648,14 +648,14 @@ fn publisher(client_id: &str, org: &str) -> PublisherIdentity {
         client_id: ClientId::from(client_id),
         org: OrgId::from(org),
         label: format!("{org} agent"),
-        role: "author".to_owned(),
+        role: artifact_mcp::model::Role::Author,
         scopes: None,
     }
 }
 
 fn publisher_with_role(client_id: &str, org: &str, role: &str) -> PublisherIdentity {
     PublisherIdentity {
-        role: role.to_owned(),
+        role: role.parse().expect("valid fixture role"),
         ..publisher(client_id, org)
     }
 }
@@ -1026,7 +1026,7 @@ fn publisher_capabilities_and_concealed_reads_match_the_frozen_matrix() {
             client_id: ClientId::from(client_id),
             org: OrgId::from(org),
             label: String::new(),
-            role: role.to_owned(),
+            role: role.parse().expect("valid fixture role"),
             scopes: None,
         };
         for (&(artifact_label, shape), &(flags, read)) in MATRIX_ARTIFACTS.iter().zip(&row) {

@@ -11,7 +11,7 @@ use super::{
     parse::present,
 };
 
-/// Default push-service allowlist — `DEFAULT_WEB_PUSH_ENDPOINT_HOSTS` in [lib/config.js].
+/// Default push-service allowlist.
 pub const DEFAULT_WEB_PUSH_ENDPOINT_HOSTS: [&str; 6] = [
     "fcm.googleapis.com",
     "updates.push.services.mozilla.com",
@@ -38,7 +38,7 @@ pub struct VapidIdentity {
     pub subject: String,
 }
 
-/// `parseWebPushConfig(env)` — [lib/config.js].
+/// `parseWebPushConfig(env)`.
 ///
 /// The feature is enabled only when a VAPID identity is configured **and** `WEBHOOK_ENC_KEY` is
 /// set, because subscription endpoints are stored encrypted with that key. See
@@ -92,7 +92,7 @@ impl WebPushConfig {
     }
 }
 
-/// `parseWebPushEndpointHosts(value)` — [lib/config.js].
+/// `parseWebPushEndpointHosts(value)`.
 fn parse_web_push_endpoint_hosts(raw: Option<&str>) -> Result<Vec<String>, AppError> {
     let mut hosts: Vec<String> = Vec::new();
     for entry in raw
@@ -132,7 +132,7 @@ fn valid_host_entry(entry: &str) -> bool {
         })
 }
 
-/// `parseVapidPrivateKey(value).publicKey` — [lib/config.js]. `None` for any value that is not
+/// `parseVapidPrivateKey(value).publicKey`. `None` for any value that is not
 /// the canonical unpadded base64url encoding of a valid P-256 scalar.
 #[must_use]
 pub fn vapid_public_key(encoded: &str) -> Option<String> {
@@ -153,7 +153,7 @@ pub fn vapid_public_key(encoded: &str) -> Option<String> {
     Some(URL_SAFE_NO_PAD.encode(point.as_bytes()))
 }
 
-/// `validWebPushSubject(value)` — [lib/config.js].
+/// `validWebPushSubject(value)`.
 #[must_use]
 pub fn valid_web_push_subject(subject: &str) -> bool {
     if subject.is_empty()

@@ -9,7 +9,7 @@ use crate::model::DigestBackfillReport;
 
 use super::support::{body_row_from, into_error};
 
-/// `backfillBodyDigests()` — [lib/store.js:755-770]
+/// Backfill missing body digests.
 ///
 /// Repairs rows created before the v17 `artifact-body-digest` migration, which added the column
 /// with an empty default and never hashed the existing bodies. It is metadata repair, not a
@@ -58,7 +58,7 @@ pub fn backfill_body_digests(
             params![digest, row.id],
         )
         .map_err(|error| sql_error("backfill body digest", &error))?;
-        // Node counts an attempted repair, not `info.changes`. [lib/store.js:766-767]
+        // Node counts an attempted repair, not `info.changes`.
         report.updated += 1;
     }
     Ok(report)

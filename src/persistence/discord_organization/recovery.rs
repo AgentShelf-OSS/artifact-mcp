@@ -11,7 +11,7 @@ use crate::{
 use super::{
     helpers::{
         INVALID_RECOVERY_DESTINATION, artifact_exists, destination_matches,
-        destination_matches_preflight, internal, is_canonical_url, recovery_record, trimmed,
+        destination_matches_preflight, is_canonical_url, recovery_record, trimmed,
         valid_discord_id,
     },
     types::{
@@ -49,7 +49,7 @@ impl OrganizationDiscordStore {
                    channel_id=excluded.channel_id, canonical_artifact_url=excluded.canonical_artifact_url, \
                    state='pending', recovered_message_id=NULL, provenance='', last_error='', completed_at=NULL, updated_at=datetime('now')",
                 params![artifact, org, destination.connection_id, destination.notification_webhook_id, destination.provider_webhook_id, destination.guild_id, destination.channel_id, canonical_artifact_url],
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("schedule recovery", error))?;
             Ok(())
         }).await
     }
@@ -81,7 +81,7 @@ impl OrganizationDiscordStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("claim recovery", error))?;
             let job = tx
                 .query_row(
                     "SELECT artifact_id, org, connection_id, notification_webhook_id, \
@@ -109,7 +109,7 @@ impl OrganizationDiscordStore {
                     },
                 )
                 .optional()
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("claim recovery", error))?;
             if let Some(job) = &job {
                 let changed = tx
                     .execute(
@@ -119,12 +119,13 @@ impl OrganizationDiscordStore {
                            AND state IN ('pending','recovering','retryable','rate_limited')",
                         params![job.artifact_id.0, job.org.0],
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| crate::error::internal("claim recovery", error))?;
                 if changed != 1 {
                     return Err(AppError::Internal);
                 }
             }
-            tx.commit().map_err(internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("claim recovery", error))?;
             Ok(job)
         })
         .await
@@ -159,7 +160,7 @@ impl OrganizationDiscordStore {
                  completed_at=CASE WHEN ?3 IN ('pending','recovering','retryable','rate_limited') THEN NULL ELSE datetime('now') END, updated_at=datetime('now') \
                  WHERE artifact_id=?1 AND org=?2",
                 params![artifact, org, state.as_str(), message_id],
-            ).map_err(internal)?;
+            ).map_err(|error| crate::error::internal("complete recovery", error))?;
             if changed != 1 { return Err(AppError::NotFound("Discord recovery was not scheduled.".to_owned())); }
             recovery_record(conn, &artifact, &org)?.ok_or(AppError::Internal)
         }).await
@@ -201,7 +202,7 @@ impl OrganizationDiscordStore {
                          updated_at=datetime('now') WHERE artifact_id=?1 AND org=?2 AND state='recovering'",
                         params![artifact_name, org_name, state.as_str(), message_id],
                     )
-                    .map_err(internal)?;
+                    .map_err(|error| crate::error::internal("complete recovery audited", error))?;
                 if changed != 1 {
                     return Err(AppError::Conflict(
                         "Discord recovery lease is no longer current.".to_owned(),
@@ -259,7 +260,7 @@ impl OrganizationDiscordStore {
                    AND provenance='exact_selected_webhook_canonical_url'",
                 params![artifact, org, destination.connection_id, destination.notification_webhook_id, destination.provider_webhook_id, destination.guild_id, destination.channel_id],
                 |row| row.get::<_, String>(0),
-            ).optional().map_err(internal)
+            ).optional().map_err(|error| crate::error::internal("recovered anchor message", error))
         }).await
     }
 
@@ -305,12 +306,14 @@ impl OrganizationDiscordStore {
                     WHERE x.artifact_id=a.id AND x.org=a.org\
                  ) ORDER BY a.id",
                 )
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("eligible artifacts", error))?;
             let rows = statement
                 .query_map([org_name], |row| row.get::<_, String>(0))
-                .map_err(internal)?;
+                .map_err(|error| crate::error::internal("eligible artifacts", error))?;
             for row in rows {
-                artifact_ids.push(row.map_err(internal)?);
+                artifact_ids.push(
+                    row.map_err(|error| crate::error::internal("eligible artifacts", error))?,
+                );
             }
         }
         Ok(artifact_ids)
@@ -353,7 +356,7 @@ impl OrganizationDiscordStore {
                 params![org_name, destination.notification_webhook_id, event_id],
                 |row| row.get(0),
             )
-            .map_err(internal)?;
+            .map_err(|error| crate::error::internal("queue artifact", error))?;
         if retained {
             return Ok(0);
         }
@@ -388,7 +391,7 @@ impl OrganizationDiscordStore {
                 canonical_url
             ],
         )
-        .map_err(internal)
+        .map_err(|error| crate::error::internal("queue artifact", error))
         .map(|count| count as u64)
     }
 }

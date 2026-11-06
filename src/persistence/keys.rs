@@ -1,29 +1,14 @@
-//! Owned by U09 (terra) — publisher key persistence.
+//! Publisher key persistence.
 //!
-//! Node oracle: `lib/keys.js` (create/list/revoke) and `seedKeysFromEnv` in `lib/db.js:30-59`
-//! (the bootstrap path). Both are ported literally, including error strings, because
-//! `/settings/keys` returns a thrown message verbatim as `400 {"error": …}`
-//! ([lib/app.js:277-279]).
+//! Creation, listing, revocation, and bootstrap seeding preserve error strings because `/settings/keys` returns validation messages verbatim as `400 {"error": …}`.
 //!
 //! # The secret exists for exactly one response
 //!
-//! A publisher key's secret is generated, hashed, and shown once; only `sha256Hex(secret)` is
-//! ever written to `api_keys.key_hash` ([lib/keys.js:38-39]). Inside this module the raw value
-//! never exists as a bare `String`: it is a [`Secret`](crate::config::Secret), whose `Debug`/`Display` are redacted, and
-//! it is unwrapped only when the frozen [`CreatedPublisherKey`](crate::model::CreatedPublisherKey) is built for the caller. No error,
-//! log line, or database column can therefore carry it.
-//!
-//! **Contract-delta request:** `CreatedPublisherKey.secret` is a plain `String` on a struct that
-//! derives `Debug` (`src/model/admin.rs:23-29`), so `{:?}` on the *frozen model* prints the live
-//! secret. `config::Secret` already exists for exactly this purpose. Changing the field type is a
-//! U01-owned edit; U09 raises it rather than making it.
+//! A publisher key's secret is generated, hashed, and shown once; only `sha256Hex(secret)` is ever written to `api_keys.key_hash`. Inside this module the raw value never exists as a bare `String`: it is a [`Secret`](crate::config::Secret), whose `Debug`/`Display` are redacted, and it is unwrapped only when the frozen [`CreatedPublisherKey`](crate::model::CreatedPublisherKey) is built for the caller. No error, log line, or database column can therefore carry it.
 //!
 //! # Bootstrap seeding
 //!
-//! `ARTIFACT_API_KEYS` seeding is `INSERT … ON CONFLICT(client_id) DO NOTHING`: it may create a
-//! key, never update or un-revoke one, so keys managed in Settings stay authoritative
-//! ([lib/db.js:28-29]). Documented placeholder secrets are refused outright ([lib/db.js:36-38]) —
-//! copying `.env.example` unchanged must not leave a publicly known key live on `/mcp`.
+//! `ARTIFACT_API_KEYS` seeding is `INSERT … ON CONFLICT(client_id) DO NOTHING`: it may create a key, never update or un-revoke one, so keys managed in Settings stay authoritative. Documented placeholder secrets are refused outright because copying `.env.example` unchanged must not leave a publicly known key live on `/mcp`.
 
 mod operations;
 mod store;

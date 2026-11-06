@@ -1,6 +1,6 @@
 //! Discord discussion transport for legacy Forum/Media posts and notification-anchored threads.
 //!
-//! The public operation and result types are deliberately provider-neutral: PBI-079's
+//! The public operation and result types are deliberately provider-neutral:
 //! orchestration can persist one artifact discussion contract without treating a Discord URL as
 //! an identifier.  This adapter only converts the operation to Discord's webhook protocol.  It
 //! neither owns an outbox row nor performs a database operation.
@@ -25,7 +25,7 @@ use crate::{
 pub const MAX_DISCUSSION_CONTENT_CHARS: usize = 2_000;
 /// Discord forum and media posts have a bounded thread name.
 pub const MAX_THREAD_NAME_CHARS: usize = 100;
-/// Discord snowflakes are decimal and this bound matches PBI-056 delivery IDs.
+/// Discord snowflakes are decimal and this bound matches delivery IDs.
 pub const MAX_DISCUSSION_ID_BYTES: usize = 32;
 pub(super) const MAX_RESPONSE_BODY_BYTES: usize = 65_536;
 
@@ -199,7 +199,7 @@ pub struct DiscussionReceipt {
     pub thread_id: Option<String>,
 }
 
-/// Provider-neutral terminal/retry outcome, sharing PBI-056's locked semantics and rate-limit
+/// Provider-neutral terminal/retry outcome, sharing locked semantics and rate-limit
 /// metadata.  It contains no Discord URL, credential, or user-authored content.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DiscussionResult {

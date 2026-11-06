@@ -41,7 +41,7 @@ pub(super) async fn create_key(State(deps): State<AppDeps>, request: Request) ->
                 org: OrgId(js_or_empty(body.get("org"))),
                 label: js_or_empty(body.get("label")),
                 role: match js_or_empty(body.get("role")) {
-                    value if value.is_empty() => "author".to_owned(),
+                    value if value.is_empty() => crate::model::Role::Author.as_str().to_owned(),
                     value => value,
                 },
                 owner_email: {

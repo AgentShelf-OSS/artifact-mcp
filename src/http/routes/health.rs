@@ -671,6 +671,7 @@ mod tests {
         let fake = Arc::new(DeterministicFake);
         AppDeps {
             data: Arc::new(crate::data::DataBroker::empty()),
+            collections: Arc::new(crate::ports::collections::InertCollections),
             publisher_auth: fake.clone(),
             viewer_identity: fake.clone(),
             artifacts: fake.clone(),

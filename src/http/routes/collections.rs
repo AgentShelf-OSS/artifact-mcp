@@ -17,9 +17,9 @@ use crate::{
     AppDeps,
     error::AppError,
     model::{OrgId, Viewer},
-    persistence::collections::{
-        CollectionActor, CollectionPrincipal, CollectionStore, CollectionUpdate,
-        MAX_COLLECTIONS_PER_ORG,
+    ports::collections::{
+        CollectionActor, CollectionPrincipal, CollectionUpdate, MAX_COLLECTIONS_PER_ORG,
+        NewCollection,
     },
     security::audit::MutationAudit,
 };
@@ -138,17 +138,6 @@ fn actor(viewer: &Viewer, org: &str) -> Result<CollectionActor, AppError> {
 async fn viewer(deps: &AppDeps, headers: &HeaderMap) -> Result<Viewer, AppError> {
     deps.viewer_identity.resolve(headers).await
 }
-fn store(deps: &AppDeps) -> Result<CollectionStore, AppError> {
-    let pool = deps
-        .data
-        .pool()
-        .ok_or_else(|| AppError::Unavailable("database unavailable".into()))?;
-    Ok(match deps.audit_access.as_ref() {
-        Some(audit) => CollectionStore::with_audit(pool, audit.mutation_key()),
-        None => CollectionStore::new(pool),
-    })
-}
-
 fn mutation_audit(viewer: &Viewer) -> Result<MutationAudit, AppError> {
     MutationAudit::viewer(viewer)
 }
@@ -195,7 +184,7 @@ async fn projection(
     {
         return Err(AppError::ConcealedNotFound);
     }
-    let store = store(deps)?;
+    let store = deps.collections.as_ref();
     let mut rows = Vec::new();
     for org in orgs {
         rows.extend(
@@ -331,10 +320,7 @@ async fn create(
         Ok(a) => a,
         Err(e) => return collection_error(e),
     };
-    let s = match store(&deps) {
-        Ok(s) => s,
-        Err(e) => return collection_error(e),
-    };
+    let s = deps.collections.as_ref();
     let id = nanoid::nanoid!(
         12,
         &"0123456789abcdefghijkmnpqrstuvwxyz"
@@ -348,13 +334,15 @@ async fn create(
     let row = match s
         .create_atomic(
             &a,
-            id,
-            body.name.unwrap_or_default(),
-            body.description.unwrap_or_default(),
-            body.color.filter(|color| !color.is_empty()),
-            body.cover_artifact_id,
-            unique_ids(body.artifact_ids.unwrap_or_default()),
-            Some(audit),
+            NewCollection {
+                id,
+                name: body.name.unwrap_or_default(),
+                description: body.description.unwrap_or_default(),
+                color: body.color.filter(|color| !color.is_empty()),
+                cover: body.cover_artifact_id,
+                artifact_ids: unique_ids(body.artifact_ids.unwrap_or_default()),
+            },
+            audit,
         )
         .await
     {
@@ -422,15 +410,12 @@ async fn update(
         cover_artifact_id: cover.0,
         clear_cover: cover.1,
     };
-    let s = match store(&deps) {
-        Ok(s) => s,
-        Err(e) => return collection_error(e),
-    };
+    let s = deps.collections.as_ref();
     let audit = match mutation_audit(&v) {
         Ok(x) => x,
         Err(e) => return collection_error(e),
     };
-    if let Err(e) = s.update_audited(&a, id.clone(), update, Some(audit)).await {
+    if let Err(e) = s.update_audited(&a, id.clone(), update, audit).await {
         return collection_error(e);
     };
     match projection(&deps, &a, &[org]).await {
@@ -475,15 +460,12 @@ async fn remove(
         Ok(a) => a,
         Err(e) => return collection_error(e),
     };
-    let s = match store(&deps) {
-        Ok(s) => s,
-        Err(e) => return collection_error(e),
-    };
+    let s = deps.collections.as_ref();
     let audit = match mutation_audit(&v) {
         Ok(x) => x,
         Err(e) => return collection_error(e),
     };
-    match s.delete_audited(&a, id.clone(), Some(audit)).await {
+    match s.delete_audited(&a, id.clone(), audit).await {
         Ok(()) => Json(json!({"id":id,"deleted":true})).into_response(),
         Err(e) => collection_error(e),
     }
@@ -549,10 +531,7 @@ async fn membership(
         Err(e) => return collection_error(e),
     };
     let ids = unique_ids(body.artifact_ids.unwrap_or_default());
-    let s = match store(&deps) {
-        Ok(s) => s,
-        Err(e) => return collection_error(e),
-    };
+    let s = deps.collections.as_ref();
     let before = match s.members(&a, id.clone()).await {
         Ok(x) => x,
         Err(e) => return collection_error(e),
@@ -561,9 +540,10 @@ async fn membership(
         Ok(x) => x,
         Err(e) => return collection_error(e),
     };
+    // HTTP reports the preflight view for compatibility, discarding the mutation diff.
     if adding {
         match s
-            .add_memberships_audited(&a, id.clone(), ids.clone(), Some(audit))
+            .add_memberships_audited(&a, id.clone(), ids.clone(), audit)
             .await
         {
             Ok(_) => {
@@ -574,7 +554,7 @@ async fn membership(
         }
     } else {
         match s
-            .remove_memberships_audited(&a, id.clone(), ids.clone(), Some(audit))
+            .remove_memberships_audited(&a, id.clone(), ids.clone(), audit)
             .await
         {
             Ok(_) => {
@@ -625,10 +605,7 @@ async fn get_preferences(
     {
         return collection_error(AppError::ConcealedNotFound);
     }
-    let s = match store(&deps) {
-        Ok(store) => store,
-        Err(error) => return collection_error(error),
-    };
+    let s = deps.collections.as_ref();
     match s.preferences(&a).await {
         Ok(x) => Json(x).into_response(),
         Err(e) => collection_error(e),
@@ -679,10 +656,7 @@ async fn set_preferences(
     {
         return collection_error(AppError::ConcealedNotFound);
     }
-    let s = match store(&deps) {
-        Ok(s) => s,
-        Err(e) => return collection_error(e),
-    };
+    let s = deps.collections.as_ref();
     let mut write_actor = a.clone();
     if write_actor.is_admin {
         write_actor.org = "all".into();

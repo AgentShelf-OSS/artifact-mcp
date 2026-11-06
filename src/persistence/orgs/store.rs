@@ -96,7 +96,7 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("create org audited", error))?;
             let created = create_org_in_transaction_from_request(&tx, &request)?;
             let audit = audit.for_target_tenant(&created.name.0)?;
             let event = AuditEvent {
@@ -114,7 +114,8 @@ impl OrgStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("create org audited", error))?;
             Ok(created)
         })
         .await
@@ -140,9 +141,10 @@ impl OrgStore {
             let audit = audit.for_target_tenant(&target)?;
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("delete org audited", error))?;
             if !delete_org_in_transaction(&tx, &target)? {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("delete org audited", error))?;
                 return Ok(false);
             }
             let event = AuditEvent {
@@ -160,7 +162,8 @@ impl OrgStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("delete org audited", error))?;
             Ok(true)
         })
         .await
@@ -357,7 +360,7 @@ impl OrgStore {
         db::interact(&pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("add category audited", error))?;
             let normalized = norm_category(&name);
             let existed = tx
                 .query_row(
@@ -370,7 +373,8 @@ impl OrgStore {
                 .is_some();
             let result = add_category(&tx, &org.0, &name)?;
             if existed {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("add category audited", error))?;
                 return Ok(result);
             }
             let event = AuditEvent {
@@ -388,7 +392,8 @@ impl OrgStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("add category audited", error))?;
             Ok(result)
         })
         .await
@@ -458,7 +463,7 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("set color audited", error))?;
             let current = tx
                 .query_row("SELECT color FROM orgs WHERE name=?1", [&org.0], |row| {
                     row.get::<_, Option<String>>(0)
@@ -467,7 +472,8 @@ impl OrgStore {
                 .map_err(|error| database_failure("read org color", &error))?;
             let stored = set_color(&tx, &org.0, color.as_deref())?;
             if current.as_ref() == Some(&stored) {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("set color audited", error))?;
                 return Ok(stored);
             }
             let event = AuditEvent {
@@ -485,7 +491,8 @@ impl OrgStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("set color audited", error))?;
             Ok(stored)
         })
         .await
@@ -539,9 +546,10 @@ impl OrgStore {
         db::interact(&self.pool, move |conn| {
             let tx = conn
                 .transaction_with_behavior(TransactionBehavior::Immediate)
-                .map_err(|_| AppError::Internal)?;
+                .map_err(|error| crate::error::internal("audited org bool", error))?;
             if !mutation(&tx, &org.0, &value)? {
-                tx.commit().map_err(|_| AppError::Internal)?;
+                tx.commit()
+                    .map_err(|error| crate::error::internal("audited org bool", error))?;
                 return Ok(false);
             }
             let event = AuditEvent {
@@ -559,7 +567,8 @@ impl OrgStore {
                 audit.context(),
                 &event,
             )?;
-            tx.commit().map_err(|_| AppError::Internal)?;
+            tx.commit()
+                .map_err(|error| crate::error::internal("audited org bool", error))?;
             Ok(true)
         })
         .await

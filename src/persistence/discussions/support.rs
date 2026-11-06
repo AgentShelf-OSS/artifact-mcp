@@ -2,7 +2,6 @@
 
 use rusqlite::Transaction;
 
-use super::internal;
 use crate::{
     error::AppError,
     security::audit::{AuditEvent, MutationAudit, append_in_transaction},
@@ -16,7 +15,8 @@ pub(super) fn append_audit_then_commit<T>(
     value: T,
 ) -> Result<T, AppError> {
     append_in_transaction(&tx, audit_key, &audit.event_id()?, audit.context(), &event)?;
-    tx.commit().map_err(internal)?;
+    tx.commit()
+        .map_err(|error| crate::error::internal("append audit then commit", error))?;
     Ok(value)
 }
 

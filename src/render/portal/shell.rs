@@ -220,7 +220,9 @@ pub(super) fn shell_feedback_json(view: &ShellView) -> Result<String, AppError> 
             })
             .collect::<Vec<_>>(),
     )
-    .map_err(|_| AppError::Internal)
+    .map_err(|_error| {
+        crate::error::internal("render viewer shell", "serialization or rendering failed")
+    })
 }
 
 pub(super) fn shell_navigation(view: &ShellView) -> (String, String) {

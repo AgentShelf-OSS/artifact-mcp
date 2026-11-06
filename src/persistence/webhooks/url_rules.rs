@@ -2,7 +2,7 @@
 // URL masking and the Discord allowlist
 // ---------------------------------------------------------------------------
 
-/// Port of the exported `maskUrl(value)` — [lib/webhooks.js:39-47].
+/// Port of the exported `maskUrl(value)`.
 ///
 /// `${parsed.protocol}//${parsed.host}…${url.slice(-4)}`, falling back to `…${url.slice(-4)}` when
 /// the value does not parse as a URL. Note the missing `/` relative to
@@ -71,7 +71,7 @@ pub fn truncate_utf16(value: &str, max: usize) -> String {
     value.to_owned()
 }
 
-/// Port of `DISCORD_WEBHOOK_RE.test(url)` — [lib/webhooks.js:23,87].
+/// Port of `DISCORD_WEBHOOK_RE.test(url)`.
 ///
 /// The regex is `^https://(discord|discordapp)\.com/api/webhooks/` with the `i` flag, anchored at
 /// the start only. It is a **prefix allowlist on the raw string**, which is what makes lookalikes
