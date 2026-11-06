@@ -44,7 +44,7 @@ harness = false
 
 [dependencies]
 artifact-cdp = { path = "../preview-renderer/cdp" }
-base64 = "0.22"
+base64 = "0.23"
 serde_json = { version = "1", features = ["float_roundtrip"] }
 tokio = { version = "1", features = ["macros", "net", "rt", "sync", "time"] }
 
