@@ -48,7 +48,7 @@ dependencies = [
 
 [[package]]
 name = "artifact-mcp"
-version = "1.30.1"
+version = "1.31.0"
 dependencies = [
  "aes-gcm",
  "artifact-mcp",
