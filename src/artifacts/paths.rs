@@ -1,7 +1,7 @@
 //! Artifact, history, and preview paths.
 //!
-//! The on-disk layout is frozen by the rebuild blueprint §D2 and must not change; bodies do
-//! not move during cutover, and Node and Rust have to alternate against the same directory.
+//! The on-disk layout is frozen by the rebuild blueprint §D2 and must not change; existing
+//! bodies, retained revisions, and previews must remain readable at their stored paths.
 //!
 //! ```text
 //! /data/artifacts/<id>.html
@@ -13,21 +13,21 @@
 //! /data/previews/<id>/<body_sha256>.png
 //! ```
 //!
-//! Node oracle, function by function:
+//! Path constructors and their layout:
 //!
-//! | Rust | Node |
+//! | Constructor | Path relative to the data directory |
 //! |---|---|
-//! | [`artifact_dir`] | `path.join(dataDir, "artifacts")` |
-//! | [`single_body_path`] | `filePath(id)` |
-//! | [`bundle_dir`] | `bundleDir(id)` |
-//! | [`transient_path`] | `transientPath(id, kind)` |
-//! | [`history_root`] / [`history_dir`] | `HISTORY_DIR`, `historyDir(id)` |
-//! | [`history_body_path`] | `historyBodyPath(id, revision, isBundle)` |
-//! | [`preview_dir`] | `path.join(dataDir, "previews")` |
-//! | [`preview_artifact_dir`] | `artifactDir(id)` |
-//! | [`thumbnail_path`] | `thumbnailPath(id, digest)` |
+//! | [`artifact_dir`] | `artifacts` |
+//! | [`single_body_path`] | `artifacts/<id>.html` |
+//! | [`bundle_dir`] | `artifacts/<id>` |
+//! | [`transient_path`] | `artifacts/.<id>.<kind>-<random>` |
+//! | [`history_root`] / [`history_dir`] | `artifacts/.history`, `artifacts/.history/<id>` |
+//! | [`history_body_path`] | `artifacts/.history/<id>/<revision>[.html]` |
+//! | [`preview_dir`] | `previews` |
+//! | [`preview_artifact_dir`] | `previews/<id>` |
+//! | [`thumbnail_path`] | `previews/<id>/<digest>.png` |
 //!
-//! Every constructor takes an already-validated [`SafeArtifactId`] / [`BodyDigest`], so no caller-supplied string ever reaches a path segment unchecked. That is stricter than Node, which only guards the preview paths; it cannot change behaviour for real artifacts because every generated id satisfies `/^[0-9a-z]{6,24}$/`.
+//! Constructors that accept artifact ids or digests take an already-validated [`SafeArtifactId`] / [`BodyDigest`], so no caller-supplied id or digest reaches a path segment unchecked. Every generated id satisfies `/^[0-9a-z]{6,24}$/`, so these checks preserve the stored layout for real artifacts.
 
 use std::path::{Path, PathBuf};
 

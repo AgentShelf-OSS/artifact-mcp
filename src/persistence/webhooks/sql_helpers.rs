@@ -54,7 +54,7 @@ pub(super) fn discussion_anchor_exists(
     .map_err(|error| crate::error::internal("discussion anchor exists", error))
 }
 
-/// `String(value || "").trim()` — the normalization every Node entry point applies.
+/// Trim leading and trailing whitespace from a webhook input string.
 pub(super) fn trimmed(value: &str) -> String {
     value.trim().to_owned()
 }

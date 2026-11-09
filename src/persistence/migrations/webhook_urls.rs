@@ -20,8 +20,8 @@ pub struct EncryptedUrl {
 ///
 /// Migrations convert legacy plaintext webhook rows without implementing encryption.
 /// `src/security/crypto.rs` provides authenticated encryption;
-/// when no key is configured the caller passes `None` and rows stay plaintext, matching
-/// `encryptPlaintextWebhookUrls` returning `0` in the Node reference.
+/// when no key is configured the caller passes `None` and rows stay plaintext,
+/// preserving the historical zero-conversion result.
 pub trait WebhookUrlCipher: Send + Sync {
     /// Encrypts one webhook URL, returning the three at-rest columns.
     ///
@@ -33,8 +33,8 @@ pub trait WebhookUrlCipher: Send + Sync {
 /// Mask a webhook URL for at-rest display.
 ///
 /// The masked value is what remains in the plaintext `url` column once the row is encrypted, so it
-/// must never contain the token segment. Node builds `${protocol}//${host}/…${url.slice(-4)}` and
-/// falls back to `…${url.slice(-4)}` for unparsable values.
+/// must never contain the token segment. The frozen format is `{protocol}//{host}/…{last4}`,
+/// falling back to `…{last4}` for unparsable values.
 #[must_use]
 pub fn mask_webhook_url(value: &str) -> String {
     let suffix = last_four(value);
@@ -54,7 +54,7 @@ pub fn mask_webhook_url(value: &str) -> String {
 /// Equivalent of JavaScript `value.slice(-4)` for the ASCII URLs stored in this column.
 /// Port of JavaScript `url.slice(-4)` — the last four **UTF-16 code units**, not characters.
 ///
-/// `String::chars()` diverges for astral characters: for `https://example.test/🎉🎉🎉`, Node yields
+/// `String::chars()` diverges for astral characters: for `https://example.test/🎉🎉🎉`, the frozen format yields
 /// `🎉🎉` (each emoji is two UTF-16 units) while a `chars()`-based slice yields `/🎉🎉🎉`. This value
 /// is written into the `url` column during plaintext→encrypted conversion, so the divergence would
 /// persist at rest.

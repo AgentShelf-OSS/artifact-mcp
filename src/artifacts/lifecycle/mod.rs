@@ -32,9 +32,9 @@
 //!
 //! # Compatibility constraints
 //!
-//! 1. **`ArtifactUpdate` cannot express Node's "entry-only bundle update".** Node distinguishes `files === undefined && entry !== undefined` from `files === {}` (which is the error `files is empty`). The frozen model has a single `content: Option<ArtifactContent>`, so this module reads `Bundle { files: [], entry: Some(_) }` as the entry-only update and `Bundle { files: [], entry: None }` as `files is empty`. The one divergent input is a caller that supplies *both* an empty file map and an entry: Node reports `files is empty`, this reports success on the entry change. MCP arguments must be mapped accordingly.
-//! 2. **A bundle path that sanitizes to a trailing separator is an I/O failure, not a validated rejection.** `sanitizeRel("a/b/")` returns `"a/b/"` and Node then fails inside `writeFileSync` with `EISDIR`; Rust's `Path::join` would silently drop the separator and create a *file*. `StoreContext::stage_bundle_files` therefore refuses such a name so both runtimes fail the publish. Fixing it properly means rejecting the name in `sanitizeRel` on both sides.
-//! 3. **Lifecycle failures carry Node's `reason` token as their message** (`not_found`, `conflict`, `revision_not_found`, `type_mismatch`, `body_missing`). The HTTP restore route returns that token verbatim while the MCP tool renders a friendly sentence, so the token is the only shape both consumers can derive theirs from. The `AppError` variant already encodes the status Node uses.
+//! 1. **`ArtifactUpdate` encodes an entry-only bundle update with an empty file list.** The retired Node twin distinguished an omitted file map with an entry from an explicit empty map, which reported `files is empty`. The frozen model has a single `content: Option<ArtifactContent>`, so this module reads `Bundle { files: [], entry: Some(_) }` as the entry-only update and `Bundle { files: [], entry: None }` as `files is empty`. An explicit empty file map plus an entry therefore succeeds here, unlike the historical input. MCP arguments must be mapped accordingly.
+//! 2. **A bundle path that sanitizes to a trailing separator is an I/O failure, not a validated rejection.** `sanitize_relative_path("a/b/")` returns `"a/b/"`. The retired Node twin then failed during file writing with `EISDIR`; `Path::join` would silently drop the separator and create a *file*. `StoreContext::stage_bundle_files` refuses such a name to preserve the historical failure. Rejecting the name during sanitization would change that contract.
+//! 3. **Lifecycle failures carry a frozen `reason` token as their message** (`not_found`, `conflict`, `revision_not_found`, `type_mismatch`, `body_missing`). The HTTP restore route returns that token verbatim while the MCP tool renders a friendly sentence, so the token is the only shape both consumers can derive theirs from. The `AppError` variant encodes the corresponding HTTP status.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -161,7 +161,7 @@ impl ArtifactStore {
         Self::new_for_test(pool, artifact_dir, limits, ids, audit_key)
     }
 
-    /// `files.mkdirSync(artifactDir, { recursive: true })` runs here, as Node does at store
+    /// Create the artifact directory and any missing parents during store
     /// construction.
     #[must_use]
     pub fn new_for_test(
@@ -224,7 +224,7 @@ impl ArtifactStore {
         audit_key: [u8; 32],
         delivery_base_url: String,
     ) -> Self {
-        // Best effort, exactly like Node: a store over an unwritable directory fails per
+        // Best effort: a store over an unwritable directory fails per
         // operation rather than at construction.
         let _ = std::fs::create_dir_all(&artifact_dir);
         Self {

@@ -17,7 +17,7 @@
 //! The stored and public URL masks differ by one character:
 //!
 //! * `storedMaskUrl` — `{scheme}://{host}/…{last4}` — what is written to the `url` column when a row is encrypted. Already ported as [`mask_webhook_url`](crate::persistence::migrations::mask_webhook_url) and applied by [`WebhookUrlProtection::protect`].
-//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored `https://discord.com/…oken` renders as `https://discord.com…oken`. That is the Node behaviour and the admin UI depends on it, so it is reproduced exactly.
+//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored `https://discord.com/…oken` renders as `https://discord.com…oken`. The admin UI depends on this frozen display format, originally produced by the retired Node twin.
 //!
 //! # Secret containment
 //!
@@ -55,7 +55,7 @@ pub const EVENTS: [WebhookEvent; 6] = [
     WebhookEvent::Resolved,
 ];
 
-/// Verbatim Node rejection for a URL outside the Discord allowlist.
+/// Frozen rejection message for a URL outside the Discord allowlist.
 pub const INVALID_URL_MESSAGE: &str = "Webhook URL must be an HTTPS Discord webhook URL.";
 
 /// Maximum webhook label length after trimming, in UTF-16 code units.

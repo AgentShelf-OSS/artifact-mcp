@@ -178,7 +178,7 @@ impl ArtifactStore {
     ///
     /// # Errors
     /// [`AppError::NotFound`] (`not_found`), [`AppError::Conflict`] (`conflict`),
-    /// [`AppError::Validation`] with Node's message, or a propagated I/O failure.
+    /// [`AppError::Validation`] with the frozen validation message, or a propagated I/O failure.
     pub(crate) async fn update_for(
         &self,
         meta: &ArtifactMeta,
@@ -283,7 +283,7 @@ impl ArtifactStore {
     /// `moveArtifactToOrg(id, targetOrg, category)`
     ///
     /// # Errors
-    /// [`AppError::NotFound`] (`not_found`) or [`AppError::Validation`] with Node's
+    /// [`AppError::NotFound`] (`not_found`) or [`AppError::Validation`] with the
     /// `Unknown organization "…".` message.
     pub(crate) async fn move_to_org_for(
         &self,

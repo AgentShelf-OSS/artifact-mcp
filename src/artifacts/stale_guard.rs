@@ -1,7 +1,7 @@
 //! ADR-0023 stale-base guard: pure segment digests and base/stale evaluation.
 //!
 //! This module performs no I/O. `conformance/stale-guard-reference.py` is the reference; the
-//! Node runtime and this module must reproduce `conformance/stale-guard-vectors.json` exactly.
+//! module must reproduce the frozen `conformance/stale-guard-vectors.json` exactly.
 
 use std::collections::HashSet;
 

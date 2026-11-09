@@ -13,9 +13,9 @@
 //!
 //! # Not best-effort
 //!
-//! Unlike the view analytics next door, the notification projection is **not** wrapped in an error guard by its caller. The gallery builds `notificationState` outside the guarded per-org loop above it, so a failure here fails the gallery request. That asymmetry is deliberate in the reference (an empty badge would silently hide feedback), and it is why these functions return `Result` instead of degrading like [`crate::persistence::views`].
+//! Unlike view analytics, the notification projection does **not** suppress failures. The retired Node twin built notification state outside its guarded per-org loop, so a failure failed the gallery request. Preserve that policy because an empty badge would silently hide feedback. These functions return `Result` instead of degrading like [`crate::persistence::views`].
 //!
-//! One mechanical difference: Node passes `@limit` to the counting statements too, where the SQL does not use it. better-sqlite3 ignores the extra named value; rusqlite rejects an unknown parameter name, so the count path binds only the parameters its statement declares. No observable difference.
+//! The retired Node twin passed `@limit` to counting statements that did not use it. Its SQLite driver ignored the extra named value; rusqlite rejects unknown parameter names, so the count path binds only the parameters its statement declares. This preserves the frozen results.
 
 use rusqlite::Connection;
 

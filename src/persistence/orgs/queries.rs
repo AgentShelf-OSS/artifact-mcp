@@ -37,7 +37,7 @@ pub fn org_for_domain(conn: &Connection, domain: &str) -> Result<Option<OrgId>, 
 /// `orgForEmail(email)`
 ///
 /// The v21 column is `COLLATE NOCASE`, so an un-normalized address would still match; the
-/// normalization is kept anyway because Node performs it before the query.
+/// normalization is kept before the query to preserve the frozen lookup behavior.
 ///
 /// # Errors
 /// [`AppError::Internal`] when the query fails.
@@ -103,7 +103,7 @@ pub fn list_orgs(conn: &Connection) -> Result<Vec<Organization>, AppError> {
             categories: categories(conn, &name)?,
             key_count: key_counts.get(&name).copied().unwrap_or(0),
             // `o.color || null`: `setColor` stores NULL for "cleared", but a legacy row could
-            // hold `''`, which Node also reports as `null`.
+            // hold `''`, which the frozen response format also reports as `null`.
             color: color.filter(|value| !value.is_empty()),
             created_at: created_at.map(Timestamp),
             name: OrgId(name),

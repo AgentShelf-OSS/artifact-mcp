@@ -151,7 +151,7 @@ pub(super) fn normalize_verified_owner(
 
 /// `revokeKey(clientId)`
 ///
-/// Node passes the client id through untrimmed, so a padded id revokes nothing; preserved.
+/// The client id is passed through untrimmed, so a padded id revokes nothing.
 /// Revoking an already-revoked key returns `false` because the statement requires
 /// `revoked_at IS NULL`.
 ///

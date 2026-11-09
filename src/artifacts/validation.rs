@@ -1,21 +1,21 @@
 //! Artifact input, bundle path, MIME, and limit validation.
 //!
-//! Every rule here is a faithful port of the Node reference. The oracle is:
+//! These rules preserve the frozen input contract, originally defined by the retired Node twin:
 //!
-//! - `sanitizeRel`
-//! - `isReserved` / `RESERVED`
-//! - `ARTIFACT_ID` / `SHA256` shape checks
+//! - relative path sanitization
+//! - reserved artifact ids
+//! - artifact id and SHA-256 shape checks
 //! - single-file body validation
-//! - `validateBundle` (and its `publishBundle` twin)
+//! - bundle validation
 //!
-//! Where Node's behaviour is surprising it is reproduced anyway and called out in a comment:
-//! the conformance oracle diffs Rust against Node, so a unilateral "fix" is a failure, not an
-//! improvement. Open contract-delta requests are listed below.
+//! Surprising historical behavior is preserved and called out in a comment.
+//! Conformance checks the frozen outputs, so changing these rules requires a contract change.
+//! Compatibility constraints are listed below.
 //!
 //! # Compatibility constraints
 //!
 //! 1. `RESERVED` is a hand-maintained list that has drifted from the real route table. The router registers top-level `/thumbnails/:id` and `/notifications/seen` before the `/:id` artifact routes, but neither `thumbnails` nor `notifications` is in `RESERVED`. Both are valid artifact-id shapes under `/^[0-9a-z]{6,24}$/`. Ported faithfully; see [`is_reserved_artifact_id`].
-//! 2. Node accepts drive-qualified and UNC-looking paths as *literal relative names* — `C:\x` normalises to `C:/x` and `\\srv\share\x` to `srv/share/x`. Neither escapes the bundle root on a POSIX host, so this is a naming oddity rather than a traversal hole, but it is not what a reader of the sanitizer expects. Ported faithfully; see [`sanitize_relative_path`].
+//! 2. Drive-qualified and UNC-looking paths are accepted as *literal relative names*. `C:\x` normalises to `C:/x` and `\\srv\share\x` to `srv/share/x`. Neither escapes the bundle root on a POSIX host, so this is a naming oddity rather than a traversal hole, but it is not what a reader of the sanitizer expects. Preserved for compatibility; see [`sanitize_relative_path`].
 //! 3. Entry auto-selection picks the first `.html` file in publisher order. A bundle with `{"z.html": …, "a.html": …}` and no `index.html` or explicit entry must resolve to `z.html`. Both `ArtifactContent::Bundle::files` and [`validate_bundle`] preserve that order; a sorted container would select `a.html` and break compatibility.
 
 use std::path::{Path, PathBuf};
@@ -24,7 +24,7 @@ use crate::config::{RESERVED_ARTIFACT_IDS, StorageLimits, is_valid_artifact_id};
 use crate::error::AppError;
 use crate::model::ArtifactId;
 
-/// The bundle entry Node falls back to before scanning for any `.html` file.
+/// The default bundle entry, checked before scanning for any `.html` file.
 pub const DEFAULT_BUNDLE_ENTRY: &str = "index.html";
 
 /// Length of a lowercase hex SHA-256 digest — `const SHA256 = /^[a-f0-9]{64}$/`.
@@ -36,7 +36,7 @@ pub const DIGEST_HEX_LENGTH: usize = 64;
 
 /// `RESERVED.has(id) || !/^[0-9a-z]{6,24}$/.test(id)`
 ///
-/// Node's `RESERVED` set also contains the empty string; an empty id already fails the shape
+/// The retired Node twin's `RESERVED` set contained the empty string; an empty id fails the shape
 /// test, so `RESERVED_ARTIFACT_IDS` omits it without changing the answer.
 ///
 /// **Known divergence from the route table (contract-delta request 1):** `thumbnails` and
@@ -54,9 +54,9 @@ pub struct SafeArtifactId(String);
 impl SafeArtifactId {
     /// Accepts any id with a valid *shape*, including the reserved names.
     ///
-    /// This mirrors Node, where `filePath`/`bundleDir` are reached with whatever id the caller
-    /// holds; only the higher-level `readArtifact`/`getArtifactMeta`
-    /// entry points consult `isReserved`.
+    /// Path construction checks the id's shape without checking reserved names.
+    /// Use [`Self::addressable`] when resolving an id supplied by a caller
+    /// to read an artifact or its metadata.
     #[must_use]
     pub fn parse(value: &str) -> Option<Self> {
         is_valid_artifact_id(value).then(|| Self(value.to_owned()))
@@ -113,9 +113,9 @@ pub fn is_valid_digest(value: &str) -> bool {
 
 /// Port of `path.posix.normalize`, restricted to the relative inputs `sanitizeRel` produces.
 ///
-/// Node's `normalizeString` keeps leading `..` segments (`allowAboveRoot` is true for relative
-/// paths), collapses `.` and repeated separators, and re-appends a trailing separator when the
-/// input had one. An input that normalises away entirely becomes `"."`, or `"./"` when the
+/// Keep leading `..` segments for relative paths, collapse `.` and repeated separators,
+/// and re-append a trailing separator when the input had one.
+/// An input that normalises away entirely becomes `"."`, or `"./"` when the
 /// input ended in a separator.
 #[must_use]
 pub fn posix_normalize_relative(value: &str) -> String {
@@ -135,7 +135,7 @@ pub fn posix_normalize_relative(value: &str) -> String {
         }
     }
     if stack.is_empty() {
-        // `normalizeString` produced nothing: Node returns "./" or "." for a relative path.
+        // No segments remain: return "./" or "." for the relative path.
         return if trailing_separator { "./" } else { "." }.to_owned();
     }
     let mut normalized = stack.join("/");
@@ -156,7 +156,7 @@ pub fn posix_normalize_relative(value: &str) -> String {
 /// return normalized;
 /// ```
 ///
-/// Consequences worth stating explicitly, all of them Node's:
+/// Consequences of the frozen path rules:
 ///
 /// - A leading `/` is *stripped*, not rejected: `/etc/passwd` becomes the literal relative
 ///   name `etc/passwd`. It cannot escape the bundle root.
@@ -164,8 +164,8 @@ pub fn posix_normalize_relative(value: &str) -> String {
 ///   `C:\x` survives as the literal relative name `C:/x` (contract-delta request 2).
 /// - Percent-encoded traversal (`..%2f..`) is *not* decoded, so it stays a single literal
 ///   filename. Safe, and deliberately preserved.
-/// - A trailing separator survives (`a/b/`), and a bare `./` is accepted. Both are Node
-///   quirks that the digest and the on-disk manifest already encode.
+/// - A trailing separator survives (`a/b/`), and a bare `./` is accepted. The digest and
+///   the on-disk manifest already encode these historical quirks.
 #[must_use]
 pub fn sanitize_relative_path(value: &str) -> Option<String> {
     let replaced = value.replace('\\', "/");
@@ -185,8 +185,8 @@ pub fn sanitize_relative_path(value: &str) -> Option<String> {
     Some(normalized)
 }
 
-/// Node's `path.resolve` semantics: purely lexical, never touching the filesystem and never
-/// following symlinks. Used for the belt-and-braces containment check in `readBundleFile`
+/// Resolve a path purely lexically, without touching the filesystem or
+/// following symlinks. Used for the bundle-file containment check.
 #[must_use]
 pub fn lexically_resolve(path: &Path) -> PathBuf {
     let absolute = if path.is_absolute() {
@@ -271,7 +271,7 @@ pub struct ValidatedSingleBody {
 /// The limit is exclusive — exactly `maxBytes` is accepted.
 ///
 /// # Errors
-/// [`AppError::Validation`] carrying Node's exact message.
+/// [`AppError::Validation`] carrying the frozen validation message.
 pub fn validate_single_body(
     html: &str,
     limits: &StorageLimits,
@@ -297,7 +297,7 @@ pub fn validate_single_body(
 pub struct ValidatedBundle {
     /// `clean` — sanitized relative path and content, in the caller's original order.
     /// Duplicates are preserved: two raw names can sanitize to the same relative path, and
-    /// Node keeps both (double-counting bytes and writing the later one last).
+    /// both are kept, counting both byte lengths and writing the later one last.
     pub files: Vec<(String, String)>,
     /// `total` — sum of `Buffer.byteLength(content, "utf8")`.
     pub total_bytes: u64,
@@ -307,14 +307,14 @@ pub struct ValidatedBundle {
 
 /// `validateBundle(bundleFiles, entry, preferEntry)`
 ///
-/// `files` is an ordered slice, not a map: Node iterates `Object.keys` (insertion order) and
+/// `files` preserves publisher order, as required by the frozen input contract, and
 /// entry auto-selection depends on that order. See contract-delta request 3.
 ///
 /// `prefer_entry` is the existing `meta.entry` on an update; pass `None`
 /// for a fresh publish, which is exactly what `publishBundle` does.
 ///
 /// # Errors
-/// [`AppError::Validation`] carrying Node's exact message, in Node's evaluation order:
+/// [`AppError::Validation`] carrying the frozen message, in this evaluation order:
 /// empty → too many files → unsafe path → total bytes → entry resolution.
 pub fn validate_bundle(
     files: &[(String, String)],
@@ -368,7 +368,7 @@ pub fn validate_bundle(
 /// ```
 ///
 /// Note the fall-through: a *requested* entry that fails `sanitizeRel` yields `null`, which is
-/// falsy, so Node silently auto-selects instead of reporting the bad entry. Reproduced.
+/// falsy in the historical contract, so auto-select instead of reporting the bad entry.
 ///
 /// `.endsWith(".html")` is literal — a `.htm` file never auto-selects.
 ///

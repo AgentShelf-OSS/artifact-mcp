@@ -2,14 +2,14 @@
 //!
 //! Staging, swapping, trash, history pruning, and reconciliation belong to the lifecycle module.
 //!
-//! Node oracle:
+//! Read operations:
 //!
-//! - `MIME` / `mimeFor`
-//! - `readArtifact`
-//! - `readBundleFile`
-//! - `readHistoryArtifact`
-//! - `readHistoryBundleFile`
-//! - `readTree`
+//! - MIME lookup
+//! - single-file body reads
+//! - bundle file reads
+//! - retained single-file revision reads
+//! - retained bundle file reads
+//! - bundle snapshot reads
 //!
 //! Authorization is *not* performed here. The frozen ports take an `AuthorizedArtifact` (contract §"Frozen domain and access types"), so the caller has already proven access; these functions receive only the validated id and the metadata fields the read depends on.
 
@@ -59,11 +59,11 @@ pub const SINGLE_BODY_CONTENT_TYPE: &str = "text/html; charset=utf-8";
 /// `"a.tar.gz"` yields `gz`, and `"file."` yields the empty string. All three fall through to
 /// the default. Reproduced exactly.
 ///
-/// One deliberate, safer divergence: Node indexes a plain object literal, so a bundle file
-/// named `x.constructor` or `x.toString` resolves to an inherited `Object.prototype` member
-/// instead of `undefined`, and `mimeFor` returns a *function*. Express then throws on the
+/// One deliberate, safer divergence from the retired Node twin: its plain object lookup
+/// resolved `x.constructor` or `x.toString` to an inherited `Object.prototype` member
+/// instead of `undefined`, returning a *function*. Express then threw on the
 /// header write. Rust has no prototype chain, so such a name returns
-/// [`DEFAULT_CONTENT_TYPE`]. Recorded as a Node bug, not a parity target.
+/// [`DEFAULT_CONTENT_TYPE`]. That historical bug is excluded from the frozen contract.
 #[must_use]
 pub fn mime_for(rel: &str) -> &'static str {
     let extension = rel.rsplit('.').next().unwrap_or("").to_lowercase();
@@ -79,13 +79,13 @@ pub fn mime_for(rel: &str) -> &'static str {
 
 /// The body half of `readArtifact(id)`
 ///
-/// Node's `isReserved` gate is already enforced by [`SafeArtifactId::addressable`], and the
+/// The reserved-id gate is already enforced by [`SafeArtifactId::addressable`], and the
 /// metadata lookup belongs to the persistence layer, so what remains is: read the file, or
 /// report a missing body.
 ///
-/// Node reads with `"utf8"`, which silently substitutes U+FFFD for invalid sequences; this
-/// returns the bytes as stored. Publishing only ever writes UTF-8, so the two agree for every
-/// body the service itself produced.
+/// The retired Node twin decoded UTF-8 and substituted U+FFFD for invalid sequences; this
+/// returns the bytes as stored. Publishing only ever writes UTF-8, so this preserves the
+/// historical response for every body the service itself produced.
 #[must_use]
 pub fn read_body(artifact_dir: &Path, id: &SafeArtifactId) -> Option<ArtifactFile> {
     read_file_at(
@@ -96,8 +96,8 @@ pub fn read_body(artifact_dir: &Path, id: &SafeArtifactId) -> Option<ArtifactFil
 
 /// The body half of `readHistoryArtifact(id, revision)`
 ///
-/// The caller supplies the revision row's `is_bundle`; Node returns `null` for a bundle
-/// revision here, which is expressed by the `is_bundle` guard at the call site.
+/// The caller supplies the revision row's `is_bundle`; bundle revisions return `None`
+/// through the `is_bundle` guard at the call site.
 #[must_use]
 pub fn read_revision_body(
     artifact_dir: &Path,
@@ -144,7 +144,7 @@ pub fn read_revision_bundle_file(
 }
 
 /// List every regular file beneath a bundle root in JavaScript's default string-sort order.
-/// Sizes are filesystem byte lengths, matching Node's `statSync(full).size`.
+/// Sizes are filesystem byte lengths, as required by the frozen listing format.
 pub fn list_bundle_files(root: &Path) -> Result<Option<Vec<(String, u64)>>, AppError> {
     if !root.is_dir() {
         return Ok(None);
@@ -212,11 +212,11 @@ pub fn read_bundle_file_at(
 
 /// `readTree(dir)`
 ///
-/// Reads a bundle snapshot back into `{ 'rel/path': content }`. Node decodes as UTF-8, so
-/// invalid sequences become U+FFFD; `from_utf8_lossy` matches that.
+/// Reads a bundle snapshot back into `{ 'rel/path': content }`. Decode as UTF-8 with
+/// `from_utf8_lossy`, replacing invalid sequences with U+FFFD as the frozen contract requires.
 ///
-/// The returned map is ordered lexicographically rather than by directory enumeration. Node's
-/// only caller is `restoreById`, which passes an explicit `entry` alongside it,
+/// The returned map is ordered lexicographically rather than by directory enumeration. The
+/// restore caller passes an explicit `entry` alongside it,
 /// so entry auto-selection never observes the difference.
 ///
 /// # Errors
@@ -256,8 +256,8 @@ fn collect_tree(
 
 /// `if (!files.existsSync(full) || !files.statSync(full).isFile()) return null;`
 ///
-/// A directory, a broken symlink, or an unreadable file all become `None`, exactly as Node's
-/// `existsSync`/`isFile` pair does.
+/// A directory, a broken symlink, or an unreadable file all become `None`, preserving
+/// the frozen missing-body behavior.
 fn read_file_at(path: &Path, content_type: &str) -> Option<ArtifactFile> {
     if !std::fs::metadata(path).is_ok_and(|metadata| metadata.is_file()) {
         return None;
@@ -288,7 +288,7 @@ mod tests {
         for rel in ["noextension", "archive.tar.gz", "trailing.", "", ".hidden"] {
             assert_eq!(mime_for(rel), DEFAULT_CONTENT_TYPE, "{rel}");
         }
-        // No prototype chain in Rust: Node would return `Object.prototype.constructor` here.
+        // The retired Node twin returned `Object.prototype.constructor` here.
         assert_eq!(mime_for("x.constructor"), DEFAULT_CONTENT_TYPE);
         assert_eq!(mime_for("x.toString"), DEFAULT_CONTENT_TYPE);
     }

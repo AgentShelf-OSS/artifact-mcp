@@ -4,7 +4,7 @@
 //!
 //! # Ordering is part of the contract
 //!
-//! Node checks preconditions in a fixed order and returns on the first failure, so the *message* a caller sees depends on that order (for example `addCategory` reports the unknown org before it reports an empty category name). The sync operations below keep the same sequence.
+//! Check preconditions in a fixed order and return on the first failure, because the *message* a caller sees depends on that order. For example, adding a category reports the unknown org before it reports an empty category name. The sync operations below preserve that frozen sequence.
 //!
 //! # Case handling
 //!

@@ -124,7 +124,7 @@ pub fn list_for_client(
          WHERE a.client_id = ?1"
     );
     let mut binds: Vec<&String> = vec![&client_id.0];
-    // Node's four prepared statements differ only in these two predicates and their bind order.
+    // The four filter combinations differ only in these predicates and their bind order.
     if let Some(artifact_id) = artifact_id {
         sql.push_str(" AND f.artifact_id = ?2");
         binds.push(&artifact_id.0);

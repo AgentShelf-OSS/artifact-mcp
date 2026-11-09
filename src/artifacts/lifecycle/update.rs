@@ -9,7 +9,7 @@ impl StoreContext {
 
     /// `update({ … })`
     ///
-    /// `expected_revision` is already resolved by the caller: Node substitutes `meta.revision`
+    /// `expected_revision` is already resolved by the caller: it substitutes `meta.revision`
     /// when the client omitted it, and the frozen
     /// [`ArtifactUpdate`] has no "absent" state.
     pub(super) fn update_sync(
@@ -253,7 +253,7 @@ impl StoreContext {
         update: &ArtifactUpdate,
     ) -> Result<UpdatePlan, AppError> {
         let wants_single = matches!(update.content, Some(ArtifactContent::SingleHtml(_)));
-        // Contract-delta request 1: an empty file list plus an entry is Node's "entry only"
+        // Compatibility constraint 1: an empty file list plus an entry is an "entry only"
         // update; an empty file list on its own still reaches `files is empty`.
         let entry_only = matches!(
             &update.content,
