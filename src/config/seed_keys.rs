@@ -18,7 +18,7 @@ pub struct SeedKey {
     pub secret: Secret,
 }
 
-/// The result of parsing `ARTIFACT_API_KEYS`, including entries Node refuses to seed.
+/// The result of parsing `ARTIFACT_API_KEYS`, including skipped placeholder entries.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SeedKeys {
     /// Entries eligible for bootstrap insertion, in declaration order.
@@ -28,7 +28,7 @@ pub struct SeedKeys {
 }
 
 impl SeedKeys {
-    /// Port of the `ARTIFACT_API_KEYS` parsing half of `seedKeysFromEnv`.
+    /// Parse `ARTIFACT_API_KEYS` entries for bootstrap insertion.
     #[must_use]
     pub fn parse(raw: &str) -> Self {
         let mut parsed = Self::default();

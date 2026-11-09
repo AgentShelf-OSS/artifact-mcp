@@ -282,7 +282,7 @@ fn parse_anchor(value: Option<&OrderedJson>) -> ParsedAnchor {
     if value.as_object().is_none() {
         // The frozen `SubmitFeedback` cannot carry a non-object anchor. A NaN point makes U11
         // fail at the same late validation position (after body and parent checks); the route
-        // remaps that one sentinel error back to Node's exact object-type message.
+        // remaps that one sentinel error back to the frozen object-type message.
         return ParsedAnchor {
             value: Some(FeedbackAnchor {
                 x: f64::NAN,

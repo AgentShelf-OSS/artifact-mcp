@@ -2,8 +2,8 @@
 //!
 //! Digest-addressed thumbnails use `/data/previews/<id>/<body_sha256>.png` through
 //! [`crate::artifacts::paths::thumbnail_path`]. **Only validated server-owned artifact ids and
-//! SHA-256 digests ever reach a path segment**: every constructor here takes an
-//! [`SafeArtifactId`]/[`BodyDigest`] newtypes, which are the Rust form of Node's
+//! SHA-256 digests ever reach a path segment**: every constructor here takes
+//! [`SafeArtifactId`]/[`BodyDigest`] newtypes, which enforce the
 //! `/^[0-9a-z]{6,24}$/` and `/^[a-f0-9]{64}$/` guards.
 //!
 //! # Optional by design (blueprint risk #11)
@@ -18,24 +18,8 @@
 //!   unable to fail because of a preview;
 //! * a disabled renderer short-circuits to `None` before any network or filesystem work.
 //!
-//! This mirrors Node, where `createArtifactPreviewNotifier` delivers the notification with an
-//! `undefined`/`null` preview rather than propagating and the startup
-//! audit is wrapped in a bare `try/catch` ([server.js:112-122]).
-//!
-//! # Compatibility behavior, function by function
-//!
-//! | Rust | Node |
-//! |---|---|
-//! | [`valid_png`] | `validPng(value, maxBytes)` — |
-//! | [`thumbnail_placeholder`] | `thumbnailPlaceholder(meta, accent)` — |
-//! | [`safe_color`] | `safeColor(value, org)` — |
-//! | [`ThumbnailStore::read_thumbnail`] | `readThumbnail(meta, requestedDigest)` — |
-//! | [`ThumbnailStore::ensure_thumbnail`] | `ensureThumbnail(meta, html)` — |
-//! | `ThumbnailStore::generate` (private) | `generate(meta, html)` — |
-//! | [`ThumbnailStore::cleanup_obsolete`] | `cleanupObsolete(id, keepDigest)` — |
-//! | [`ThumbnailStore::remove_artifact`] | `removeArtifact(id)` — |
-//! | [`ThumbnailStore::audit`] | `audit(artifacts)` — |
-//! | [`ThumbnailQueue`] | `createThumbnailQueue({thumbnails})` — |
+//! This preserves the retired Node twin's best-effort preview behavior. Notifications are
+//! delivered without a preview on failure, and a failed startup audit does not prevent startup.
 //!
 //! # Atomicity
 //!
@@ -57,13 +41,11 @@
 //! * The HTTP layer needs only the preview port: [`PreviewService::read_thumbnail`] for `/thumbnails/:id`
 //!   and [`PreviewService::placeholder`] for the SVG fallback.
 //! * Startup owns the audit lifecycle. Two things are not reachable through the port and need the concrete
-//!   types: the audit needs an implementation of [`PreviewArtifactIndex`] over the artifact store
-//!   (Node passes `artifactStore`, whose `getArtifactMeta` the audit calls
-//!   [server.js:113]), and the low-priority backfill needs
-//!   [`ThumbnailQueue::enqueue`] with [`PreviewHtml::Deferred`], because the port's `html: &str`
-//!   cannot express Node's "re-read the body when the job runs, and skip it if the digest moved"
-//!   ([server.js:138-143]). Both are ordinary calls on [`PreviewIntegration::store`] /
-//!   [`PreviewIntegration::queue`]; no port change is requested.
+//!   types: the audit needs an implementation of [`PreviewArtifactIndex`] over the artifact store,
+//!   and the low-priority backfill needs [`ThumbnailQueue::enqueue`] with [`PreviewHtml::Deferred`].
+//!   The port's `html: &str` cannot defer reading the body until execution or skip it when the
+//!   digest has changed. Use [`PreviewIntegration::store`] and [`PreviewIntegration::queue`]
+//!   for these calls.
 //! * [`ThumbnailQueue::enqueue`] starts the lane with `tokio::spawn`, so it must be called from
 //!   inside a Tokio runtime. Every caller is already an `async` route or startup task.
 
@@ -164,10 +146,10 @@ pub fn safe_color(accent: Option<&str>, org: &str) -> String {
     format!("hsl({} 68% 44%)", hash % 360)
 }
 
-/// `thumbnailPlaceholder(meta, accent)`
+/// Build the thumbnail placeholder SVG.
 ///
 /// The SVG served whenever no PNG exists: renderer disabled, render still queued, or a bundle
-/// (which is never rendered). Byte-identical to Node's template literal, newlines included; the
+/// (which is never rendered). Preserves the retired Node twin's frozen bytes, newlines included; the
 /// only interpolated values are the two frozen labels and a [`safe_color`] output, so nothing
 /// caller-controlled reaches the markup.
 #[must_use]
@@ -218,8 +200,8 @@ impl PreviewArtifactIndex for HashMap<String, PreviewArtifactRef> {
 
 /// Audit counts for orphan directories, partial files, and invalid files.
 ///
-/// Every listed path has already been removed. Entries are sorted, unlike Node's raw `readdir`
-/// order, so the report is reproducible; the removals themselves are identical.
+/// Every listed path has already been removed. Entries are sorted so the report is reproducible;
+/// sorting does not affect which paths are removed.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct PreviewAuditReport {
     /// Preview directories with no matching artifact, and non-directory entries at that level.
@@ -232,7 +214,7 @@ pub struct PreviewAuditReport {
 }
 
 impl PreviewAuditReport {
-    /// `orphanDirs.length || partialFiles.length || invalidFiles.length` — [server.js:114]
+    /// Whether the audit found no orphan directories, partial files, or invalid files.
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.orphan_dirs.is_empty()
@@ -373,15 +355,15 @@ impl ThumbnailStore {
         None
     }
 
-    /// `ensureThumbnail(meta, html)`
+    /// Ensure a thumbnail is available for the artifact.
     ///
     /// Returns the existing thumbnail, renders and persists a new one, or returns `None`. All
     /// concurrent callers for the same `<id>:<digest>` share one render and one write; unlike the
-    /// renderer's cache the entry is dropped as soon as it settles (Node's `.finally`), so this
+    /// renderer's cache the entry is dropped as soon as it settles, so this
     /// is coalescing only, never a memo of a persisted file.
     ///
-    /// `html` is `None` when a deferred backfill job decided the body is stale
-    /// ([server.js:138-143]); an existing thumbnail is still returned in that case.
+    /// `html` is `None` when a deferred backfill job decided the body is stale;
+    /// an existing thumbnail is still returned in that case.
     pub async fn ensure_thumbnail(
         &self,
         meta: &ArtifactMeta,
@@ -515,12 +497,12 @@ impl ThumbnailStore {
         blocking(move || remove_any_quietly(&dir)).await;
     }
 
-    /// `audit(artifacts)`
+    /// Audit stored preview files against the artifact index.
     ///
     /// Startup sweep of `/data/previews`: removes directories with no artifact, files that are
     /// not the artifact's current `<digest>.png` (crash-interrupted temporaries included), and
     /// files that are no longer valid PNGs. Never fails — an unwritable previews directory
-    /// degrades thumbnails, it does not stop the service ([server.js:111-122]).
+    /// degrades thumbnails, it does not stop the service.
     pub async fn audit(&self, index: &dyn PreviewArtifactIndex) -> PreviewAuditReport {
         let root = self.preview_dir();
         let mut report = PreviewAuditReport::default();
@@ -639,9 +621,9 @@ where
     tokio::task::spawn_blocking(task).await.ok()
 }
 
-/// `mkdir(dir, {recursive}) → writeFile(temp, png, {flag:"wx"}) → rename(temp, target)`
+/// Create the directory, write an exclusively created temporary file, then rename it into place.
 ///
-/// `create_new` is Node's `wx`: it fails rather than overwriting a concurrent writer's temp file.
+/// `create_new` fails rather than overwriting a concurrent writer's temp file.
 /// The data is flushed before the rename so the swap publishes complete bytes.
 fn write_then_rename(
     dir: &Path,

@@ -276,7 +276,7 @@ async fn keyed_update(
         ),
         PublishKind::Bundle => {
             let files = bundle_files(arguments.get("files"))?;
-            // An empty bundle is the entry-only update sentinel; Node rejects an empty snapshot.
+            // An empty bundle is the entry-only update sentinel; the publish contract rejects empty files.
             if files.is_empty() {
                 return Err(AppError::Validation("files is empty".to_owned()).into());
             }

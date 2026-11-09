@@ -85,8 +85,8 @@ impl PreviewConfig {
 /// `PREVIEW_RENDERER_TOKEN` or `PREVIEW_RENDERER_TOKEN_FILE`, with the renderer's `RENDER_TOKEN`
 /// rules: setting both is an error; the file is read once, here, and one trailing newline
 /// (`\n` or `\r\n`) is removed; the token must be 32 to 4096 printable ASCII characters without
-/// spaces. Values are never trimmed otherwise, so both sides compare the same bytes. No error
-/// message contains the token.
+/// spaces. Values are never trimmed otherwise, so the client and renderer compare the same
+/// bytes. No error message contains the token.
 fn parse_preview_renderer_token(env: &dyn EnvSource) -> Result<Option<Secret>, AppError> {
     const VALUE: &str = "PREVIEW_RENDERER_TOKEN";
     const FILE: &str = "PREVIEW_RENDERER_TOKEN_FILE";
@@ -133,7 +133,7 @@ fn read_preview_renderer_token_file(key: &str, path: &str) -> Result<Vec<u8>, Ap
     Ok(bytes)
 }
 
-/// Port of `rendererEndpoint(value)`
+/// Parse the renderer URL and append the render endpoint.
 fn renderer_endpoint(raw: &str) -> Result<String, AppError> {
     let trimmed = raw.trim();
     let with_slash = if trimmed.ends_with('/') {
@@ -151,10 +151,10 @@ fn renderer_endpoint(raw: &str) -> Result<String, AppError> {
         .map_err(|_| invalid("PREVIEW_RENDERER_URL", trimmed, "an http(s) URL"))
 }
 
-/// Port of `parseViewport(value)`
+/// Parse the preview viewport.
 ///
-/// Node silently falls back to `1200x630` for a malformed value; a present but malformed
-/// value fails closed here instead.
+/// The retired Node twin fell back to `1200x630` for malformed values; a present but
+/// malformed value fails closed here instead.
 fn parse_viewport(raw: Option<String>) -> Result<(u64, u64), AppError> {
     let Some(raw) = raw else {
         return Ok((

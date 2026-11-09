@@ -104,7 +104,7 @@ fn reject_request_shape(
     }
     let body_limit = body_limit(&state.body, class);
     // `/mcp` authenticates before it buffers or rejects a body: an unauthenticated oversized
-    // request must remain a 401, matching the established Node wire contract.  Its route then
+    // request must remain a 401, matching the frozen v1 wire contract.  Its route then
     // drains under the same absolute deadline before returning either the 401 or a 413.  Every
     // other bounded JSON endpoint can safely reject its declared length here.
     if class != RequestClass::Mcp
@@ -296,7 +296,7 @@ impl IngressState {
 }
 
 /// JSON-RPC's direct HTTP transport uses a JSON-RPC error envelope for listener/admission
-/// failures. The frozen Node HTTP contract keeps malformed and oversized request bodies as REST
+/// failures. The frozen v1 HTTP contract keeps malformed and oversized request bodies as REST
 /// envelopes, however, rather than JSON-RPC transport errors.
 pub fn mcp_admission_response(status: StatusCode, retry_after: Option<u64>) -> Response {
     if matches!(
@@ -371,7 +371,7 @@ pub(super) enum RequestClass {
     Feedback,
     State,
     /// ADR-0012 push/reminder mutations. Admitted like a mutation, but the state budget is spent
-    /// by the handler after concealment and the disabled check (Node order).
+    /// by the handler after concealment and the disabled check, preserving the contract order.
     PushMutation,
     Mcp,
     Admin,

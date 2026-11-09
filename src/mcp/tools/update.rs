@@ -386,7 +386,7 @@ pub(crate) async fn update_artifact(
     let content = if let Some(files_value) = files_value {
         let files = bundle_files(Some(files_value))?;
         // U08 uses an empty bundle plus `Some(entry)` as the sentinel for an entry-only update.
-        // A caller-provided empty `files` object is not that sentinel: Node rejects it even when
+        // The frozen update contract rejects a caller-provided empty `files` object even when
         // `entry` is also present, so intercept it before constructing `ArtifactUpdate`.
         if files.is_empty() {
             return Err(AppError::Validation("files is empty".to_owned()).into());
