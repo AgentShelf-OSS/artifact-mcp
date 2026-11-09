@@ -17,10 +17,11 @@ use crate::{
         discussion_envelope::{DiscordDiscussionEnvelopeV1, DiscordDiscussionOperationV1},
     },
     model::{
-        ArtifactId, ArtifactMeta, ClientId, Feedback, FeedbackId, FeedbackMutation, FeedbackRef,
-        NotificationPayload, OrgId, SubmitFeedback, Timestamp, Viewer, WebhookEvent,
+        ArtifactMeta, Feedback, FeedbackId, FeedbackMutation, FeedbackRef, NotificationPayload,
+        OrgId, SubmitFeedback, Viewer, WebhookEvent,
     },
     persistence::{
+        artifact_rows::{META_COLUMNS, meta_from_row},
         discussions::{
             ActiveDiscussionPlan, CreateDiscussionMessageLink, DiscussionMessageLink,
             active_plan_in_transaction, create_link_in_transaction,
@@ -319,16 +320,15 @@ fn revalidate_artifact(
 ) -> Result<ArtifactMeta, AppError> {
     let persisted = tx
         .query_row(
-            "SELECT a.id, a.client_id, a.org, a.title, a.description, a.bytes, a.created_at, \
-                    a.updated_at, a.uploader_label, a.owner_email, a.is_bundle, a.entry, \
-                    a.revision, a.category, a.hidden, a.body_sha256 \
-             FROM artifacts a \
-             WHERE a.id = ?1 \
-               AND NOT EXISTS (\
-                 SELECT 1 FROM artifact_durability_intents i WHERE i.artifact_id = a.id\
-               )",
+            &format!(
+                "SELECT {META_COLUMNS} FROM artifacts a \
+                 WHERE a.id = ?1 \
+                   AND NOT EXISTS (\
+                     SELECT 1 FROM artifact_durability_intents i WHERE i.artifact_id = a.id\
+                   )"
+            ),
             params![authorized.id.0],
-            artifact_from_row,
+            meta_from_row,
         )
         .optional()
         .map_err(|error| database_failure("reload feedback artifact", &error))?;
@@ -786,33 +786,6 @@ fn delivery_event_id(
         }
     }
     Err(AppError::Internal)
-}
-
-fn artifact_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactMeta> {
-    Ok(ArtifactMeta {
-        id: ArtifactId(row.get(0)?),
-        client_id: ClientId(row.get(1)?),
-        org: OrgId(row.get(2)?),
-        title: row.get(3)?,
-        description: row.get(4)?,
-        bytes: nonnegative_u64(row, 5)?,
-        created_at: Timestamp(row.get(6)?),
-        updated_at: Timestamp(row.get(7)?),
-        uploader_label: row.get(8)?,
-        owner_email: row.get(9)?,
-        is_bundle: row.get::<_, i64>(10)? != 0,
-        entry: row.get(11)?,
-        revision: nonnegative_u64(row, 12)?,
-        category: row.get(13)?,
-        hidden: row.get::<_, i64>(14)? != 0,
-        body_sha256: row.get(15)?,
-        artifact_key: None,
-    })
-}
-
-fn nonnegative_u64(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
-    let value: i64 = row.get(index)?;
-    u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
 }
 
 fn not_found() -> AppError {

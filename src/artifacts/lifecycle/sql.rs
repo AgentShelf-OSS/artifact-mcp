@@ -6,10 +6,8 @@ use super::*;
 // SQL
 // ---------------------------------------------------------------------------
 
-/// Every v21 `artifacts` column, in the order [`meta_from_row`] reads them.
-pub(super) const META_COLUMNS: &str = "id, client_id, org, title, description, bytes, created_at, updated_at, \
-     uploader_label, owner_email, is_bundle, entry, revision, category, hidden, body_sha256, \
-     artifact_key";
+pub(super) use crate::persistence::artifact_rows::META_COLUMNS;
+use crate::persistence::artifact_rows::meta_from_row;
 
 /// Conflict message for an `(org, artifact_key)` unique-index violation during publish
 /// (ADR-0015). The MCP layer re-resolves the key once when it sees exactly this conflict.
@@ -22,28 +20,6 @@ pub(super) const REVISION_COLUMNS: &str = "artifact_id, org, revision, title, de
 fn u64_column(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<u64> {
     let value: i64 = row.get(index)?;
     u64::try_from(value).map_err(|_| rusqlite::Error::IntegralValueOutOfRange(index, value))
-}
-
-fn meta_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactMeta> {
-    Ok(ArtifactMeta {
-        id: ArtifactId(row.get(0)?),
-        client_id: ClientId(row.get(1)?),
-        org: OrgId(row.get(2)?),
-        title: row.get(3)?,
-        description: row.get(4)?,
-        bytes: u64_column(row, 5)?,
-        created_at: Timestamp(row.get(6)?),
-        updated_at: Timestamp(row.get(7)?),
-        uploader_label: row.get(8)?,
-        owner_email: row.get(9)?,
-        is_bundle: row.get::<_, i64>(10)? != 0,
-        entry: row.get(11)?,
-        revision: u64_column(row, 12)?,
-        category: row.get(13)?,
-        hidden: row.get::<_, i64>(14)? != 0,
-        body_sha256: row.get(15)?,
-        artifact_key: row.get(16)?,
-    })
 }
 
 pub(super) fn revision_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactRevision> {

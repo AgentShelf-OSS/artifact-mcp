@@ -86,6 +86,31 @@ fn skip_space(text: &str, from: usize) -> usize {
         .map_or(text.len(), |(offset, _)| from + offset)
 }
 
+/// Find consecutive Rust tokens, allowing whitespace between them but not within identifiers.
+fn find_rust_tokens(source: &str, tokens: &[&str]) -> Option<usize> {
+    let first = *tokens.first()?;
+    let identifier = |character: char| character.is_alphanumeric() || character == '_';
+    source.match_indices(first).find_map(|(start, _)| {
+        if first.chars().next().is_some_and(identifier)
+            && source[..start].chars().next_back().is_some_and(identifier)
+        {
+            return None;
+        }
+        let mut cursor = start;
+        for token in tokens {
+            cursor = skip_space(source, cursor);
+            let rest = source[cursor..].strip_prefix(token)?;
+            if token.chars().next_back().is_some_and(identifier)
+                && rest.chars().next().is_some_and(identifier)
+            {
+                return None;
+            }
+            cursor += token.len();
+        }
+        Some(start)
+    })
+}
+
 fn is_line_terminator(character: char) -> bool {
     matches!(character, '\n' | '\r' | '\u{2028}' | '\u{2029}')
 }
@@ -131,19 +156,6 @@ fn quoted_word(text: &str, from: usize) -> Option<(String, usize)> {
     let close = from + 1 + length;
     (length > 0 && text.as_bytes().get(close) == Some(&b'"'))
         .then(|| (text[from + 1..close].to_owned(), close + 1))
-}
-
-/// The body of `CONSTANT: &str = r#"..."#;`.
-fn rust_raw_string<'a>(source: &'a str, constant: &str) -> Result<&'a str, String> {
-    let marker = format!("{constant}: &str = r#\"");
-    let start = source
-        .find(&marker)
-        .ok_or_else(|| format!("could not find {constant}"))?
-        + marker.len();
-    let end = source[start..]
-        .find("\"#;")
-        .ok_or_else(|| format!("could not find closing delimiter for {constant}"))?;
-    Ok(&source[start..start + end])
 }
 
 /// Tool names matched by `/^\s*"([a-z_]+)"\s*(?:if [^{]+)?=>/gm` inside the tools/call match.
@@ -208,7 +220,10 @@ fn named_tool_definition_names(source: &str) -> Vec<String> {
 }
 
 fn app_only_tool_definitions(source: &str, errors: &mut Errors) -> Result<Vec<String>, String> {
-    let Some(start) = source.find("if supports_apps {\n        definitions.push") else {
+    let Some(start) = find_rust_tokens(
+        source,
+        &["if", "supports_apps", "{", "definitions", ".", "push"],
+    ) else {
         errors.check(
             false,
             "could not locate MCP App-only tool declaration block",
@@ -392,10 +407,8 @@ fn check_surface_into(root: &Path, base: Option<&str>, errors: &mut Errors) -> R
     let mcp_docs = read("docs/mcp-api.md")?;
     let cargo = read("Cargo.toml")?;
     let native_tests = read("tests/native/main.rs")?;
-    let frozen_tools = parse(
-        "FROZEN_TOOL_DEFINITIONS_JSON",
-        rust_raw_string(&tool_definitions, "FROZEN_TOOL_DEFINITIONS_JSON")?,
-    )?;
+    let frozen_path = "src/mcp/frozen_tools.json";
+    let frozen_tools = parse(frozen_path, &read(frozen_path)?)?;
     let schemas_path = "conformance/mcp.tool-output-schemas.json";
     let output_schemas = parse(schemas_path, &read(schemas_path)?)?;
     let golden_path = "conformance/goldens/mcp.tools-list.json";
@@ -514,14 +527,39 @@ fn check_surface_into(root: &Path, base: Option<&str>, errors: &mut Errors) -> R
     }
 
     errors.check(
-        dispatch.contains("modern_tool_definitions_for_client(allow_app_tools)")
-            && dispatch.contains("frozen_tool_definitions()")
-            && dispatch.contains("validate_schema_input(\n        &definition.input_schema"),
+        find_rust_tokens(
+            &dispatch,
+            &[
+                "modern_tool_definitions_for_client",
+                "(",
+                "allow_app_tools",
+                ")",
+            ],
+        )
+        .is_some()
+            && find_rust_tokens(&dispatch, &["frozen_tool_definitions", "(", ")"]).is_some()
+            && find_rust_tokens(
+                &dispatch,
+                &[
+                    "validate_schema_input",
+                    "(",
+                    "&",
+                    "definition",
+                    ".",
+                    "input_schema",
+                ],
+            )
+            .is_some(),
         "tools/call no longer validates input against the advertised definitions",
     );
     errors.check(
-        dispatch.contains("let schema = tool_output_schema(name)")
-            && dispatch.contains("validate_schema_input(&schema"),
+        find_rust_tokens(
+            &dispatch,
+            &["let", "schema", "=", "tool_output_schema", "(", "name", ")"],
+        )
+        .is_some()
+            && find_rust_tokens(&dispatch, &["validate_schema_input", "(", "&", "schema"])
+                .is_some(),
         "tools/call no longer validates structured output against the typed output schema",
     );
 
@@ -563,7 +601,24 @@ fn check_surface_into(root: &Path, base: Option<&str>, errors: &mut Errors) -> R
         "could not read the Cargo.toml package version",
     );
     errors.check(
-        dispatch.contains("pub const SERVER_VERSION: &str = env!(\"CARGO_PKG_VERSION\")"),
+        find_rust_tokens(
+            &dispatch,
+            &[
+                "pub",
+                "const",
+                "SERVER_VERSION",
+                ":",
+                "&",
+                "str",
+                "=",
+                "env",
+                "!",
+                "(",
+                "\"CARGO_PKG_VERSION\"",
+                ")",
+            ],
+        )
+        .is_some(),
         "MCP serverInfo is not derived from Cargo package version",
     );
     for version in &protocol_versions {
@@ -732,8 +787,9 @@ fn the_advertised_mcp_surface_is_synchronized() {
 
 // --- Tests of the checker itself (ported from scripts/check-mcp-surface.test.mjs) ---------------
 
-const SURFACE_FILES: [&str; 15] = [
+const SURFACE_FILES: [&str; 16] = [
     "src/mcp/tool_defs.rs",
+    "src/mcp/frozen_tools.json",
     "src/mcp/dispatch.rs",
     "src/mcp/resources.rs",
     "src/mcp/tasks.rs",
@@ -806,6 +862,89 @@ fn an_unmodified_copy_of_the_surface_passes() {
 }
 
 #[test]
+fn compact_frozen_json_and_reflowed_validation_still_pass() {
+    let copy = SurfaceCopy::new("reflowed");
+    copy.edit("src/mcp/frozen_tools.json", |source| {
+        js::stringify(&js::parse(&source).expect("frozen definitions JSON"))
+    });
+    copy.edit("src/mcp/dispatch.rs", |source| {
+        source
+            .replace("validate_schema_input(", "validate_schema_input \n (\n")
+            .replace(
+                "modern_tool_definitions_for_client(allow_app_tools)",
+                "modern_tool_definitions_for_client (\n allow_app_tools\n )",
+            )
+            .replace("frozen_tool_definitions()", "frozen_tool_definitions ( )")
+            .replace(
+                "let schema = tool_output_schema(name)",
+                "let schema\n = tool_output_schema ( name )",
+            )
+            .replace(
+                "pub const SERVER_VERSION: &str = env!(\"CARGO_PKG_VERSION\")",
+                "pub const SERVER_VERSION : &str\n = env! (\"CARGO_PKG_VERSION\")",
+            )
+    });
+    copy.edit("src/mcp/tool_defs.rs", |source| {
+        source.replace(
+            "if supports_apps {\n        definitions.push",
+            "if supports_apps\n    {\n        definitions\n            .push",
+        )
+    });
+    if let Err(errors) = check_surface(&copy.0, None) {
+        panic!("{errors:#?}");
+    }
+}
+
+#[test]
+fn missing_schema_validation_is_still_reported() {
+    let copy = SurfaceCopy::new("missing-validation");
+    copy.edit("src/mcp/dispatch.rs", |source| {
+        source.replace("validate_schema_input(", "validate_schema_input_disabled(")
+    });
+    let errors = copy.errors();
+    for expected in [
+        "tools/call no longer validates input against the advertised definitions",
+        "tools/call no longer validates structured output against the typed output schema",
+    ] {
+        assert_reported(&errors, expected);
+    }
+}
+
+#[test]
+fn rust_token_matches_preserve_identifier_boundaries_and_literal_contents() {
+    let tokens = [
+        "validate_schema_input",
+        "(",
+        "&",
+        "definition",
+        ".",
+        "input_schema",
+    ];
+    assert!(
+        find_rust_tokens(
+            "validate_schema_input(\n &definition . input_schema,",
+            &tokens
+        )
+        .is_some()
+    );
+    for source in [
+        "skip_validate_schema_input(&definition.input_schema,",
+        "validate_schema_input_disabled(&definition.input_schema,",
+        "validate_schema_input(&definition.input_schema_extra,",
+        "validate_schema_input(&def inition.input_schema,",
+    ] {
+        assert!(find_rust_tokens(source, &tokens).is_none(), "{source}");
+    }
+    assert!(
+        find_rust_tokens(
+            "env!(\"CARGO_ PKG_VERSION\")",
+            &["env", "!", "(", "\"CARGO_PKG_VERSION\"", ")"]
+        )
+        .is_none()
+    );
+}
+
+#[test]
 fn an_unsynchronized_modern_declaration_fails_the_derived_surface_gate() {
     let copy = SurfaceCopy::new("rename");
     copy.edit("src/mcp/tool_defs.rs", |source| {
@@ -845,6 +984,22 @@ fn a_tool_missing_from_the_mcp_documentation_is_reported() {
     assert_reported(
         &copy.errors(),
         "read_artifact is advertised but absent from MCP documentation",
+    );
+}
+
+#[test]
+fn frozen_contract_drift_is_reported_from_the_json_source() {
+    let copy = SurfaceCopy::new("frozen");
+    copy.edit("src/mcp/frozen_tools.json", |source| {
+        source.replacen(
+            "Delete one of your artifacts by id.",
+            "Delete an artifact.",
+            1,
+        )
+    });
+    assert_reported(
+        &copy.errors(),
+        "frozen tool definitions drift from conformance/goldens/mcp.tools-list.json",
     );
 }
 

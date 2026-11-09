@@ -12,7 +12,7 @@ use axum::{Router, routing::get};
 use artifact_mcp::{
     config::{AppConfig, Secret, SeedKeys},
     integrations::thumbnails::{PreviewArtifactRef, PreviewIntegration},
-    model::{ArtifactId, ArtifactMeta, ClientId, OrgId, Timestamp},
+    model::{ArtifactMeta, Timestamp},
     persistence::{
         db::{self, Database, PINNED_PRAGMAS},
         migrations::MigrationContext,
@@ -655,23 +655,12 @@ async fn disabled_preview_renderer_is_a_clean_startup_and_render_noop() {
     assert!(audit.is_empty());
 
     let meta = ArtifactMeta {
-        id: ArtifactId("abc123def456".to_owned()),
-        client_id: ClientId("publisher".to_owned()),
-        org: OrgId("acme".to_owned()),
         title: "No renderer".to_owned(),
-        description: String::new(),
         bytes: 13,
         created_at: Timestamp("2026-07-21 00:00:00".to_owned()),
         updated_at: Timestamp("2026-07-21 00:00:00".to_owned()),
-        uploader_label: String::new(),
-        owner_email: None,
-        is_bundle: false,
-        entry: String::new(),
-        revision: 1,
-        category: String::new(),
-        hidden: false,
         body_sha256: "0".repeat(64),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("abc123def456", "acme")
     };
     assert_eq!(
         previews

@@ -32,7 +32,22 @@ fn validate_node(
     property_order: &[&str],
     errors: &mut Vec<String>,
 ) {
-    let schema_type = schema.get("type").and_then(Value::as_str);
+    let schema_type = match schema.get("type") {
+        Some(Value::Array(types)) => {
+            let types = types.iter().filter_map(Value::as_str).collect::<Vec<_>>();
+            let Some(matching) = types
+                .iter()
+                .copied()
+                .find(|schema_type| matches_schema_type(schema_type, value))
+            else {
+                errors.push(format!("{path} must be one of: {}", types.join(", ")));
+                return;
+            };
+            Some(matching)
+        }
+        Some(schema_type) => schema_type.as_str(),
+        None => None,
+    };
     if schema_type == Some("array") {
         let Some(values) = value.as_array() else {
             errors.push(format!("{path} must be an array"));
@@ -110,24 +125,31 @@ fn validate_node(
         return;
     }
 
-    let matches = match schema_type {
-        Some("string") => matches!(value, OrderedJson::String(_)),
-        Some("number") => matches!(value, OrderedJson::Number(_)),
-        Some("integer") => value
-            .as_number()
-            .and_then(serde_json::Number::as_f64)
-            .is_some_and(|number| number.is_finite() && number.fract() == 0.0),
-        Some("array") => matches!(value, OrderedJson::Array(_)),
-        Some("boolean") => matches!(value, OrderedJson::Bool(_)),
-        Some(_) | None => true,
-    };
-    if !matches && let Some(schema_type) = schema_type {
+    if let Some(schema_type) = schema_type
+        && !matches_schema_type(schema_type, value)
+    {
         let article = if matches!(schema_type, "object" | "integer" | "array") {
             "an"
         } else {
             "a"
         };
         errors.push(format!("{path} must be {article} {schema_type}"));
+    }
+}
+
+fn matches_schema_type(schema_type: &str, value: &OrderedJson) -> bool {
+    match schema_type {
+        "null" => matches!(value, OrderedJson::Null),
+        "string" => matches!(value, OrderedJson::String(_)),
+        "number" => matches!(value, OrderedJson::Number(_)),
+        "integer" => value
+            .as_number()
+            .and_then(serde_json::Number::as_f64)
+            .is_some_and(|number| number.is_finite() && number.fract() == 0.0),
+        "array" => matches!(value, OrderedJson::Array(_)),
+        "object" => matches!(value, OrderedJson::Object(_)),
+        "boolean" => matches!(value, OrderedJson::Bool(_)),
+        _ => true,
     }
 }
 
@@ -331,7 +353,350 @@ fn path_prefix(path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use super::*;
+
+    // Descriptions annotate schemas; they impose no validation constraint.
+    const ANNOTATIONS: &[&str] = &["description"];
+    // Advertised client constraints are intentionally not enforced by the schema validator.
+    // src/mcp/collections.rs and src/persistence/collections.rs normalize inputs first and
+    // own the existing error contract, so enforcing these here would change accepted inputs.
+    const HANDLER_ENFORCED: &[&str] = &["maxItems", "minLength", "maxLength", "minimum", "maximum"];
+
+    fn schema_errors(schema: &Value, value: Value) -> Vec<String> {
+        let value = serde_json::from_value(value).expect("valid ordered JSON");
+        validate_schema_input(schema, &value, &[])
+    }
+
+    fn unsupported_schema_keywords(
+        schema: &Value,
+        path: &str,
+        seen: &mut BTreeSet<String>,
+        errors: &mut Vec<String>,
+    ) {
+        for (keyword, value) in schema.as_object().expect("schema object") {
+            let child_path = format!("{path}[{keyword:?}]");
+            seen.insert(keyword.clone());
+            match keyword.as_str() {
+                "type" | "required" | "minItems" => {}
+                keyword
+                    if ANNOTATIONS.contains(&keyword) || HANDLER_ENFORCED.contains(&keyword) => {}
+                "properties" => {
+                    for (name, child) in value.as_object().expect("schema properties") {
+                        unsupported_schema_keywords(
+                            child,
+                            &format!("{child_path}[{name:?}]"),
+                            seen,
+                            errors,
+                        );
+                    }
+                }
+                "items" | "additionalProperties" => {
+                    if value.is_object() {
+                        unsupported_schema_keywords(value, &child_path, seen, errors);
+                    }
+                }
+                _ => errors.push(format!(
+                    "{child_path}: unsupported schema keyword {keyword}"
+                )),
+            }
+        }
+    }
+
+    #[test]
+    fn every_tool_schema_uses_only_implemented_or_explicitly_allowed_keywords() {
+        let schemas: Value = serde_json::from_str(include_str!(
+            "../../conformance/mcp.tool-output-schemas.json"
+        ))
+        .expect("valid output schemas");
+        let mut errors = Vec::new();
+        let mut seen = BTreeSet::new();
+        for (tool, schema) in schemas.as_object().expect("output schemas") {
+            unsupported_schema_keywords(
+                schema,
+                &format!("output {tool}: $"),
+                &mut seen,
+                &mut errors,
+            );
+        }
+        for definition in
+            super::super::tool_defs::frozen_tool_definitions().expect("frozen tool definitions")
+        {
+            unsupported_schema_keywords(
+                &definition.input_schema,
+                &format!("input {}: $", definition.name),
+                &mut seen,
+                &mut errors,
+            );
+        }
+        assert!(errors.is_empty(), "{}", errors.join("\n"));
+        for (kind, keywords) in [
+            ("annotation", ANNOTATIONS),
+            ("handler-enforced", HANDLER_ENFORCED),
+        ] {
+            for keyword in keywords {
+                assert!(seen.contains(*keyword), "unused {kind} keyword: {keyword}");
+            }
+        }
+    }
+
+    #[test]
+    fn keyword_guard_reports_typos_and_unimplemented_constraints_at_schema_paths() {
+        let schema = serde_json::json!({
+            "requird": ["items"],
+            "propertes": {},
+            "properties": {
+                "enum": {
+                    "type": "array",
+                    "items": { "enum": ["allowed"] }
+                },
+                "values": {
+                    "type": "object",
+                    "additionalProperties": { "format": "date-time" }
+                }
+            }
+        });
+        let mut errors = Vec::new();
+        unsupported_schema_keywords(
+            &schema,
+            "input example: $",
+            &mut BTreeSet::new(),
+            &mut errors,
+        );
+        assert_eq!(errors.len(), 4, "{errors:?}");
+        for path in [
+            "$[\"requird\"]",
+            "$[\"propertes\"]",
+            "$[\"properties\"][\"enum\"][\"items\"][\"enum\"]",
+            "$[\"properties\"][\"values\"][\"additionalProperties\"][\"format\"]",
+        ] {
+            assert!(
+                errors
+                    .iter()
+                    .any(|error| error.starts_with(&format!("input example: {path}:"))),
+                "missing schema path {path}: {errors:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn collection_constraints_keep_handler_normalization_and_error_contracts() {
+        let definitions =
+            super::super::tool_defs::frozen_tool_definitions().expect("frozen tool definitions");
+        for (tool, value) in [
+            ("list_collections", serde_json::json!({ "limit": -1 })),
+            ("list_collections", serde_json::json!({ "limit": 0 })),
+            ("list_collections", serde_json::json!({ "limit": 101 })),
+            (
+                "create_collection",
+                serde_json::json!({ "name": format!(" {} ", "a".repeat(79)) }),
+            ),
+            (
+                "create_collection",
+                serde_json::json!({ "name": "example", "description": " ".repeat(501) }),
+            ),
+            ("create_collection", serde_json::json!({ "name": "" })),
+            (
+                "create_collection",
+                serde_json::json!({ "name": "example", "artifact_ids": vec!["artifact"; 101] }),
+            ),
+        ] {
+            let definition = definitions
+                .iter()
+                .find(|definition| definition.name == tool)
+                .expect("frozen collection tool");
+            assert_eq!(
+                schema_errors(&definition.input_schema, value.clone()),
+                Vec::<String>::new(),
+                "{tool} must leave normalized constraints and errors to handlers: {value}"
+            );
+        }
+    }
+
+    #[test]
+    fn nullable_type_union_accepts_members_and_rejects_other_types() {
+        let schema = serde_json::json!({ "type": ["string", "null"] });
+        assert!(schema_errors(&schema, Value::Null).is_empty());
+        assert!(schema_errors(&schema, serde_json::json!("text")).is_empty());
+        assert_eq!(
+            schema_errors(&schema, serde_json::json!(42)),
+            ["arguments must be one of: string, null"]
+        );
+    }
+
+    #[test]
+    fn type_unions_validate_matching_object_and_array_members() {
+        let schema = serde_json::json!({
+            "type": ["object", "null"],
+            "properties": {
+                "items": {
+                    "type": ["array", "null"],
+                    "minItems": 1,
+                    "items": { "type": ["integer", "null"] }
+                }
+            },
+            "required": ["items"]
+        });
+        for value in [
+            Value::Null,
+            serde_json::json!({ "items": null }),
+            serde_json::json!({ "items": [1, null] }),
+        ] {
+            assert!(schema_errors(&schema, value).is_empty());
+        }
+        for (value, expected) in [
+            (serde_json::json!({}), "items is required"),
+            (
+                serde_json::json!({ "items": [] }),
+                "items must contain at least 1 item",
+            ),
+            (
+                serde_json::json!({ "items": [1.5] }),
+                "items.0 must be one of: integer, null",
+            ),
+        ] {
+            assert_eq!(schema_errors(&schema, value), [expected]);
+        }
+    }
+
+    #[test]
+    fn single_type_errors_keep_their_exact_messages() {
+        for (schema_type, value, expected) in [
+            (
+                "string",
+                serde_json::json!(42),
+                "arguments must be a string",
+            ),
+            ("number", Value::Null, "arguments must be a number"),
+            (
+                "integer",
+                serde_json::json!(1.5),
+                "arguments must be an integer",
+            ),
+            ("boolean", Value::Null, "arguments must be a boolean"),
+            ("array", Value::Null, "arguments must be an array"),
+            ("object", Value::Null, "arguments must be an object"),
+        ] {
+            let schema = serde_json::json!({ "type": schema_type });
+            assert_eq!(schema_errors(&schema, value), [expected]);
+        }
+    }
+
+    #[test]
+    fn artifact_output_schemas_accept_recorded_list_and_read_results() {
+        let schemas: Value = serde_json::from_str(include_str!(
+            "../../conformance/mcp.tool-output-schemas.json"
+        ))
+        .expect("valid output schemas");
+        let fixtures = [
+            (
+                "mcp.read-artifact.json",
+                include_str!("../../conformance/goldens/mcp.read-artifact.json"),
+            ),
+            (
+                "mcp.publish-artifact-key.json",
+                include_str!("../../conformance/goldens/mcp.publish-artifact-key.json"),
+            ),
+        ];
+        let mut listed = 0;
+        let mut read = 0;
+        for (name, fixture) in fixtures {
+            let mut checked = 0;
+            let golden: Value = serde_json::from_str(fixture).expect("valid golden");
+            for (index, step) in golden["steps"]
+                .as_array()
+                .expect("golden steps")
+                .iter()
+                .enumerate()
+            {
+                let Some(output) = step.pointer("/body/json/result/structuredContent") else {
+                    continue;
+                };
+                let tool = if output.get("artifacts").is_some() {
+                    listed += 1;
+                    "list_artifacts"
+                } else if output.get("content_type").is_some() {
+                    read += 1;
+                    "read_artifact"
+                } else {
+                    continue;
+                };
+                assert_eq!(
+                    schema_errors(&schemas[tool], output.clone()),
+                    Vec::<String>::new(),
+                    "{name} step {index}: {tool}"
+                );
+                checked += 1;
+            }
+            assert!(checked > 0, "no list/read results checked in {name}");
+        }
+        assert!(listed > 0, "no list_artifacts results checked");
+        assert!(read > 0, "no read_artifact results checked");
+    }
+
+    #[test]
+    fn artifact_output_schemas_reject_malformed_item_fields() {
+        let schemas: Value = serde_json::from_str(include_str!(
+            "../../conformance/mcp.tool-output-schemas.json"
+        ))
+        .expect("valid output schemas");
+        let golden: Value = serde_json::from_str(include_str!(
+            "../../conformance/goldens/mcp.read-artifact.json"
+        ))
+        .expect("valid golden");
+        let listed = &golden["steps"][1]["body"]["json"]["result"]["structuredContent"];
+        let mut wrong_type = listed.clone();
+        wrong_type["artifacts"][0]["revision"] = serde_json::json!("1");
+        assert_eq!(
+            schema_errors(&schemas["list_artifacts"], wrong_type),
+            ["artifacts.0.revision must be an integer"]
+        );
+        let mut missing = listed.clone();
+        missing["artifacts"][0]
+            .as_object_mut()
+            .expect("artifact item")
+            .remove("title");
+        assert_eq!(
+            schema_errors(&schemas["list_artifacts"], missing),
+            ["artifacts.0.title is required"]
+        );
+        let mut extra = listed.clone();
+        extra["artifacts"][0]["surprise"] = serde_json::json!(true);
+        assert_eq!(
+            schema_errors(&schemas["list_artifacts"], extra),
+            ["artifacts.0.surprise is not allowed"]
+        );
+
+        let bundle = &golden["steps"][6]["body"]["json"]["result"]["structuredContent"];
+        let mut wrong_type = bundle.clone();
+        wrong_type["files"][0]["entry"] = serde_json::json!(1);
+        assert_eq!(
+            schema_errors(&schemas["read_artifact"], wrong_type),
+            ["files.0.entry must be a boolean"]
+        );
+        let mut missing = bundle.clone();
+        missing["files"][0]
+            .as_object_mut()
+            .expect("bundle file")
+            .remove("path");
+        assert_eq!(
+            schema_errors(&schemas["read_artifact"], missing),
+            ["files.0.path is required"]
+        );
+        let mut extra = bundle.clone();
+        extra["files"][0]["surprise"] = serde_json::json!(true);
+        assert_eq!(
+            schema_errors(&schemas["read_artifact"], extra),
+            ["files.0.surprise is not allowed"]
+        );
+        let mut extra = bundle.clone();
+        extra["surprise"] = serde_json::json!(true);
+        assert_eq!(
+            schema_errors(&schemas["read_artifact"], extra),
+            ["surprise is not allowed"]
+        );
+    }
 
     #[test]
     fn reports_required_unknown_known_and_nested_errors_in_node_order() {

@@ -299,21 +299,31 @@ pub(super) async fn get_data_bindings(
     if let Err(response) = require_admin(&deps, &headers).await {
         return response;
     }
-    if deps
-        .artifacts
-        .find_meta(&artifact_id.clone().into())
-        .await
-        .ok()
-        .flatten()
-        .is_none()
-    {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error":"not_found"})),
-        )
-            .into_response();
+    match deps.artifacts.find_meta(&artifact_id.clone().into()).await {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error":"not_found"})),
+            )
+                .into_response();
+        }
+        Err(error) => {
+            return connection_error(&DataError::internal("find bindings artifact", error));
+        }
     }
-    let value = deps.data.get_bindings(&artifact_id).await;
+    bindings_response(deps.data.as_ref(), &artifact_id).await
+}
+async fn bindings_response(data: &dyn crate::ports::DataService, artifact_id: &str) -> Response {
+    let value = match data.try_bindings(artifact_id).await {
+        Ok(value) => value,
+        // Keep stale bindings editable when validation fails or the artifact changed org.
+        Err(DataError::NotFound) => crate::data::BindingManifest::default(),
+        Err(error) => {
+            tracing::error!(artifact_id, %error, "artifact bindings read failed");
+            return connection_error(&error);
+        }
+    };
     Json(serde_json::json!({"id":artifact_id,"bindings":value.bindings})).into_response()
 }
 pub(super) async fn update_data_bindings(
@@ -336,27 +346,25 @@ pub(super) async fn update_data_bindings(
     ) else {
         return connection_error(&DataError::BadParams);
     };
-    let Some(meta) = deps
-        .artifacts
-        .find_meta(&artifact_id.into())
-        .await
-        .ok()
-        .flatten()
-    else {
-        return (
-            StatusCode::NOT_FOUND,
-            Json(serde_json::json!({"error":"not_found"})),
-        )
-            .into_response();
+    let meta = match deps.artifacts.find_meta(&artifact_id.into()).await {
+        Ok(Some(meta)) => meta,
+        Ok(None) => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(serde_json::json!({"error":"not_found"})),
+            )
+                .into_response();
+        }
+        Err(error) => {
+            return connection_error(&DataError::internal("find bindings artifact", error));
+        }
     };
     match deps
         .data
         .set_bindings_audited(&meta.id.0, manifest, &meta.org.0, audit)
         .await
     {
-        Ok(()) => {
-            Json(serde_json::json!({"id":meta.id,"bindings":deps.data.get_bindings(&meta.id.0).await.bindings})).into_response()
-        }
+        Ok(()) => bindings_response(deps.data.as_ref(), &meta.id.0).await,
         Err(error) => connection_error(&error),
     }
 }
@@ -364,6 +372,124 @@ pub(super) async fn update_data_bindings(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    async fn bindings_broker(setup: &'static str) -> crate::data::DataBroker {
+        let pool = tokio::task::spawn_blocking(move || {
+            let pool = r2d2::Pool::builder()
+                .max_size(1)
+                .build(r2d2_sqlite::SqliteConnectionManager::memory())
+                .unwrap();
+            {
+                let connection = pool.get().unwrap();
+                connection
+                    .execute_batch(
+                        "CREATE TABLE artifacts (id TEXT, org TEXT);
+                         CREATE TABLE artifact_data_bindings (artifact_id TEXT, org TEXT, bindings TEXT);
+                         CREATE TABLE data_sources (id TEXT, definition TEXT, enabled INTEGER, version INTEGER);
+                         INSERT INTO artifacts (id, org) VALUES ('artifact', 'acme');",
+                    )
+                    .unwrap();
+                connection.execute_batch(setup).unwrap();
+            }
+            pool
+        })
+        .await
+        .unwrap();
+        crate::data::DataBroker::empty().with_pool(pool)
+    }
+
+    async fn assert_bindings_response(
+        broker: &crate::data::DataBroker,
+        status: StatusCode,
+        body: &[u8],
+    ) {
+        let response = bindings_response(broker, "artifact").await;
+        assert_eq!(response.status(), status);
+        let bytes = axum::body::to_bytes(response.into_body(), 4096)
+            .await
+            .unwrap();
+        assert_eq!(bytes.as_ref(), body);
+    }
+
+    #[tokio::test]
+    async fn bindings_read_failure_returns_error() {
+        let broker = bindings_broker("DROP TABLE artifact_data_bindings;").await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::BAD_GATEWAY,
+            br#"{"error":"data_unavailable","message":"Connection data is unavailable."}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn bindings_decode_failure_returns_error() {
+        let broker = bindings_broker(
+            "INSERT INTO artifact_data_bindings VALUES ('artifact', 'acme', 'invalid json');",
+        )
+        .await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::BAD_GATEWAY,
+            br#"{"error":"data_unavailable","message":"Connection data is unavailable."}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn absent_bindings_preserve_empty_response() {
+        let broker = bindings_broker("").await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::OK,
+            br#"{"bindings":{},"id":"artifact"}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn bindings_success_preserves_response() {
+        let broker = bindings_broker(
+            r#"INSERT INTO data_sources VALUES ('push', '{"id":"push","org":"acme","kind":"push","operations":{"status":{"key":"status"}}}', 1, 1);
+               INSERT INTO artifact_data_bindings VALUES ('artifact', 'acme', '{"bindings":{"reviews":{"source":"push","operations":["status"]}}}');"#,
+        )
+        .await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::OK,
+            br#"{"bindings":{"reviews":{"operations":["status"],"source":"push","subscriptions":[]}},"id":"artifact"}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn invalid_bindings_preserve_empty_response() {
+        let broker = bindings_broker(
+            r#"INSERT INTO artifact_data_bindings VALUES ('artifact', 'acme', '{"bindings":{"missing":{"source":"unknown"}}}');"#,
+        )
+        .await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::OK,
+            br#"{"bindings":{},"id":"artifact"}"#,
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn org_mismatched_bindings_preserve_empty_response() {
+        let broker = bindings_broker(
+            r#"INSERT INTO artifact_data_bindings VALUES ('artifact', 'other', '{"bindings":{"old":{"source":"push"}}}');"#,
+        )
+        .await;
+        assert_bindings_response(
+            &broker,
+            StatusCode::OK,
+            br#"{"bindings":{},"id":"artifact"}"#,
+        )
+        .await;
+    }
+
     #[tokio::test]
     async fn typed_errors_preserve_status_and_body() {
         let statuses = [

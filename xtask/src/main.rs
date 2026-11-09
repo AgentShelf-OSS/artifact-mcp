@@ -3,6 +3,7 @@
 //! ```text
 //! cargo xtask historical-fixture [--schema N | --case NAME] [--out DIR] [--replace-frozen-fixtures]
 //! cargo xtask historical-fixture --verify-against-committed [--schema N | --case NAME] [--out DIR]
+//! cargo xtask gate [--dry-run] [--skip-browser]
 //! cargo xtask release <subcommand> ...
 //! cargo xtask cf-access-setup | tunnel | publish-data-artifact | benchmark-durability ...
 //! ```
@@ -10,6 +11,7 @@
 #![forbid(unsafe_code)]
 
 mod fixture;
+mod gate;
 mod ops;
 mod release;
 mod verify;
@@ -30,6 +32,7 @@ usage: cargo xtask <command> [args]
 
 commands:
   historical-fixture     add or verify frozen historical database fixtures
+  gate                   run the local CI checks for all three workspaces
   release                release evidence: manifest, source SBOM, verification
   cf-access-setup        bootstrap the Cloudflare Access application
   tunnel                 manage the Anthropic MCP tunnel profile
@@ -316,6 +319,7 @@ fn run() -> Result<bool> {
             Ok(true)
         }
         "historical-fixture" => historical_fixture(rest),
+        "gate" => gate::run(rest),
         "release" => release::run(rest),
         "cf-access-setup" | "tunnel" | "publish-data-artifact" | "benchmark-durability" => {
             ops::run(command, rest)

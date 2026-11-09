@@ -530,27 +530,17 @@ async fn shell_navigation(
 #[cfg(test)]
 mod library_tests {
     use super::library_body;
-    use crate::model::{ArtifactId, ArtifactMeta, ClientId, OrgArtifacts, OrgId, Timestamp};
+    use crate::model::{ArtifactMeta, OrgArtifacts, OrgId, Timestamp};
 
     fn meta(id: &str, updated: &str, hidden: bool) -> ArtifactMeta {
         ArtifactMeta {
-            id: ArtifactId(id.into()),
-            client_id: ClientId("publisher".into()),
-            org: OrgId("acme".into()),
             title: format!("Title {id}"),
-            description: String::new(),
             bytes: 1,
             created_at: Timestamp(updated.into()),
             updated_at: Timestamp(updated.into()),
-            uploader_label: String::new(),
-            owner_email: None,
-            is_bundle: false,
-            entry: String::new(),
-            revision: 1,
             category: "Family".into(),
             hidden,
-            body_sha256: String::new(),
-            artifact_key: None,
+            ..ArtifactMeta::fixture(id, "acme")
         }
     }
 

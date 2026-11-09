@@ -66,23 +66,16 @@ fn gallery_renders_fixed_clock_state_and_escapes_hostile_metadata() {
     let renderer = AskamaPageRenderer::with_fixed_clock(&AppConfig::default(), 0);
     let attack = "</script>\"&\u{2028}🎉";
     let artifact = ArtifactMeta {
-        id: ArtifactId::from("artifact1234"),
-        client_id: ClientId::from("publisher"),
-        org: OrgId::from("acme🎉"),
         title: attack.to_owned(),
         description: format!("description {attack}"),
         bytes: 1_310_720,
         created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         updated_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         uploader_label: "Publisher \"One\"".to_owned(),
-        owner_email: None,
-        is_bundle: false,
-        entry: String::new(),
         revision: 3,
         category: "Reports".to_owned(),
-        hidden: false,
         body_sha256: "deadbeefcafebabe".to_owned(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("artifact1234", "acme🎉")
     };
     let notification = ViewerNotification {
         id: FeedbackId::from("feedback-1"),
@@ -241,9 +234,6 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         is_admin: false,
     };
     let meta = ArtifactMeta {
-        id: ArtifactId::from("artifact1234"),
-        client_id: ClientId::from("publisher"),
-        org: OrgId::from("acme"),
         title: attack.to_owned(),
         description: attack.to_owned(),
         bytes: 42,
@@ -251,13 +241,10 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
         updated_at: Timestamp("2026-07-21 12:00:00".to_owned()),
         uploader_label: attack.to_owned(),
         owner_email: Some(attack.to_owned()),
-        is_bundle: false,
-        entry: String::new(),
         revision: 3,
         category: attack.to_owned(),
-        hidden: false,
         body_sha256: "deadbeefcafebabe000000000000000000000000000000000000000000000000".to_owned(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("artifact1234", "acme")
     };
     let authorized =
         AccessPolicy::authorize_viewer(&viewer, Some(meta)).expect("same-org authorization");
@@ -528,23 +515,15 @@ fn shared_gallery_css_preserves_brand_and_organization_accents() {
 
 fn parity_meta(attack: &str) -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId::from("artifact1234"),
-        client_id: ClientId::from("publisher"),
-        org: OrgId::from("acme🎉"),
         title: attack.to_owned(),
         description: attack.to_owned(),
         bytes: 1_310_720,
         created_at: Timestamp("1970-01-01 00:00:00".to_owned()),
         updated_at: Timestamp("1970-01-01 00:00:00".to_owned()),
-        uploader_label: String::new(),
-        owner_email: None,
-        is_bundle: false,
-        entry: String::new(),
         revision: 3,
         category: "Reports".to_owned(),
-        hidden: false,
         body_sha256: "deadbeefcafebabe".to_owned(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("artifact1234", "acme🎉")
     }
 }
 

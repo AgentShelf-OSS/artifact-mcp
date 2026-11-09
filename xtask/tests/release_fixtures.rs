@@ -166,12 +166,12 @@ fn invalid_invocations_exit_1_without_a_report() {
 }
 
 /// Boots every committed fixture with a native release binary:
-/// `ARTIFACT_MCP_BINARY=target/release/artifact-mcp cargo test -p xtask --test release_fixtures -- --ignored`
+/// `ARTIFACT_MCP_BIN=target/release/artifact-mcp cargo test -p xtask --test release_fixtures -- --ignored`
 #[test]
-#[ignore = "needs ARTIFACT_MCP_BINARY, a built artifact-mcp release binary"]
+#[ignore = "needs ARTIFACT_MCP_BIN, a built artifact-mcp release binary"]
 fn every_committed_fixture_passes_against_a_native_binary() {
-    let binary = std::env::var("ARTIFACT_MCP_BINARY")
-        .expect("set ARTIFACT_MCP_BINARY to a built artifact-mcp binary");
+    let binary = std::env::var("ARTIFACT_MCP_BIN")
+        .expect("set ARTIFACT_MCP_BIN to a built artifact-mcp binary");
     let out = TempDir::new("fixture-native");
     let report_path = out.join("historical-fixture-preflight.json");
     let result = release(

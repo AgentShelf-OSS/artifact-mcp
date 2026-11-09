@@ -29,6 +29,34 @@ pub struct ArtifactMeta {
     pub artifact_key: Option<String>,
 }
 
+#[cfg(any(test, feature = "test-util"))]
+impl ArtifactMeta {
+    /// Test metadata for the given artifact and organization, with publisher `publisher`,
+    /// title `Artifact`, revision 1, empty content metadata, and no owner or artifact key.
+    #[must_use]
+    pub fn fixture(id: &str, org: &str) -> Self {
+        Self {
+            id: ArtifactId::from(id),
+            client_id: ClientId::from("publisher"),
+            org: OrgId::from(org),
+            title: "Artifact".to_owned(),
+            description: String::new(),
+            bytes: 0,
+            created_at: Timestamp(String::new()),
+            updated_at: Timestamp(String::new()),
+            uploader_label: String::new(),
+            owner_email: None,
+            is_bundle: false,
+            entry: String::new(),
+            revision: 1,
+            category: String::new(),
+            hidden: false,
+            body_sha256: String::new(),
+            artifact_key: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ArtifactContent {
     SingleHtml(String),

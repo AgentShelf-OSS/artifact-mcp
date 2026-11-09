@@ -714,27 +714,14 @@ async fn is_file(path: &Path) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{OrgId, Timestamp};
 
     fn meta(is_bundle: bool, org: &str) -> ArtifactMeta {
         ArtifactMeta {
-            id: ArtifactId("abc123def456".to_owned()),
             client_id: crate::model::ClientId("client".to_owned()),
-            org: OrgId(org.to_owned()),
             title: "Title".to_owned(),
-            description: String::new(),
-            bytes: 0,
-            created_at: Timestamp(String::new()),
-            updated_at: Timestamp(String::new()),
-            uploader_label: String::new(),
-            owner_email: None,
             is_bundle,
-            entry: String::new(),
-            revision: 1,
-            category: String::new(),
-            hidden: false,
             body_sha256: "a".repeat(64),
-            artifact_key: None,
+            ..ArtifactMeta::fixture("abc123def456", org)
         }
     }
 

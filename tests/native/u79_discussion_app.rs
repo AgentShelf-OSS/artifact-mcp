@@ -13,8 +13,8 @@ use artifact_mcp::{
         DiscordDiscussionEnvelopeV1, DiscordDiscussionOperationV1,
     },
     model::{
-        ArtifactId, ArtifactMeta, ClientId, EmailAddress, FeedbackId, OrgId, SubmitFeedback,
-        Timestamp, Viewer, WebhookEvent,
+        ArtifactMeta, EmailAddress, FeedbackId, OrgId, SubmitFeedback, Timestamp, Viewer,
+        WebhookEvent,
     },
     persistence::{
         feedback_delivery,
@@ -75,23 +75,16 @@ impl Fixture {
                 Arc::new(SequenceIds::default()),
             ),
             meta: ArtifactMeta {
-                id: ArtifactId::from(ARTIFACT),
-                client_id: ClientId::from("publisher"),
-                org: OrgId::from(ORG),
                 title: "Discussed artifact".into(),
-                description: String::new(),
                 bytes: 1,
                 created_at: Timestamp("2026-01-01".into()),
                 updated_at: Timestamp("2026-01-01".into()),
                 uploader_label: "publisher".into(),
                 owner_email: Some("owner@example.test".into()),
-                is_bundle: false,
-                entry: String::new(),
                 revision: 7,
                 category: "Docs".into(),
-                hidden: false,
                 body_sha256: "a".repeat(64),
-                artifact_key: None,
+                ..ArtifactMeta::fixture(ARTIFACT, ORG)
             },
         }
     }

@@ -10,7 +10,7 @@ mod portal_characterization_tests {
     use crate::{
         config::AppConfig,
         model::{
-            ArtifactId, ClientId, EmailAddress, Feedback, FeedbackAuthor, FeedbackId, OrgArtifacts,
+            ArtifactId, EmailAddress, Feedback, FeedbackAuthor, FeedbackId, OrgArtifacts,
             Timestamp, Viewer,
         },
         security::access::AccessPolicy,
@@ -18,9 +18,6 @@ mod portal_characterization_tests {
 
     fn meta(id: &str, org: &str, category: &str) -> ArtifactMeta {
         ArtifactMeta {
-            id: ArtifactId::from(id),
-            client_id: ClientId::from("publisher"),
-            org: OrgId::from(org),
             title: format!("Title {id}"),
             description: "Description".to_owned(),
             bytes: 1_310_720,
@@ -28,13 +25,10 @@ mod portal_characterization_tests {
             updated_at: Timestamp("2026-01-02 00:00:00".to_owned()),
             uploader_label: "Uploader".to_owned(),
             owner_email: Some("viewer@example.test".to_owned()),
-            is_bundle: false,
-            entry: String::new(),
             revision: 3,
             category: category.to_owned(),
-            hidden: false,
             body_sha256: "deadbeefcafebabe".to_owned(),
-            artifact_key: None,
+            ..ArtifactMeta::fixture(id, org)
         }
     }
 

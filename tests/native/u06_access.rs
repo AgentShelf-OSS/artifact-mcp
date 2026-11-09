@@ -52,23 +52,16 @@ const RESERVED_IDS: [&str; 6] = ["raw", "settings", "mcp", "s", "favicon.ico", "
 
 fn artifact(id: &str, org: &str, client_id: &str) -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId::from(id),
         client_id: ClientId::from(client_id),
-        org: OrgId::from(org),
         title: "Concealed".to_owned(),
         description: "acme private".to_owned(),
         bytes: 21,
         created_at: Timestamp("2026-07-21T00:00:00.000Z".to_owned()),
         updated_at: Timestamp("2026-07-21T00:00:00.000Z".to_owned()),
         uploader_label: "acme agent".to_owned(),
-        owner_email: None,
-        is_bundle: false,
         entry: "index.html".to_owned(),
-        revision: 1,
-        category: String::new(),
-        hidden: false,
         body_sha256: "a".repeat(64),
-        artifact_key: None,
+        ..ArtifactMeta::fixture(id, org)
     }
 }
 

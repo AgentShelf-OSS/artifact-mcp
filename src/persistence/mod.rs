@@ -3,6 +3,7 @@
 
 //! Persistence declarations frozen by U01; adapters are owned by U03 and U09–U12.
 
+pub(crate) mod artifact_rows;
 pub mod collections;
 pub mod db;
 pub mod discord_inbound;
