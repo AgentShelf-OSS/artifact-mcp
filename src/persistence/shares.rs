@@ -21,7 +21,7 @@
 //!
 //! # Timezone assumption
 //!
-//! The retired Node twin parsed `new Date("2026-05-01T10:00")`, an ISO date-time with **no** offset, in the *server's local zone*. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. This preserves the historical behavior for a UTC process, as used by the container image and conformance harness. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent. Recorded as a contract-delta request.
+//! The retired Node twin parsed `new Date("2026-05-01T10:00")`, an ISO date-time with **no** offset, in the *server's local zone*. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. This preserves the historical behavior for a UTC process, as used by the container image and conformance harness. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent. Recorded as a compatibility constraint.
 
 use std::sync::Arc;
 
