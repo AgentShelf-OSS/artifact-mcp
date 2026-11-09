@@ -7,7 +7,7 @@
 //! * **Recording is best-effort and must never fail the request.** [`record`] logs upsert errors without propagating them, and [`shell_analytics`] keeps a `counts` value already assigned before a later failure. [`gallery_analytics`] does the same for the gallery's per-org loop. The *read* side is best-effort too: every analytics query on a route path is wrapped, so a broken `artifact_views` table degrades the page instead of failing the request.
 //! * **The shell render is the single attribution point.** Record a view only from `GET /:id` and only when `!viewer.isAdmin && viewer.email`. Raw, thumbnail, and bundle-subresource requests deliberately do not count, so a page with N iframes is still one view. [`should_record`] is that predicate; route units must not call [`record`] anywhere else.
 //! * **Repeat views increment, they do not duplicate.** `ON CONFLICT(artifact_id, email) DO UPDATE SET count = count + 1, last_viewed_at = datetime('now')` keeps `unique_viewers` stable while `views` grows.
-//! * **Ordering is observable.** `viewersFor` is `ORDER BY last_viewed_at DESC` and `topForOrg` is `ORDER BY views DESC, last_viewed_at DESC`; both feed ordered JSON arrays (`artifact_stats`, the gallery). Neither query gains a tiebreaker here — an extra sort key would diverge wherever Node's order is arbitrary.
+//! * **Ordering is observable.** Viewer listing uses `ORDER BY last_viewed_at DESC` and the org ranking uses `ORDER BY views DESC, last_viewed_at DESC`; both feed ordered JSON arrays (`artifact_stats`, the gallery). Neither query gains a tiebreaker here, because an extra sort key would change the frozen ordering for tied rows.
 //! * **An artifact with no rows still reports zeroes.** The aggregate has no `GROUP BY`, so it always yields one row: `{ views: 0, unique_viewers: 0, last_viewed_at: null }`.
 
 use std::collections::BTreeMap;
@@ -63,7 +63,7 @@ LIMIT ?";
 pub struct ShellAnalytics {
     /// Aggregate counts, or `None` when the aggregate read failed.
     pub counts: Option<ViewCounts>,
-    /// Per-viewer rows; `None` for non-admins *and* when the read failed, as in Node.
+    /// Per-viewer rows; `None` for non-admins *and* when the read failed.
     pub viewers: Option<Vec<ViewerView>>,
 }
 
@@ -235,11 +235,11 @@ pub fn top_for_org(
         .map_err(|error| crate::error::internal("read top viewed", error))
 }
 
-/// The shell route's read-side analytics, best-effort in the same shape as
+/// The shell route's read-side analytics, with best-effort reads.
 ///
 /// A failure of the aggregate read leaves both fields `None`; a failure of the viewer read keeps
-/// an aggregate that was already loaded, because Node assigns `counts` before it can throw on
-/// `viewersFor`.
+/// an aggregate that was already loaded, preserving the frozen partial result when
+/// the later query fails.
 #[must_use]
 pub fn shell_analytics(
     conn: &Connection,
@@ -306,7 +306,7 @@ pub fn gallery_analytics(conn: &Connection, orgs: &[OrgId], is_admin: bool) -> G
 /// Pooled [`record`]: still best-effort, so a pool or task failure is swallowed too.
 ///
 /// The frozen `EngagementService::record_view` returns `Result`, but this adapter only ever
-/// reports `Ok(())` — Node's caller has no failure path to reproduce.
+/// reports `Ok(())` to preserve the best-effort recording contract.
 ///
 /// # Errors
 /// Never; the signature exists to satisfy the frozen port shape.

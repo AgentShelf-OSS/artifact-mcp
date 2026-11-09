@@ -82,18 +82,18 @@ pub(super) fn load_body_rows(conn: &Connection) -> Result<Vec<BodyRow>, AppError
         .map_err(|error| sql_error("read storage audit rows", &error))
 }
 
-/// Directory entries in Node's processing order: `.staging-` first, then `.trash-`, then
+/// Directory entries in recovery order: `.staging-` first, then `.trash-`, then
 /// everything else.
 ///
-/// Node keeps `readdirSync` order inside a rank because `Array.prototype.sort` is stable; this
-/// sorts by name inside a rank instead, which is deterministic across runtimes and filesystems.
-/// The two can only differ when a single artifact has two transient paths of the same kind, an
-/// order the reference does not define either.
+/// The retired Node twin kept directory enumeration order inside a rank; this sorts by name
+/// inside a rank instead, which is deterministic across filesystems. The orders can differ
+/// when a single artifact has two transient paths of the same kind, for which the historical
+/// contract did not define an order.
 pub(super) fn ranked_entries(artifact_dir: &Path) -> Result<Vec<String>, AppError> {
     let mut names: Vec<String> = Vec::new();
     let entries = match std::fs::read_dir(artifact_dir) {
         Ok(entries) => entries,
-        // Node would throw; at startup a missing directory just means an empty store, and both
+        // At startup a missing directory means an empty store, and
         // `Database::open_at` creates it.
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(names),
         Err(error) => return Err(io_failure("list artifact directory", artifact_dir, &error)),

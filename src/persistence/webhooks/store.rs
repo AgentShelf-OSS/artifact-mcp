@@ -72,7 +72,7 @@ impl WebhookStore {
     ///
     /// # Errors
     /// Returns [`AppError::Validation`] for an unknown organization or a URL outside the Discord
-    /// allowlist, propagating the Node message verbatim; otherwise a database or cipher fault.
+    /// allowlist, propagating the frozen message verbatim; otherwise a database or cipher fault.
     pub async fn create(&self, request: CreateWebhook) -> Result<WebhookSummary, AppError> {
         let org = trimmed(&request.org.0);
         let url = trimmed(&request.url);
@@ -329,7 +329,7 @@ fn create_in(
     events: &str,
     stored: &StoredWebhookUrl,
 ) -> Result<WebhookSummary, AppError> {
-    // Node's order is unknown-organization first, then invalid-URL.
+    // Preserve the frozen error order: unknown-organization first, then invalid-URL.
     if !org_exists(conn, org)? {
         return Err(AppError::Validation(format!(
             "Unknown organization \"{org}\"."
@@ -354,7 +354,7 @@ fn create_in(
         ),
     )
     .map_err(|error| crate::error::internal("create in", error))?;
-    // Node re-reads the row so database defaults (`created_at`) are authoritative.
+    // Re-read the row so database defaults (`created_at`) are authoritative.
     row_by_id(conn, &id.0)?
         .map(|row| row.public())
         .ok_or(AppError::Internal)

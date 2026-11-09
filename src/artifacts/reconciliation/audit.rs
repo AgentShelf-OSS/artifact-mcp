@@ -205,7 +205,7 @@ fn transient_is_recovery_evidence(
 
 /// Move the installed outgoing revision to its history path before recovery installs staging.
 /// The metadata transaction records that outgoing revision atomically with the current revision;
-/// if no such row exists, Node falls back to replacing the installed path without a snapshot.
+/// if no such row exists, recovery preserves the installed body and leaves staging in place.
 fn preserve_outgoing_body(
     artifact_dir: &Path,
     row: &BodyRow,

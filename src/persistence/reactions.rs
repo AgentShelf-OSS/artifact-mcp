@@ -7,11 +7,11 @@
 //! * **Absent row reads as neutral.** The result is `{ favorite: 0, vote: 0 }` when no row exists; there is no "unset" state visible to callers.
 //! * **Partial update.** Read the current row first and only replace the field(s) supplied, then upsert *both* columns. A missing field keeps its stored value.
 //! * **Upsert, never duplicate.** `ON CONFLICT(email, artifact_id) DO UPDATE` keeps exactly one row per viewer per artifact.
-//! * **Vote normalisation.** Node clamps (`vote > 0 ? 1 : vote < 0 ? -1 : 0`) *after* the route has already rejected anything outside `{-1, 0, 1}` in `parseReactionInput`. Both layers are reproduced here: [`validate`] returns Node's exact message and [`normalize_vote`] applies the same clamp, so no unchecked value can reach the `CHECK` constraint.
+//! * **Vote normalisation.** Clamp votes to `-1`, `0`, or `1` *after* rejecting values outside that set. Both checks preserve the frozen contract: [`validate`] returns the exact validation message and [`normalize_vote`] clamps by sign, so no unchecked value can reach the `CHECK` constraint.
 //!
 //! # Concurrency note (difference in mechanism, not in behaviour)
 //!
-//! Node's read-modify-write runs on better-sqlite3's single process-wide connection, which serialises it implicitly. The Rust pool has up to four connections, so [`set`] performs the same read-then-upsert inside an `IMMEDIATE` transaction. The observable result is identical; without it two concurrent partial updates could interleave and lose a field.
+//! The retired Node twin serialized read-modify-write operations through one process-wide SQLite connection. The Rust pool has up to four connections, so [`set`] reads and upserts inside an `IMMEDIATE` transaction to preserve that behavior. Without it two concurrent partial updates could interleave and lose a field.
 
 use std::collections::BTreeMap;
 
@@ -21,10 +21,10 @@ use crate::error::AppError;
 use crate::model::{ArtifactId, EmailAddress, Reaction, ReactionUpdate, Sentiment};
 use crate::persistence::db::{self, DbPool};
 
-/// Node's rejection message for an out-of-range `favorite`.
+/// Frozen rejection message for an out-of-range `favorite`.
 pub const FAVORITE_VALUE_MESSAGE: &str = "favorite must be true, false, 0, or 1.";
 
-/// Node's rejection message for an out-of-range `vote`.
+/// Frozen rejection message for an out-of-range `vote`.
 pub const VOTE_VALUE_MESSAGE: &str = "vote must be -1, 0, or 1.";
 
 /// The only vote values the v3 `CHECK` constraint accepts.
@@ -46,7 +46,7 @@ SELECT artifact_id,
        SUM(favorite)                              AS favorites
 FROM reactions GROUP BY artifact_id";
 
-/// Rejects an update Node's route would never have accepted.
+/// Rejects an update outside the frozen reaction input contract.
 ///
 /// `favorite` is already a `bool` in [`ReactionUpdate`], so only `vote` can carry an illegal
 /// value; preserve the validation message byte-for-byte so the HTTP envelope matches.
@@ -139,8 +139,8 @@ pub fn set(
 
 /// Every reaction a single viewer has recorded, keyed by artifact.
 ///
-/// Node builds a `Map` in row order; only keyed lookup is observable,
-/// so the frozen `BTreeMap` return type loses nothing.
+/// Only keyed lookup is observable; the frozen `BTreeMap` return type
+/// does not need to preserve database row order.
 ///
 /// # Errors
 /// Returns [`AppError::Internal`] if the query fails.

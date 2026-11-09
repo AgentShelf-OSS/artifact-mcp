@@ -114,7 +114,7 @@ fn create_org_in_transaction(
         insert_domain(transaction, domain, name)?;
     }
 
-    // Node returns a literal rather than re-reading the row, so `color` and `created_at` are
+    // Construct the response without re-reading the row, so `color` and `created_at` are
     // absent.
     Ok(Organization {
         name: OrgId(name.to_owned()),
@@ -321,7 +321,7 @@ pub fn remove_email_member(conn: &Connection, org: &str, email: &str) -> Result<
 
 /// `addCategory(org, name)`
 ///
-/// `INSERT OR IGNORE`, so re-adding an existing category succeeds, exactly as in Node.
+/// `INSERT OR IGNORE`, so re-adding an existing category succeeds.
 ///
 /// # Errors
 /// [`AppError::Validation`] for an unknown org or an empty category name;

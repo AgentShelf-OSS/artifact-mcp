@@ -238,7 +238,7 @@ pub fn norm_category(value: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// Error messages — one helper per Node `throw`
+// Error messages, one helper per validation failure
 // ---------------------------------------------------------------------------
 
 /// `Unknown organization "<org>".`

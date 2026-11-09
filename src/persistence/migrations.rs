@@ -1,6 +1,6 @@
 //! Append-only version/name-compatible SQLite migrations.
 //!
-//! Every statement below is a verbatim copy of the SQL it executes so that `sqlite_master.sql` text, column order, index names, check constraints, and composite foreign keys are identical between a Node-created and a Rust-created database. Do not "tidy" the SQL: the schema comparison in `tests/native/u03_migrations.rs` checks normalised statement text against a database the Node runtime wrote, and a reformatted statement is a real divergence in a shared production database.
+//! Preserve the migration SQL so that `sqlite_master.sql` text, column order, index names, check constraints, and composite foreign keys match the frozen historical schema. Do not "tidy" the SQL: the schema comparison in `tests/native/u03_migrations.rs` checks normalised statement text, and historical fixtures include databases written by the retired Node twin. Reformatting SQL can change persisted schema text.
 //!
 //! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no function in this module may be awaited or called while a transaction is held across `.await`.
 
@@ -44,7 +44,7 @@ pub use webhook_urls::{
     EncryptedUrl, WebhookUrlCipher, encrypt_plaintext_webhook_urls, mask_webhook_url,
 };
 
-/// Latest schema version. The ledger is append-only and must match Node exactly.
+/// Latest schema version. The ledger is append-only; preserve shipped versions and names.
 pub const LATEST_SCHEMA_VERSION: i64 = 40;
 
 /// Environment-derived inputs consumed by migrations with programmatic side effects.
@@ -59,7 +59,7 @@ pub struct MigrationContext {
 }
 
 impl MigrationContext {
-    /// Mirrors `String(process.env.ORG_EMAIL_DOMAINS || "")` in the Node reference.
+    /// Read `ORG_EMAIL_DOMAINS`, defaulting to an empty string when it is unavailable.
     #[must_use]
     pub fn from_env() -> Self {
         Self {

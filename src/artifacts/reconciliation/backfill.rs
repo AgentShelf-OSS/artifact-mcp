@@ -58,7 +58,7 @@ pub fn backfill_body_digests(
             params![digest, row.id],
         )
         .map_err(|error| sql_error("backfill body digest", &error))?;
-        // Node counts an attempted repair, not `info.changes`.
+        // Count an attempted repair, regardless of how many rows the UPDATE changed.
         report.updated += 1;
     }
     Ok(report)
