@@ -15,7 +15,7 @@ path = "src/main.rs"
 
 [features]
 # Deterministic fakes (`FixedClock`, `SequentialIdSource`, `SeededRandom`, `ScriptedRandom`,
-# `Testkit`) for tests. The self dev-dependency below turns it on for every test target, so
+# `Testkit`, `FakeDiscordGateway`, `FakeDiscordRest`) for tests. The self dev-dependency below turns it on for every test target, so
 # release builds never compile them.
 test-util = []
 

@@ -12,7 +12,7 @@
 //! * Domains and emails are trimmed and lowercased.
 //! * The v21 `org_email_members.email` column is `COLLATE NOCASE`, so membership lookups and deletes are case-insensitive *in SQLite as well* — the normalization and the collation are two independent layers and both are preserved.
 //!
-//! # Deliberate divergence (contract-delta request)
+//! # Deliberate divergence (compatibility constraint)
 //!
 //! `String.prototype.slice(0, n)` counts UTF-16 code units and will happily cut a surrogate pair in half; better-sqlite3 then stores the lone surrogate as the invalid UTF-8 sequence `ED A0 BD` (verified empirically). A Rust `String` cannot hold that, so [`truncate_utf16`] drops the straddling character instead. Only reachable with an astral character that starts at exactly the label/category cap.
 

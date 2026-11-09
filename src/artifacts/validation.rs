@@ -39,7 +39,7 @@ pub const DIGEST_HEX_LENGTH: usize = 64;
 /// The retired Node twin's `RESERVED` set contained the empty string; an empty id fails the shape
 /// test, so `RESERVED_ARTIFACT_IDS` omits it without changing the answer.
 ///
-/// **Known divergence from the route table (contract-delta request 1):** `thumbnails` and
+/// **Known divergence from the route table (compatibility constraint 1):** `thumbnails` and
 /// `notifications` are real top-level routes and are *not* reserved. Reproduced as-is.
 #[must_use]
 pub fn is_reserved_artifact_id(id: &str) -> bool {
@@ -161,7 +161,7 @@ pub fn posix_normalize_relative(value: &str) -> String {
 /// - A leading `/` is *stripped*, not rejected: `/etc/passwd` becomes the literal relative
 ///   name `etc/passwd`. It cannot escape the bundle root.
 /// - Backslashes become separators first, so `..\..\x` is rejected as traversal, while
-///   `C:\x` survives as the literal relative name `C:/x` (contract-delta request 2).
+///   `C:\x` survives as the literal relative name `C:/x` (compatibility constraint 2).
 /// - Percent-encoded traversal (`..%2f..`) is *not* decoded, so it stays a single literal
 ///   filename. Safe, and deliberately preserved.
 /// - A trailing separator survives (`a/b/`), and a bare `./` is accepted. The digest and
@@ -308,7 +308,7 @@ pub struct ValidatedBundle {
 /// `validateBundle(bundleFiles, entry, preferEntry)`
 ///
 /// `files` preserves publisher order, as required by the frozen input contract, and
-/// entry auto-selection depends on that order. See contract-delta request 3.
+/// entry auto-selection depends on that order. See compatibility constraint 3.
 ///
 /// `prefer_entry` is the existing `meta.entry` on an update; pass `None`
 /// for a fresh publish, which is exactly what `publishBundle` does.

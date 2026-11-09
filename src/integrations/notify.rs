@@ -84,11 +84,11 @@ pub const fn event_color(event: &WebhookEvent) -> u32 {
     }
 }
 
-/// The top-level POST body: The top-level POST body contains one embed.
+/// The top-level POST body, which contains one embed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DiscordPayload {
-    /// Exactly one embed, as the reference always builds.
+    /// Exactly one embed; the frozen payload format always has one.
     pub embeds: Vec<Embed>,
 }
 
@@ -112,7 +112,7 @@ pub struct Embed {
     pub url: Option<String>,
     /// Event-specific fields; may be empty.
     pub fields: Vec<EmbedField>,
-    /// Assigned after `fields` in every branch of the reference.
+    /// Serialized after `fields` on every path, as in the frozen payload bytes.
     pub description: String,
     /// Assigned last, only on the preview path.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -127,7 +127,7 @@ pub struct EmbedAuthor {
     pub name: String,
 }
 
-/// One `{ name, value, inline }` field, in the reference's literal order.
+/// One `{ name, value, inline }` field, in the frozen payload's key order.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EmbedField {
@@ -135,7 +135,7 @@ pub struct EmbedField {
     pub name: String,
     /// Field body; always a JSON string, even for numeric values.
     pub value: String,
-    /// Always `true` in the reference.
+    /// Always `true` in the frozen payload format.
     pub inline: bool,
 }
 
@@ -191,9 +191,8 @@ fn to_fixed_one(numerator: u64, denominator: u64) -> String {
 
 /// Build an embed from the event and payload.
 ///
-/// `org` is a separate argument because the reference injects it into the payload at the call site
-/// (`emit` does `{ ...payload, org }`, `test` passes `webhookRow.org`), and the frozen
-/// [`NotificationPayload`] has no `org` field.
+/// `org` is a separate argument because the frozen [`NotificationPayload`] has no `org` field;
+/// callers supply it (the retired Node twin likewise injected it at the call site).
 #[must_use]
 pub fn build_embed(
     event: &WebhookEvent,
@@ -304,8 +303,7 @@ fn capitalize(word: &str) -> String {
 }
 
 /// `text(value || fallback, 1024)` — the `||` is applied *before* trimming, so a whitespace-only
-/// value collapses to the empty string rather than to the fallback. That is the reference
-/// behaviour.
+/// value collapses to the empty string rather than to the fallback. That is the frozen behaviour.
 fn or_default(value: &str, fallback: &str) -> String {
     text(if value.is_empty() { fallback } else { value }, FIELD_MAX)
 }
@@ -731,7 +729,7 @@ impl NotificationSink for DiscordNotifier {
 /// The admin test action sends a fixed payload.
 ///
 /// `url` is the hard-coded `http://localhost:3480`, not the configured public base URL; that is
-/// the reference behaviour and is ported verbatim.
+/// the frozen test payload, kept unchanged.
 #[must_use]
 pub fn test_payload() -> NotificationPayload {
     NotificationPayload {

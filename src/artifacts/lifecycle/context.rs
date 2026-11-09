@@ -274,10 +274,11 @@ impl StoreContext {
     /// ```
     ///
     /// Files are written in the caller's order — the order the publisher supplied, and the order
-    /// entry auto-selection already used (contract delta 4). Nothing here re-sorts them, and a
+    /// entry auto-selection already used (compatibility constraint 3 in `crate::artifacts::validation`). Nothing here re-sorts them, and a
     /// duplicate relative path keeps the frozen "last write wins" behavior.
     ///
-    /// See contract-delta request 2 for the trailing-separator rejection.
+    /// See compatibility constraint 2 in the lifecycle module docs for the trailing-separator
+    /// rejection.
     pub(super) fn stage_bundle_files(
         &self,
         staging: &Path,

@@ -79,8 +79,8 @@ pub fn truncate_utf16(value: &str, max: usize) -> String {
 /// must be `/`.
 ///
 /// This is the SSRF guard. It is deliberately not re-expressed as "parse the URL, then compare the
-/// host", because a parser difference between the two runtimes would then become a *security*
-/// difference; matching the reference's literal prefix test keeps the two decisions identical.
+/// host": a literal prefix test on the raw string leaves no room for parser confusion about which
+/// host a URL names, and it is the exact rule every stored webhook URL was admitted under.
 #[must_use]
 pub fn is_discord_webhook_url(value: &str) -> bool {
     const PREFIXES: [&str; 2] = [
