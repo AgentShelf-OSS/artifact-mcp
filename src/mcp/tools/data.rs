@@ -46,24 +46,29 @@ pub(crate) async fn data_bindings(
     };
     if !write {
         let manifest = deps.data.try_bindings(id).await.map_err(data_error)?;
-        return tool_result(
-            object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
-        );
+        let bindings = serde_json::to_value(manifest.bindings)
+            .expect("bindings contain only string keys, strings, and string arrays");
+        let bindings: OrderedJson =
+            serde_json::from_value(bindings).expect("OrderedJson accepts every serde_json::Value");
+        return tool_result(object! { "id" => OrderedJson::string(id), "bindings" => bindings });
     }
     let raw = arguments
         .get("bindings")
         .cloned()
         .ok_or_else(|| JsonRpcError::InvalidParams("bindings is required".into()))?;
+    let raw = serde_json::to_value(raw).expect("OrderedJson serializes through serde_json::Value");
     let manifest: crate::data::BindingManifest =
-        serde_json::from_value(serde_json::json!({"bindings": serde_json::to_value(raw).unwrap()}))
+        serde_json::from_value(serde_json::json!({"bindings": raw}))
             .map_err(|_| AppError::Validation("bad_params".into()))?;
     deps.data
         .set_bindings(id, manifest.clone(), &authorized.meta().org.0)
         .await
         .map_err(data_error)?;
-    tool_result(
-        object! { "id" => OrderedJson::string(id), "bindings" => serde_json::from_value(serde_json::to_value(manifest.bindings).unwrap()).unwrap() },
-    )
+    let bindings = serde_json::to_value(manifest.bindings)
+        .expect("bindings contain only string keys, strings, and string arrays");
+    let bindings: OrderedJson =
+        serde_json::from_value(bindings).expect("OrderedJson accepts every serde_json::Value");
+    tool_result(object! { "id" => OrderedJson::string(id), "bindings" => bindings })
 }
 
 pub(crate) async fn set_artifact_data(
@@ -81,7 +86,12 @@ pub(crate) async fn set_artifact_data(
         .ok_or_else(|| JsonRpcError::InvalidParams("value is required".into()))?;
     let revision = deps
         .data
-        .set_snapshot(id, binding, key, serde_json::to_value(value).unwrap())
+        .set_snapshot(
+            id,
+            binding,
+            key,
+            serde_json::to_value(value).expect("OrderedJson serializes through serde_json::Value"),
+        )
         .await
         .map_err(data_error)?;
     let _ = owned;
@@ -103,9 +113,10 @@ pub(crate) async fn append_artifact_events(
         .get("events")
         .cloned()
         .ok_or_else(|| JsonRpcError::InvalidParams("events is required".into()))?;
-    let events: Vec<crate::data::Event> =
-        serde_json::from_value(serde_json::to_value(raw).unwrap())
-            .map_err(|_| AppError::Validation("bad_params".into()))?;
+    let events: Vec<crate::data::Event> = serde_json::from_value(
+        serde_json::to_value(raw).expect("OrderedJson serializes through serde_json::Value"),
+    )
+    .map_err(|_| AppError::Validation("bad_params".into()))?;
     let (accepted, duplicates) = deps
         .data
         .append_events(id, binding, sub, events)

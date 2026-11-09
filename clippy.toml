@@ -17,3 +17,6 @@ await-holding-invalid-types = [
   { path = "rusqlite::Transaction", reason = "a transaction must never span an await point" },
   { path = "r2d2::PooledConnection", reason = "a pooled connection parked across an await starves the pool (max_size = 4)" },
 ]
+
+# Test assertions may unwrap; production code denies clippy::unwrap_used.
+allow-unwrap-in-tests = true

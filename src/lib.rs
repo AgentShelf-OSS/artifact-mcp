@@ -1,6 +1,7 @@
 //! U01 contract root for the artifact-mcp Rust rebuild.
 
 #![forbid(unsafe_code)]
+#![deny(clippy::unwrap_used)]
 
 pub mod adapters;
 pub mod app;
