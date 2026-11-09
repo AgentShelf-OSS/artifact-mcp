@@ -143,9 +143,8 @@ pub enum RestError {
     NotFound,
 }
 
-/// Persistence adapter contract for the future SQL repository.  Every implementation must write
-/// the inbox event and feedback/link mutation atomically; the in-memory implementation below is
-/// only a deterministic test double.
+/// Inbound processing state contract. The persistence adapter loads the relevant feedback into
+/// the in-memory implementation, then writes the event and feedback/link mutation atomically.
 pub trait InboundEventInbox: Send {
     fn has_event(&self, event: &InboundEvent) -> bool;
     fn record_event(&mut self, event: &InboundEvent, result: InboundResult);
@@ -154,12 +153,16 @@ pub trait InboundEventInbox: Send {
     fn mark_thread_degraded(&mut self, reason: ThreadDegradedReason);
 }
 
+#[cfg(any(test, feature = "test-util"))]
 mod fakes;
 mod gateway;
+mod memory_inbox;
 mod processor;
 
+#[cfg(any(test, feature = "test-util"))]
 pub use fakes::*;
 pub use gateway::*;
+pub use memory_inbox::MemoryInbox;
 pub use processor::*;
 
 #[cfg(test)]
