@@ -10,28 +10,27 @@ pub(super) fn invalid(key: &str, raw: &str, expectation: &str) -> AppError {
 
 /// Fetch a variable, treating "absent" and "empty after trimming" identically.
 ///
-/// Node reaches the same conclusion for both: `"" || fallback` and
-/// `Number.isSafeInteger(Number("")) && 0 > 0` both select the fallback.
+/// This preserves the retired Node twin's fallback for both missing and blank values.
 pub(super) fn present(env: &dyn EnvSource, key: &str) -> Option<String> {
     env.get(key).filter(|value| !value.trim().is_empty())
 }
 
-/// Port of `nonEmptyString(value, fallback)`
+/// Trim a non-empty string or use the fallback.
 pub(super) fn non_empty_string(env: &dyn EnvSource, key: &str, default: &str) -> String {
     present(env, key).map_or_else(|| default.to_owned(), |value| value.trim().to_owned())
 }
 
-/// Port of `value || fallback` for strings Node does **not** trim.
+/// Use the fallback for absent or empty strings, without trimming whitespace.
 pub(super) fn raw_string(env: &dyn EnvSource, key: &str, default: &str) -> String {
     env.get(key)
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| default.to_owned())
 }
 
-/// Port of `positiveInteger(value, fallback)`
+/// Parse a positive decimal integer or use the default for an absent value.
 ///
-/// Accepts exactly the decimal integers Node accepts; rejects (rather than silently
-/// discarding) anything else that is actually present.
+/// Preserves the retired Node twin's accepted integers. Invalid present values
+/// are rejected instead of silently discarded.
 pub(super) fn positive_integer(
     env: &dyn EnvSource,
     key: &str,
@@ -50,7 +49,7 @@ pub(super) fn positive_integer(
     Ok(parsed)
 }
 
-/// Port of `process.env.X === "1"`
+/// Accept only `1` as the enabled value.
 pub(super) fn flag(env: &dyn EnvSource, key: &str) -> bool {
     env.get(key).is_some_and(|value| value == "1")
 }
@@ -63,7 +62,7 @@ pub(super) fn enabled_unless_zero(env: &dyn EnvSource, key: &str) -> Result<bool
     }
 }
 
-/// Port of the `bytes` package's `parse()` used by `express.json({ limit })`.
+/// Preserve the `bytes` size grammar used by the retired Node twin's JSON limits.
 ///
 /// `bytes.parse` matches `/^((-|\+)?(\d+(?:\.\d+)?)) *(kb|mb|gb|tb|pb)$/i` and otherwise
 /// falls back to `parseInt(val, 10)`, then floors `unit * value`. Only the accepting

@@ -2,10 +2,9 @@ use super::*;
 
 /// The HTML a queued job will render.
 ///
-/// `Deferred` is Node's `typeof job.html === "function"`: the startup
-/// backfill re-reads the body *at execution time* and returns `None` when a concurrent update has
-/// moved the digest on, so a stale body can never overwrite the authoritative thumbnail
-/// ([server.js:138-143]).
+/// `Deferred` lets startup backfill re-read the body *at execution time* and return `None`
+/// when a concurrent update has moved the digest on, so a stale body can never overwrite
+/// the authoritative thumbnail.
 pub enum PreviewHtml {
     /// Already-loaded body.
     Ready(String),

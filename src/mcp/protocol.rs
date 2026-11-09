@@ -1,8 +1,8 @@
 //! Direct streamable-HTTP JSON-RPC envelopes and batching.
 //!
-//! The request AST deliberately retains object insertion order. Two observable Node behaviours
-//! depend on it: `Object.keys` determines validation-error traversal order, and `Object.entries`
-//! determines the first bundle HTML file selected when no entry is supplied.
+//! The request AST deliberately retains object insertion order. The frozen wire contract
+//! depends on it for validation-error traversal order and selection of the first bundle
+//! HTML file when no entry is supplied.
 
 use std::future::Future;
 
@@ -40,7 +40,7 @@ pub async fn handle_mcp_for_era(
     .await
 }
 
-/// Protocol engine with an injected method dispatcher, used by the Node parity proof.
+/// Protocol engine with an injected method dispatcher.
 pub async fn handle_mcp_with<F, Fut>(payload: OrderedJson, dispatch: F) -> Option<Value>
 where
     F: Fn(OrderedJson) -> Fut,

@@ -15,8 +15,8 @@
 //! # Token source and precedence
 //!
 //! `Cf-Access-Jwt-Assertion` is preferred; the `CF_Authorization` cookie is the fallback. The
-//! header wins *even when it is unusable* — Node evaluates `headerToken || readAccessCookie(req)`,
-//! so a present-but-garbage header is used and fails, and the cookie is never consulted. That is
+//! header wins *even when it is unusable*: a present-but-garbage header is used and fails,
+//! and the cookie is never consulted. This preserves the retired Node twin's precedence. That is
 //! load-bearing: `access_retry.rs` exists precisely because Cloudflare sometimes sends the cookie
 //! without the header.
 //!
@@ -37,7 +37,7 @@
 //!
 //! # Fail-closed
 //!
-//! Every verification failure — no token, malformed compact form, unknown `kid`, bad signature, wrong `iss`/`aud`, expired or not-yet-valid beyond the leeway, malformed cookie, unusable JWKS — collapses to an anonymous [`Viewer`]. Node's `catch { return {email:null, …} }` makes that the contract, and it is what `human-concealment.invariant3` depends on.
+//! Every verification failure, including no token, malformed compact form, unknown `kid`, bad signature, wrong `iss`/`aud`, expired or not-yet-valid beyond the leeway, malformed cookie, or unusable JWKS, yields an anonymous [`Viewer`]. This frozen failure contract is what `human-concealment.invariant3` depends on.
 //!
 //! # Secret containment
 //!
@@ -62,7 +62,7 @@ use crate::{
     },
 };
 
-/// Opaque shell identity shared with the Node runtime.
+/// Opaque shell identity preserving the frozen viewer-handle format.
 pub fn viewer_handle(email: &str, audit_key: &[u8; 32]) -> String {
     let mut derivation = Hmac::<Sha256>::new_from_slice(audit_key).expect("fixed HMAC key");
     derivation.update(b"artifact-viewer-id");
@@ -229,7 +229,7 @@ pub trait OrgDirectory: Send + Sync + fmt::Debug {
 }
 
 /// A directory with no registered orgs: resolution falls through to the environment map and then
-/// to the bare email domain, exactly as an empty registry does in Node.
+/// to the bare email domain, preserving the frozen empty-registry behavior.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct NoOrgDirectory;
 
@@ -255,8 +255,7 @@ impl OrgDirectory for NoOrgDirectory {
 
 /// `domainOf(email)` — the part after the **last** `@`, lowercased, or `""`.
 ///
-/// `lastIndexOf` (not `indexOf`) is deliberate in Node and reproduced here: it is what makes a
-/// local part containing `@` resolve to the real domain.
+/// Splitting at the last `@` makes a local part containing `@` resolve to the real domain.
 #[must_use]
 pub fn domain_of(email: &str) -> String {
     email
@@ -366,8 +365,8 @@ fn decode_json_object(segment: &str) -> Option<Map<String, Value>> {
 ///
 /// # Two deliberate narrowings
 ///
-/// * **An object claim.** `String({})` is `"[object Object]"` in JavaScript, and Node would carry
-///   that through as a viewer email whose org resolves to `""`. Collapsing it to no identity is
+/// * **An object claim.** The retired Node twin carried `String({})`, `"[object Object]"`,
+///   through as a viewer email whose org resolved to `""`. Collapsing it to no identity is
 ///   strictly more fail-closed, and Cloudflare Access cannot issue a JWT whose `email` claim is
 ///   an object.
 /// * **Float formatting.** `serde_json`'s rendering can differ from JavaScript's (`1.0` vs `1`).
@@ -611,8 +610,8 @@ impl AccessViewerIdentity {
 
     /// The email this request presents, before any org resolution.
     ///
-    /// `Ok(None)` is "no identity"; it is never an error, because Node's resolver has no failure
-    /// mode other than "anonymous".
+    /// `None` means "no identity". Resolution failures yield an anonymous viewer,
+    /// preserving the frozen failure contract.
     async fn presented_email(&self, headers: &HeaderMap) -> Option<String> {
         match self.mode() {
             AccessIdentityMode::Jwt => {
@@ -656,7 +655,7 @@ impl ViewerIdentity for AccessViewerIdentity {
 /// not have to know that. Re-parsing the environment here would risk the two drifting apart.
 ///
 /// # Errors
-/// Returns [`AppError::Validation`] carrying Node's verbatim refusal message when
+/// Returns [`AppError::Validation`] carrying the frozen refusal message verbatim when
 /// `REQUIRE_ACCESS_JWT=1` is set without a usable JWT configuration, or when `header-trust` is
 /// selected on a non-loopback bind without `HEADER_TRUST_ALLOW_INSECURE=1`.
 pub fn assert_ready(config: &AppConfig) -> Result<(), AppError> {

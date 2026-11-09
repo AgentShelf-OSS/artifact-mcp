@@ -44,7 +44,7 @@ pub struct AccessRetryState {
 /// it is an independent CSRF signal rather than a secret.
 pub const PORTAL_MUTATION_HEADER: &str = "x-artifact-mutation";
 const PORTAL_MUTATION_VALUE: &str = "1";
-// Keep this byte sequence, including key order, aligned with Express's `res.json` output.
+// Preserve the frozen response bytes and key order inherited from the retired Express server.
 // This response returns before the ordinary `express_etag` layer, so the gate installs the
 // same representation headers itself.
 const CSRF_FORBIDDEN_BODY: &[u8] = br#"{"error":"forbidden","code":"same_origin_required"}"#;
@@ -198,10 +198,10 @@ impl AccessRetryState {
     }
 }
 
-/// Return Node's once-only Access session retry page before entering the Express-equivalent app.
+/// Return the once-only Access session retry page before entering the application router.
 ///
-/// This middleware must wrap [`express_etag`]: Node handles the retry with native `res.end`, so
-/// the page receives the listener security/cache headers but no Express-generated ETag.
+/// This middleware must wrap [`express_etag`] so the retry page receives the listener
+/// security/cache headers without an ETag, as required by the frozen HTTP contract.
 pub async fn access_session_retry(
     State(state): State<AccessRetryState>,
     request: Request,
@@ -240,16 +240,15 @@ pub async fn access_session_retry(
     response
 }
 
-/// Add the same body-derived weak ETag as Express's default `res.send`/`res.json` path.
+/// Add a body-derived weak ETag using the frozen format from the retired Express server.
 ///
-/// The current Node app bypasses `res.send` for redirects, bodyless MCP responses, listener-level
-/// Access retry pages, and its final 404 handler. Within the Axum router those paths are exactly
-/// the redirects carrying `Location` and responses without a `Content-Type`, so they remain
-/// untagged. All normal HTML, JSON, raw artifact, public-share, thumbnail, and rendered error
-/// responses pass through this middleware.
+/// The frozen HTTP contract leaves redirects, bodyless MCP responses, listener-level Access
+/// retry pages, and the final 404 handler untagged. Within the Axum router those paths are
+/// redirects carrying `Location` and responses without a `Content-Type`. All normal HTML, JSON,
+/// raw artifact, public-share, thumbnail, and rendered error responses pass through this middleware.
 ///
-/// Express tags only a body that `res.send` holds in memory. In Axum that is a body with an exact
-/// size. A streamed body (NDJSON data operations, Listen PCM, SSE) passes through untouched:
+/// Only bodies with an exact size receive a tag. A streamed body
+/// (NDJSON data operations, Listen PCM, SSE) passes through untouched:
 /// buffering it to hash would hold every byte until the upstream finishes.
 pub async fn express_etag(request: Request, next: Next) -> Response {
     let method = request.method().clone();
@@ -309,7 +308,7 @@ fn apply_conditional_request(
         response.headers_mut().remove(header::CONTENT_LENGTH);
         response.headers_mut().remove(header::TRANSFER_ENCODING);
         // An empty stream has an unknown size hint, preventing Axum's outer route service from
-        // reintroducing `content-length: 0` after Express deliberately removed that header.
+        // reintroducing `content-length: 0` after the frozen response policy removed that header.
         *response.body_mut() = Body::from_stream(Body::empty().into_data_stream());
     } else if response.status() == StatusCode::NO_CONTENT {
         response.headers_mut().remove(header::CONTENT_TYPE);
@@ -351,8 +350,8 @@ fn response_is_fresh(
     else {
         return false;
     };
-    // No current Express `send` response carries Last-Modified. The `fresh` package therefore
-    // treats any simultaneous If-Modified-Since condition as stale even when the ETag matches.
+    // The frozen contract inherited the retired Express server's `fresh` behavior without
+    // Last-Modified: any If-Modified-Since condition is stale even when the ETag matches.
     if request_headers.contains_key(header::IF_MODIFIED_SINCE) {
         return false;
     }
@@ -374,8 +373,8 @@ fn response_is_fresh(
     })
 }
 
-/// Express/`etag` weak entity tag: lowercase hexadecimal byte length, a dash, and the first 27
-/// Base64 characters of SHA-1 over the exact response bytes.
+/// Frozen weak entity tag from the retired Express server: lowercase hexadecimal byte length,
+/// a dash, and the first 27 Base64 characters of SHA-1 over the exact response bytes.
 #[must_use]
 pub fn weak_etag(content: &[u8]) -> String {
     let digest = sha1(content);
@@ -454,16 +453,15 @@ fn sha1(content: &[u8]) -> [u8; 20] {
 
 /// Append `no-transform` to every response's cache policy.
 ///
-/// This ports the `preventResponseTransforms` listener boundary in `server.js`. Cloudflare honors
-/// the directive for Email Address Obfuscation, so bytes produced by artifact delivery and all
-/// other routes remain unchanged in transit.
+/// Cloudflare honors the directive for Email Address Obfuscation, so bytes produced by artifact
+/// delivery and all other routes remain unchanged in transit.
 pub async fn prevent_response_transforms(request: Request, next: Next) -> Response {
     let mut response = next.run(request).await;
     append_no_transform(response.headers_mut());
     response
 }
 
-/// Apply the listener's `withNoTransform` behavior to an Axum header map.
+/// Apply the listener's `no-transform` cache directive to an Axum header map.
 pub fn append_no_transform(headers: &mut HeaderMap) {
     let current = headers
         .get(header::CACHE_CONTROL)
@@ -488,7 +486,7 @@ pub fn append_no_transform(headers: &mut HeaderMap) {
 
 /// Explicit Axum body limit for `/mcp`.
 ///
-/// Axum defaults body-buffering extractors to 2 MiB. The Node server instead accepts the
+/// Axum defaults body-buffering extractors to 2 MiB. The frozen HTTP contract accepts the
 /// configured `MCP_JSON_LIMIT` (50,593,792 bytes by default for an 8 MiB bundle), so the MCP route
 /// must attach this layer where it is registered.
 pub fn mcp_body_limit(config: &AppConfig) -> DefaultBodyLimit {

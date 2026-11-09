@@ -26,8 +26,8 @@ pub const WEBHOOK_ID_LENGTH: usize = 12;
 /// Whether a value has the exact persisted webhook-row identifier shape.
 ///
 /// Audit records may retain this server-generated path identifier, but never the webhook URL or
-/// another arbitrary identifier-shaped value. Keeping this validator beside the generator avoids
-/// the two runtimes drifting on alphabet or length.
+/// another arbitrary identifier-shaped value. Keeping this validator beside the generator keeps
+/// them on the same alphabet and length constants.
 #[must_use]
 pub fn is_valid_webhook_id(value: &str) -> bool {
     value.len() == WEBHOOK_ID_LENGTH
@@ -46,8 +46,8 @@ pub fn is_valid_artifact_id(value: &str) -> bool {
             .all(|byte| byte.is_ascii_digit() || byte.is_ascii_lowercase())
 }
 
-/// `const RESERVED = new Set([...])` — ids that can never address an artifact.
-/// The empty string is the seventh member in Node and is excluded here by construction.
+/// Reserved ids that can never address an artifact.
+/// The empty string is excluded by construction and needs no entry here.
 pub const RESERVED_ARTIFACT_IDS: [&str; 10] = [
     "mcp",
     "health",

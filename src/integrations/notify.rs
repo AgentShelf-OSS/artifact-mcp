@@ -10,16 +10,16 @@
 //!    and `https://discordapp.com/api/webhooks/` by
 //!    [`is_discord_webhook_url`], redirects
 //!    are refused rather than followed, and every request is bounded by [`DELIVERY_TIMEOUT`].
-//!    A prior audit cleared the Node predicate; it is ported literally, not "improved".
+//!    The allowlist predicate preserves the audited behavior of the retired Node twin.
 //! 3. **Detached delivery.** [`DiscordNotifier::emit`] resolves before any request completes and
 //!    can never return an error, so a dead Discord endpoint cannot fail a publish or an update.
 //!
 //! # Where the guard lives
 //!
-//! Node enforces the allowlist only in `webhooks.create()`. This port *also* re-checks at delivery
-//! time. That is strictly narrower than Node — the delivery check can only reject a URL that
-//! `create` would already have rejected — and it means a row hand-edited into the database, or one
-//! whose plaintext `url` column was tampered with, still cannot be used to reach an internal host.
+//! The retired Node twin checked the allowlist only when creating a webhook. Delivery also
+//! re-checks it here. The delivery check rejects only URLs that creation would already reject,
+//! so a row hand-edited into the database, or one whose plaintext `url` column was tampered with,
+//! still cannot be used to reach an internal host.
 //!
 //! # Secret containment
 //!
@@ -43,15 +43,15 @@ use crate::{
 /// Delivery timeout is four seconds.
 pub const DELIVERY_TIMEOUT: Duration = Duration::from_millis(4000);
 
-/// Verbatim Node fallback when a delivery fails without a message.
+/// Frozen fallback when a delivery fails without a message.
 pub const GENERIC_FAILURE: &str = "Webhook delivery failed.";
 
-/// Verbatim Node result for `test()` on a webhook with no URL.
+/// Frozen result for testing a webhook with no URL.
 pub const UNKNOWN_WEBHOOK: &str = "Unknown webhook.";
 
-/// Recorded when the endpoint answers with a 3xx. Node's `redirect: "error"` makes `fetch` reject
-/// with an opaque `"fetch failed"`; this message says what actually happened. Only `last_error`
-/// text differs — the security decision (never follow) is identical.
+/// Recorded when the endpoint answers with a 3xx. The retired Node twin reported an opaque
+/// `"fetch failed"`; this message identifies the redirect. Only `last_error` text differs
+/// from that historical result. Redirects remain forbidden.
 pub const REDIRECT_REFUSED: &str = "Discord returned a redirect, which is not followed.";
 
 /// Recorded when a stored URL is not on the Discord allowlist. Reuses the `create()` wording so an
@@ -162,9 +162,9 @@ pub fn text(value: &str, max: usize) -> String {
 /// Byte sizes use one decimal place and binary units.
 ///
 /// `toFixed(1)` is **not** `format!("{:.1}")`: ECMAScript rounds a tie to the larger integer
-/// (away from zero) while Rust rounds to even, so `1280` renders as `1.3 KB` in Node and would
-/// render as `1.2 KB` from a naive port. The quotient is an exact rational here (the divisor is a
-/// power of two), so the rounding is done in integer arithmetic and is exact for both runtimes.
+/// (away from zero) while Rust rounds to even, so the frozen format renders `1280` as `1.3 KB`,
+/// rather than `1.2 KB`. The quotient is an exact rational here (the divisor is a power of two),
+/// so integer arithmetic preserves the retired Node twin's rounding exactly.
 #[must_use]
 pub fn format_bytes(value: u64) -> String {
     const KIB: u64 = 1024;
@@ -373,7 +373,7 @@ pub trait WebhookTransport: Send + Sync + fmt::Debug {
     /// POST `request` to `url`, returning the status or a failure message.
     ///
     /// The error is a message string rather than an [`AppError`] because it is recorded verbatim
-    /// in `org_webhooks.last_error`, mirroring `String(error?.message || …)`.
+    /// in `org_webhooks.last_error`, preserving the retired Node twin's error-message format.
     fn post<'a>(
         &'a self,
         url: &'a str,
@@ -442,8 +442,8 @@ impl WebhookTransport for HttpTransport {
             let response = tokio::time::timeout(self.timeout, send)
                 .await
                 .map_err(|_| "Webhook delivery timed out.".to_owned())?
-                // `error.message` in Node is opaque for network faults; reqwest's Display can
-                // contain the URL, so it is deliberately not propagated.
+                // The frozen network-fault message is opaque. Reqwest's Display can contain
+                // the secret URL, so it is deliberately not propagated.
                 .map_err(|error| {
                     tracing::warn!(
                         timeout_ms = u64::try_from(self.timeout.as_millis()).unwrap_or(u64::MAX),
@@ -523,8 +523,8 @@ impl DiscordNotifier {
         payload: NotificationPayload,
         preview: Option<Arc<Vec<u8>>>,
     ) {
-        // Node wraps the whole body in `try {} catch {}`: a failure to even list the webhooks is
-        // swallowed. Reproduced here, with a log so the failure is still observable.
+        // Listing webhooks is best-effort, preserving the frozen delivery behavior.
+        // A failure is logged and swallowed so it cannot fail the artifact operation.
         let deliveries = match self.webhooks.for_event(&org, &event).await {
             Ok(deliveries) => deliveries,
             Err(error) => {

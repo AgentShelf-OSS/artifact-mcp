@@ -7,7 +7,7 @@
 //! point here is total: it returns `None` instead of an error for *any* failure — disabled,
 //! unreachable, slow, non-PNG, oversized, or malformed.
 //!
-//! # Sidecar contract (`preview-renderer/src/server.rs`, unchanged from the retired Node `server.js`)
+//! # Sidecar contract (`preview-renderer/src/server.rs`)
 //!
 //! | Aspect | Contract | Source |
 //! |---|---|---|
@@ -27,31 +27,20 @@
 //! additionally coalesces *identical* work so a burst of viewers cannot produce a burst of
 //! renders.
 //!
-//! # Node oracle, function by function
-//!
-//! | Rust | Node |
-//! |---|---|
-//! | [`PreviewRenderer::new`] | `createPreviewRenderer({…})` |
-//! | [`PreviewRenderer::enabled`] | `enabled: !!endpoint` |
-//! | [`PreviewRenderer::render_preview`] | `renderPreview(html)` |
-//! | [`PreviewRenderer::render_revision_preview`] | `renderRevisionPreview(id, revision, html)` |
-//! | cache insert/refresh/evict | `remember(key, value)` |
-//!
-//! Endpoint normalisation (`rendererEndpoint`) and the timeout, viewport,
+//! Endpoint normalisation and the timeout, viewport,
 //! cache-size and byte-cap defaults are already parsed by the caller into
 //! [`crate::config::PreviewConfig`]; this module consumes them and never reads the environment.
 //!
 //! # Cache and coalescing semantics
 //!
-//! Node stores the **promise**, not the resolved buffer, which makes the
-//! cache do double duty: concurrent callers with the same key await the same in-flight render, and
-//! a settled successful render is reused. A `null` or rejected result is evicted
-//! so a transient renderer failure is retried rather than remembered.
+//! Concurrent callers with the same key await the same in-flight render, and a settled
+//! successful render is reused. A failed result is evicted so a transient renderer failure
+//! is retried rather than remembered.
 //!
-//! The Rust port keeps a bounded insertion-ordered list of
+//! The cache keeps a bounded insertion-ordered list of
 //! `Arc<tokio::sync::OnceCell<Option<Vec<u8>>>>` slots. `OnceCell::get_or_init` runs exactly one
 //! initialiser for any number of concurrent callers of the same key and hands every other caller
-//! the same value, which is precisely the shared-promise behaviour. Failure eviction is explicit
+//! the same value. Failure eviction is explicit
 //! and pointer-checked so a slot re-created by a later caller is never removed by an earlier one.
 
 use std::sync::{Arc, Mutex};
@@ -69,7 +58,7 @@ pub const RENDERED_CONTENT_TYPE: &str = "image/png";
 
 /// `JSON.stringify({ html, ...dimensions })`
 ///
-/// Field order matches Node's object literal so a captured request body is byte-comparable.
+/// Field order preserves the frozen request bytes from the retired Node twin.
 #[derive(Debug, Serialize)]
 struct RenderRequest<'a> {
     html: &'a str,
@@ -80,8 +69,8 @@ struct RenderRequest<'a> {
 /// One cache entry: an in-flight or settled render shared by every caller of the same key.
 type RenderSlot = Arc<OnceCell<Option<Vec<u8>>>>;
 
-/// Bounded, insertion-ordered render cache. `Map` iteration order is insertion order in
-/// JavaScript, which is what makes Node's delete-then-set an LRU refresh.
+/// Bounded, insertion-ordered render cache. Removing then appending an entry
+/// refreshes its position for least-recently-used eviction.
 #[derive(Debug, Default)]
 struct RenderCache {
     entries: Vec<(String, RenderSlot)>,
@@ -89,8 +78,7 @@ struct RenderCache {
 
 /// HTTP client for the optional preview sidecar.
 ///
-/// Shared through an [`Arc`]; the cache is shared with it, matching Node's single module-level
-/// renderer.
+/// Shared through an [`Arc`], so all callers share one renderer cache.
 #[derive(Debug)]
 pub struct PreviewRenderer {
     endpoint: Option<String>,
@@ -219,8 +207,7 @@ impl PreviewRenderer {
             return None;
         }
 
-        // `declaredLength > maxBytes`. A missing or unparsable
-        // `content-length` is `NaN` in Node and `None` here: both skip the pre-check and rely on
+        // A missing or unparsable `content-length` skips the pre-check and relies on
         // the streaming cap below.
         if response
             .content_length()

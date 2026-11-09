@@ -209,7 +209,7 @@ pub(super) fn shell_feedback_json(view: &ShellView) -> Result<String, AppError> 
                     anchor_h: feedback.anchor_h,
                     anchor_approx: feedback.anchor_approx,
                     anchor_page: feedback.anchor_page.as_deref(),
-                    // The frozen Feedback model does not expose Node's projection-only stale flag.
+                    // The Feedback model does not expose the retired Node twin's projection-only stale flag.
                     anchor_page_stale: false,
                     anchor_kind: feedback.anchor_kind.as_deref(),
                     anchor_node_id: feedback.anchor_node_id.as_deref(),

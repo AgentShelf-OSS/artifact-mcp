@@ -60,7 +60,7 @@ impl StorageLimits {
     }
 }
 
-/// Per-route JSON body limits in bytes, mirroring every `express.json({ limit })` call.
+/// Per-route JSON body limits in bytes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BodyLimits {
     /// `POST /mcp`.
@@ -95,8 +95,8 @@ impl BodyLimits {
         env: &dyn EnvSource,
         max_bundle_bytes: u64,
     ) -> Result<Self, AppError> {
-        // `MCP_JSON_LIMIT` is the only limit express receives as a raw string, so it is the
-        // only one parsed with the `bytes` grammar.
+        // `MCP_JSON_LIMIT` accepts a raw size string, so it is the only limit parsed
+        // with the historical `bytes` grammar.
         let mcp_json = match present(env, "MCP_JSON_LIMIT") {
             Some(raw) => parse_byte_size("MCP_JSON_LIMIT", &raw)?,
             None => mcp_json_limit_for(max_bundle_bytes),

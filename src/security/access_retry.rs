@@ -75,7 +75,7 @@ pub fn access_retry_target(
     // `req.url || "/"`.
     let target = if target.is_empty() { "/" } else { target };
     let base = Url::parse(REQUEST_TARGET_BASE).ok()?;
-    // A target the URL parser rejects lands in Node's `catch` and yields no retry.
+    // A target the URL parser rejects yields no retry.
     let parsed = Url::options().base_url(Some(&base)).parse(target).ok()?;
 
     if !is_retryable_path(parsed.path()) {

@@ -133,7 +133,7 @@ pub fn inject_reader_bridge(content: &[u8], _page_path: Option<&str>) -> Vec<u8>
     output.into_bytes()
 }
 
-/// Install the data client before published scripts, matching the Node representation.
+/// Install the data client before published scripts.
 #[must_use]
 pub fn inject_data_client(content: &[u8]) -> Vec<u8> {
     let html = String::from_utf8_lossy(content);
@@ -151,7 +151,7 @@ pub fn inject_data_client(content: &[u8]) -> Vec<u8> {
     format!("{}{}{}", &html[..insertion], sdk, &html[insertion..]).into_bytes()
 }
 
-/// Remove the same closed `<script>...</script>` blocks as the Node preview representation.
+/// Remove closed `<script>...</script>` blocks from the preview representation.
 ///
 /// This is console-noise suppression, not a security boundary. Preview iframes remain sandboxed.
 #[must_use]

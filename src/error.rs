@@ -69,10 +69,10 @@ impl IntoResponse for AppError {
             }),
         )
             .into_response();
-        // Express's `res.json` emits `application/json; charset=utf-8`, while axum's `Json`
-        // emits a bare `application/json`. The conformance oracle compares headers exactly, and
-        // the concealed-404 body is the most-compared response in the suite (the 57-step
-        // invariant-3 matrix), so the charset parameter has to match the oracle.
+        // The frozen HTTP contract includes `charset=utf-8`, inherited from the retired
+        // Express server. Axum's `Json` emits a bare `application/json`. Conformance compares
+        // headers exactly, including the concealed-404 response in the 57-step invariant-3
+        // matrix, so retain the charset parameter.
         response.headers_mut().insert(
             axum::http::header::CONTENT_TYPE,
             axum::http::HeaderValue::from_static("application/json; charset=utf-8"),

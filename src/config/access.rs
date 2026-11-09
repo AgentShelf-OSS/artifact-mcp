@@ -26,7 +26,7 @@ pub enum AccessIdentityMode {
 }
 
 impl AccessIdentityMode {
-    /// The exact label the Node startup banner uses.
+    /// The identity-mode label used in the startup banner.
     #[must_use]
     pub const fn as_str(self) -> &'static str {
         match self {
@@ -97,7 +97,7 @@ impl AccessConfig {
     }
 
     pub(super) fn from_source(env: &dyn EnvSource) -> Result<Self, AppError> {
-        // `Number(x) || 60`: unset, empty, and 0 all select 60 in Node.
+        // Unset, empty, and zero select the default tolerance of 60 seconds.
         let clock_tolerance_seconds = match present(env, "ACCESS_CLOCK_TOLERANCE_S") {
             None => DEFAULT_ACCESS_CLOCK_TOLERANCE_SECONDS,
             Some(raw) => {
@@ -131,7 +131,7 @@ impl AccessConfig {
     }
 }
 
-/// Port of the `DOMAIN_ORG` map builder
+/// Parse the `ORG_EMAIL_DOMAINS` map.
 fn parse_domain_orgs(raw: Option<&str>) -> BTreeMap<String, String> {
     let mut map = BTreeMap::new();
     for pair in raw.unwrap_or_default().split(',') {
@@ -148,7 +148,7 @@ fn parse_domain_orgs(raw: Option<&str>) -> BTreeMap<String, String> {
     map
 }
 
-/// Port of the `ADMIN_EMAILS`/`ADMIN_DOMAINS` set builders
+/// Parse the `ADMIN_EMAILS` and `ADMIN_EMAIL_DOMAINS` sets.
 fn parse_lowercase_list(raw: Option<&str>) -> BTreeSet<String> {
     raw.unwrap_or_default()
         .split(',')

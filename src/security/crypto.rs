@@ -49,19 +49,19 @@ use crate::{
 pub const KEY_BYTES: usize = 32;
 /// GCM nonce length in bytes — `const NONCE_BYTES = 12`.
 pub const NONCE_BYTES: usize = 12;
-/// GCM authentication tag length in bytes — Node's default `authTagLength`.
+/// GCM authentication tag length in bytes, preserving the stored ciphertext format.
 pub const TAG_BYTES: usize = 16;
 
-/// Verbatim Node message for an unusable `WEBHOOK_ENC_KEY`.
+/// Frozen message for an unusable `WEBHOOK_ENC_KEY`.
 pub const INVALID_KEY_MESSAGE: &str = "WEBHOOK_ENC_KEY must be a 32-byte base64 value.";
 
-/// Verbatim Node message for decrypting with no key configured.
+/// Frozen message for decrypting with no key configured.
 ///
 /// It never reaches an HTTP body: the frozen error table maps this condition to
-/// [`AppError::Internal`], exactly as an uncaught throw becomes a 500 in the Node reference.
+/// [`AppError::Internal`], preserving the frozen HTTP 500 response.
 pub const MISSING_KEY_MESSAGE: &str = "WEBHOOK_ENC_KEY is required to decrypt webhook URLs.";
 
-/// Verbatim Node startup warning for the plaintext fallback.
+/// Frozen startup warning for the plaintext fallback.
 pub const PLAINTEXT_FALLBACK_WARNING: &str = "[artifact-mcp] WARNING: WEBHOOK_ENC_KEY is unset — Discord webhook URLs will be stored \
 in PLAINTEXT. Set a 32-byte base64 key to encrypt webhook credentials at rest.";
 
@@ -88,14 +88,13 @@ fn js_trim(value: &str) -> &str {
     value.trim_matches(is_js_whitespace)
 }
 
-/// Port of `parseEncryptionKey(value)`.
+/// Parse the optional webhook encryption key.
 ///
 /// Absent, or empty after trimming, yields `None` (the plaintext fallback). Otherwise the value
-/// must decode to exactly 32 bytes **and** re-encode to itself: Node's `Buffer.from(v, "base64")`
-/// is lenient, and the `key.toString("base64") !== encoded` guard is what makes the accepted set
-/// exactly the canonical padded encodings. `base64`'s `STANDARD` engine rejects non-canonical
-/// padding and non-zero trailing bits directly; the re-encode check is retained so the two
-/// implementations agree by construction rather than by coincidence.
+/// must decode to exactly 32 bytes **and** re-encode to itself. The retired Node twin combined
+/// a lenient decoder with a re-encode guard to accept only canonical padded encodings.
+/// `base64`'s `STANDARD` engine rejects non-canonical padding and non-zero trailing bits
+/// directly; the re-encode check retains the historical accepted key format explicitly.
 ///
 /// # Errors
 /// Returns [`AppError::Validation`] carrying [`INVALID_KEY_MESSAGE`] verbatim.
@@ -119,7 +118,7 @@ fn invalid_key() -> AppError {
     AppError::Validation(INVALID_KEY_MESSAGE.to_owned())
 }
 
-/// Port of `warnIfWebhookEncryptionDisabled(value)`.
+/// Emit the plaintext fallback warning once when no encryption key is configured.
 ///
 /// Returns `true` when this call emitted the warning, so the once-only behaviour is observable
 /// without capturing a `tracing` subscriber.
@@ -178,7 +177,7 @@ impl WebhookCipher {
         Self::from_key_bytes(bytes, random)
     }
 
-    /// Port of `parseEncryptionKey` composed with cipher construction: `None` means "no key
+    /// Parse the optional encryption key and construct the cipher: `None` means "no key
     /// configured", which is the plaintext fallback rather than an error.
     ///
     /// # Errors
@@ -201,7 +200,7 @@ impl WebhookCipher {
         Ok(Self { cipher, random })
     }
 
-    /// Port of `encrypt(plaintext, key)`.
+    /// Encrypt the plaintext with the configured key.
     ///
     /// A fresh 12-byte nonce is drawn per call, no associated data is bound, and the detached
     /// 16-byte tag is returned alongside the ciphertext, all Base64-encoded.
@@ -227,7 +226,7 @@ impl WebhookCipher {
         })
     }
 
-    /// Port of `decrypt(record, key)`.
+    /// Decrypt the stored record with the configured key.
     ///
     /// Any modification of the ciphertext, nonce or tag fails authentication; no plaintext is ever
     /// produced from an unauthenticated record.
@@ -298,7 +297,7 @@ fn aead_failure(reason: &'static str) -> AppError {
 /// The three at-rest columns of `org_webhooks` as a single value.
 ///
 /// `url` is the *displayable* column: the masked form when encryption is on, and the real URL when
-/// the plaintext fallback is active — exactly what `create()` writes in the Node reference.
+/// the plaintext fallback is active, preserving the stored format from the retired Node twin.
 #[derive(Clone, PartialEq, Eq)]
 pub struct StoredWebhookUrl {
     /// The `url` column: masked when `encrypted` is `Some`, verbatim otherwise.
@@ -394,10 +393,10 @@ impl WebhookUrlProtection {
         }
     }
 
-    /// Port of `deliveryRow(row)`.
+    /// Reveal the stored URL for delivery.
     ///
-    /// A row with no ciphertext is returned as-is (the legacy plaintext path, which Node does not
-    /// gate on the key); a row with ciphertext requires the key.
+    /// A row with no ciphertext is returned as-is through the legacy plaintext path, without
+    /// requiring a key; a row with ciphertext requires the key.
     ///
     /// # Errors
     /// Returns [`AppError::Internal`] when the row is encrypted but no key is configured — the

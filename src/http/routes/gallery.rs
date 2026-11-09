@@ -76,7 +76,7 @@ pub(crate) fn html_response(status: StatusCode, body: String, no_store: bool) ->
     response
 }
 
-/// Express's default text redirect shape, with an optional public-share indexing guard.
+/// Frozen text redirect shape from the retired Express server, with an optional indexing guard.
 pub(crate) fn found_redirect(location: &str, noindex: bool) -> Result<Response, AppError> {
     let mut response = Response::new(Body::from(format!("Found. Redirecting to {location}")));
     *response.status_mut() = StatusCode::FOUND;
@@ -163,7 +163,7 @@ async fn gallery_result(deps: &AppDeps, viewer: Viewer) -> Result<Response, AppE
         }
     }
 
-    // Deliberately not best-effort. Node builds this projection outside the analytics guard.
+    // Deliberately not best-effort. Projection errors propagate outside the analytics guard.
     let notifications = deps
         .engagement
         .recent_notifications(&viewer, NOTIFICATION_LIMIT)
@@ -371,7 +371,7 @@ async fn mark_notifications_seen_result(
         )
             .into_response());
     };
-    // Deliberately not best-effort: a failed watermark write fails the request in Node.
+    // Deliberately not best-effort: a failed watermark write fails the request.
     deps.engagement.mark_notifications_seen(email).await?;
     Ok(Json(SeenResponse { ok: true }).into_response())
 }
