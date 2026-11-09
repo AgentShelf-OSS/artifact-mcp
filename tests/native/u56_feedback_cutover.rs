@@ -10,8 +10,8 @@ use artifact_mcp::{
     error::AppError,
     integrations::delivery_envelope::{DeliveryEnvelopeV1, stable_delivery_event_id},
     model::{
-        ArtifactId, ArtifactMeta, ClientId, EmailAddress, FeedbackId, OrgId, SubmitFeedback,
-        Timestamp, Viewer, WebhookEvent,
+        ArtifactMeta, EmailAddress, FeedbackId, OrgId, SubmitFeedback, Timestamp, Viewer,
+        WebhookEvent,
     },
     persistence::{
         feedback, feedback_delivery,
@@ -77,9 +77,6 @@ impl Fixture {
                 Arc::new(SequenceOutboxIds::default()),
             ),
             meta: ArtifactMeta {
-                id: ArtifactId::from(ARTIFACT),
-                client_id: ClientId::from("publisher"),
-                org: OrgId::from(ORG),
                 title: "Stale route title".to_owned(),
                 description: "Stale route description".to_owned(),
                 bytes: 7,
@@ -87,13 +84,10 @@ impl Fixture {
                 updated_at: Timestamp("2026-07-29 00:00:00".to_owned()),
                 uploader_label: "Stale publisher".to_owned(),
                 owner_email: Some("owner@example.test".to_owned()),
-                is_bundle: false,
-                entry: String::new(),
                 revision: 2,
                 category: "Stale".to_owned(),
-                hidden: false,
                 body_sha256: "b".repeat(64),
-                artifact_key: None,
+                ..ArtifactMeta::fixture(ARTIFACT, ORG)
             },
         }
     }
@@ -152,6 +146,29 @@ impl Fixture {
             .query_row("SELECT COUNT(*) FROM feedback", [], |row| row.get(0))
             .expect("feedback count")
     }
+}
+
+#[test]
+fn artifact_key_does_not_change_feedback_delivery_bytes() {
+    let mut unkeyed = Fixture::new();
+    let mut keyed = Fixture::new();
+    keyed
+        .conn
+        .execute(
+            "UPDATE artifacts SET artifact_key = 'project/report' WHERE id = ?1",
+            [ARTIFACT],
+        )
+        .expect("artifact key");
+    for fixture in [&mut unkeyed, &mut keyed] {
+        fixture.subscribe("feedback-one", "feedback");
+        fixture.submit("Feedback body", None);
+    }
+    let unkeyed_rows = delivery_rows(&unkeyed.conn, "feedback");
+    let keyed_rows = delivery_rows(&keyed.conn, "feedback");
+    assert_eq!(unkeyed_rows.len(), 1);
+    assert_eq!(keyed_rows.len(), 1);
+    assert_eq!(unkeyed_rows[0].payload, keyed_rows[0].payload);
+    assert_eq!(unkeyed_rows[0].digest, keyed_rows[0].digest);
 }
 
 #[test]

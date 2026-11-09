@@ -123,23 +123,17 @@ impl Fake {
 
 fn artifact(is_bundle: bool) -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId::from(ID),
-        client_id: ClientId::from("publisher"),
-        org: OrgId::from("acme"),
         title: "Raw Case".to_owned(),
         description: "fixture".to_owned(),
         bytes: 17,
         created_at: Timestamp("2026-07-21 00:00:00".to_owned()),
         updated_at: Timestamp("2026-07-21 00:00:00".to_owned()),
         uploader_label: "Agent".to_owned(),
-        owner_email: None,
         is_bundle,
         entry: "index.html".to_owned(),
         revision: 2,
-        category: String::new(),
-        hidden: false,
         body_sha256: DIGEST.to_owned(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture(ID, "acme")
     }
 }
 

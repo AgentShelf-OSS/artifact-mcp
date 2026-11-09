@@ -564,23 +564,14 @@ mod tests {
 
     fn meta(org: &str, client_id: &str) -> ArtifactMeta {
         ArtifactMeta {
-            id: ArtifactId::from("abc123def456"),
             client_id: ClientId::from(client_id),
-            org: OrgId::from(org),
             title: "Concealed".to_owned(),
-            description: String::new(),
             bytes: 12,
             created_at: Timestamp("2026-01-01T00:00:00.000Z".to_owned()),
             updated_at: Timestamp("2026-01-01T00:00:00.000Z".to_owned()),
-            uploader_label: String::new(),
-            owner_email: None,
-            is_bundle: false,
             entry: "index.html".to_owned(),
-            revision: 1,
-            category: String::new(),
-            hidden: false,
             body_sha256: "0".repeat(64),
-            artifact_key: None,
+            ..ArtifactMeta::fixture("abc123def456", org)
         }
     }
 

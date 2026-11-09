@@ -40,9 +40,6 @@ impl DataBroker {
         validate_bindings(&m, &sources, &org).map_err(|_| DataError::NotFound)?;
         Ok(m)
     }
-    pub async fn get_bindings(&self, id: &str) -> BindingManifest {
-        self.try_bindings(id).await.unwrap_or_default()
-    }
     pub async fn set_bindings(
         &self,
         id: &str,

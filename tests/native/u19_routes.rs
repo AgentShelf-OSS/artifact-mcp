@@ -767,23 +767,15 @@ impl HealthProbe for RouteHarness {
 
 fn meta(org: &str) -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId::from("abc123def456"),
-        client_id: ClientId::from("publisher"),
-        org: OrgId::from(org),
-        title: "Artifact".to_owned(),
         description: "Description".to_owned(),
         bytes: 42,
         created_at: Timestamp("2026-07-20T00:00:00.000Z".to_owned()),
         updated_at: Timestamp("2026-07-20T00:00:00.000Z".to_owned()),
         uploader_label: "Publisher".to_owned(),
-        owner_email: None,
-        is_bundle: false,
-        entry: String::new(),
         revision: 2,
         category: "Reports".to_owned(),
-        hidden: false,
         body_sha256: "0".repeat(64),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("abc123def456", org)
     }
 }
 

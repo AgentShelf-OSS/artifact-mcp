@@ -10,7 +10,7 @@ The application is a dependency-light modular monolith: one server process, one 
 
 ## Domain language
 
-- **Artifact** — one published, immutable piece of HTML content plus its metadata. It remains immutable until deletion.
+- **Artifact** — published HTML content plus its metadata. Updates, patches, restores, metadata edits, and keyed republishing can change the artifact. Retained content revisions are immutable.
 - **Single-page artifact** — an artifact whose body is one self-contained `.html` file.
 - **Bundle** — an artifact whose body is a directory of relative-path files and one HTML entry file.
 - **Artifact record** — the SQLite metadata row for an artifact.
@@ -54,7 +54,7 @@ The application is a dependency-light modular monolith: one server process, one 
 1. A non-admin publisher can only publish into the organization fixed by its key; an `org` argument cannot override it.
 2. A non-admin viewer can only list, open, react to, or delete artifacts in their resolved organization.
 3. Cross-organization reads are concealed as `404`, so artifact identifiers do not disclose tenant membership.
-4. Raw HTML is untrusted. Every HTML response receives a CSP `sandbox` directive without `allow-same-origin`; the viewer iframe also omits `allow-same-origin`.
+4. Raw artifact HTML is untrusted. Artifact HTML delivery through `src/http/artifact_response.rs` receives a CSP `sandbox` directive without `allow-same-origin`; the viewer iframe also omits `allow-same-origin`. Trusted application HTML does not receive this sandbox directive.
 5. Bundle paths are relative, normalized, and traversal-guarded. Storage limits apply before publication completes.
 6. An artifact record and body represent one lifecycle. Publication uses staging, deletion uses trash, reactions cascade on deletion, and startup reconciliation recovers interrupted moves where possible.
 7. SQLite schema changes are ordered, transactional migrations recorded in `schema_migrations`.
@@ -67,10 +67,11 @@ The application is a dependency-light modular monolith: one server process, one 
 
 ## Trust model
 
-There are two ingress paths:
+The authentication paths are:
 
-- `POST /mcp` is bypassed by Cloudflare Access and authenticated by a publisher bearer key.
+- `POST /mcp` is bypassed by Cloudflare Access and authenticated by a publisher bearer key or a scoped OAuth access token. `src/security/oauth.rs` validates OAuth tokens; `src/http/routes/mcp/admission.rs` enforces tool scopes.
 - Human routes are protected by Cloudflare Access. In production, `src/security/identity.rs` verifies the Access JWT before deriving viewer email, organization, and administrator status.
+- Operational audit routes `/audit/events` and `/audit/export` authenticate publisher bearer credentials in `src/http/routes/mcp/routes.rs`; `src/security/audit/query.rs` requires OAuth audit scopes and rejects legacy API keys.
 
 The application shell is trusted code. Published artifact code is untrusted. CSP sandboxing gives raw HTML an opaque origin, including when it is opened directly, but the current deployment still delivers trusted and untrusted documents from one hostname. A separate artifact-delivery origin remains a defense-in-depth option; see ADR-0003.
 
@@ -81,9 +82,10 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 - `src/security/access.rs` — organization and administrator policy, including concealed-read decisions.
 - `src/security/auth.rs` / `src/security/identity.rs` — publisher-key authentication and Cloudflare viewer identity. These are security-critical modules.
 - `src/mcp/dispatch.rs` / `src/mcp/tool_defs.rs` / `src/mcp/validation.rs` — MCP method dispatch, declared tool schemas, and request validation.
-- `src/config.rs` — runtime configuration, including the upload and HTTP-envelope limits.
+- `src/config/` (entry `src/config/mod.rs`) — runtime configuration, including the upload and HTTP-envelope limits.
 - `src/artifacts/` — artifact lifecycle module: publication, reads, deletion, and storage reconciliation.
 - `src/persistence/db.rs` / `src/persistence/migrations.rs` — SQLite opening, the connection pool, and ordered schema evolution. The migration bodies live in `src/persistence/migrations/`, grouped by schema range. Some migrations load shared SQL from the top-level `migrations/` directory.
+- `src/persistence/artifact_rows.rs` — shared artifact metadata columns and by-name SQLite row decoding for lifecycle and feedback queries.
 - `src/persistence/keys.rs` / `src/persistence/reactions.rs` — publisher-key and reaction persistence.
 - `src/persistence/state.rs`: viewer-state persistence, transactional revision checks, and per-artifact limits.
 - `src/http/routes/state.rs`: authenticated viewer-state HTTP routes. The viewer shell (`assets/shell/01-state-broker.js`) brokers state messages, caches reads, and debounces writes.

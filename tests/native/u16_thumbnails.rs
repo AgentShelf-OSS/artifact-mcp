@@ -33,23 +33,16 @@ const OTHER_DIGEST: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123
 
 fn meta(id: &str, digest: &str, is_bundle: bool) -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId(id.to_owned()),
         client_id: ClientId("client".to_owned()),
-        org: OrgId("acme".to_owned()),
         title: "Report".to_owned(),
-        description: String::new(),
         bytes: 42,
         created_at: Timestamp("2026-01-01 00:00:00".to_owned()),
         updated_at: Timestamp("2026-01-01 00:00:00".to_owned()),
         uploader_label: "Publisher".to_owned(),
-        owner_email: None,
         is_bundle,
-        entry: String::new(),
         revision: 3,
-        category: String::new(),
-        hidden: false,
         body_sha256: digest.to_owned(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture(id, "acme")
     }
 }
 

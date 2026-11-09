@@ -78,7 +78,6 @@ pub trait DataService: Send + Sync {
     // Artifact bindings.
     fn try_bindings<'a>(&'a self, id: &'a str)
     -> BoxFuture<'a, Result<BindingManifest, DataError>>;
-    fn get_bindings<'a>(&'a self, id: &'a str) -> BoxFuture<'a, BindingManifest>;
     fn set_bindings<'a>(
         &'a self,
         id: &'a str,

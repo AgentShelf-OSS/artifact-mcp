@@ -5,9 +5,7 @@ use artifact_mcp::{
         DELETION_TOMBSTONE, DiscordAuthor, DiscordMessage, IgnoreReason, InboundEvent,
         InboundEventKind, InboundResult, RejectReason,
     },
-    model::{
-        ArtifactId, ArtifactMeta, ClientId, EmailAddress, FeedbackId, OrgId, Timestamp, Viewer,
-    },
+    model::{ArtifactId, ArtifactMeta, EmailAddress, FeedbackId, OrgId, Viewer},
     persistence::{
         db::{self, Database, DbPool},
         discord_inbound::DiscordInboundStore,
@@ -331,25 +329,7 @@ async fn resolving_discord_origin_feedback_never_enqueues_provider_delivery() {
             [],
         )
         .expect("resolved subscriber");
-        let meta = ArtifactMeta {
-            id: ArtifactId::from("artifact-a"),
-            client_id: ClientId::from("publisher"),
-            org: OrgId::from("acme"),
-            title: "Artifact".to_owned(),
-            description: String::new(),
-            bytes: 0,
-            created_at: Timestamp(String::new()),
-            updated_at: Timestamp(String::new()),
-            uploader_label: String::new(),
-            owner_email: None,
-            is_bundle: false,
-            entry: String::new(),
-            revision: 1,
-            category: String::new(),
-            hidden: false,
-            body_sha256: String::new(),
-            artifact_key: None,
-        };
+        let meta = ArtifactMeta::fixture("artifact-a", "acme");
         assert!(
             feedback_delivery::resolve_as_publisher(
                 conn,

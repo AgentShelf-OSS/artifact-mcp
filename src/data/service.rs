@@ -105,9 +105,6 @@ impl DataService for DataBroker {
     ) -> BoxFuture<'a, Result<BindingManifest, DataError>> {
         Box::pin(DataBroker::try_bindings(self, id))
     }
-    fn get_bindings<'a>(&'a self, id: &'a str) -> BoxFuture<'a, BindingManifest> {
-        Box::pin(DataBroker::get_bindings(self, id))
-    }
     fn set_bindings<'a>(
         &'a self,
         id: &'a str,

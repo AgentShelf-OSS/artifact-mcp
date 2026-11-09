@@ -55,7 +55,34 @@
     "type": "object",
     "properties": {
       "count": { "type": "integer" },
-      "artifacts": { "type": "array", "items": { "type": "object" } }
+      "artifacts": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": { "type": "string" },
+            "url": { "type": "string" },
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "created_at": { "type": "string" },
+            "org": { "type": "string" },
+            "category": { "type": "string" },
+            "revision": { "type": "integer" },
+            "updated_at": { "type": "string" },
+            "bytes": { "type": "integer" },
+            "is_bundle": { "type": "integer" },
+            "entry": { "type": "string" },
+            "hidden": { "type": "integer" },
+            "uploader_label": { "type": "string" },
+            "artifact_key": { "type": "string" }
+          },
+          "required": [
+            "id", "url", "title", "description", "created_at", "org", "category",
+            "revision", "updated_at", "bytes", "is_bundle", "entry", "hidden", "uploader_label"
+          ],
+          "additionalProperties": false
+        }
+      }
     },
     "required": ["count", "artifacts"]
   },
@@ -229,7 +256,19 @@
       "bytes_returned": { "type": "integer" },
       "truncated": { "type": "boolean" },
       "content": { "type": "string" },
-      "files": { "type": "array", "items": { "type": "object" } },
+      "files": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" },
+            "bytes": { "type": "integer" },
+            "entry": { "type": "boolean" }
+          },
+          "required": ["path", "bytes", "entry"],
+          "additionalProperties": false
+        }
+      },
       "artifact_key": { "type": "string" }
     },
     "required": [
@@ -242,7 +281,8 @@
       "offset",
       "bytes_returned",
       "truncated"
-    ]
+    ],
+    "additionalProperties": false
   },
   "list_data_sources": {
     "type": "object",

@@ -11,8 +11,8 @@ use artifact_mcp::config::{
 };
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
-    ArtifactId, ArtifactMeta, ClientId, CreateOrganization, CreatePublisherKey, CreateShare,
-    CreateWebhook, EmailAddress, OrgId, Timestamp, UpdatePublisherKey, Viewer, WebhookId,
+    ArtifactMeta, ClientId, CreateOrganization, CreatePublisherKey, CreateShare, CreateWebhook,
+    EmailAddress, OrgId, Timestamp, UpdatePublisherKey, Viewer, WebhookId,
 };
 use artifact_mcp::persistence::{
     keys::KeyStore,
@@ -126,23 +126,11 @@ fn webhook_store(db: &TestDb) -> WebhookStore {
 
 fn artifact_meta() -> ArtifactMeta {
     ArtifactMeta {
-        id: ArtifactId("auditart0001".to_owned()),
         client_id: ClientId("publisher-1".to_owned()),
-        org: OrgId("acme".to_owned()),
         title: "Audited artifact".to_owned(),
-        description: String::new(),
-        bytes: 0,
         created_at: Timestamp("2026-01-01T00:00:00Z".to_owned()),
         updated_at: Timestamp("2026-01-01T00:00:00Z".to_owned()),
-        uploader_label: String::new(),
-        owner_email: None,
-        is_bundle: false,
-        entry: String::new(),
-        revision: 1,
-        category: String::new(),
-        hidden: false,
-        body_sha256: String::new(),
-        artifact_key: None,
+        ..ArtifactMeta::fixture("auditart0001", "acme")
     }
 }
 
