@@ -750,11 +750,7 @@ fn open_database(path: &Path, read_only: bool) -> Result<Connection, String> {
 fn query_rows(connection: &Connection, query: &str) -> Result<Vec<Obj>, String> {
     let fail = |error: rusqlite::Error| format!("post-state SQL {query:?}: {error}");
     let mut statement = connection.prepare(query).map_err(fail)?;
-    let names: Vec<String> = statement
-        .column_names()
-        .into_iter()
-        .map(str::to_owned)
-        .collect();
+    let names: Vec<String> = statement.column_names().map(str::to_owned).collect();
     let mut rows = statement.query([]).map_err(fail)?;
     let mut out = Vec::new();
     while let Some(row) = rows.next().map_err(fail)? {
