@@ -39,10 +39,10 @@ ipnet = "2"
 nanoid = "0.5"
 p256 = { version = "0.14", default-features = false, features = ["arithmetic", "ecdh", "ecdsa", "std"] }
 r2d2 = "0.8"
-r2d2_sqlite = "0.34"
+r2d2_sqlite = "0.36"
 rand = "0.10"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
-rusqlite = { version = "0.39", features = ["bundled"] }
+rusqlite = { version = "0.41", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["float_roundtrip"] }
 sha2 = "0.11"

@@ -425,7 +425,6 @@ fn table_rows(conn: &Connection, table: &str) -> Result<(Vec<String>, Vec<Vec<Va
         };
     let names = statement
         .column_names()
-        .into_iter()
         .map(str::to_owned)
         .collect::<Vec<_>>();
     let width = names.len();
