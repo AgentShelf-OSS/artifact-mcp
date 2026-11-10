@@ -80,7 +80,7 @@ impl WebhookRow {
         let cipher: Option<String> = row.get("url_cipher")?;
         let nonce: Option<String> = row.get("url_nonce")?;
         let tag: Option<String> = row.get("url_tag")?;
-        // Node keys the encrypted branch on `url_cipher` alone (`if (!row?.url_cipher) return row`),
+        // The frozen at-rest contract keys the encrypted branch on `url_cipher` alone,
         // so a row missing a sibling column is still treated as encrypted and fails to decrypt
         // rather than silently falling back to the masked column.
         let encrypted = cipher.map(|ciphertext| EncryptedUrl {

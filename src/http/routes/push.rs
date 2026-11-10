@@ -33,7 +33,7 @@ use crate::{
     render::portal::{artifact_install_name, artifact_install_short_name},
 };
 
-/// Push JSON bodies are small; the contract mirrors Node's `8kb` parser limit.
+/// Push JSON bodies are small; the frozen contract limits them to 8 KiB.
 pub const PUSH_JSON_LIMIT: u64 = 8 * 1024;
 
 const SERVICE_WORKER: &str = include_str!("../../../assets/push-sw.js");
@@ -115,7 +115,7 @@ async fn manifest() -> Response {
 /// authorization, admin handling, and concealed `404` ([`authorize`]). Public shares get no
 /// per-artifact manifest. Object keys are sorted recursively (`serde_json::Map` is ordered by
 /// key, and `sort_all_objects` keeps that true under `preserve_order`) and the JSON is compact,
-/// which is byte-identical to Node's `artifactWebManifest`.
+/// preserving the frozen manifest bytes from the retired Node twin.
 async fn artifact_manifest(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,
@@ -305,8 +305,7 @@ fn object_fields(body: &OrderedJson) -> Option<&[(String, OrderedJson)]> {
     }
 }
 
-/// Authorized artifact + push service + viewer email, in the Node order: concealment, then
-/// the disabled check.
+/// Authorized artifact, push service, and viewer email. Concealment precedes the disabled check.
 struct ArtifactGrant {
     service: Arc<PushService>,
     artifact_id: String,

@@ -148,7 +148,7 @@ pub const FORBIDDEN_MESSAGE: &str = "Forbidden";
 /// `{ ok: false, status: 403, error: "Admins only" }`.
 pub const ADMINS_ONLY_MESSAGE: &str = "Admins only";
 
-/// The publisher org that Node treats as the administrator tenant — `auth.org === "admin"`
+/// The publisher org that grants administrator access, `auth.org === "admin"`.
 /// This is also the organization assigned to administrator viewers.
 pub const ADMIN_ORG: &str = "admin";
 
@@ -169,9 +169,9 @@ pub fn unknown_artifact_message(id: &str) -> String {
 
 /// Whether a denial is allowed to reveal that the artifact exists.
 ///
-/// Mirrors the `{ conceal }` option of `artifactAccess`. Every
-/// artifact-scoped human route uses [`Concealment::Conceal`]; [`Concealment::Reveal`] exists
-/// only because Node still exports the un-concealed decision and its parity is pinned.
+/// Every artifact-scoped human route uses [`Concealment::Conceal`].
+/// [`Concealment::Reveal`] retains the un-concealed decision from the retired Node twin;
+/// its behavior is pinned by frozen tests.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Concealment {
     /// `{ conceal: true }` — foreign and missing answer identically.
@@ -325,7 +325,7 @@ impl AccessPolicy {
     ///
     /// Deliberately **not** concealed: both denials are `403` about the caller's role, and the
     /// routes that use it (`/settings*`, org registry, webhook admin) carry no artifact id, so
-    /// no tenant membership can leak. Note Node answers `403` — not `401` — when unsigned.
+    /// no tenant membership can leak. The frozen contract uses `403` for unsigned callers too.
     ///
     /// # Errors
     ///
@@ -342,11 +342,10 @@ impl AccessPolicy {
 
     /// `auth?.org === "admin"`.
     ///
-    /// The publisher admin test is the **org**, exactly as in Node, not
-    /// `PublisherIdentity::is_admin`. The authenticator builds the identity from the `api_keys`
-    /// row (`client_id`, `org`, `label`) and has no admin flag at all, so the org is the only
-    /// value with a Node-defined meaning. Using it keeps the Rust decision fail-closed if the
-    /// derived flag were ever set from a wider rule.
+    /// The publisher admin test uses the stored **org**, preserving the frozen authorization
+    /// contract. The authenticator builds the identity from the `api_keys` row
+    /// (`client_id`, `org`, `label`), which has no admin flag. Using the org keeps the decision
+    /// fail-closed if a derived flag were ever set from a wider rule.
     #[must_use]
     pub fn publisher_is_admin(auth: &PublisherIdentity) -> bool {
         auth.org.0 == ADMIN_ORG

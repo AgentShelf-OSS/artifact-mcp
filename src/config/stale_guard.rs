@@ -60,7 +60,7 @@ impl Default for StaleGuardConfig {
 }
 
 impl StaleGuardConfig {
-    /// Node parity: an unusable value falls back silently to its default; it never fails startup.
+    /// An unusable value falls back silently to its default; it never fails startup.
     pub(super) fn from_source(env: &dyn EnvSource) -> Self {
         let mode = match present(env, "STALE_GUARD")
             .map(|raw| raw.trim().to_ascii_lowercase())

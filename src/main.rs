@@ -4,6 +4,8 @@
 //! [`artifact_mcp::startup`]. This file runs the stages in order, emits the startup observer
 //! stages, and owns the HTTP/1 listener and process entry point.
 
+#![deny(clippy::unwrap_used)]
+
 use std::{future::Future, net::SocketAddr, process::ExitCode, sync::Arc, time::Duration};
 
 use artifact_mcp::{

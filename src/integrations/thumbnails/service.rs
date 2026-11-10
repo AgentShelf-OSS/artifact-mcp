@@ -144,9 +144,8 @@ impl PreviewService for PreviewIntegration {
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, AppError>> {
         Box::pin(async move {
             // The lane exists to serialise *renders*. With no renderer there is nothing to
-            // serialise, so the store is consulted directly — which still returns a thumbnail
-            // left on disk by an earlier run that had the sidecar enabled, exactly as Node's
-            // `generate` does before it checks `renderer?.enabled`.
+            // serialise, so the store is consulted directly. This still returns a thumbnail
+            // left on disk by an earlier run that had the sidecar enabled.
             if !self.store.enabled() {
                 return Ok(self.store.ensure_thumbnail(meta, Some(html)).await);
             }

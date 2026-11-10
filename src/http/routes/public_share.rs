@@ -110,7 +110,7 @@ async fn shared_file_result(
     if !artifact.meta().is_bundle {
         return Err(AppError::ConcealedNotFound);
     }
-    // Axum includes the separator in a catch-all capture; Express's `req.params[0]` does not.
+    // Axum includes the separator in a catch-all capture; bundle file lookup needs a relative path.
     let path = path.strip_prefix('/').unwrap_or(path);
     let Some(file) = deps.artifacts.read_bundle_file(&artifact, path).await? else {
         return Err(AppError::ConcealedNotFound);

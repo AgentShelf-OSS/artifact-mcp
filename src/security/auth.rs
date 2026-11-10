@@ -17,7 +17,7 @@
 //!
 //! A non-admin key's org is authoritative: an `org` argument can never redirect it. The only escape is a key whose stored org is literally `admin`, and only when it supplies a non-blank `org`. [`OrgTarget`] makes that structural — the requested org is consumed by a constructor that has the identity in hand, so no caller can assemble a target org without passing the check.
 //!
-//! Registration of the requested org (`orgExists`) is a *separate* check that Node applies only on the move path; it belongs to the `AdminService::org_exists` caller and is deliberately not duplicated here.
+//! Registration of the requested org is a *separate* check on the move path; it belongs to the `AdminService::org_exists` caller and is deliberately not duplicated here.
 //!
 //! # Secret containment
 //!
@@ -37,13 +37,13 @@ use crate::{
 /// The stored org value that grants cross-tenant publisher rights.
 pub const ADMIN_ORG: &str = "admin";
 
-/// The verbatim body message Node returns for a rejected publisher key.
+/// The frozen body message for a rejected publisher key.
 pub const UNAUTHORIZED_MESSAGE: &str = "unauthorized";
 
 /// The fallback credential header.
 pub const API_KEY_HEADER: &str = "x-api-key";
 
-/// Node's message when an admin key omits the required explicit org.
+/// The frozen message when an admin key omits the required explicit org.
 pub const ADMIN_ORG_REQUIRED_MESSAGE: &str = "org is required for admin keys";
 
 // ---------------------------------------------------------------------------
@@ -64,7 +64,7 @@ impl BearerKey {
         Self(value.into())
     }
 
-    /// The SHA-256 hex digest Node stores in `api_keys.key_hash`.
+    /// The SHA-256 hex digest stored in `api_keys.key_hash`.
     #[must_use]
     pub fn hash(&self) -> KeyHash {
         KeyHash(sha256_hex(&self.0))
@@ -122,11 +122,11 @@ impl fmt::Display for KeyHash {
     }
 }
 
-/// `sha256Hex(value)` — the hex SHA-256 of `value`'s UTF-8 bytes.
+/// The hex SHA-256 of `value`'s UTF-8 bytes.
 ///
-/// Node's `createHash("sha256").update(string)` defaults to UTF-8, so the digest input is the
-/// same byte sequence Rust sees. Both the runtime lookup and the `ARTIFACT_API_KEYS` seed path
-/// go through this one function, which is why a Rust-seeded key authenticates under Node.
+/// The stored hash format inherited from the retired Node twin uses UTF-8 input.
+/// Both runtime lookup and the `ARTIFACT_API_KEYS` seed path use this function,
+/// so seeded keys and existing stored keys authenticate with the same byte representation.
 #[must_use]
 pub fn sha256_hex(value: &str) -> String {
     use fmt::Write as _;
@@ -206,12 +206,11 @@ fn match_bearer(value: &str) -> Option<&str> {
     Some(captured)
 }
 
-/// `bearer(req)` — the presented credential, or `None` when there is none.
+/// The presented credential, or `None` when there is none.
 ///
-/// Node builds a string and lets `checkKey` reject the empty case; this returns `None` for the
-/// empty string so the "no credential" branch cannot be forgotten. A header whose bytes are not
-/// valid UTF-8 is treated as absent, which fails closed exactly where Node would have produced a
-/// Latin-1 string that cannot match any stored hash.
+/// Returns `None` for an empty credential so the "no credential" branch cannot be forgotten.
+/// A header whose bytes are not valid UTF-8 is treated as absent. This preserves the retired
+/// Node twin's refusal of headers that could not match any stored hash.
 #[must_use]
 pub fn bearer_key(headers: &HeaderMap) -> Option<BearerKey> {
     let authorization = headers
@@ -329,8 +328,8 @@ impl PublisherAuthenticator for KeyAuthenticator {
 
 /// Build the frozen [`PublisherIdentity`] from an active row.
 ///
-/// `is_admin` is derived, never stored: Node has no admin column and asks `auth.org === "admin"`
-/// at every decision point.
+/// `is_admin` is derived, never stored: the key row has no admin column, and administrator
+/// status depends on `auth.org === "admin"`.
 /// # Errors
 /// Rejects an unknown stored role with the standard unauthorized response.
 pub fn identity_for(record: PublisherKeyRecord) -> Result<PublisherIdentity, AppError> {

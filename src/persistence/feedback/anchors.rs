@@ -122,9 +122,9 @@ type NormalizedAnchorV2 = (Option<String>, Option<String>, Option<String>);
 
 /// `normalizeAnchor(anchor)`.
 ///
-/// `path` is `anchor.path` in Node, which lives inside the anchor object; the frozen
-/// `SubmitFeedback` carries it beside the anchor, so an unanchored submission discards it exactly
-/// as `normalizeAnchor(null)` does.
+/// In the historical input format, `path` lived inside the anchor object. The frozen
+/// `SubmitFeedback` carries it beside the anchor, so an unanchored submission discards it
+/// to preserve the same behavior.
 ///
 /// Trim an over-hanging box to the document edge rather than rejecting it.
 /// A box that starts on the far edge has zero area after trimming and is an error.
@@ -246,7 +246,7 @@ fn unit_interval(value: f64) -> bool {
 /// [`AppError::Validation`] carrying [`ANCHOR_PAGE_UNANCHORED_MESSAGE`],
 /// [`ANCHOR_PAGE_NOT_BUNDLE_MESSAGE`], [`ANCHOR_PAGE_REQUIRED_MESSAGE`],
 /// [`ANCHOR_PAGE_TRAVERSAL_MESSAGE`], [`ANCHOR_PAGE_NOT_A_FILE_MESSAGE`], or
-/// [`ANCHOR_PAGE_MISSING_MESSAGE`], in Node's order.
+/// [`ANCHOR_PAGE_MISSING_MESSAGE`], in the frozen validation order.
 pub fn validate_anchor_page(
     is_bundle: bool,
     anchor: Option<&FeedbackAnchor>,
@@ -307,8 +307,8 @@ fn is_drive_qualified(raw: &str) -> bool {
 
 /// `path.posix.normalize(raw)` for a relative path with no `..` segment (both already rejected).
 ///
-/// Node collapses `.` and empty segments, returns `"."`/`"./"` when nothing is left, and
-/// **preserves a trailing slash** — which is why `a/b/` normalizes to `a/b/` and then fails the
+/// Collapse `.` and empty segments, return `"."`/`"./"` when nothing is left, and
+/// **preserve a trailing slash**, so `a/b/` normalizes to `a/b/` and then fails the
 /// file lookup rather than silently resolving to `a/b`.
 fn posix_normalize(raw: &str) -> String {
     let trailing = raw.ends_with('/');

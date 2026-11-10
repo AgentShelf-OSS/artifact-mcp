@@ -184,7 +184,12 @@ fn cursor(
     let Some(array) = row.as_array() else {
         return Err(AppError::Validation("Invalid collection cursor".into()).into());
     };
-    if array.len() != 10 || array[..9] != expected_prefix.as_array().unwrap()[..] {
+    if array.len() != 10
+        || array[..9]
+            != expected_prefix
+                .as_array()
+                .expect("expected_prefix is constructed with json!([...])")[..]
+    {
         return Err(AppError::Validation("Invalid collection cursor".into()).into());
     }
     let offset = array[9]
@@ -562,7 +567,7 @@ fn collection_error(error: McpError) -> McpError {
     }
 }
 
-// Legacy MCP text content preserves the Node field order as well as the JSON value.
+// Legacy MCP text content retains the retired Node server's field order and JSON value.
 pub fn ordered_response(value: Value) -> OrderedJson {
     match value {
         Value::Object(mut fields) => {

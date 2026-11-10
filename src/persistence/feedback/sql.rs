@@ -2,7 +2,7 @@
 // SQL
 // ---------------------------------------------------------------------------
 
-/// Explicit column list in the order [`read_row`] expects. Node uses `SELECT *`; naming the
+/// Explicit column list in the order [`read_row`] expects. Naming the
 /// columns keeps the mapping independent of the `ALTER TABLE` order migrations 12-19 produced.
 pub(super) const COLUMNS: &str = "id, artifact_id, org, viewer_email, body, artifact_revision, parent_id, \
      anchor_path, anchor_x, anchor_y, anchor_w, anchor_h, anchor_approx, anchor_page, created_at, \

@@ -40,8 +40,8 @@ pub struct NewFeedback<'a> {
 /// [`AppError::Validation`] for [`EMPTY_BODY_MESSAGE`], [`too_long_message`], the three reply-parent
 /// messages, and the anchor messages — evaluated in exactly that order. A `CHECK` violation from
 /// the `feedback` table (reachable only when `FEEDBACK_MAX_BODY` is configured above the schema's
-/// own 4000-character bound) is surfaced as [`AppError::Validation`] with SQLite's message, the way
-/// Node's route surfaces a thrown `SqliteError` as a 400. Any other SQL fault is
+/// own 4000-character bound) is surfaced as [`AppError::Validation`] with SQLite's message,
+/// preserving the historical 400 response for a constraint failure. Any other SQL fault is
 /// [`AppError::Unavailable`].
 pub fn add(
     conn: &Connection,

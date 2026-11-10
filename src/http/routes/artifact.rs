@@ -671,7 +671,7 @@ pub(crate) async fn parse_json_request(
         BodyReadError::TooLarge => json_error(StatusCode::PAYLOAD_TOO_LARGE, "payload too large"),
         BodyReadError::Invalid => json_error(StatusCode::BAD_REQUEST, "invalid JSON"),
     })?;
-    // Bodyless portal actions retain Node's `req.body = {}`-style behaviour. Any actual bytes
+    // Bodyless portal actions retain the frozen empty-body behaviour. Any actual bytes
     // with an unsupported content type, including chunked bodies without Content-Length, are
     // rejected before authorization or mutation instead of silently executing as `Null`.
     if !is_json_content_type(&headers) {

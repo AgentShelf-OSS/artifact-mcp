@@ -91,7 +91,7 @@ pub enum FaultPoint {
 /// The verdict an armed failpoint produces.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum InjectedFault {
-    /// An in-process failure: the operation compensates exactly as Node's `catch` block does.
+    /// An in-process failure: the operation runs its compensation steps.
     Error(AppError),
     /// The process died at this point: no compensation runs, and the on-disk/database state is
     /// left exactly as of the boundary for startup reconciliation to repair.
@@ -208,7 +208,7 @@ impl FaultInjector for ScriptedFaults {
     }
 }
 
-/// An aborted operation, carrying whether Node's `catch` block should run.
+/// An aborted operation, carrying whether compensation should run.
 #[derive(Debug)]
 pub(super) struct Interrupt {
     pub(super) error: AppError,

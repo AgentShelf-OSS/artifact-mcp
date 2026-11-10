@@ -216,7 +216,7 @@ impl StoreContext {
             .map_err(|error| sql_error("commit revert transaction", &error))
     }
 
-    /// `pruneHistory(id)` — best effort, exactly like Node's swallowing `try`.
+    /// Prune retained history on a best-effort basis, without propagating failures.
     pub(super) fn prune_history(&self, conn: &Connection, id: &SafeArtifactId) {
         let Ok(offset) = i64::try_from(self.limits.max_history) else {
             return;

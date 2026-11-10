@@ -21,7 +21,7 @@
 //!
 //! # Timezone assumption
 //!
-//! `new Date("2026-05-01T10:00")` — an ISO date-time with **no** offset — is parsed in the *server's local zone* by JavaScript. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. That is identical to Node whenever the process runs in UTC, which is what the container image and the conformance harness do. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent and matches unconditionally. Recorded as a contract-delta request.
+//! The retired Node twin parsed `new Date("2026-05-01T10:00")`, an ISO date-time with **no** offset, in the *server's local zone*. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. This preserves the historical behavior for a UTC process, as used by the container image and conformance harness. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent. Recorded as a compatibility constraint.
 
 use std::sync::Arc;
 
@@ -91,7 +91,7 @@ const DROP_ON_MOVE_SQL: &str = "DELETE FROM artifact_shares WHERE artifact_id = 
 ///
 /// # Errors
 /// [`AppError::Validation`] carrying [`EXPIRES_FORMAT_MESSAGE`], [`EXPIRES_FUTURE_MESSAGE`], or
-/// [`EXPIRES_CALENDAR_MESSAGE`] — the exact strings the Node routes surface as a 400 body
+/// [`EXPIRES_CALENDAR_MESSAGE`], the frozen strings surfaced as a 400 body
 /// and as an MCP tool error.
 pub fn expiry_for(clock: &dyn Clock, expires: &str) -> Result<Option<String>, AppError> {
     if expires == "24h" {
@@ -130,7 +130,7 @@ pub fn expiry_for(clock: &dyn Clock, expires: &str) -> Result<Option<String>, Ap
 
 /// `create({ artifactId, org, createdBy, expires })`.
 ///
-/// `created_at` is left to the column default (`datetime('now')`), as in Node; the returned record
+/// `created_at` is left to the column default (`datetime('now')`); the returned record
 /// carries only `token` + `expires_at`, which is what both call sites serialize.
 ///
 /// # Errors
@@ -144,7 +144,7 @@ pub fn create(
     org: &OrgId,
     request: &CreateShare,
 ) -> Result<PublicShare, AppError> {
-    // Node computes the expiry *before* minting the token, so a rejected `expires` burns no id.
+    // Compute the expiry *before* minting the token, so a rejected `expires` burns no id.
     let expires_at = expiry_for(clock, &request.expires)?;
     let token = ids.share_token()?;
     conn.execute(
@@ -340,7 +340,7 @@ struct IsoShape {
     /// The written offset, still unvalidated: `+24:00` is *shape*-legal (the regular expression
     /// only counts digits) and must therefore fail as an invalid instant, not as a bad shape.
     offset: Option<IsoOffset>,
-    /// True for the bare `YYYY-MM-DD` form — the only shape Node calendar-checks.
+    /// True for the bare `YYYY-MM-DD` form, the only shape with a separate calendar check.
     date_only: bool,
 }
 
@@ -402,7 +402,7 @@ impl IsoShape {
 /// `^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$`
 ///
 /// Shape only — out-of-range field *values* are rejected later by [`IsoShape::to_unix_millis`],
-/// which is what keeps Node's two distinct error messages in the right order.
+/// which keeps the two frozen error messages in the right order.
 fn parse_iso_shape(value: &str) -> Option<IsoShape> {
     let bytes = value.as_bytes();
     let mut cursor = 0_usize;

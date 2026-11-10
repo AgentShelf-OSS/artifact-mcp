@@ -1,6 +1,6 @@
 //! Canonical body and bundle digests.
 //!
-//! Node oracle:
+//! Frozen digest algorithm, originally used by the retired Node twin:
 //!
 //! ```text
 //! function sha256(content) {
@@ -14,7 +14,7 @@
 //! }
 //! ```
 //!
-//! This value is load bearing beyond display: it addresses the preview file (`/data/previews/<id>/<body_sha256>.png`), it is the durable commit marker crash recovery compares against, and the v17 `artifact-body-digest` migration backfills it. It must stay byte identical to Node's.
+//! This value is load bearing beyond display: it addresses the preview file (`/data/previews/<id>/<body_sha256>.png`), it is the durable commit marker crash recovery compares against, and the v17 `artifact-body-digest` migration backfills it. It must stay byte identical to stored digests.
 
 use std::cmp::Ordering;
 use std::io;
@@ -27,7 +27,7 @@ const HEX: [u8; 16] = *b"0123456789abcdef";
 
 /// `createHash("sha256").update(content).digest("hex")`
 ///
-/// Node hashes a JS string as UTF-8, so `sha256_hex(text.as_bytes())` is the same digest.
+/// Text is hashed as UTF-8, so `sha256_hex(text.as_bytes())` preserves the frozen digest format.
 #[must_use]
 pub fn sha256_hex(content: &[u8]) -> String {
     let digest = Sha256::digest(content);
@@ -89,8 +89,8 @@ where
 
 /// `bodyDigestAtPath(target, isBundle)`
 ///
-/// Returns `None` where Node's `try { … } catch { return null; }` would: a missing body, an
-/// unreadable file, or `readdirSync` on something that is not a directory.
+/// Returns `None` for a missing body, an unreadable file, or a bundle path that cannot be
+/// read as a directory.
 #[must_use]
 pub fn body_digest_at_path(target: &Path, is_bundle: bool) -> Option<String> {
     if !is_bundle {

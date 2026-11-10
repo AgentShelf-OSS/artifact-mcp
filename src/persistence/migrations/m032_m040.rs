@@ -6,7 +6,7 @@ use rusqlite::Transaction;
 use super::{MigrationContext, schema_helpers::ensure_column};
 
 /// Migration 32 (`feedback-anchor-v2`) installs the dense anchor-v2
-/// metadata columns. Purely additive, idempotent `ALTER TABLE` statements, in Node's exact
+/// metadata columns. Purely additive, idempotent `ALTER TABLE` statements, in the frozen
 /// order; a NULL value retains the existing anchor semantics.
 pub(super) fn m32_feedback_anchor_v2(
     tx: &Transaction<'_>,
@@ -133,8 +133,8 @@ pub(super) fn m038_collection_principals(
     ))
 }
 
-/// ADR-0012 scheduled reminders and Web Push subscriptions. Both runtimes execute the same shared
-/// SQL file so `sqlite_master` stays identical.
+/// ADR-0012 scheduled reminders and Web Push subscriptions. Execute the shared
+/// SQL file unchanged to preserve the frozen `sqlite_master` text.
 pub(super) fn m039_web_push_reminders(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,
@@ -144,8 +144,8 @@ pub(super) fn m039_web_push_reminders(
     ))
 }
 
-/// ADR-0015 per-organization artifact keys for publish upsert. Shared SQL keeps `sqlite_master`
-/// identical across runtimes.
+/// ADR-0015 per-organization artifact keys for publish upsert. Shared SQL preserves the frozen
+/// `sqlite_master` text for historical schema compatibility.
 pub(super) fn m040_artifact_keys(
     tx: &Transaction<'_>,
     _ctx: &MigrationContext,

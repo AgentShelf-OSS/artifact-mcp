@@ -39,7 +39,7 @@ pub fn parse_stored_events(column: &str) -> Vec<WebhookEvent> {
 
 /// Port of `parseEvents(value, { defaultAll })`.
 ///
-/// The typed model removes two of Node's four outcomes by construction: a non-array and an unknown
+/// The typed model rules out two historical failures: a non-array and an unknown
 /// event name cannot be represented by `Option<&[WebhookEvent]>`, so the
 /// `"Webhook events must be an array."` and `"Unknown webhook event: …"` throws are unreachable
 /// here. What remains — the `defaultAll` behaviour and order-preserving de-duplication — is

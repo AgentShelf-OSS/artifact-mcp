@@ -100,7 +100,7 @@ impl StoreContext {
         conn: &Connection,
         meta: &ArtifactMeta,
     ) -> Result<RevisionHistory, AppError> {
-        // Node reloads the live row before listing. Use that revision both for the response and
+        // Reload the live row before listing. Use that revision both for the response and
         // to exclude the live attribution marker from the retained-history array.
         let current = load_meta(conn, &meta.id.0)?.map_or(meta.revision, |row| row.revision);
         let mut statement = conn

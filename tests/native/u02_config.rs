@@ -1,5 +1,5 @@
 //! U02 native tests — environment defaults, fail-closed parsing, typed limits, and the
-//! identifier alphabets/lengths the Node reference generates.
+//! identifier alphabets/lengths captured from the retired Node runtime.
 //!
 //! The process environment is never mutated: every case builds a [`MapEnv`], which keeps
 //! the suite deterministic under cargo's parallel test threads and avoids the `unsafe`
@@ -321,7 +321,7 @@ fn body_limits_match_every_express_json_call() {
     // lib/app.js:634,643,669,679,708 — "8kb"
     assert_eq!(config.body.category_json, DEFAULT_CATEGORY_JSON_LIMIT);
     assert_eq!(config.body.category_json, 8_192);
-    // lib/app.js:152 — the "8mb" fallback express uses when no limit is supplied
+    // Retired lib/app.js:152 — the "8mb" fallback Express used when no limit was supplied
     assert_eq!(DEFAULT_MCP_JSON_FALLBACK_LIMIT, 8 * 1024 * 1024);
 }
 

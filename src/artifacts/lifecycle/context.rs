@@ -220,7 +220,7 @@ impl StoreContext {
 
     /// Generate an unused artifact ID.
     ///
-    /// Node loops forever; a bounded retry keeps a broken id source from hanging a request. The
+    /// A bounded retry keeps a broken id source from hanging a request. The
     /// chance of 64 consecutive collisions over a 33^12 space is not physically meaningful.
     pub(super) fn next_id(&self, conn: &Connection) -> Result<SafeArtifactId, AppError> {
         const MAX_ATTEMPTS: usize = 64;
@@ -274,10 +274,11 @@ impl StoreContext {
     /// ```
     ///
     /// Files are written in the caller's order — the order the publisher supplied, and the order
-    /// entry auto-selection already used (contract delta 4). Nothing here re-sorts them, and a
-    /// duplicate relative path keeps Node's "last write wins".
+    /// entry auto-selection already used (compatibility constraint 3 in `crate::artifacts::validation`). Nothing here re-sorts them, and a
+    /// duplicate relative path keeps the frozen "last write wins" behavior.
     ///
-    /// See contract-delta request 2 for the trailing-separator rejection.
+    /// See compatibility constraint 2 in the lifecycle module docs for the trailing-separator
+    /// rejection.
     pub(super) fn stage_bundle_files(
         &self,
         staging: &Path,
@@ -289,7 +290,7 @@ impl StoreContext {
             .map_err(|error| io_failure("create staging directory", staging, &error))?;
         for (rel, content) in files {
             if rel.ends_with('/') {
-                // Node's `writeFileSync` on a trailing-slash path fails with EISDIR; `Path::join`
+                // Preserve the historical I/O failure for trailing-slash paths. `Path::join`
                 // would silently drop the separator and create a file instead.
                 tracing::error!(path = %rel, "bundle file name resolves to a directory");
                 return Err(AppError::Internal);

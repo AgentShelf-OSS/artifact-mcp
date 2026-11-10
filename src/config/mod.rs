@@ -4,8 +4,8 @@
 //!
 //! Parsing policy (fail-closed):
 //!
-//! * An **absent** variable, or one whose value is empty after trimming, uses the Node default. Node reaches the same result because `Number("")` is `0` (not `> 0`) and `"" || fallback` yields the fallback, so this is behaviour-preserving.
-//! * A **present, non-empty** variable that Node would silently discard (`NaN`, negative, zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`] instead of silently falling back. This is the one deliberate hardening over Node: it never changes the result for an input Node accepts, and no conformance case supplies an input Node would discard.
+//! * An **absent** variable, or one whose value is empty after trimming, uses the configured default. This preserves the retired Node twin's fallback behavior for missing and blank values.
+//! * A **present, non-empty** invalid variable (`NaN`, negative, zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`] instead of silently falling back. This deliberately hardens the retired Node twin's parsing while preserving its accepted inputs. No conformance case supplies an input that the retired parser would discard.
 //! * Nothing in this module panics, and the crate forbids `unsafe`.
 
 mod access;
@@ -287,7 +287,7 @@ impl AppConfig {
     /// Validate configuration before startup.
     ///
     /// # Errors
-    /// Returns [`AppError::Validation`] carrying the Node message verbatim when the
+    /// Returns [`AppError::Validation`] carrying the frozen refusal message verbatim when the
     /// configured identity mode is unsafe for the configured bind.
     pub fn validate_startup(&self) -> Result<(), AppError> {
         if self.access.require_jwt && !self.access.jwt_verification_on() {
