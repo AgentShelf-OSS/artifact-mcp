@@ -699,20 +699,20 @@ async fn sender_encrypts_signs_and_applies_every_outcome() {
     let n = |value: i64| OrderedJson::Number(value.into());
     let title = OrderedJson::string("Diaper change due");
     service
-        .set_reminder(
-            "art-acme".into(),
-            "acme".into(),
-            push::ReminderScope::Org,
-            String::new(),
-            "diaper".into(),
-            artifact_mcp::integrations::push_runtime::ReminderInput {
+        .set_reminder(artifact_mcp::integrations::push_runtime::ReminderRequest {
+            artifact_id: "art-acme".into(),
+            org: "acme".into(),
+            scope: push::ReminderScope::Org,
+            owner: String::new(),
+            key: "diaper".into(),
+            input: artifact_mcp::integrations::push_runtime::ReminderInput {
                 fire_at: None,
                 delay_seconds: Some(&n(60)),
                 title: Some(&title),
                 body: None,
             },
-            "viewer".into(),
-        )
+            created_by: "viewer".into(),
+        })
         .await
         .unwrap();
     clock.advance_millis(60_000);

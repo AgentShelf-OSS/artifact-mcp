@@ -13,6 +13,17 @@ use std::{
 };
 use tokio::sync::mpsc;
 
+/// One resolved subscription and its cancellation channel for the reconnect loop.
+pub(super) struct SubscriptionRun {
+    id: String,
+    topic: RequestedSubscription,
+    binding: Binding,
+    source: SourceConfig,
+    sub: SubscriptionConfig,
+    cursor: Option<String>,
+    tx: mpsc::Sender<DataEnvelope>,
+}
+
 impl DataBroker {
     pub async fn stream(
         &self,
@@ -59,7 +70,15 @@ impl DataBroker {
                 .cloned();
             tasks.push(tokio::spawn(async move {
                 broker
-                    .run_subscription(id, topic, binding, source, sub, previous, tx)
+                    .run_subscription(SubscriptionRun {
+                        id,
+                        topic,
+                        binding,
+                        source,
+                        sub,
+                        cursor: previous,
+                        tx,
+                    })
                     .await;
             }));
         }
@@ -108,17 +127,16 @@ impl DataBroker {
             current.0.subscriptions.get(subscription).cloned()?,
         ))
     }
-    #[allow(clippy::too_many_arguments)] // One resolved subscription and its cancellation channel.
-    pub(super) async fn run_subscription(
-        &self,
-        id: String,
-        topic: RequestedSubscription,
-        binding: Binding,
-        mut source: SourceConfig,
-        mut sub: SubscriptionConfig,
-        mut cursor: Option<String>,
-        tx: mpsc::Sender<DataEnvelope>,
-    ) {
+    pub(super) async fn run_subscription(&self, run: SubscriptionRun) {
+        let SubscriptionRun {
+            id,
+            topic,
+            binding,
+            mut source,
+            mut sub,
+            mut cursor,
+            tx,
+        } = run;
         let mut backoff = 1;
         loop {
             if tx.is_closed() || !self.current_binding(&id, &topic, &binding).await {
@@ -269,7 +287,10 @@ impl DataBroker {
             tokio::select! { _=tx.closed()=>return Ok(()), _=tokio::time::sleep(Duration::from_millis(sub.interval_ms))=>{} }
         }
     }
-    #[allow(clippy::too_many_arguments)] // The connector needs its binding for revocation checks.
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "The SSE connector needs its binding for revocation checks; its sole caller forwards the resolved subscription and channels."
+    )]
     pub(super) async fn sse_stream(
         &self,
         id: &str,

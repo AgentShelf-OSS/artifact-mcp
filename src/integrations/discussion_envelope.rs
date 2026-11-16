@@ -237,7 +237,6 @@ impl DiscordDiscussionEnvelopeV1 {
         Ok(envelope)
     }
 
-    #[allow(clippy::too_many_arguments)]
     pub fn validate_bound(
         &self,
         tenant: &OrgId,

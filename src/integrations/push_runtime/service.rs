@@ -349,6 +349,17 @@ impl std::fmt::Debug for PushService {
     }
 }
 
+/// Reminder ownership, key, schedule input, and creator identity for one upsert.
+pub struct ReminderRequest<'a> {
+    pub artifact_id: String,
+    pub org: String,
+    pub scope: ReminderScope,
+    pub owner: String,
+    pub key: String,
+    pub input: ReminderInput<'a>,
+    pub created_by: String,
+}
+
 impl PushService {
     /// Build the service when the feature is enabled; `Ok(None)` when it is not.
     ///
@@ -560,17 +571,19 @@ impl PushService {
     ///
     /// # Errors
     /// The shared [`PushError`] codes.
-    #[allow(clippy::too_many_arguments)]
     pub async fn set_reminder(
         &self,
-        artifact_id: String,
-        org: String,
-        scope: ReminderScope,
-        owner: String,
-        key: String,
-        input: ReminderInput<'_>,
-        created_by: String,
+        request: ReminderRequest<'_>,
     ) -> Result<ReminderSaved, PushError> {
+        let ReminderRequest {
+            artifact_id,
+            org,
+            scope,
+            owner,
+            key,
+            input,
+            created_by,
+        } = request;
         if !push::valid_key(&key) {
             return Err(PushError::BadKey);
         }

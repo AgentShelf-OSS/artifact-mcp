@@ -2,6 +2,17 @@
 
 use super::*;
 
+/// Transactional lifecycle inputs that mirror the update durability record.
+struct UpdateCommitInput<'a> {
+    meta: &'a ArtifactMeta,
+    expected_revision: u64,
+    plan: &'a UpdatePlan,
+    acting_client_id: Option<&'a ClientId>,
+    intent_id: &'a str,
+    audit: &'a MutationAudit,
+    operation: &'a str,
+}
+
 impl StoreContext {
     // -----------------------------------------------------------------------
     // update
@@ -92,13 +103,15 @@ impl StoreContext {
         // Commit metadata FIRST, then swap the body.
         let committed = match self.commit_update(
             conn,
-            &meta,
-            expected_revision,
-            &plan,
-            update.acting_client_id.as_ref(),
-            &intent_id,
-            audit,
-            operation,
+            UpdateCommitInput {
+                meta: &meta,
+                expected_revision,
+                plan: &plan,
+                acting_client_id: update.acting_client_id.as_ref(),
+                intent_id: &intent_id,
+                audit,
+                operation,
+            },
         ) {
             Ok(committed) => committed,
             Err(error) => {
@@ -365,18 +378,20 @@ impl StoreContext {
     ///
     /// The guard pins `client_id` and `org` to the values read at the start of the operation, so
     /// a concurrent re-tenant or delete turns into a conflict instead of a lost update.
-    #[allow(clippy::too_many_arguments)] // Transactional lifecycle inputs mirror the durability record exactly.
     fn commit_update(
         &self,
         conn: &mut Connection,
-        meta: &ArtifactMeta,
-        expected_revision: u64,
-        plan: &UpdatePlan,
-        acting_client_id: Option<&ClientId>,
-        intent_id: &str,
-        audit: &MutationAudit,
-        operation: &str,
+        commit: UpdateCommitInput<'_>,
     ) -> Result<bool, AppError> {
+        let UpdateCommitInput {
+            meta,
+            expected_revision,
+            plan,
+            acting_client_id,
+            intent_id,
+            audit,
+            operation,
+        } = commit;
         let transaction = conn
             .transaction_with_behavior(TransactionBehavior::Immediate)
             .map_err(|error| sql_error("open update transaction", &error))?;

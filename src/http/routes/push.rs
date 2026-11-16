@@ -26,7 +26,7 @@ use crate::{
             state::scope_query,
         },
     },
-    integrations::push_runtime::{PushService, ReminderInput},
+    integrations::push_runtime::{PushService, ReminderInput, ReminderRequest},
     mcp::protocol::OrderedJson,
     model::Viewer,
     model::push::{self, PushError, ReminderScope},
@@ -592,15 +592,15 @@ async fn put_reminder(
     };
     match grant
         .service
-        .set_reminder(
-            grant.artifact_id,
-            grant.org,
+        .set_reminder(ReminderRequest {
+            artifact_id: grant.artifact_id,
+            org: grant.org,
             scope,
             owner,
-            key.clone(),
+            key: key.clone(),
             input,
-            "viewer".to_owned(),
-        )
+            created_by: "viewer".to_owned(),
+        })
         .await
     {
         Ok(saved) => ok_json(serde_json::json!({
