@@ -1,11 +1,9 @@
 //! Typed environment, limits, clocks, IDs, and random sources.
 //!
-//! Defaults preserve the original implementation's behavior.
-//!
 //! Parsing policy (fail-closed):
 //!
-//! * An **absent** variable, or one whose value is empty after trimming, uses the configured default. This preserves the retired Node twin's fallback behavior for missing and blank values.
-//! * A **present, non-empty** invalid variable (`NaN`, negative, zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`] instead of silently falling back. This deliberately hardens the retired Node twin's parsing while preserving its accepted inputs. No conformance case supplies an input that the retired parser would discard.
+//! * An **absent** variable, or one whose value is empty after trimming, uses the configured default.
+//! * A **present, non-empty** invalid variable (`NaN`, negative, zero, unparsable byte size, malformed URL) is rejected with [`AppError::Validation`] instead of silently falling back.
 //! * Nothing in this module panics, and the crate forbids `unsafe`.
 
 mod access;

@@ -8,7 +8,7 @@ use super::env::Secret;
 
 /// Parse an optional webhook encryption key.
 ///
-/// The canonical re-encode check preserves the stored key format of the retired Node twin.
+/// The canonical re-encode check preserves the stored key format.
 pub(super) fn parse_webhook_enc_key(value: Option<&str>) -> Result<Option<Secret>, AppError> {
     let Some(raw) = value else {
         return Ok(None);

@@ -69,10 +69,9 @@ impl IntoResponse for AppError {
             }),
         )
             .into_response();
-        // The frozen HTTP contract includes `charset=utf-8`, inherited from the retired
-        // Express server. Axum's `Json` emits a bare `application/json`. Conformance compares
-        // headers exactly, including the concealed-404 response in the 57-step invariant-3
-        // matrix, so retain the charset parameter.
+        // The frozen HTTP contract includes `charset=utf-8`. Axum's `Json` emits a bare
+        // `application/json`. Conformance compares headers exactly, including the concealed-404
+        // response in the 57-step invariant-3 matrix, so retain the charset parameter.
         response.headers_mut().insert(
             axum::http::header::CONTENT_TYPE,
             axum::http::HeaderValue::from_static("application/json; charset=utf-8"),

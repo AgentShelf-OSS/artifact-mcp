@@ -3,8 +3,7 @@
 //! Every token here is really signed with the fixture keys in `u05_support.rs`, and every clock
 //! comparison runs against a [`FixedClock`], so the 60-second leeway boundaries are asserted at
 //! the exact second rather than approximately. The verdicts, header-trust resolutions, and
-//! signed-email trim outcomes that the retired Node runtime (`jose@5.10.0`) produced are pinned
-//! below as frozen vectors.
+//! signed-email trim outcomes are pinned below as frozen vectors for the identity contract.
 
 use std::sync::Arc;
 
@@ -60,7 +59,7 @@ fn jwt_config(extra: &[(&str, &str)]) -> Arc<AppConfig> {
 /// An in-memory `org_domains` / `org_email_members` registry.
 ///
 /// The email match is ASCII case-insensitive because the v21 table declares
-/// `email TEXT PRIMARY KEY COLLATE NOCASE` (`lib/migrations.js:420`). Reproducing the collation
+/// `email TEXT PRIMARY KEY COLLATE NOCASE`. Reproducing the collation
 /// here is what makes the "explicit membership beats domain routing" matrix meaningful.
 #[derive(Debug, Default)]
 struct FakeDirectory {
@@ -135,7 +134,7 @@ async fn verify(resolver: &AccessViewerIdentity, token: &str) -> Result<String, 
 }
 
 // ---------------------------------------------------------------------------
-// Cookie parsing — lib/identity.js:96-109
+// Cookie parsing
 // ---------------------------------------------------------------------------
 
 fn cookie(value: &str) -> Option<String> {
@@ -199,7 +198,7 @@ fn repeated_cookie_headers_are_all_scanned() {
 }
 
 // ---------------------------------------------------------------------------
-// Header vs cookie precedence — lib/identity.js:117-119
+// Header vs cookie precedence
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -538,7 +537,7 @@ async fn a_malformed_compact_serialization_is_refused() {
 }
 
 // ---------------------------------------------------------------------------
-// Startup modes — lib/identity.js:49-76,116-136
+// Startup modes
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
@@ -644,7 +643,7 @@ fn header_trust_refuses_a_non_loopback_bind_unless_explicitly_acknowledged() {
 }
 
 // ---------------------------------------------------------------------------
-// Email → org and admin resolution — lib/identity.js:83-91
+// Email → org and admin resolution
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -737,7 +736,7 @@ async fn explicit_membership_beats_domain_routing_which_beats_the_environment_ma
         org_of(&resolver, "user@unmapped.test").await,
         ("unmapped.test".to_owned(), false)
     );
-    // An address with no domain at all resolves to the empty org, exactly as Node does.
+    // An address with no domain at all resolves to the empty org.
     assert_eq!(org_of(&resolver, "nodomain").await, (String::new(), false));
 }
 
@@ -812,14 +811,12 @@ async fn every_rejection_reaches_the_route_layer_as_an_anonymous_viewer() {
 }
 
 // ---------------------------------------------------------------------------
-// Frozen vectors from the retired Node runtime
+// Frozen identity-contract vectors
 // ---------------------------------------------------------------------------
 
 /// `jose.jwtVerify` verdicts for [`jose_matrix`], in order: `ok`, `expired`
 /// (`ERR_JWT_EXPIRED`), `not-yet-valid` (`ERR_JWT_CLAIM_VALIDATION_FAILED` on `nbf`), or
 /// `rejected` (any other failure).
-///
-/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 const JOSE_VERDICTS: &[(&str, &str)] = &[
     ("valid", "ok"),
     ("nbf-600", "ok"),
@@ -975,7 +972,8 @@ async fn jose_claim_verdicts_match_the_retired_node_runtime() {
         let resolver = resolver(jwt_config(&[("ACCESS_CLOCK_TOLERANCE_S", &tolerance)]));
         let verdict = match verify(&resolver, candidate).await {
             Ok(email) => {
-                // Node reports the raw claim; `lib/identity.js` trims and lowercases it next.
+                // The expected raw claim is trimmed and lowercased before comparison with viewer
+                // identity.
                 assert_eq!(email, "member@acme.test", "{label}");
                 "ok"
             }
@@ -1009,7 +1007,6 @@ async fn header_trust_resolution_matches_the_retired_node_runtime() {
         ),
     );
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     // `(email header, viewer email, viewer org, is_admin)`.
     let cases: [(&str, Option<&str>, Option<&str>, bool); 17] = [
         (
@@ -1116,7 +1113,6 @@ async fn header_trust_resolution_matches_the_retired_node_runtime() {
 async fn signed_admin_email_trim_matches_the_retired_node_runtime() {
     // JavaScript's `trim` strips U+FEFF and keeps U+0085; Rust's `trim` does the opposite.
     let resolver = resolver(jwt_config(&[("ADMIN_EMAILS", "boss@acme.test")]));
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (claim, email, org, is_admin) in [
         (
             "\u{85}boss@acme.test\u{85}",

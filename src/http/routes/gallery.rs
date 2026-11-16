@@ -76,7 +76,7 @@ pub(crate) fn html_response(status: StatusCode, body: String, no_store: bool) ->
     response
 }
 
-/// Frozen text redirect shape from the retired Express server, with an optional indexing guard.
+/// Frozen text redirect response shape, with an optional indexing guard.
 pub(crate) fn found_redirect(location: &str, noindex: bool) -> Result<Response, AppError> {
     let mut response = Response::new(Body::from(format!("Found. Redirecting to {location}")));
     *response.status_mut() = StatusCode::FOUND;

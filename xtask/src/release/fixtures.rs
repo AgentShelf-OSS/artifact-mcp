@@ -151,7 +151,7 @@ fn execute(invocation: Invocation) -> std::result::Result<usize, String> {
     Ok(count)
 }
 
-/// `String(error)` for the errors the Node script threw.
+/// JavaScript `String(error)` formatting for release-command error messages.
 fn error_string(message: &str) -> String {
     if message.starts_with("TypeError: ") || message.starts_with("SyntaxError: ") {
         message.to_owned()

@@ -431,7 +431,6 @@ async fn patch_artifact_contract_is_atomic_utf8_safe_and_revision_guarded() {
 fn patch_engine_bytes_and_errors_match_frozen_vectors() {
     // `Ok((content, bytes_before, bytes_after))` or `Err(message)`.
     type Outcome = Result<(&'static str, usize, usize), &'static str>;
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let cases: [(&str, Value, Outcome); 9] = [
         (
             "before unique after",

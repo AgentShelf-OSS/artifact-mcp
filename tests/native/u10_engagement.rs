@@ -2,7 +2,7 @@
 //!
 //! These run entirely on the Rust adapters over a real migrated SQLite file (U03's pool, so
 //! `foreign_keys = ON` and the cascades are genuine). The two `frozen_node_vector` tests pin the
-//! persisted reaction and view rows with values captured from the retired Node runtime.
+//! persisted reaction and view rows used by existing databases.
 
 use artifact_mcp::error::AppError;
 use artifact_mcp::model::{
@@ -170,7 +170,7 @@ fn a_partial_update_keeps_the_field_it_does_not_mention() {
         }
     );
 
-    // An empty update rewrites the same values, exactly as `lib/reactions.js:26-32` does.
+    // An empty update rewrites the current values without changing either field.
     let noop = reactions::set(&mut conn, &viewer, &id("art-1"), ReactionUpdate::default())
         .expect("empty update");
     assert_eq!(noop, favorite_only);
@@ -227,7 +227,7 @@ fn the_schema_check_constraint_is_the_last_line_of_defence() {
     let conn = fixture.conn();
     insert_artifact(&conn, "art-1", "acme", "One");
 
-    // v3 `reaction-integrity` (lib/migrations.js:120-121) rejects both illegal columns even when
+    // v3 `reaction-integrity` rejects both illegal columns even when
     // the write bypasses the adapter entirely.
     for (favorite, vote) in [(0_i64, 2_i64), (0, -2), (2, 0), (-1, 0)] {
         conn.execute(
@@ -322,7 +322,6 @@ fn deleting_an_artifact_cascades_its_reactions() {
 /// The persisted `reactions` rows after a scripted mix of full and partial updates.
 #[test]
 fn reaction_writes_persist_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let fixture = Fixture::new("react-frozen");
     let mut conn = fixture.conn();
     insert_artifact(&conn, "alpha", "acme", "Alpha");
@@ -641,7 +640,6 @@ fn deleting_an_artifact_cascades_its_view_analytics() {
 /// matches the existing row, so it takes the UPDATE branch: the counter moves and `org` does not.
 #[test]
 fn view_writes_persist_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let fixture = Fixture::new("views-frozen");
     let conn = fixture.conn();
     insert_artifact(&conn, "alpha", "acme", "Alpha");
@@ -818,7 +816,7 @@ fn only_the_shell_render_of_an_identified_member_is_attributed() {
     );
 }
 
-/// The shell route's analytics contract (`lib/app.js:491-510`): record first when the viewer
+/// The shell route's analytics contract: record first when the viewer
 /// qualifies, then read the projections best-effort.
 fn shell_render(
     conn: &Connection,

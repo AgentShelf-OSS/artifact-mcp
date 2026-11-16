@@ -4,8 +4,8 @@
 //! production, so the plaintext column is what live rows use today, and the encrypted column is
 //! what they will use after the key is set. Both are exercised end to end here.
 //!
-//! The final section holds frozen vectors from the retired Node runtime: rows it wrote, the
-//! allowlist decision it reached for each URL shape, and its display mask.
+//! The final section pins stored rows, allowlist decisions for each URL shape, and the
+//! display mask used by existing webhook records.
 
 use artifact_mcp::error::AppError;
 use artifact_mcp::integrations::delivery_worker::{WebhookResolutionFailure, WorkerWebhooks};
@@ -262,7 +262,7 @@ async fn create_rejects_unknown_orgs_and_urls_outside_the_allowlist() {
 
 #[tokio::test]
 async fn the_unknown_org_check_runs_before_the_url_check() {
-    // `lib/webhooks.js:86-87` checks the org first; a doubly-invalid request must report the org.
+    // The org is checked first; a doubly-invalid request must report the org error.
     let (_dir, _pool, store) = fixture("order", "acme", None).await;
     let error = store
         .create(request("nope", "http://evil.tld/"))
@@ -577,7 +577,7 @@ async fn record_result_stamps_success_and_truncates_failures() {
     );
     assert_eq!(after_failure.last_ok_at, None);
 
-    // An empty message becomes the Node default, and long messages are cut at 500 units.
+    // An empty message becomes the default, and long messages are cut at 500 units.
     store
         .record_result(&created.id, Err(String::new()))
         .await
@@ -686,13 +686,12 @@ async fn create_never_names_the_rejected_url_in_its_error() {
 }
 
 // ---------------------------------------------------------------------------
-// Frozen vectors from the retired Node runtime
+// Frozen webhook storage and validation vectors
 // ---------------------------------------------------------------------------
 
-/// Rows that `lib/webhooks.js` wrote with `WEBHOOK_ENC_KEY` set to [`test_key`]:
+/// Stored rows encrypted with `WEBHOOK_ENC_KEY` set to [`test_key`]:
 /// `(id, original URL, url column, url_cipher, url_nonce, url_tag)`. Databases created before the
 /// Rust cutover hold rows in exactly this layout, so Rust must keep reading them.
-// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 const NODE_ENCRYPTED_ROWS: &[(&str, &str, &str, &str, &str, &str)] = &[
     (
         "uuv19a84w1wt",
@@ -772,9 +771,8 @@ async fn node_written_encrypted_rows_decrypt_with_the_key_and_fail_closed_withou
 /// `(display mask, plaintext url column, encrypted url column)` of an accepted webhook.
 type Accepted = (&'static str, &'static str, &'static str);
 
-/// Every `create()` decision of `lib/webhooks.js`: `Some(Accepted)` when accepted, `None` when
+/// Frozen webhook creation decisions: `Some(Accepted)` when accepted, `None` when
 /// rejected with [`INVALID_URL_MESSAGE`].
-// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 const NODE_CREATE_DECISIONS: &[(&str, Option<Accepted>)] = &[
     (
         "https://discord.com/api/webhooks/1/token",
@@ -875,7 +873,6 @@ async fn create_reaches_the_frozen_allowlist_and_at_rest_decisions() {
 }
 
 /// `maskUrl` display values, including userinfo, default ports, non-URLs and UTF-16 slicing.
-// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 const NODE_DISPLAY_MASKS: &[(&str, &str)] = &[
     (
         "https://discord.com/api/webhooks/123456789012345678/secret-token",

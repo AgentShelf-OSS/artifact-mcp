@@ -59,11 +59,8 @@ pub const SINGLE_BODY_CONTENT_TYPE: &str = "text/html; charset=utf-8";
 /// `"a.tar.gz"` yields `gz`, and `"file."` yields the empty string. All three fall through to
 /// the default. Reproduced exactly.
 ///
-/// One deliberate, safer divergence from the retired Node twin: its plain object lookup
-/// resolved `x.constructor` or `x.toString` to an inherited `Object.prototype` member
-/// instead of `undefined`, returning a *function*. Express then threw on the
-/// header write. Rust has no prototype chain, so such a name returns
-/// [`DEFAULT_CONTENT_TYPE`]. That historical bug is excluded from the frozen contract.
+/// Names such as `x.constructor` and `x.toString` have no MIME table entry and return
+/// [`DEFAULT_CONTENT_TYPE`]. Only explicit table entries can become response headers.
 #[must_use]
 pub fn mime_for(rel: &str) -> &'static str {
     let extension = rel.rsplit('.').next().unwrap_or("").to_lowercase();
@@ -83,9 +80,8 @@ pub fn mime_for(rel: &str) -> &'static str {
 /// metadata lookup belongs to the persistence layer, so what remains is: read the file, or
 /// report a missing body.
 ///
-/// The retired Node twin decoded UTF-8 and substituted U+FFFD for invalid sequences; this
-/// returns the bytes as stored. Publishing only ever writes UTF-8, so this preserves the
-/// historical response for every body the service itself produced.
+/// The body is returned as stored bytes, without replacing invalid UTF-8 sequences.
+/// Publishing writes UTF-8, so bodies produced by this service need no conversion.
 #[must_use]
 pub fn read_body(artifact_dir: &Path, id: &SafeArtifactId) -> Option<ArtifactFile> {
     read_file_at(
@@ -288,7 +284,6 @@ mod tests {
         for rel in ["noextension", "archive.tar.gz", "trailing.", "", ".hidden"] {
             assert_eq!(mime_for(rel), DEFAULT_CONTENT_TYPE, "{rel}");
         }
-        // The retired Node twin returned `Object.prototype.constructor` here.
         assert_eq!(mime_for("x.constructor"), DEFAULT_CONTENT_TYPE);
         assert_eq!(mime_for("x.toString"), DEFAULT_CONTENT_TYPE);
     }

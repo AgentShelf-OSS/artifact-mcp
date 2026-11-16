@@ -1625,7 +1625,6 @@ async fn every_u19_route_conceals_cross_org_unsigned_and_missing_before_subordin
     }
 }
 
-/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 fn frozen_action_route_results() -> serde_json::Value {
     serde_json::json!({
         "delete": {"status": 403, "body": {"error": "Forbidden"}},

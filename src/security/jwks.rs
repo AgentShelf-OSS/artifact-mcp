@@ -2,8 +2,8 @@
 //!
 //! This module preserves the remote key-set behavior of `jose@5.10.0`:
 //!
-//! * `node_modules/jose/dist/node/esm/jwks/remote.js` — cache freshness, cooldown, rotation.
-//! * `node_modules/jose/dist/node/esm/jwks/local.js` — candidate filtering and key import.
+//! Cache freshness, cooldown, rotation, candidate filtering, and key import follow the
+//! frozen rules below so Cloudflare Access token validation stays consistent.
 //!
 //! # Frozen behaviours
 //!

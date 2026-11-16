@@ -2028,8 +2028,8 @@ async fn webhook_events_reject_non_arrays_and_unknown_names_with_node_messages()
     }
 }
 
-/// Admin route requests replayed against the Rust router. `route` names the Express route the
-/// retired Node runtime registered for the same request.
+/// Admin route requests replayed against the router. `route` identifies the request
+/// handler in the frozen route matrix.
 fn admin_route_cases() -> Value {
     json!([
         {"method": "get", "route": "/settings", "uri": "/settings"},
@@ -2052,7 +2052,6 @@ fn admin_route_cases() -> Value {
     ])
 }
 
-/// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 fn frozen_admin_route_results() -> Value {
     json!([
         {"status": 200, "body": "<main>settings fixture</main>"},

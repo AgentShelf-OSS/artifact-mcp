@@ -513,7 +513,6 @@ fn edge_case_embeds_match_the_frozen_node_bytes() {
     empty.body = None;
     empty.viewer_email = None;
     empty.resolver = None;
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
         embed(WebhookEvent::Published, "", &empty),
         concat!(
@@ -550,7 +549,6 @@ fn edge_case_embeds_match_the_frozen_node_bytes() {
     escaping.description = "ünïcødé — 🎉 — トークン — \u{2028}\u{2029}".to_owned();
     escaping.uploader_label = "</script><script>alert(1)</script>".to_owned();
     escaping.category = "a/b".to_owned();
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
         embed(WebhookEvent::Published, "acme & co", &escaping),
         concat!(
@@ -579,7 +577,6 @@ fn edge_case_embeds_match_the_frozen_node_bytes() {
             .expect("field value")
             .to_owned()
     };
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (bytes, size) in [
         (1, "1 B"),
         (1_024 + 768, "1.8 KB"),
@@ -603,7 +600,6 @@ fn edge_case_embeds_match_the_frozen_node_bytes() {
     long.category = "C".repeat(1200);
     let value: serde_json::Value =
         serde_json::from_str(&embed(WebhookEvent::Published, "acme", &long)).expect("embed JSON");
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(value["embeds"][0]["title"], format!("{}…", "T".repeat(255)));
     assert_eq!(
         value["embeds"][0]["description"],

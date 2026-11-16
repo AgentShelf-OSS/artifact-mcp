@@ -792,7 +792,7 @@ async fn a_disabled_sidecar_is_an_inert_service() {
 #[tokio::test]
 async fn a_disabled_sidecar_still_serves_a_thumbnail_left_on_disk() {
     // Turning the `preview` compose profile off must not blind the service to thumbnails an
-    // earlier run already rendered: Node checks the existing file before `renderer?.enabled`.
+    // earlier run already rendered: the existing file is checked before renderer availability.
     let data = TempDataDir::new("u16-disabled-existing");
     let png = sample_png();
     let target = expected_path(data.path(), ID, DIGEST);
@@ -845,7 +845,6 @@ fn png_validation_bounds() {
 /// `validArtifactId` / `validDigest` decided them.
 #[test]
 fn path_guards_match_the_frozen_node_verdicts() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (id, valid) in [
         (ID, true),
         ("abcdef", true),
@@ -866,7 +865,6 @@ fn path_guards_match_the_frozen_node_verdicts() {
         assert_eq!(SafeArtifactId::parse(id).is_some(), valid, "id {id:?}");
     }
     let trailing_newline = format!("{DIGEST}\n");
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (digest, valid) in [
         (DIGEST, true),
         (OTHER_DIGEST, true),
@@ -901,7 +899,6 @@ fn the_placeholder_matches_the_frozen_node_bytes() {
         meta.org = OrgId(org.to_owned());
         String::from_utf8(thumbnail_placeholder(&meta, accent)).expect("utf-8 svg")
     };
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
         svg("acme", None),
         concat!(
@@ -918,7 +915,6 @@ fn the_placeholder_matches_the_frozen_node_bytes() {
             r##"<text x="600" y="586" text-anchor="middle" font-family="system-ui,sans-serif" font-size="27" fill="#596273">Preview temporarily unavailable</text></svg>"##,
         )
     );
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (org, accent, fill) in [
         ("acme", Some("#0a0"), "#00aa00"),
         ("acme", Some("  #ABCDEF  "), "#ABCDEF"),

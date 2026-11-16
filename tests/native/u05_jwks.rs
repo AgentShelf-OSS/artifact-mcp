@@ -1,6 +1,6 @@
 //! U05 — JWKS selection, caching, and rotation (`src/security/jwks.rs`).
 //!
-//! `jose`'s `createRemoteJWKSet` is what `lib/identity.js:44` actually installs, so these assert
+//! The identity resolver uses a remote JWKS cache. These tests assert
 //! its behaviour: a 600 s freshness window, a 30 s refetch cooldown, one reload on an unknown
 //! `kid`, and a candidate filter that refuses an ambiguous set instead of guessing.
 //!

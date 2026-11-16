@@ -4,8 +4,6 @@
 //! them directly on disk and in the database, so each ADR-0002 rule is pinned in isolation and a
 //! future refactor cannot make a rule untestable by changing when it is reachable.
 //!
-//! Ported from the retired Node runtime's `auditStorage({ cleanTransient })`
-//! ([lib/store.js:675-744]).
 
 use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
 use artifact_mcp::model::ArtifactMeta;
@@ -68,7 +66,7 @@ async fn a_staged_body_is_installed_when_the_final_path_is_empty() {
 #[tokio::test]
 async fn a_staged_body_replaces_a_stale_one_when_the_digest_disagrees() {
     // The commit-then-swap window: metadata is already at the NEW digest while the OLD body is
-    // still installed and the NEW body waits in staging. [lib/store.js:705-712]
+    // still installed and the NEW body waits in staging.
     let fixture = Fixture::new("recon-staged-stale");
     let meta = fixture.publish_single(OLD).await;
     fixture.execute(&format!(
@@ -212,7 +210,7 @@ async fn a_trashed_body_is_discarded_once_its_record_is_gone() {
 async fn a_surviving_staging_path_beats_a_surviving_trash_path() {
     // Both a staged (committed-new) and a trashed (old) body survive one crash. `.staging-` is
     // processed first, so the committed content is installed and the old body is discarded —
-    // never the other way around. [lib/store.js:688-691]
+    // never the other way around.
     let fixture = Fixture::new("recon-staging-beats-trash");
     let meta = fixture.publish_single(OLD).await;
     std::fs::remove_file(fixture.artifact_dir.join(format!("{}.html", meta.id.0)))

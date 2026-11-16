@@ -567,7 +567,7 @@ fn collection_error(error: McpError) -> McpError {
     }
 }
 
-// Legacy MCP text content retains the retired Node server's field order and JSON value.
+// Legacy MCP text content keeps frozen field order and JSON values for existing clients.
 pub fn ordered_response(value: Value) -> OrderedJson {
     match value {
         Value::Object(mut fields) => {

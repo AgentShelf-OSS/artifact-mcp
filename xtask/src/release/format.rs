@@ -1,8 +1,7 @@
 //! The input formats the release commands accept.
 //!
-//! Each function is the exact language of one regular expression from the Node scripts. The
-//! JavaScript expressions had no `u` or `m` flag, so `\d` is ASCII and `$` anchors only at the
-//! end of the input.
+//! These patterns follow the frozen JavaScript regular-expression grammar without `u` or
+//! `m` flags: `\d` is ASCII and `$` anchors only at the end of the input.
 
 use super::js;
 
@@ -160,8 +159,7 @@ pub fn strip_image_tag(reference: &str) -> &str {
 }
 
 /// `https://github.com/<repository>/attestations/<digits>`, with the repository matched
-/// literally. The Node verifier built a regular expression from the repository without
-/// escaping `.`, so a `.` there matched any character; this check is stricter.
+/// literally. A `.` in the repository name must match only a literal dot, never any character.
 pub fn is_attestation_reference(reference: &str, repository: &str) -> bool {
     reference
         .strip_prefix("https://github.com/")

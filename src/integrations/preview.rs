@@ -56,9 +56,7 @@ use super::thumbnails::valid_png;
 /// The only `content-type` a rendered response may carry.
 pub const RENDERED_CONTENT_TYPE: &str = "image/png";
 
-/// `JSON.stringify({ html, ...dimensions })`
-///
-/// Field order preserves the frozen request bytes from the retired Node twin.
+/// Preview-renderer request bytes keep the frozen field order: `html`, `width`, `height`.
 #[derive(Debug, Serialize)]
 struct RenderRequest<'a> {
     html: &'a str,

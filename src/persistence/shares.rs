@@ -13,7 +13,7 @@
 //! | revoked | `revoked_at` is set |
 //! | stale | the row survives but its artifact is gone or now belongs to another org |
 //!
-//! The original implementation collapsed invalid/expired/revoked in SQL and stale in the route. Splitting the decision across two layers is what makes a leak possible: a route that forgets the second half turns a moved or deleted artifact into a distinguishable response. This port collapses all four **inside the persistence result shape**: [`resolve`] is the only function here that accepts a bare token, and it returns `Option<ShareGrant>` — there is no reason code for a caller to accidentally propagate. Conformance asserts the resulting 404s are byte-identical (`share.public-delivery` step 5, `sameAsStep: 3`) and carry `cache-control: no-store` + `x-robots-tag: noindex`.
+//! Splitting token validation across layers can make a moved or deleted artifact distinguishable from an invalid token. This module collapses all four **inside the persistence result shape**: [`resolve`] is the only function here that accepts a bare token, and it returns `Option<ShareGrant>` — there is no reason code for a caller to accidentally propagate. Conformance asserts the resulting 404s are byte-identical (`share.public-delivery` step 5, `sameAsStep: 3`) and carry `cache-control: no-store` + `x-robots-tag: noindex`.
 //!
 //! [`revoke`] and [`list_for_artifact`] are artifact-scoped: their callers have already proven
 //! access to that artifact (`AuthorizedArtifact`), so their outputs are not a public oracle.
@@ -21,7 +21,7 @@
 //!
 //! # Timezone assumption
 //!
-//! The retired Node twin parsed `new Date("2026-05-01T10:00")`, an ISO date-time with **no** offset, in the *server's local zone*. `time` is compiled without `local-offset`, so [`expiry_for`] reads such an input as UTC. This preserves the historical behavior for a UTC process, as used by the container image and conformance harness. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent. Recorded as a compatibility constraint.
+//! An ISO date-time with **no** offset, such as `"2026-05-01T10:00"`, is read as UTC by [`expiry_for`]. `time` is compiled without `local-offset`. The container image and conformance harness use UTC, so expiry stays consistent with persisted share timestamps. Every other accepted shape (date-only, `Z`, explicit `±HH:MM`) is offset-independent. Recorded as a compatibility constraint.
 
 use std::sync::Arc;
 

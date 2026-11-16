@@ -1,4 +1,4 @@
-//! The JavaScript semantics that the Node release scripts relied on.
+//! JavaScript value semantics required by the release evidence format.
 //!
 //! The release evidence files were written with `JSON.stringify(value, null, 2)` and checked
 //! with `JSON.parse`, strict equality, `Number(string)` and `String(value)`. This module
@@ -473,7 +473,7 @@ pub fn utf16_cmp(left: &str, right: &str) -> Ordering {
     left.encode_utf16().cmp(right.encode_utf16())
 }
 
-/// `left.localeCompare(right)` under Node's ICU root collation, for the characters a fixture
+/// `left.localeCompare(right)` under ICU root collation, for the characters a fixture
 /// body path can contain.
 ///
 /// ASCII follows the CLDR root order (whitespace, punctuation and symbols, digits, then letters

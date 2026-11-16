@@ -147,7 +147,7 @@ fn web_push_is_disabled_by_default_and_needs_the_encryption_key() {
     let config = AppConfig::from_source(&without_enc).unwrap();
     assert!(config.web_push.vapid.is_some());
     assert!(!config.web_push_enabled());
-    // A subject alone (no key) is ignored, like Node.
+    // A subject alone (no key) is ignored.
     assert!(AppConfig::from_source(&MapEnv::empty().with("WEB_PUSH_SUBJECT", "nope")).is_ok());
 }
 

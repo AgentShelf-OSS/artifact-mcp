@@ -1,10 +1,9 @@
 //! U09 organization persistence: validation order, normalization, uniqueness, cascade, and the
 //! `COLLATE NOCASE` membership semantics introduced by migration v21.
 //!
-//! Behaviour ported from the retired Node runtime's `lib/orgs.js`. Messages asserted here are the
-//! literal 400 bodies the admin routes return. The frozen vectors at the end pin the Unicode and
-//! JavaScript-string normalization that decides org membership, with values captured from that
-//! runtime.
+//! Messages asserted here are the literal 400 bodies the admin routes return. The frozen
+//! vectors pin Unicode and JavaScript-string normalization so existing organization
+//! memberships keep resolving consistently.
 
 use std::collections::BTreeMap;
 
@@ -37,7 +36,7 @@ fn creates_an_org_case_folded_with_a_capped_label() {
 
     assert_eq!(created.name, OrgId("acme".to_owned()));
     assert_eq!(created.label.len(), orgs::ORG_LABEL_MAX_LENGTH);
-    // Node returns a literal, so neither field is read back from the row. [lib/orgs.js:126]
+    // The result is a literal; neither field is read back from the row.
     assert_eq!(created.color, None);
     assert_eq!(created.created_at, None);
     assert_eq!(created.key_count, 0);
@@ -120,7 +119,7 @@ fn creates_an_org_with_a_domain_atomically() {
     );
     assert!(!orgs::org_exists(&conn, "globex").expect("exists"));
 
-    // A taken domain always reports the cross-org form here. [lib/orgs.js:120]
+    // A taken domain always reports the cross-org form here.
     assert_eq!(
         validation_message(orgs::create_org(
             &mut conn,
@@ -130,7 +129,7 @@ fn creates_an_org_with_a_domain_atomically() {
     );
     assert!(!orgs::org_exists(&conn, "globex").expect("exists"));
 
-    // An empty or whitespace-only domain is simply absent. [lib/orgs.js:116]
+    // An empty or whitespace-only domain is simply absent.
     let blank = orgs::create_org(&mut conn, &request("blank", "", Some("   "))).expect("create");
     assert!(blank.domains.is_empty());
 }
@@ -314,7 +313,7 @@ fn registers_categories_idempotently_after_normalizing_them() {
         validation_message(orgs::add_category(&conn, "nope", "Docs")),
         "Unknown organization \"nope\"."
     );
-    // The unknown org is reported before the empty name. [lib/orgs.js:172-173]
+    // The unknown org is reported before the empty name.
     assert_eq!(
         validation_message(orgs::add_category(&conn, "nope", "   ")),
         "Unknown organization \"nope\"."
@@ -442,7 +441,7 @@ fn lists_orgs_with_their_members_and_active_key_counts() {
     assert_eq!(acme.categories, ["Docs"]);
     assert_eq!(acme.color, Some("#abc".to_owned()));
     assert!(acme.created_at.is_some(), "listed rows carry created_at");
-    // Only unrevoked keys count. [lib/orgs.js:15]
+    // Only unrevoked keys count.
     assert_eq!(acme.key_count, 1);
     assert_eq!(listed[1].key_count, 0);
 
@@ -667,7 +666,6 @@ async fn the_pooled_store_exposes_the_same_behaviour_as_the_sync_layer() {
 /// folding and the `\s` rejection are pinned with literal values rather than re-derived.
 #[test]
 fn unicode_domain_and_email_normalization_match_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let db = TestDb::new("u09-frozen-unicode");
     let mut conn = db.conn();
     seed_org(&mut conn, "acme");
@@ -745,7 +743,6 @@ fn unicode_domain_and_email_normalization_match_the_frozen_node_vector() {
 /// Rust's standard library; these are the values org and category normalization must produce.
 #[test]
 fn javascript_string_primitives_match_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     // (input, trim(), toLowerCase(), length, trim().replace(/\s+/g, " ").slice(0, 60))
     let cases: [(&str, &str, &str, usize, &str); 11] = [
         (" padded ", "padded", " padded ", 8, "padded"),

@@ -1,5 +1,5 @@
 //! U02 native tests — environment defaults, fail-closed parsing, typed limits, and the
-//! identifier alphabets/lengths captured from the retired Node runtime.
+//! identifier alphabets/lengths used by persisted records.
 //!
 //! The process environment is never mutated: every case builds a [`MapEnv`], which keeps
 //! the suite deterministic under cargo's parallel test threads and avoids the `unsafe`
@@ -69,7 +69,6 @@ fn access_sync_is_opt_in_and_requires_complete_safe_configuration() {
 fn empty_environment_reproduces_every_node_default() {
     let config = parse_ok(&[]);
 
-    // server.js:27, server.js:190, server.js:28, lib/db.js:8
     assert_eq!(config.port, DEFAULT_PORT);
     assert_eq!(config.port, 3480);
     assert_eq!(config.listen_host, DEFAULT_LISTEN_HOST);
@@ -80,7 +79,6 @@ fn empty_environment_reproduces_every_node_default() {
     assert_eq!(config.data_dir, PathBuf::from(DEFAULT_DATA_DIR));
     assert_eq!(config.data_dir, PathBuf::from("/data"));
 
-    // lib/config.js:19-26
     assert_eq!(config.app_name, DEFAULT_APP_NAME);
     assert_eq!(config.app_name, "Artifact Index");
     assert_eq!(config.app_brand, DEFAULT_APP_BRAND);
@@ -91,7 +89,6 @@ fn empty_environment_reproduces_every_node_default() {
     assert_eq!(config.storage.max_bundle_bytes, 8 * 1024 * 1024);
     assert_eq!(config.storage.max_bundle_files, 100);
 
-    // lib/identity.js:14-38
     assert!(config.access.team_domain.is_empty());
     assert!(config.access.aud.is_empty());
     assert!(!config.access.trust_headers);
@@ -106,7 +103,6 @@ fn empty_environment_reproduces_every_node_default() {
     assert!(config.access.admin_emails.is_empty());
     assert!(config.access.admin_email_domains.is_empty());
 
-    // lib/preview.js:6-8, lib/thumbnails.js:17
     assert!(!config.preview.enabled());
     assert_eq!(config.preview.renderer_endpoint, None);
     assert_eq!(config.preview.timeout_ms, 8000);
@@ -116,7 +112,6 @@ fn empty_environment_reproduces_every_node_default() {
     assert_eq!(config.preview.max_png_bytes, 7_500_000);
     assert_eq!(config.preview.renderer_token, None);
 
-    // lib/crypto.js:9, lib/db.js:30
     assert!(config.webhook_enc_key.is_none());
     assert!(config.discord_bot_token.is_none());
     assert!(config.seed_keys.entries.is_empty());
@@ -149,8 +144,7 @@ fn cast_allowlist_requires_exact_artifact_revision_grants() {
 
 #[test]
 fn empty_and_whitespace_values_fall_back_exactly_like_node() {
-    // Node: `Number("")` is 0 (not > 0) and `"" || fallback` selects the fallback, so an
-    // exported-but-blank variable is indistinguishable from an unset one.
+    // An exported-but-blank variable uses the same fallback as an unset one.
     let config = parse_ok(&[
         ("PORT", "   "),
         ("APP_NAME", ""),
@@ -226,7 +220,6 @@ fn ingress_controls_parse_as_positive_bounded_origin_limits() {
 #[test]
 fn derived_paths_follow_the_data_directory() {
     let config = parse_ok(&[("DATA_DIR", "/srv/artifacts")]);
-    // lib/db.js:9-10, lib/thumbnails.js:70
     assert_eq!(
         config.artifact_dir(),
         PathBuf::from("/srv/artifacts/artifacts")
@@ -309,25 +302,24 @@ fn invalid_configuration_never_panics_and_maps_to_http_400() {
 fn body_limits_match_every_express_json_call() {
     let config = parse_ok(&[]);
 
-    // lib/app.js:261,302,322,341,362,373,380,392,409 — "64kb"
+    // Key request bodies use the frozen 64 KiB limit.
     assert_eq!(config.body.key_json, DEFAULT_KEY_JSON_LIMIT);
     assert_eq!(config.body.key_json, 65_536);
-    // lib/app.js:545 — "8kb"
+    // Reaction request bodies use the frozen 8 KiB limit.
     assert_eq!(config.body.reaction_json, DEFAULT_REACTION_JSON_LIMIT);
     assert_eq!(config.body.reaction_json, 8_192);
-    // lib/app.js:563 — "16kb"
+    // Feedback request bodies use the frozen 16 KiB limit.
     assert_eq!(config.body.feedback_json, DEFAULT_FEEDBACK_JSON_LIMIT);
     assert_eq!(config.body.feedback_json, 16_384);
-    // lib/app.js:634,643,669,679,708 — "8kb"
+    // Category request bodies use the frozen 8 KiB limit.
     assert_eq!(config.body.category_json, DEFAULT_CATEGORY_JSON_LIMIT);
     assert_eq!(config.body.category_json, 8_192);
-    // Retired lib/app.js:152 — the "8mb" fallback Express used when no limit was supplied
+    // An omitted HTTP body limit uses the frozen "8mb" default.
     assert_eq!(DEFAULT_MCP_JSON_FALLBACK_LIMIT, 8 * 1024 * 1024);
 }
 
 #[test]
 fn mcp_json_limit_defaults_to_the_bundle_derived_envelope() {
-    // lib/config.js:13-17,27 and server.js:186
     assert_eq!(mcp_json_limit_for(8 * 1024 * 1024), 50_593_792);
     assert_eq!(parse_ok(&[]).body.mcp_json, 50_593_792);
     assert_eq!(
@@ -371,7 +363,7 @@ fn mcp_json_limit_accepts_the_byte_size_strings_express_understands() {
 
 #[test]
 fn preview_configuration_normalizes_the_renderer_endpoint() {
-    // lib/preview.js:25-36 appends `render` to the configured base.
+    // The renderer endpoint appends `render` to the configured base.
     let config = parse_ok(&[
         ("PREVIEW_RENDERER_URL", "http://preview-renderer:3000"),
         ("PREVIEW_RENDER_TIMEOUT_MS", "2500"),
@@ -404,7 +396,6 @@ fn preview_configuration_normalizes_the_renderer_endpoint() {
 
 #[test]
 fn webhook_encryption_key_requires_canonical_32_byte_base64() {
-    // lib/crypto.js:9-18
     let config = parse_ok(&[("WEBHOOK_ENC_KEY", VALID_WEBHOOK_KEY)]);
     let key = config.webhook_enc_key.as_ref().expect("key parsed");
     assert_eq!(key.expose(), VALID_WEBHOOK_KEY);
@@ -620,7 +611,6 @@ fn preview_renderer_token_file_is_read_once_with_one_trailing_newline_removed() 
 
 #[test]
 fn artifact_api_keys_parse_exactly_like_seed_keys_from_env() {
-    // lib/db.js:30-58
     let config = parse_ok(&[(
         "ARTIFACT_API_KEYS",
         " agent-a:acme:s3cret , agent-b:legacy-secret , agent-c:beta:with:colons ,\
@@ -635,17 +625,17 @@ fn artifact_api_keys_parse_exactly_like_seed_keys_from_env() {
     assert_eq!(entries[0].org.0, "acme");
     assert_eq!(entries[0].secret.expose(), "s3cret");
 
-    // A two-part entry maps to org `default`. [lib/db.js:46]
+    // A two-part entry maps to org `default`.
     assert_eq!(entries[1].client_id.0, "agent-b");
     assert_eq!(entries[1].org.0, "default");
     assert_eq!(entries[1].secret.expose(), "legacy-secret");
 
-    // Secrets containing colons are rejoined. [lib/db.js:44]
+    // Secrets containing colons are rejoined.
     assert_eq!(entries[2].client_id.0, "agent-c");
     assert_eq!(entries[2].org.0, "beta");
     assert_eq!(entries[2].secret.expose(), "with:colons");
 
-    // Documented placeholders are recorded but never seeded. [lib/db.js:38,51-54]
+    // Documented placeholders are recorded but never seeded.
     let ignored: Vec<&str> = config
         .seed_keys
         .ignored_placeholders
@@ -661,7 +651,6 @@ fn artifact_api_keys_parse_exactly_like_seed_keys_from_env() {
 
 #[test]
 fn access_identity_mode_matches_the_node_matrix() {
-    // lib/identity.js:50-55
     assert_eq!(
         parse_ok(&[]).access.identity_mode(),
         AccessIdentityMode::Disabled
@@ -681,7 +670,7 @@ fn access_identity_mode_matches_the_node_matrix() {
         .identity_mode(),
         AccessIdentityMode::Jwt
     );
-    // Only the exact string "1" enables header trust. [lib/identity.js:16]
+    // Only the exact string "1" enables header trust.
     assert!(
         !parse_ok(&[("TRUST_ACCESS_HEADERS", "true")])
             .access
@@ -692,7 +681,7 @@ fn access_identity_mode_matches_the_node_matrix() {
             .access
             .trust_headers
     );
-    // A half-configured Access application never reaches JWT mode. [lib/identity.js:50]
+    // A half-configured Access application never reaches JWT mode.
     assert_eq!(
         parse_ok(&[("CF_ACCESS_TEAM_DOMAIN", "team.cloudflareaccess.com")])
             .access
@@ -706,7 +695,6 @@ fn access_identity_mode_matches_the_node_matrix() {
 
 #[test]
 fn jwks_url_is_derived_from_the_team_domain() {
-    // lib/identity.js:43
     assert_eq!(parse_ok(&[]).access.jwks_url(), None);
     assert_eq!(
         parse_ok(&[("CF_ACCESS_TEAM_DOMAIN", "team.cloudflareaccess.com")])
@@ -719,7 +707,6 @@ fn jwks_url_is_derived_from_the_team_domain() {
 
 #[test]
 fn startup_validation_reproduces_assert_ready() {
-    // lib/identity.js:57-61
     let error = parse_ok(&[("REQUIRE_ACCESS_JWT", "1")])
         .validate_startup()
         .expect_err("REQUIRE_ACCESS_JWT without CF_ACCESS_* must refuse to start");
@@ -731,7 +718,7 @@ fn startup_validation_reproduces_assert_ready() {
         )
     );
 
-    // lib/identity.js:66-76 — header trust on a non-loopback bind is refused.
+    // Header trust on a non-loopback bind is refused.
     let error = parse_ok(&[("TRUST_ACCESS_HEADERS", "1")])
         .validate_startup()
         .expect_err("header trust on 0.0.0.0 must refuse to start");
@@ -766,7 +753,6 @@ fn startup_validation_reproduces_assert_ready() {
 
 #[test]
 fn org_and_admin_lists_are_normalized_like_node() {
-    // lib/identity.js:25-39
     let config = parse_ok(&[
         (
             "ORG_EMAIL_DOMAINS",
@@ -825,7 +811,7 @@ fn org_and_admin_lists_are_normalized_like_node() {
 
 #[test]
 fn access_clock_tolerance_treats_zero_as_the_default() {
-    // `Number(x) || 60` — lib/identity.js:22
+    // `Number(x) || 60`
     assert_eq!(
         parse_ok(&[("ACCESS_CLOCK_TOLERANCE_S", "0")])
             .access
@@ -858,14 +844,14 @@ fn assert_shape(value: &str, alphabet: &str, length: usize, label: &str) {
 
 #[test]
 fn frozen_alphabets_match_the_node_nanoid_declarations() {
-    // lib/store.js:30 — note the omitted `l` and `o`.
+    // Note the omitted `l` and `o`.
     assert_eq!(ARTIFACT_ID_ALPHABET, "0123456789abcdefghijkmnpqrstuvwxyz");
     assert_eq!(ARTIFACT_ID_ALPHABET.len(), 34);
     assert!(!ARTIFACT_ID_ALPHABET.contains('l'));
     assert!(!ARTIFACT_ID_ALPHABET.contains('o'));
     assert_eq!(ARTIFACT_ID_LENGTH, 12);
 
-    // lib/shares.js:6 — nanoid's URL-safe alphabet.
+    // Share tokens use the URL-safe alphabet.
     assert_eq!(
         SHARE_TOKEN_ALPHABET,
         "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-"
@@ -873,12 +859,12 @@ fn frozen_alphabets_match_the_node_nanoid_declarations() {
     assert_eq!(SHARE_TOKEN_ALPHABET.len(), 64);
     assert_eq!(SHARE_TOKEN_LENGTH, 24);
 
-    // lib/feedback.js:10 — full lowercase alphanumerics.
+    // Full lowercase alphanumerics.
     assert_eq!(FEEDBACK_ID_ALPHABET, "0123456789abcdefghijklmnopqrstuvwxyz");
     assert_eq!(FEEDBACK_ID_ALPHABET.len(), 36);
     assert_eq!(FEEDBACK_ID_LENGTH, 16);
 
-    // lib/webhooks.js:11 — shares the artifact alphabet.
+    // Webhook ids share the artifact alphabet.
     assert_eq!(WEBHOOK_ID_ALPHABET, ARTIFACT_ID_ALPHABET);
     assert_eq!(WEBHOOK_ID_LENGTH, 12);
 }
@@ -976,7 +962,7 @@ fn generated_artifact_ids_satisfy_the_real_validators() {
             ARTIFACT_ID_LENGTH,
             "artifact id",
         );
-        // lib/thumbnails.js:19 — /^[0-9a-z]{6,24}$/ gates every thumbnail path.
+        // /^[0-9a-z]{6,24}$/ gates every thumbnail path.
         assert!(
             is_valid_artifact_id(&id.0),
             "thumbnail validator rejected {id}"
@@ -1186,7 +1172,7 @@ fn deterministic_random_sources_replay_identical_streams() {
 
 #[test]
 fn tts_worker_concurrency_accepts_the_documented_range() {
-    // lib/speech.js: absent or blank means 3; 1-8 are accepted.
+    // Worker count: absent or blank means 3; 1-8 are accepted.
     for value in ["", " ", "1", "3", " 8 "] {
         parse_ok(&[("TTS_WORKER_CONCURRENCY", value)]);
     }

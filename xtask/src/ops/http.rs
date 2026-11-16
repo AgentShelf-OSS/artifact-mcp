@@ -1,6 +1,6 @@
 //! A small blocking HTTP client for the operator commands.
 //!
-//! One `reqwest` client runs on a current-thread Tokio runtime. Like Node's `fetch`, it ignores
+//! One `reqwest` client runs on a current-thread Tokio runtime. It ignores
 //! `HTTP(S)_PROXY` variables and needs no `HOME`. Errors are reduced to [`FetchError`], which
 //! never carries a header value, so a credential sent in a header cannot reach an error message.
 
@@ -11,9 +11,9 @@ use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 /// Why a request produced no response.
 #[derive(Debug, PartialEq, Eq)]
 pub enum FetchError {
-    /// The configured timeout elapsed (Node: "The operation was aborted due to timeout").
+    /// The configured timeout elapsed.
     Timeout,
-    /// Connection, TLS or protocol failure (Node: "fetch failed").
+    /// Connection, TLS, or protocol failure.
     Network,
     /// A header value is not a valid HTTP field value. The value is deliberately not kept.
     InvalidHeader(&'static str),

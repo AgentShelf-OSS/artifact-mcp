@@ -2,7 +2,7 @@
 //!
 //! The release workflow attaches the files these commands write to every GitHub Release, and
 //! operators verify them before a deployment. The output bytes, accepted inputs and exit codes
-//! match the Node scripts they replace:
+//! are stable release interfaces:
 //!
 //! - exit 2 for a usage or input-format error of `source-sbom` and `manifest`;
 //! - exit 1 for a runtime failure, a failed manifest verification, or a failed fixture preflight.
@@ -53,7 +53,7 @@ pub fn run(args: &[String]) -> Result<bool> {
     }
 }
 
-/// Why a generator stopped: the Node scripts exited 2 for usage errors and 1 otherwise.
+/// Generator exit policy: usage errors exit 2; other failures exit 1.
 enum Failure {
     Usage(String),
     Runtime(String),
@@ -77,7 +77,7 @@ fn finish(result: std::result::Result<(), Failure>, usage: &str) -> Result<bool>
     }
 }
 
-/// The `--key value` parser of the Node generators: pairs only, no repeats, no unknown keys,
+/// The release `--key value` format: pairs only, no repeats, no unknown keys,
 /// and every allowed key present. Returns the values in `allowed` order.
 fn parse_pairs(args: &[String], allowed: &[&str]) -> std::result::Result<Vec<String>, Failure> {
     let mut values: Vec<(&str, &str)> = Vec::new();
@@ -111,8 +111,8 @@ fn wants_help(args: &[String]) -> bool {
     matches!(args, [only] if only == "-h" || only == "--help")
 }
 
-/// Node's `path.resolve(path)`: absolute against the working directory, `.` and `..` removed
-/// lexically (symbolic links are not consulted).
+/// Resolve an absolute path against the working directory. Remove `.` and `..` lexically
+/// without consulting symbolic links.
 fn resolve(path: &str) -> std::io::Result<PathBuf> {
     let joined = std::env::current_dir()?.join(path);
     let mut resolved = PathBuf::from("/");
@@ -128,7 +128,7 @@ fn resolve(path: &str) -> std::io::Result<PathBuf> {
     Ok(resolved)
 }
 
-/// Node's `path.join(base, relative)`: `relative` is appended even when it starts with `/`, then
+/// Join paths lexically: `relative` is appended even when it starts with `/`, then
 /// `.` and `..` are removed lexically.
 fn node_join(base: &Path, relative: &str) -> PathBuf {
     let mut joined = base.to_path_buf();

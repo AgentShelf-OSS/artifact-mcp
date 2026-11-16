@@ -249,7 +249,7 @@ async fn native_reader_is_explicit_html_only_and_keeps_sandbox_policy() {
 }
 
 // ---------------------------------------------------------------------------
-// Frozen vectors from the retired Node runtime (`lib/artifact-http.js`)
+// Frozen response-format vectors
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -257,7 +257,6 @@ fn anchor_bridge_injection_matches_the_frozen_node_output() {
     // `(content, pagePath, output with the bridge shown as {BRIDGE}, JS literal for the page)`.
     // The last `</body>` wins, U+FEFF counts as whitespace in `</body >`, and the page path is a
     // JSON string with `<` escaped.
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let cases: [(&str, Option<&str>, &str, &str); 5] = [
         (
             "<!doctype html><html><body><p>anchor me</p></body></html>",
@@ -303,9 +302,9 @@ fn anchor_bridge_injection_matches_the_frozen_node_output() {
         );
     }
 
-    // `$` in a page path is data. The retired Node runtime spliced the literal in with
-    // `String.prototype.replace`, which expanded `$&`, `$$`, `` $` `` and `$'` and could paste
-    // bridge source into the page string. The page literal must stay exactly the JSON encoding.
+    // `$` in a page path is data. Replacement-string expansion of `$&`, `$$`, `` $` ``
+    // and `$'` could paste bridge source into the page string. The page literal must stay
+    // exactly the JSON encoding.
     let (before, after) = ANCHOR_BRIDGE.split_once(marker).expect("marker");
     let injected = String::from_utf8(inject_anchor_bridge(
         b"<body>x</body>",
@@ -323,7 +322,6 @@ fn anchor_bridge_injection_matches_the_frozen_node_output() {
 #[test]
 fn script_stripping_and_html_detection_match_the_frozen_node_output() {
     // JavaScript's `\s` includes U+FEFF but not U+0085, so only the first closes the tag.
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (input, expected) in [
         ("<p>plain</p>", "<p>plain</p>"),
         ("<script>alert(1)</script><p>after</p>", "<p>after</p>"),
@@ -344,7 +342,6 @@ fn script_stripping_and_html_detection_match_the_frozen_node_output() {
         );
     }
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (content_type, html) in [
         ("text/html", true),
         ("text/html; charset=utf-8", true),
@@ -371,7 +368,6 @@ fn script_stripping_and_html_detection_match_the_frozen_node_output() {
 #[test]
 fn download_names_match_the_frozen_node_output() {
     // `(title, download name)`; the Content-Disposition header quotes the name verbatim.
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     for (title, expected) in [
         ("", "artifact.html"),
         ("Raw Case", "Raw-Case.html"),

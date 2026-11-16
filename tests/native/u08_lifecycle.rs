@@ -3,8 +3,8 @@
 //! These are the *happy* and *rejected* paths. Crash safety lives in `u08_failpoints.rs` and
 //! `u08_reconciliation.rs`.
 //!
-//! The behaviour was ported from the retired Node runtime's `lib/store.js`. The persisted
-//! digests and normalized metadata are pinned by frozen vectors captured from that runtime.
+//! Persisted digests and normalized metadata are pinned by frozen vectors so existing
+//! artifact records remain compatible.
 
 use artifact_mcp::artifacts::digest::bundle_manifest_digest;
 use artifact_mcp::artifacts::lifecycle::testing::RawLifecycleTestExt;
@@ -53,7 +53,7 @@ async fn publish_installs_the_body_and_commits_matching_metadata() {
 #[tokio::test]
 async fn publish_bundle_selects_the_first_html_in_publisher_order() {
     // Contract delta 4: `{z.html, a.html}` with no index.html selects z.html, because
-    // auto-selection walks the publisher's insertion order. [lib/store.js:254]
+    // auto-selection walks the publisher's insertion order.
     let fixture = Fixture::new("publish-bundle-order");
     let published = fixture
         .publish_bundle(&[("z.html", "<b>z</b>"), ("a.html", "<b>a</b>")], None)
@@ -231,7 +231,7 @@ async fn update_bumps_the_revision_and_snapshots_the_outgoing_body() {
     assert_eq!(result.meta.revision, 2);
     assert_eq!(result.meta.body_sha256, sha256_hex("NEW"));
     assert_eq!(fixture.body_on_disk(&meta).as_deref(), Some("NEW"));
-    // The OUTGOING revision (1) is what gets recorded and snapshotted. [lib/store.js:413]
+    // The OUTGOING revision (1) is what gets recorded and snapshotted.
     assert_eq!(
         fixture.scalar::<i64>("SELECT revision FROM artifact_revisions WHERE revision = 1"),
         1
@@ -267,7 +267,7 @@ async fn update_rejects_a_stale_expected_revision() {
         "a conflicting update removes its staged body: {:?}",
         fixture.entries()
     );
-    // A zero expected revision is Node's `< 1` rejection. [lib/store.js:319-321]
+    // Expected revisions must be at least 1; zero is rejected.
     let invalid = fixture
         .store
         .update_for(&meta, html_update(0, "NEWER"), mutation_audit())
@@ -1075,7 +1075,6 @@ async fn persisted_body_digests_match_frozen_vectors() {
         u64,
         &'static str,
     );
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let bundles: [BundleVector; 4] = [
         (
             &[("z.html", "Z"), ("a.html", "A")],
@@ -1152,7 +1151,6 @@ async fn publish_normalizes_metadata_like_the_frozen_vectors() {
     let long_description = "d".repeat(600);
     let long_category = "c".repeat(100);
     let long_label = "l".repeat(80);
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let cases: [(Fields<'_>, [&str; 5]); 5] = [
         (
             (

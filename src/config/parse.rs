@@ -9,8 +9,6 @@ pub(super) fn invalid(key: &str, raw: &str, expectation: &str) -> AppError {
 }
 
 /// Fetch a variable, treating "absent" and "empty after trimming" identically.
-///
-/// This preserves the retired Node twin's fallback for both missing and blank values.
 pub(super) fn present(env: &dyn EnvSource, key: &str) -> Option<String> {
     env.get(key).filter(|value| !value.trim().is_empty())
 }
@@ -29,8 +27,7 @@ pub(super) fn raw_string(env: &dyn EnvSource, key: &str, default: &str) -> Strin
 
 /// Parse a positive decimal integer or use the default for an absent value.
 ///
-/// Preserves the retired Node twin's accepted integers. Invalid present values
-/// are rejected instead of silently discarded.
+/// Invalid present values are rejected instead of silently discarded.
 pub(super) fn positive_integer(
     env: &dyn EnvSource,
     key: &str,
@@ -62,7 +59,7 @@ pub(super) fn enabled_unless_zero(env: &dyn EnvSource, key: &str) -> Result<bool
     }
 }
 
-/// Preserve the `bytes` size grammar used by the retired Node twin's JSON limits.
+/// Parse JSON limits with the frozen `bytes` size grammar.
 ///
 /// `bytes.parse` matches `/^((-|\+)?(\d+(?:\.\d+)?)) *(kb|mb|gb|tb|pb)$/i` and otherwise
 /// falls back to `parseInt(val, 10)`, then floors `unit * value`. Only the accepting

@@ -1,6 +1,6 @@
 //! Append-only version/name-compatible SQLite migrations.
 //!
-//! Preserve the migration SQL so that `sqlite_master.sql` text, column order, index names, check constraints, and composite foreign keys match the frozen historical schema. Do not "tidy" the SQL: the schema comparison in `tests/native/u03_migrations.rs` checks normalised statement text, and historical fixtures include databases written by the retired Node twin. Reformatting SQL can change persisted schema text.
+//! Preserve the migration SQL so that `sqlite_master.sql` text, column order, index names, check constraints, and composite foreign keys match the frozen historical schema. Do not "tidy" the SQL: the schema comparison in `tests/native/u03_migrations.rs` checks normalised statement text, and historical fixtures include pre-Rust databases. Reformatting SQL can change persisted schema text.
 //!
 //! Blocking discipline: every function here is synchronous `rusqlite` work. Callers must run them inside `tokio::task::spawn_blocking` (see [`crate::persistence::db::interact`]); no function in this module may be awaited or called while a transaction is held across `.await`.
 

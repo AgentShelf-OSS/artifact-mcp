@@ -163,7 +163,7 @@ fn configuration_defaults_and_validation() {
         parse(&[("STALE_GUARD", "off")]).expect("off").mode,
         StaleGuardMode::Off
     );
-    // Node parity: unusable values fall back silently to the defaults.
+    // Unusable values fall back silently to the defaults.
     for bad in [
         ("STALE_GUARD", "loud"),
         ("STALE_GUARD_MIN_SEGMENTS", "0"),

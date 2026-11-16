@@ -3,21 +3,20 @@
 //! Three properties here are load-bearing and each is pinned by a test:
 //!
 //! 1. **Byte-identical embeds.** Discord renders what it is sent, so the JSON must match
-//!    `JSON.stringify(buildEmbed(event, payload))` exactly — including key order, which is why the
+//!    the frozen embed JSON exactly, including key order, which is why the
 //!    payload is a `serde` struct tree (declaration order) and not a `serde_json::Map`
-//!    (alphabetical). `tests/native/u12_notify.rs` pins the bytes the retired Node runtime sent.
+//!    (alphabetical). `tests/native/u12_notify.rs` pins the exact payload bytes.
 //! 2. **The SSRF guard.** Delivery targets are restricted to `https://discord.com/api/webhooks/`
 //!    and `https://discordapp.com/api/webhooks/` by
 //!    [`is_discord_webhook_url`], redirects
 //!    are refused rather than followed, and every request is bounded by [`DELIVERY_TIMEOUT`].
-//!    The allowlist predicate preserves the audited behavior of the retired Node twin.
 //! 3. **Detached delivery.** [`DiscordNotifier::emit`] resolves before any request completes and
 //!    can never return an error, so a dead Discord endpoint cannot fail a publish or an update.
 //!
 //! # Where the guard lives
 //!
-//! The retired Node twin checked the allowlist only when creating a webhook. Delivery also
-//! re-checks it here. The delivery check rejects only URLs that creation would already reject,
+//! Webhook creation checks the allowlist. Delivery also re-checks it here. The delivery check
+//! rejects only URLs that creation would already reject,
 //! so a row hand-edited into the database, or one whose plaintext `url` column was tampered with,
 //! still cannot be used to reach an internal host.
 //!
@@ -49,9 +48,8 @@ pub const GENERIC_FAILURE: &str = "Webhook delivery failed.";
 /// Frozen result for testing a webhook with no URL.
 pub const UNKNOWN_WEBHOOK: &str = "Unknown webhook.";
 
-/// Recorded when the endpoint answers with a 3xx. The retired Node twin reported an opaque
-/// `"fetch failed"`; this message identifies the redirect. Only `last_error` text differs
-/// from that historical result. Redirects remain forbidden.
+/// Recorded when the endpoint answers with a 3xx. The message identifies the redirect
+/// and is stored in `last_error`. Redirects are forbidden.
 pub const REDIRECT_REFUSED: &str = "Discord returned a redirect, which is not followed.";
 
 /// Recorded when a stored URL is not on the Discord allowlist. Reuses the `create()` wording so an
@@ -164,7 +162,7 @@ pub fn text(value: &str, max: usize) -> String {
 /// `toFixed(1)` is **not** `format!("{:.1}")`: ECMAScript rounds a tie to the larger integer
 /// (away from zero) while Rust rounds to even, so the frozen format renders `1280` as `1.3 KB`,
 /// rather than `1.2 KB`. The quotient is an exact rational here (the divisor is a power of two),
-/// so integer arithmetic preserves the retired Node twin's rounding exactly.
+/// so integer arithmetic preserves this rounding exactly.
 #[must_use]
 pub fn format_bytes(value: u64) -> String {
     const KIB: u64 = 1024;
@@ -192,7 +190,7 @@ fn to_fixed_one(numerator: u64, denominator: u64) -> String {
 /// Build an embed from the event and payload.
 ///
 /// `org` is a separate argument because the frozen [`NotificationPayload`] has no `org` field;
-/// callers supply it (the retired Node twin likewise injected it at the call site).
+/// callers supply it.
 #[must_use]
 pub fn build_embed(
     event: &WebhookEvent,
@@ -371,7 +369,7 @@ pub trait WebhookTransport: Send + Sync + fmt::Debug {
     /// POST `request` to `url`, returning the status or a failure message.
     ///
     /// The error is a message string rather than an [`AppError`] because it is recorded verbatim
-    /// in `org_webhooks.last_error`, preserving the retired Node twin's error-message format.
+    /// in `org_webhooks.last_error`.
     fn post<'a>(
         &'a self,
         url: &'a str,

@@ -1,4 +1,4 @@
-//! Route-level proofs for U17, with frozen route-shape vectors from the retired Node runtime.
+//! Route-level proofs for U17, with frozen route-shape vectors for the HTTP contract.
 
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -1797,8 +1797,7 @@ async fn route_shapes_match_frozen_vectors() {
         rust_route_snapshot(&fake, Method::POST, "/notifications/seen").await,
     ]);
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0. The CSP equals
-    // `DOCUMENT_SANDBOX`, whose literal value `u14_response.rs` pins.
+    // The CSP equals `DOCUMENT_SANDBOX`, whose literal value `u14_response.rs` pins.
     let raw = |cache: &str| {
         json!({
             "status": 200,

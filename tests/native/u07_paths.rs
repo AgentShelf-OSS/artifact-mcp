@@ -1,8 +1,8 @@
 //! U07 native tests: the frozen path layout, the bundle path sanitizer, the MIME table, the
 //! limit boundaries, entry selection, id validation, and the on-disk read APIs.
 //!
-//! The hostile-path expectations and the bundle-digest vectors were captured from the retired
-//! Node runtime, so they pin the behaviour that persisted rows and preview file names rely on.
+//! The hostile-path expectations and bundle-digest vectors pin the behavior that persisted
+//! rows and preview file names rely on.
 
 use std::fs;
 use std::path::Path;
@@ -23,8 +23,7 @@ use artifact_mcp::config::StorageLimits;
 
 use crate::u03_support::TempDataDir;
 
-/// Adversarial relative paths. The expectations were verified against the retired Node runtime,
-/// so they are claims about the shipped behaviour, not about a Rust-only opinion.
+/// Adversarial relative paths pin the accepted bundle names and traversal rejections.
 ///
 /// `None` = the sanitizer must reject; `Some(rel)` = it must normalise to exactly `rel`.
 const TRAVERSAL_CASES: &[(&str, Option<&str>)] = &[
@@ -78,7 +77,7 @@ const TRAVERSAL_CASES: &[(&str, Option<&str>)] = &[
     ("a/b/./../c", Some("a/c")),
     ("./a", Some("a")),
     ("a//b", Some("a/b")),
-    // Node keeps a trailing separator, and accepts a bare `./`.
+    // The frozen path contract keeps a trailing separator and accepts a bare `./`.
     ("a/", Some("a/")),
     ("./", Some("./")),
     ("a/b/", Some("a/b/")),
@@ -193,7 +192,7 @@ fn artifact_id_validation_matches_the_node_regex_and_reserved_set() {
         assert!(SafeArtifactId::parse(good).is_some());
     }
 
-    // Contract-delta request 1: real top-level routes that Node's RESERVED set omits.
+    // Real top-level routes omitted from the frozen reserved-id set remain valid ids.
     for shadowing in ["thumbnails", "notifications"] {
         assert!(
             !is_reserved_artifact_id(shadowing),
@@ -358,8 +357,7 @@ fn mime_table_covers_every_frozen_extension() {
         "",
         ".hidden",
         "x.unknownext",
-        // Names of `Object.prototype` members: Node's object-literal lookup leaked inherited
-        // values for some of these; Rust always falls back.
+        // Names of `Object.prototype` members have no explicit MIME entry and use the fallback.
         "x.constructor",
         "x.__proto__",
         "x.toString",
@@ -561,7 +559,7 @@ fn entry_selection_follows_node_precedence() {
             .to_string(),
         "entry \"missing.html\" is not one of the files"
     );
-    // 7. An entry that fails sanitizing is silently ignored and auto-selection runs (Node quirk).
+    // 7. An entry that fails sanitizing is silently ignored and auto-selection runs.
     assert_eq!(
         select_entry(&files, Some("../evil.html"), None).expect("entry"),
         "index.html"
@@ -623,7 +621,7 @@ fn bundle_digest_is_independent_of_enumeration_order_on_disk() {
         Some(sha256_hex(b"<h1>hi</h1>").as_str())
     );
 
-    // Node's `try { … } catch { return null }` cases.
+    // Digest reads return `None` on I/O failure or an invalid bundle entry.
     assert_eq!(
         body_digest_at_path(&dir.path().join("missing"), false),
         None
@@ -644,7 +642,6 @@ fn bundle_manifest_digests_match_frozen_vectors() {
         u64,
         &'static str,
     );
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let cases: [DigestCase; 5] = [
         (
             &[("index.html", "<h1>hi</h1>")],

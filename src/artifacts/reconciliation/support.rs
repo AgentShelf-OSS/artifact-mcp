@@ -85,10 +85,8 @@ pub(super) fn load_body_rows(conn: &Connection) -> Result<Vec<BodyRow>, AppError
 /// Directory entries in recovery order: `.staging-` first, then `.trash-`, then
 /// everything else.
 ///
-/// The retired Node twin kept directory enumeration order inside a rank; this sorts by name
-/// inside a rank instead, which is deterministic across filesystems. The orders can differ
-/// when a single artifact has two transient paths of the same kind, for which the historical
-/// contract did not define an order.
+/// Entries inside a rank sort by name for deterministic recovery across filesystems.
+/// This also fixes the order when an artifact has two transient paths of the same kind.
 pub(super) fn ranked_entries(artifact_dir: &Path) -> Result<Vec<String>, AppError> {
     let mut names: Vec<String> = Vec::new();
     let entries = match std::fs::read_dir(artifact_dir) {

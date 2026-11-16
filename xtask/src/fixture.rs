@@ -1,12 +1,10 @@
-//! Synthetic historical fixtures: the Rust port of the retired
-//! `scripts/generate-historical-fixtures.mjs` (last present at commit `7211de0`).
+//! Synthetic historical fixtures for migration and recovery checks.
 //!
 //! A case directory holds `artifacts.db`, the artifact bodies under `artifacts/`, and
-//! `fixture.json`, which records every byte that was written. The rows, bodies, constants, and
-//! manifest fields match the Node generator so that the corpus stays uniform. Only the provenance
-//! changes: `generation` names this command, and `migrationLedgerSha256` is the SHA-256 of
-//! `src/persistence/migrations.rs` and the migration modules under `src/persistence/migrations/`
-//! (the Node generator hashed `lib/migrations.js`).
+//! `fixture.json`, which records every byte written. Rows, bodies, constants, and manifest
+//! fields preserve the committed corpus format. Provenance identifies this command in
+//! `generation`. `migrationLedgerSha256` hashes `src/persistence/migrations.rs` and the
+//! migration modules under `src/persistence/migrations/`.
 
 use std::collections::BTreeSet;
 use std::fs;
@@ -39,7 +37,7 @@ const LEDGER_REF: &str = "current append-only migration ledger";
 const FIXTURE_OWNER: &str = "fixture-owner@example.test";
 const FIXTURE_DESCRIPTION: &str = "Synthetic historical fixture";
 
-/// Pre-ledger (schema 0) layout, byte for byte as the Node generator executed it. SQLite stores
+/// Pre-ledger (schema 0) layout, with frozen SQL statement bytes. SQLite stores
 /// the statement text in `sqlite_master`, so the line breaks and indentation are part of the
 /// fixture.
 const PRE_LEDGER_LAYOUT: &str = concat!(
@@ -67,7 +65,7 @@ pub enum WebhookMode {
     Mixed,
 }
 
-/// One fixture case. Field names follow the `CASES` entries of the Node generator.
+/// One fixture case. Field names match the committed corpus format.
 #[derive(Clone, Debug)]
 pub struct CaseSpec {
     pub name: String,
@@ -81,8 +79,8 @@ pub struct CaseSpec {
 /// Name of the one rich case that the current ledger (not a release tag) produced.
 pub const DURABILITY_RECOVERY_CASE: &str = "release-v24-durability-recovery";
 
-/// Rich cases that a historical release tag's Node `lib/migrations.js` produced. They are frozen
-/// evidence and cannot be regenerated from the Rust ledger.
+/// Rich cases produced by historical release migrations. These frozen databases test
+/// pre-Rust data and cannot be regenerated from the current ledger.
 pub const TAG_RELEASE_CASES: &[(&str, &str)] = &[
     ("release-v16", "v1.2.0"),
     ("release-v20", "v1.4.0"),
@@ -127,7 +125,7 @@ impl CaseSpec {
     }
 }
 
-/// `boundary-vNN` with at least two digits, as the Node generator named it.
+/// `boundary-vNN` with at least two digits, matching committed corpus directory names.
 #[must_use]
 pub fn boundary_name(schema: i64) -> String {
     format!("boundary-v{schema:02}")
@@ -169,7 +167,7 @@ pub fn case_by_name(name: &str) -> Result<CaseSpec> {
 // fixture.json
 // ---------------------------------------------------------------------------------------------
 
-/// `fixture.json`. Field order is the Node generator's object literal order, and
+/// `fixture.json`. Field order matches the committed corpus, and
 /// `serde_json::to_string_pretty` plus a newline reproduces `JSON.stringify(manifest, null, 2)`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -195,8 +193,8 @@ pub struct Origin {
     pub source_ref: SourceRef,
 }
 
-/// Provenance of a current-ledger case. The field name is unchanged from the Node generator; the
-/// digest now covers [`LEDGER_SOURCE`].
+/// Provenance of a current-ledger case. The corpus field name stays fixed; the
+/// digest covers [`LEDGER_SOURCE`].
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct SourceRef {
@@ -344,7 +342,7 @@ fn number(value: usize) -> Value {
     ))
 }
 
-/// Port of the Node `insert()` helper: skip a table that does not exist yet and keep only the
+/// Skip a table that does not exist yet and keep only the
 /// columns that exist at this schema.
 struct Rows<'conn> {
     conn: &'conn Connection,
@@ -447,7 +445,7 @@ impl Rows<'_> {
     }
 }
 
-/// Options of the Node `artifact()` helper, with its defaults.
+/// Synthetic artifact row options and their fixture defaults.
 struct ArtifactOptions {
     bytes: usize,
     is_bundle: bool,
@@ -485,7 +483,7 @@ fn columns(conn: &Connection, table: &str) -> Result<BTreeSet<String>> {
     Ok(names)
 }
 
-/// Port of the Node `encrypted()` helper: AES-256-GCM under [`FIXTURE_KEY`] with a nonce of
+/// Fixture AES-256-GCM record under [`FIXTURE_KEY`] with a nonce of
 /// twelve `nonce_byte` bytes, plus the masked display URL.
 fn encrypted(url: &str, nonce_byte: u8) -> Result<Vec<(&'static str, Value)>> {
     let key = BASE64.decode(FIXTURE_KEY)?;
@@ -518,8 +516,8 @@ fn write_body(root: &Path, relative: &str, contents: &str) -> Result<()> {
     Ok(())
 }
 
-/// Every file under `<root>/artifacts`, with `/` separators. The Node generator sorted with
-/// `localeCompare`; for the fixture file names this is the same as byte order.
+/// Every file under `<root>/artifacts`, with `/` separators. The committed corpus uses
+/// `localeCompare` order; for these fixture file names it equals byte order.
 pub fn body_manifest(root: &Path) -> Result<Vec<BodyEntry>> {
     fn visit(base: &Path, dir: &Path, out: &mut Vec<BodyEntry>) -> Result<()> {
         for entry in fs::read_dir(dir)? {
@@ -627,7 +625,7 @@ fn build_case(
             } else {
                 &[]
             })),
-            // The Node generator wrote `null` for a recovery case without durability state;
+            // The committed corpus uses `null` for a recovery case without durability state;
             // only the tag-built release-v23 fixture has that shape and it is never regenerated.
             prepared_metadata_only: durability.then(|| PreparedMetadataOnly {
                 id: "prepared24".to_owned(),
@@ -723,7 +721,7 @@ fn suffix(spec: &CaseSpec) -> String {
     }
 }
 
-/// The synthetic rows, in the Node generator's order.
+/// The synthetic rows, in committed corpus order.
 fn seed_rows(rows: &mut Rows<'_>, spec: &CaseSpec) -> Result<()> {
     rows.insert(
         "orgs",
@@ -1089,7 +1087,7 @@ fn seed_durability_rows(rows: &mut Rows<'_>) -> Result<()> {
     ])
 }
 
-/// The body files, in the Node generator's order.
+/// The body files, in committed corpus order.
 fn write_bodies(root: &Path, spec: &CaseSpec) -> Result<()> {
     let suffix = suffix(spec);
     write_body(root, &format!("single{suffix}.html"), CURRENT_SINGLE)?;

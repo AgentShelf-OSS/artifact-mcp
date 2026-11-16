@@ -11,7 +11,7 @@
 //!
 //! # Concurrency note (difference in mechanism, not in behaviour)
 //!
-//! The retired Node twin serialized read-modify-write operations through one process-wide SQLite connection. The Rust pool has up to four connections, so [`set`] reads and upserts inside an `IMMEDIATE` transaction to preserve that behavior. Without it two concurrent partial updates could interleave and lose a field.
+//! The pool has up to four connections, so [`set`] reads and upserts inside an `IMMEDIATE` transaction to serialize partial updates. Without it two concurrent partial updates could interleave and lose a field.
 
 use std::collections::BTreeMap;
 
