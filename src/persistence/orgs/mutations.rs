@@ -286,6 +286,7 @@ pub fn add_email_member_with_name(
     Ok(email)
 }
 
+// Compatibility path: these rules live in `model::orgs`. New code imports them from there.
 pub use crate::model::orgs::normalize_display_name;
 
 pub fn email_display_name(conn: &Connection, email: &str) -> Result<Option<String>, AppError> {

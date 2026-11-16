@@ -1,7 +1,6 @@
 //! Scheduled reminder and Web Push validation contracts.
 
 use base64::{Engine as _, engine::general_purpose::URL_SAFE_NO_PAD};
-use sha2::{Digest, Sha256};
 
 use crate::{
     error::AppError,
@@ -245,12 +244,6 @@ pub fn valid_keys(p256dh: &str, auth: &str) -> bool {
         && p256::PublicKey::from_sec1_bytes(&point).is_ok()
 }
 
-/// Hex SHA-256 of the endpoint string, the subscription dedupe key.
-#[must_use]
-pub fn endpoint_sha256(endpoint: &str) -> String {
-    hex::encode(Sha256::digest(endpoint.as_bytes()))
-}
-
 /// Lowercased viewer email, the identity stored in every push table.
 #[must_use]
 pub fn normalize_email(value: &str) -> String {
@@ -263,5 +256,23 @@ pub fn reminder_owner(scope: ReminderScope, viewer_email: Option<&str>) -> Strin
     match scope {
         ReminderScope::Org => String::new(),
         ReminderScope::Viewer => viewer_email.map(normalize_email).unwrap_or_default(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn host_rules_match_exact_names_and_subdomain_wildcards() {
+        let hosts = vec![
+            "fcm.googleapis.com".to_owned(),
+            "*.push.apple.com".to_owned(),
+        ];
+        assert!(host_allowed("fcm.googleapis.com", &hosts));
+        assert!(host_allowed("api.push.apple.com", &hosts));
+        assert!(!host_allowed("push.apple.com", &hosts));
+        assert!(!host_allowed("evilpush.apple.com", &hosts));
+        assert!(!host_allowed("x.fcm.googleapis.com", &hosts));
     }
 }

@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::{error::AppError, persistence::migrations::EncryptedUrl};
 
+// Compatibility path: these rules live in `model::push`. New code imports them from there.
 pub use crate::model::push::*;
 
 /// At most 16 `armed` rows per artifact, all scopes together.
@@ -53,19 +54,6 @@ mod tests {
         assert_eq!(unpack_endpoint_ciphertext(&packed), Some(record));
         assert_eq!(unpack_endpoint_ciphertext("v2:a:b:c"), None);
         assert_eq!(unpack_endpoint_ciphertext("v1:a:b"), None);
-    }
-
-    #[test]
-    fn host_rules_match_exact_names_and_subdomain_wildcards() {
-        let hosts = vec![
-            "fcm.googleapis.com".to_owned(),
-            "*.push.apple.com".to_owned(),
-        ];
-        assert!(host_allowed("fcm.googleapis.com", &hosts));
-        assert!(host_allowed("api.push.apple.com", &hosts));
-        assert!(!host_allowed("push.apple.com", &hosts));
-        assert!(!host_allowed("evilpush.apple.com", &hosts));
-        assert!(!host_allowed("x.fcm.googleapis.com", &hosts));
     }
 
     #[test]

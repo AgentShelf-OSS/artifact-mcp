@@ -7,13 +7,13 @@ use crate::model::{
     SubmitFeedback,
 };
 
-use super::anchors::{js_trim, normalize_anchor_with_v2, utf16_len};
 use super::reads::{failed, get};
 use super::sql::{DELETE_SQL, INSERT_SQL, REOPEN_SQL, RESOLVE_SQL};
 use super::{
     EMPTY_BODY_MESSAGE, FORBIDDEN_MESSAGE, NOT_FOUND_MESSAGE, PARENT_NOT_FOUND_MESSAGE,
     PARENT_NOT_TOP_LEVEL_MESSAGE, PARENT_OTHER_ARTIFACT_MESSAGE, too_long_message,
 };
+use crate::model::feedback::{js_trim, normalize_anchor_with_v2, utf16_len};
 
 // ---------------------------------------------------------------------------
 // Writes

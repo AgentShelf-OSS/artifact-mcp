@@ -1,4 +1,11 @@
 use super::*;
+use sha2::{Digest, Sha256};
+
+/// Hex SHA-256 of the endpoint string, the subscription dedupe key.
+#[must_use]
+pub fn endpoint_sha256(endpoint: &str) -> String {
+    hex::encode(Sha256::digest(endpoint.as_bytes()))
+}
 
 /// One-column form of the `WEBHOOK_ENC_KEY` record: `v1:<nonce>:<ciphertext>:<tag>` (standard
 /// base64), matching the packed endpoint ciphertext format.

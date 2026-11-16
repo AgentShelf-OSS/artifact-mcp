@@ -4,6 +4,7 @@ use crate::error::AppError;
 // Shared JavaScript string semantics
 // ---------------------------------------------------------------------------
 
+// Compatibility path: these rules live in `model::orgs`. New code imports them from there.
 pub use crate::model::orgs::{is_js_whitespace, js_trim};
 
 /// Length of `value` in UTF-16 code units, which is what JavaScript's `.length` reports.

@@ -211,6 +211,7 @@ pub fn delete(
     .map_err(|error| crate::error::internal("delete", error))
 }
 
+// Compatibility path: these rules live in `model::state`. New code imports them from there.
 pub use crate::model::state::valid_key;
 
 pub async fn list_pooled(
