@@ -217,12 +217,15 @@ pub fn process_tree(root: u32) -> Vec<ProcessInfo> {
 
 /// Decode a PNG into `(width, height, rgba)`.
 pub fn decode_png(bytes: &[u8]) -> (u32, u32, Vec<u8>) {
-    let mut decoder = png::Decoder::new(bytes);
+    let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
     decoder.set_transformations(
         png::Transformations::normalize_to_color8() | png::Transformations::ALPHA,
     );
     let mut reader = decoder.read_info().unwrap();
-    let mut buffer = vec![0; reader.output_buffer_size()];
+    let size = reader
+        .output_buffer_size()
+        .expect("decoded frame size fits in memory");
+    let mut buffer = vec![0; size];
     let info = reader.next_frame(&mut buffer).unwrap();
     buffer.truncate(info.buffer_size());
     assert_eq!(
