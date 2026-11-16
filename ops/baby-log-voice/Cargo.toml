@@ -1,0 +1,28 @@
+[package]
+name = "baby-log-voice"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+[workspace]
+
+[dependencies]
+artifact-mcp = { path = "../.." }
+axum = { version = "0.8", features = ["json", "tokio", "http1"] }
+hmac = "0.13"
+sha2 = "0.11"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+thiserror = "2"
+time = { version = "0.3", features = ["formatting", "parsing"] }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+tower-http = { version = "0.7", features = ["limit", "timeout"] }
+
+
+[dev-dependencies]
+rusqlite = { version = "0.41", features = ["bundled"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.36"
+tower = { version = "0.5", features = ["util"] }

@@ -90,6 +90,46 @@ pub fn artifact_dir(data_dir: &Path) -> PathBuf {
 pub struct Database;
 
 impl Database {
+    /// Opens an already-migrated database without applying migrations or changing its schema.
+    /// Companion processes use this fail-closed entry point.
+    ///
+    /// # Errors
+    /// Rejects missing files, unsupported schemas, and databases without the canonical pragmas.
+    /// Call from a blocking task, as with the other database constructors.
+    pub fn connect_existing(data_dir: &Path) -> Result<DbPool, AppError> {
+        let db_path = database_path(data_dir);
+        let conn = Connection::open_with_flags(
+            &db_path,
+            rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .map_err(|error| unavailable("open existing database", &error))?;
+        let journal: String = conn
+            .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+            .map_err(|error| {
+                tracing::error!(error = %error, "existing database pragma check failed");
+                AppError::Unavailable("database unavailable".to_owned())
+            })?;
+        if !journal.eq_ignore_ascii_case("wal") {
+            return Err(AppError::Validation(
+                "unsupported database journal mode".to_owned(),
+            ));
+        }
+        let version = migrations::current_version(&conn).map_err(|error| {
+            tracing::error!(error = %error, "existing database schema check failed");
+            AppError::Unavailable("database unavailable".to_owned())
+        })?;
+        if version != migrations::LATEST_SCHEMA_VERSION {
+            return Err(AppError::Validation(
+                "unsupported database schema".to_owned(),
+            ));
+        }
+        apply_connection_pragmas(&conn)
+            .map_err(|error| unavailable("set connection pragmas", &error))?;
+        verify_pragmas(&conn)?;
+        drop(conn);
+        build_pool(&db_path)
+    }
+
     /// Frozen entry point: bootstrap the database described by the application configuration.
     ///
     /// The data directory comes from the already-validated [`AppConfig`].
@@ -303,6 +343,52 @@ fn unavailable(operation: &str, error: &impl Display) -> AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct Fixture(PathBuf);
+
+    impl Fixture {
+        fn new() -> Self {
+            let base = std::env::var_os("CARGO_TARGET_DIR")
+                .map(PathBuf::from)
+                .unwrap_or_else(std::env::temp_dir);
+            let path = base.join(format!("existing-database-test-{}", nanoid::nanoid!()));
+            std::fs::create_dir_all(&path).unwrap();
+            Self(path)
+        }
+    }
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            std::fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    #[test]
+    fn existing_connector_never_creates_a_missing_database() {
+        let fixture = Fixture::new();
+        assert!(Database::connect_existing(&fixture.0).is_err());
+        assert!(!database_path(&fixture.0).exists());
+    }
+
+    #[test]
+    fn existing_connector_rejects_an_old_schema_without_migrating_it() {
+        let fixture = Fixture::new();
+        let mut conn = open_bootstrap_connection(&database_path(&fixture.0)).unwrap();
+        migrations::migrate_through(&mut conn, &MigrationContext::from_env(), 1).unwrap();
+        assert!(Database::connect_existing(&fixture.0).is_err());
+        assert_eq!(migrations::current_version(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn existing_connector_accepts_the_current_database_without_seeding() {
+        let fixture = Fixture::new();
+        let original = Database::open_at(&fixture.0).unwrap();
+        let before = migrations::current_version(&checkout(&original).unwrap()).unwrap();
+        let companion = Database::connect_existing(&fixture.0).unwrap();
+        let conn = checkout(&companion).unwrap();
+        verify_pragmas(&conn).unwrap();
+        assert_eq!(migrations::current_version(&conn).unwrap(), before);
+    }
 
     #[test]
     fn pins_the_six_verified_pragmas() {
