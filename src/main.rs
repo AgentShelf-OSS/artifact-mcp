@@ -478,8 +478,19 @@ fn is_healthcheck(args: &[String]) -> Result<bool, RuntimeError> {
     }
 }
 
+/// mimalloc replaces musl's malloc, which made MCP responses 2–4× more CPU-costly (ADR 0025).
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+fn main() -> ExitCode {
+    // Before any thread starts: re-exec with the memory tuning if it is missing.
+    #[cfg(unix)]
+    startup::allocator::reexec_with_tuning();
+    serve_main()
+}
+
 #[tokio::main]
-async fn main() -> ExitCode {
+async fn serve_main() -> ExitCode {
     // Operator subcommands (backup, verify-backup, web-push-keys) print plain text for a person
     // or a cron job, so they run before the JSON log subscriber is installed. Paths may be
     // non-UTF-8, so they see the raw arguments.

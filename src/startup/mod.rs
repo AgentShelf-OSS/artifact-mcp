@@ -8,7 +8,11 @@
 //! 3. [`identity`]: publisher authentication and viewer identity.
 //! 4. [`workers`]: integration stores, the detached notifier, and the background runtimes.
 //! 5. [`services`]: the production port adapters.
+//!
+//! Before any stage, `main` calls [`allocator::reexec_with_tuning`] (unix only).
 
+#[cfg(unix)]
+pub mod allocator;
 pub mod database;
 pub mod identity;
 pub mod services;
