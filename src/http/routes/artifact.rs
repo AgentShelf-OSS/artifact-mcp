@@ -21,8 +21,8 @@ use crate::{
     },
     mcp::protocol::OrderedJson,
     model::{
-        ArtifactRevision, CreateShare, OrgId, PublicShare, ReactionUpdate, ShareToken, Timestamp,
-        Viewer,
+        ArtifactPublicView, ArtifactRevision, CreateShare, OrgId, PublicShare, ReactionUpdate,
+        ShareToken, Timestamp, Viewer,
     },
     security::{
         access::{AccessPolicy, AuthorizedArtifact, FORBIDDEN_MESSAGE, resolve_for_viewer},
@@ -432,8 +432,9 @@ struct RevisionResponse {
 
 impl From<ArtifactRevision> for RevisionResponse {
     fn from(revision: ArtifactRevision) -> Self {
+        let revision = ArtifactPublicView::from(revision);
         Self {
-            artifact_id: revision.artifact_id,
+            artifact_id: revision.id,
             org: revision.org,
             revision: revision.revision,
             title: revision.title,
@@ -442,7 +443,7 @@ impl From<ArtifactRevision> for RevisionResponse {
             bytes: revision.bytes,
             is_bundle: i64::from(revision.is_bundle),
             entry: revision.entry,
-            body_sha256: revision.body_sha256,
+            body_sha256: revision.details.body_sha256,
             created_at: revision.created_at,
         }
     }
@@ -640,12 +641,15 @@ async fn move_artifact(
             .await
     };
     match result {
-        Ok(meta) => Json(MoveResponse {
-            id,
-            org: meta.org,
-            category: meta.category,
-        })
-        .into_response(),
+        Ok(meta) => {
+            let view = ArtifactPublicView::from_meta(&meta);
+            Json(MoveResponse {
+                id,
+                org: view.org,
+                category: view.category,
+            })
+            .into_response()
+        }
         Err(AppError::NotFound(reason)) if reason == "not_found" => {
             AppError::ConcealedNotFound.into_response()
         }
@@ -751,4 +755,69 @@ pub(super) fn javascript_or_empty(value: Option<&OrderedJson>) -> String {
     value
         .filter(|value| javascript_truthy(value))
         .map_or_else(String::new, javascript_string)
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    use super::*;
+
+    #[test]
+    fn public_projection_http_metadata_bytes() {
+        assert_eq!(
+            serde_json::to_string(&CategoryResponse {
+                id: "a".into(),
+                category: "Reports".into()
+            })
+            .unwrap(),
+            r#"{"id":"a","category":"Reports"}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&VisibilityResponse {
+                id: "a".into(),
+                hidden: true
+            })
+            .unwrap(),
+            r#"{"id":"a","hidden":true}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&RestoreResponse {
+                id: "a".into(),
+                revision: 2,
+                restored_from: 1
+            })
+            .unwrap(),
+            r#"{"id":"a","revision":2,"restoredFrom":1}"#
+        );
+        assert_eq!(
+            serde_json::to_string(&MoveResponse {
+                id: "a".into(),
+                org: "acme".into(),
+                category: "Reports".into()
+            })
+            .unwrap(),
+            r#"{"id":"a","org":"acme","category":"Reports"}"#
+        );
+    }
+
+    #[test]
+    fn public_projection_http_revision_bytes() {
+        let revision = ArtifactRevision {
+            artifact_id: "a".into(),
+            org: "acme".into(),
+            revision: 2,
+            title: "Title".into(),
+            description: "Description".into(),
+            category: "Reports".into(),
+            bytes: 23,
+            is_bundle: true,
+            entry: "index.html".into(),
+            body_sha256: "0123456789abcdef".repeat(4),
+            created_at: Timestamp("created".into()),
+            client_id: Some("publisher".into()),
+        };
+        assert_eq!(
+            serde_json::to_string(&RevisionResponse::from(revision)).unwrap(),
+            r#"{"artifact_id":"a","org":"acme","revision":2,"title":"Title","description":"Description","category":"Reports","bytes":23,"is_bundle":1,"entry":"index.html","body_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","created_at":"created"}"#
+        );
+    }
 }

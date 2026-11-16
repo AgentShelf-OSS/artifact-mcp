@@ -2,6 +2,7 @@
 
 pub mod admin;
 pub mod artifact;
+pub mod artifact_public_view;
 pub mod discord;
 pub mod engagement;
 pub mod feedback;
@@ -14,5 +15,6 @@ pub mod state;
 
 pub use admin::*;
 pub use artifact::*;
+pub use artifact_public_view::*;
 pub use engagement::*;
 pub use identity::*;

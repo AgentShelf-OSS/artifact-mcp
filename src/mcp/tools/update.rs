@@ -19,7 +19,10 @@ use crate::{
         shape::{artifact_url, object, tool_result},
         validation::apply_utf8_edits,
     },
-    model::{ArtifactContent, ArtifactUpdate, PublisherIdentity, UpdateArtifactResult},
+    model::{
+        ArtifactContent, ArtifactPublicView, ArtifactUpdate, PublisherIdentity,
+        UpdateArtifactResult,
+    },
     security::{
         access::{AuthorizedArtifact, OwnedArtifact},
         audit::MutationAudit,
@@ -303,11 +306,12 @@ pub(crate) async fn patch_artifact(
         unavailable,
     )
     .await?;
+    let view = ArtifactPublicView::from_meta(&result.meta);
     tool_result(object! {
-        "id" => OrderedJson::string(result.meta.id.0.clone()),
-        "revision" => OrderedJson::number_u64(result.meta.revision),
+        "id" => OrderedJson::string(view.id.0.clone()),
+        "revision" => OrderedJson::number_u64(view.revision),
         "bytes_before" => OrderedJson::number_u64(pre.bytes),
-        "bytes_after" => OrderedJson::number_u64(result.meta.bytes),
+        "bytes_after" => OrderedJson::number_u64(view.bytes),
         "edits_applied" => OrderedJson::number_u64(edit_count),
     })
 }
@@ -426,14 +430,15 @@ pub(crate) async fn update_artifact(
         content,
     };
     let result = run_update(owned, update, auth, deps).await?;
+    let view = ArtifactPublicView::from_meta(&result.meta);
     tool_result(with_warning(
         object! {
-            "id" => OrderedJson::string(result.meta.id.0.clone()),
-            "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),
-            "revision" => OrderedJson::number_u64(result.meta.revision),
-            "bytes" => OrderedJson::number_u64(result.meta.bytes),
-            "entry" => OrderedJson::string(result.meta.entry),
-            "category" => OrderedJson::string(result.meta.category),
+            "id" => OrderedJson::string(view.id.0.clone()),
+            "url" => OrderedJson::string(artifact_url(deps, &view.id)),
+            "revision" => OrderedJson::number_u64(view.revision),
+            "bytes" => OrderedJson::number_u64(view.bytes),
+            "entry" => OrderedJson::string(view.entry),
+            "category" => OrderedJson::string(view.category),
         },
         warning,
     ))

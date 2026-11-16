@@ -4,7 +4,7 @@ use serde_json::{Value, json};
 
 use crate::{
     AppDeps,
-    model::{ArtifactId, ArtifactMeta, PublisherIdentity},
+    model::{ArtifactId, ArtifactMeta, ArtifactPublicView, PublisherIdentity},
     security::access::AccessPolicy,
 };
 
@@ -154,6 +154,9 @@ fn insert_result_meta(result: &mut Value, key: &str, value: Value) {
 }
 
 fn review_from_meta(meta: &ArtifactMeta, auth: &PublisherIdentity, deps: &AppDeps) -> Value {
+    let can_manage = AccessPolicy::publisher_can_delete(auth, meta);
+    let can_feedback = AccessPolicy::publisher_can_read(auth, meta);
+    let meta = ArtifactPublicView::from_meta(meta);
     json!({
         "id": meta.id.0,
         "url": artifact_url(deps, &meta.id),
@@ -161,12 +164,12 @@ fn review_from_meta(meta: &ArtifactMeta, auth: &PublisherIdentity, deps: &AppDep
         "description": meta.description,
         "org": meta.org.0,
         "category": meta.category,
-        "publisher": meta.uploader_label,
+        "publisher": meta.details.uploader_label,
         "revision": meta.revision,
-        "hidden": meta.hidden,
+        "hidden": meta.details.hidden,
         "isBundle": meta.is_bundle,
-        "canManage": AccessPolicy::publisher_can_delete(auth, meta),
-        "canFeedback": AccessPolicy::publisher_can_read(auth, meta),
+        "canManage": can_manage,
+        "canFeedback": can_feedback,
         "thumbnailResourceUri": format!("artifact://{}/thumbnail", meta.id.0)
     })
 }

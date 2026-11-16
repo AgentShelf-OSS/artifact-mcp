@@ -85,6 +85,7 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 - `src/error.rs` — domain, HTTP, and JSON-RPC error mappings.
 - `src/integrations/` — integration declarations for application services and provider adapters.
 - `src/model/` — domain model declarations.
+- `src/model/artifact_public_view.rs` — public metadata projection for MCP and HTTP; adapters explicitly select fields and preserve their wire order.
 - `src/observability.rs` — privacy-safe, low-cardinality MCP telemetry.
 - `src/ops/` — operator commands for backup, backup verification, and Web Push keys.
 - `src/ports/` — object-safe application port interfaces.

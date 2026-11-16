@@ -76,6 +76,13 @@ its contract needs it.
   a migration module under `src/persistence/migrations/`. Never edit a shipped migration.
 - Add the field and its test default to `ArtifactMeta` and `ArtifactMeta::fixture` in
   `src/model/artifact.rs`. Add it to `ArtifactRevision` there if revisions retain it.
+- Classify the field in `src/model/artifact_public_view.rs`: add a public field to
+  `ArtifactPublicView` or its detail types, or add its name to `WITHHELD_META_FIELDS`.
+  Update the exhaustive `From<ArtifactMeta>` destructure and the classification test. A new
+  `ArtifactRevision` field needs the same decision in `From<ArtifactRevision>`, which has no
+  classification test. Never carry `owner_email` into the view.
+  Each projection below must explicitly opt into fields from this view; review its key order,
+  names, value types, and omission rules before changing its contract.
 - Update `META_COLUMNS` and `meta_from_row` in `src/persistence/artifact_rows.rs`, including the
   reordered-column and invalid-counter tests when applicable.
 - Update artifact writes in `src/artifacts/lifecycle/publish.rs` and
@@ -88,7 +95,8 @@ its contract needs it.
   `src/artifacts/reconciliation/backfill.rs` and `src/persistence/keys/operations.rs` if affected.
 - Review MCP list/read projections in `src/mcp/tools/artifacts.rs`, shared projections in
   `src/mcp/shape.rs`, publish/update responses in `src/mcp/tools/publish.rs` and
-  `src/mcp/tools/update.rs`, and collection references in `src/mcp/collections.rs`. Update their
+  `src/mcp/tools/update.rs`, category responses in `src/mcp/tools/categories.rs`, collection
+  references in `src/mcp/collections.rs`, and preview results in `src/mcp/tasks.rs`. Update their
   contracts in `conformance/mcp.tool-output-schemas.json` for any output change.
 - Review MCP resource metadata in `src/mcp/resources.rs` and review-card metadata in
   `src/mcp/decorate.rs`.
