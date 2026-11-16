@@ -334,7 +334,7 @@ fn release_manifest_verification_rejects_missing_or_inconsistent_validation_evid
         );
     }
 
-    // A falsy `error` (here an empty string) did not fail the Node verifier either.
+    // A falsy `error` (here an empty string) does not fail manifest verification.
     release_ok(&manifest_args(), &directory.path);
     let report_bytes = format!(
         "{}\n",
@@ -354,8 +354,8 @@ fn release_manifest_verification_rejects_missing_or_inconsistent_validation_evid
 #[test]
 fn verification_is_stricter_than_the_node_verifier_where_it_coerced_types() {
     let directory = release_directory("release-strict", "native binary\n", "source\n");
-    // The Node verifier accepted each of these: its regular expressions converted an array to
-    // its string, and its attestation-reference expression left `.` unescaped.
+    // These inputs exercise stricter checks: arrays cannot stand in for strings, and
+    // attestation repository names must match literally, including dots.
     type Mutation = (&'static str, fn(&mut Value), &'static str);
     let mutations: [Mutation; 3] = [
         (
@@ -486,7 +486,7 @@ fn manifest_inputs_are_validated_like_the_node_generator() {
     assert_eq!(output.status.code(), Some(2));
     assert!(stderr(&output).contains("error: invalid arguments"));
 
-    // `Number(string)` forms the Node generator accepted; each writes the plain integer.
+    // `Number(string)` forms accepted by the manifest format; each writes the plain integer.
     for (min, current, max) in [
         ("0x0", " 0x17 ", "0b10111"),
         ("-0", "", "1e1"),

@@ -170,7 +170,7 @@ fn base(extra: &[&'static str]) -> Vec<&'static str> {
     args
 }
 
-/// Every scenario whose output Node and the port share.
+/// Scenarios with identical expected output for the current and optional reference launchers.
 fn scenarios() -> Vec<Scenario> {
     let mut list = vec![
         scenario(
@@ -413,7 +413,8 @@ fn closed_port_url() -> String {
     format!("http://{}/mcp", listener.local_addr().unwrap())
 }
 
-/// Run one scenario with `launcher` (the port or Node) and describe what happened.
+/// Run one scenario with `launcher` (the current binary or optional script reference) and describe
+/// what happened.
 fn capture(scenario: &Scenario, launcher: &dyn Fn(&Path, Option<&str>) -> Command) -> Value {
     let dir = Scratch::new(scenario.name);
     std::fs::write(dir.0.join("page.html"), html()).unwrap();
@@ -557,8 +558,8 @@ fn the_token_never_reaches_output_even_when_it_is_malformed_or_echoed() {
     for scenario in scenarios() {
         capture(&scenario, &run_port);
     }
-    // Node printed a malformed token verbatim ("Headers.append: \"Bearer ...\" is an invalid
-    // header value."); the port withholds it.
+    // Malformed tokens must be withheld from error output, including invalid-header errors.
+    // The optional script reference includes the token, so its error text is not compared here.
     let dir = Scratch::new("malformed-token");
     std::fs::write(dir.0.join("page.html"), "<p>x</p>").unwrap();
     std::fs::write(dir.0.join("bindings.json"), BINDINGS).unwrap();
@@ -655,7 +656,8 @@ fn node_capture_matches_the_former_script() {
         assert_eq!(document["scenarios"], committed_capture()["scenarios"]);
     }
 
-    // Argument errors are uncaught exceptions in Node; its stack trace holds the same line.
+    // Argument errors from the optional script reference include a stack trace.
+    // Compare the expected message line without requiring the full trace.
     let scratch = Scratch::new("node-flags");
     for args in [
         &["--bogus"][..],

@@ -124,7 +124,7 @@ impl fmt::Display for KeyHash {
 
 /// The hex SHA-256 of `value`'s UTF-8 bytes.
 ///
-/// The stored hash format inherited from the retired Node twin uses UTF-8 input.
+/// The stored hash format uses UTF-8 input.
 /// Both runtime lookup and the `ARTIFACT_API_KEYS` seed path use this function,
 /// so seeded keys and existing stored keys authenticate with the same byte representation.
 #[must_use]
@@ -209,8 +209,8 @@ fn match_bearer(value: &str) -> Option<&str> {
 /// The presented credential, or `None` when there is none.
 ///
 /// Returns `None` for an empty credential so the "no credential" branch cannot be forgotten.
-/// A header whose bytes are not valid UTF-8 is treated as absent. This preserves the retired
-/// Node twin's refusal of headers that could not match any stored hash.
+/// A header whose bytes are not valid UTF-8 is treated as absent. Such headers cannot match
+/// any stored hash.
 #[must_use]
 pub fn bearer_key(headers: &HeaderMap) -> Option<BearerKey> {
     let authorization = headers

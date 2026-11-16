@@ -636,7 +636,7 @@ fn usage_goes_to_stdout_for_help_and_stderr_for_mistakes() {
     );
 }
 
-/// The request the Messages API receives, from the port and from the former Node script.
+/// The frozen Messages API request expected from both command implementations.
 #[test]
 fn node_parity_when_the_former_script_is_available() {
     let Some(dir) = std::env::var_os("XTASK_NODE_PARITY_DIR") else {

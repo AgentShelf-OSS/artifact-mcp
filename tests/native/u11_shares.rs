@@ -57,8 +57,8 @@ fn iso_now(conn: &Connection, modifier: &str) -> String {
 
 #[test]
 fn share_tokens_are_24_symbols_of_the_frozen_64_symbol_alphabet() {
-    // 24 symbols x log2(64) = 144 bits. Both halves of that product are frozen by U02 from
-    // [lib/shares.js:6]; this test is what fails if either drifts.
+    // 24 symbols x log2(64) = 144 bits. U02 pins the length and alphabet;
+    // this test also fails if either changes.
     assert_eq!(SHARE_TOKEN_LENGTH, 24);
     assert_eq!(SHARE_TOKEN_ALPHABET.chars().count(), 64);
     assert_eq!(
@@ -165,7 +165,7 @@ fn expiry_rejects_impossible_calendar_dates_and_bad_shapes() {
     }
 
     // Rolled-over calendar dates: `new Date("2027-02-31")` is 2027-03-03, a longer-lived link
-    // than was asked for [lib/shares.js:35-39].
+    // than was asked for.
     for value in ["2027-02-31", "2027-02-30", "2027-04-31", "2027-06-31"] {
         assert_eq!(
             shares::expiry_for(clock, value),
@@ -178,8 +178,8 @@ fn expiry_rejects_impossible_calendar_dates_and_bad_shapes() {
         shares::expiry_for(clock, "2028-02-29"),
         Ok(Some("2028-02-29T00:00:00.000Z".to_owned()))
     );
-    // Only the date-only shape is calendar-checked, so a rolled-over date *with* a time survives
-    // — faithfully reproducing Node rather than "fixing" it.
+    // Only the date-only shape is calendar-checked. A rolled-over date with a time remains
+    // accepted by the frozen share-expiry contract.
     assert_eq!(
         shares::expiry_for(clock, "2027-02-31T00:00Z"),
         Ok(Some("2027-03-03T00:00:00.000Z".to_owned()))
@@ -207,7 +207,6 @@ fn expiry_rejects_impossible_calendar_dates_and_bad_shapes() {
 /// granting access, so every outcome is literal: the stored instant, or the exact rejection.
 #[test]
 fn expiry_matrix_matches_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     const FORMAT: &str = EXPIRES_FORMAT_MESSAGE;
     const FUTURE: &str = EXPIRES_FUTURE_MESSAGE;
     const CALENDAR: &str = EXPIRES_CALENDAR_MESSAGE;
@@ -355,8 +354,8 @@ fn create_persists_the_grant_and_returns_only_token_and_expiry() {
     .expect("create a share");
 
     assert_eq!(created.expires_at, None);
-    // Node returns `{ token, expires_at }` only; `created_at`/`created_by` come back from the
-    // listing, never from the create call [lib/shares.js:47].
+    // Creation returns `{ token, expires_at }` only; `created_at`/`created_by` come back from the
+    // listing, never from the create call.
     assert_eq!(created.created_at, None);
     assert_eq!(created.created_by, None);
 
@@ -401,8 +400,8 @@ fn a_rejected_expiry_consumes_neither_a_token_nor_a_row() {
     );
 
     let after = fixture.ids.share_token().expect("mint");
-    // Node validates before `generateToken()` [lib/shares.js:44-45]; the counter must have moved
-    // by exactly the two explicit mints above.
+    // Validation precedes token generation, so the counter advances only for the two explicit
+    // mints above.
     assert_ne!(before, after);
     assert_eq!(
         shares::list_for_artifact(&conn, &artifact).expect("list"),
@@ -438,7 +437,7 @@ fn revocation_is_idempotent_and_immediate() {
     assert_eq!(shares::revoke(&conn, &artifact, &created.token), Ok(true));
     assert_eq!(shares::resolve(&conn, &created.token), Ok(None));
     // `revoked_at IS NULL` in the WHERE clause makes a repeat revoke a no-op, which is what makes
-    // the MCP tool report `revoked: false` on a retry [lib/mcp.js:497].
+    // the MCP tool report `revoked: false` on a retry.
     assert_eq!(shares::revoke(&conn, &artifact, &created.token), Ok(false));
     assert_eq!(
         shares::list_for_artifact(&conn, &artifact).expect("list"),
@@ -605,7 +604,7 @@ fn an_org_move_revokes_every_share() {
     )
     .expect("create");
 
-    // `moveArtifactToOrg` [lib/store.js:463-480]: deferred FKs, move the parent and every
+    // `moveArtifactToOrg`: deferred FKs, move the parent and every
     // org-bearing child, then destroy the share links.
     let transaction = conn.transaction().expect("begin move");
     transaction

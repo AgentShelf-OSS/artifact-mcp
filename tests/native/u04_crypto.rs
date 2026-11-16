@@ -1,15 +1,12 @@
-//! U04 — the webhook AEAD (`src/security/crypto.rs`) and its at-rest record format.
+//! U04 webhook AEAD (`src/security/crypto.rs`) and its at-rest record format.
 //!
-//! Production rows were encrypted by the retired Node runtime, and `WEBHOOK_ENC_KEY` is unset in
-//! production, so both the ciphertext format and the plaintext fallback are load-bearing. A
-//! Rust→Rust round trip proves nothing about the format, so the format is pinned by frozen
-//! vectors captured from the retired Node runtime:
+//! Existing encrypted rows must remain readable, and an unset `WEBHOOK_ENC_KEY` selects
+//! the plaintext fallback. A round trip alone cannot pin the stored format, so frozen
+//! vectors check both directions:
 //!
-//! * **Node → Rust** — records Node encrypted must decrypt to the exact original UTF-8 string.
-//! * **Rust → Node** — with a pinned nonce, Rust must emit the exact record Node's `decrypt()`
-//!   accepted.
-//! * **Key parsing** — every key shape Node accepted, treated as unset, or rejected is classified
-//!   the same way, with the same verbatim messages.
+//! * Stored records decrypt to the exact original UTF-8 string.
+//! * A pinned nonce produces the exact ciphertext, nonce, and tag bytes.
+//! * Key parsing classifies accepted, unset, and rejected shapes with verbatim messages.
 
 use std::sync::Arc;
 
@@ -43,12 +40,11 @@ fn cipher() -> WebhookCipher {
 }
 
 // ---------------------------------------------------------------------------
-// Direction 1: Node encrypted, Rust decrypts
+// Stored-record decryption
 // ---------------------------------------------------------------------------
 
 #[test]
 fn rust_decrypts_records_written_by_the_retired_node_runtime() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     // `(plaintext, ciphertext, nonce, tag)` under `parity_key()`.
     let records = [
         ("", "", "25iAWWtqI4oS7Eu4", "JTf9m17ORCSy9QDeuB0HOg=="),
@@ -102,7 +98,7 @@ fn rust_decrypts_records_written_by_the_retired_node_runtime() {
 }
 
 // ---------------------------------------------------------------------------
-// Direction 2: Rust encrypts a record Node decrypted
+// Encryption into the frozen stored-record format
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -116,8 +112,7 @@ fn a_pinned_nonce_produces_the_record_the_retired_node_runtime_decrypted() {
     .expect("valid key");
     let record = cipher.encrypt("artifact-mcp").expect("encrypt");
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
-    // Node's `decrypt()` returned "artifact-mcp" for exactly this record.
+    // This exact record decrypts to "artifact-mcp".
     assert_eq!(
         record,
         EncryptedUrl {
@@ -223,7 +218,6 @@ fn key_parsing_and_error_strings_match_the_retired_node_runtime() {
     }
 
     let valid = parity_key();
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let cases: Vec<(String, Verdict)> = vec![
         (valid.clone(), Verdict::Accepted),
         (format!("  {valid}  "), Verdict::Accepted), // trimmed
@@ -256,7 +250,6 @@ fn key_parsing_and_error_strings_match_the_retired_node_runtime() {
         assert_eq!(verdict, expected, "{candidate:?}");
     }
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
         INVALID_KEY_MESSAGE,
         "WEBHOOK_ENC_KEY must be a 32-byte base64 value."
@@ -315,7 +308,7 @@ fn the_plaintext_fallback_stores_urls_verbatim_and_leaves_the_columns_null() {
     assert_eq!(ciphertext, None);
     assert_eq!(protection.reveal(&stored).expect("reveal"), url);
 
-    // A conversion pass with no cipher configured is exactly Node's `return 0`.
+    // A conversion pass with no configured cipher changes zero rows.
     struct NeverCalled;
     impl WebhookUrlCipher for NeverCalled {
         fn encrypt_url(&self, _plaintext: &str) -> Result<EncryptedUrl, AppError> {

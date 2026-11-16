@@ -1,7 +1,6 @@
 //! U05 — Cloudflare Access session retry (`src/security/access_retry.rs`).
 //!
-//! The cases mirror the retired Node runtime's identity suite, which froze this behaviour; every
-//! expected target below is a literal value, so no Node reference is needed.
+//! Every expected retry target is pinned as a literal value below.
 
 use artifact_mcp::config::AccessIdentityMode;
 use artifact_mcp::security::access_retry::{
@@ -91,7 +90,7 @@ fn every_guard_is_load_bearing() {
         ),
         None
     );
-    // An *empty* assertion header is falsy in Node, so the retry still applies.
+    // An empty assertion header still permits the session retry.
     assert!(
         target_with(&Method::GET, URL, &[cookie, (ACCESS_JWT_HEADER, "")]).is_some(),
         "an empty assertion header must not suppress the retry"
@@ -185,6 +184,6 @@ fn path_eligibility_matches_the_reserved_id_rules() {
     ] {
         assert!(!is_retryable_path(path), "{path}");
     }
-    // The empty id, which Node covers via the `""` member of its RESERVED set.
+    // An empty id is rejected by the reserved-id shape check.
     assert!(!is_retryable_path(""));
 }

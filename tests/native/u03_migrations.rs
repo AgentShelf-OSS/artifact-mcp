@@ -209,7 +209,7 @@ fn migration_seven_seeds_orgs_domains_and_categories_from_existing_data() {
 
     let ctx = MigrationContext {
         // Trailing/leading spaces, mixed case, the admin pseudo-org, and malformed entries all
-        // follow the Node parsing rules exactly.
+        // follow the frozen domain-seeding rules.
         org_email_domains: " Example.COM : acme , globex.io:globex ,skip.example:admin,broken,:orphan,nodomain.example: "
             .to_owned(),
     };
@@ -279,7 +279,7 @@ fn migration_seven_seeds_nothing_without_environment_domains() {
 #[test]
 fn environment_domain_seeding_trims_like_the_retired_node_runtime() {
     // JavaScript's `trim` strips U+FEFF but keeps U+0085, so the seeded rows differ from what a
-    // Rust `trim` would produce. Rows Node seeded this way must stay the rows Rust seeds.
+    // Rust `trim` would produce. Domain seeding must preserve existing organization routing.
     let dir = TempDataDir::new("org-registry-js-trim");
     let pool = migrate(
         &dir,
@@ -298,7 +298,6 @@ fn environment_domain_seeding_trims_like_the_retired_node_runtime() {
             .expect("rows")
     };
 
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     assert_eq!(
         rows("SELECT domain || '=' || org FROM org_domains ORDER BY domain"),
         [
@@ -514,7 +513,7 @@ fn existing_plaintext_webhook_rows_are_encrypted_in_place() {
         ),
         "https://discord.com/…oken"
     );
-    // Without a configured cipher the bootstrap leaves plaintext rows untouched (Node returns 0).
+    // Without a configured cipher the bootstrap leaves plaintext rows untouched.
     assert_eq!(
         scalar::<String>(
             &conn,
@@ -713,11 +712,10 @@ fn populated_schema_31_databases_upgrade_to_the_latest_version_and_reopen_cleanl
     );
 }
 
-/// The newest migration-boundary fixture. `scripts/generate-historical-fixtures.mjs` wrote it with
-/// the retired Node runtime's `lib/migrations.js`, so it stands in for a production database that
-/// Node created and Rust now opens.
+/// The newest migration-boundary fixture is a frozen pre-Rust database.
+/// Opening it checks that current migrations can upgrade existing production data.
 const NODE_CREATED_FIXTURE: &str = "conformance/fixtures/historical/boundary-v40/artifacts.db";
-/// The schema version the Node runtime migrated [`NODE_CREATED_FIXTURE`] to.
+/// The recorded schema version of [`NODE_CREATED_FIXTURE`].
 const NODE_CREATED_VERSION: i64 = 40;
 
 #[test]
@@ -730,7 +728,7 @@ fn a_node_created_database_has_the_rust_schema_and_reopens_without_remigrating()
     )
     .expect("copy the immutable Node-created fixture");
 
-    // Rust bootstrap applies only migrations newer than the ones Node already recorded.
+    // Bootstrap applies only migrations newer than the recorded schema version.
     let mut conn = db::open_bootstrap_connection(&node_db).expect("bootstrap connection");
     assert_eq!(
         migrations::current_version(&conn).expect("version"),

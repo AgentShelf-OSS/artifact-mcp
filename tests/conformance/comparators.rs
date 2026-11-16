@@ -535,7 +535,7 @@ fn match_entity(text: &str) -> Result<Option<(char, usize)>, String> {
 
 // --- Header normalizer -------------------------------------------------------------------------
 
-/// The response headers as one flat string per name (`node:http` joins arrays with ", ").
+/// The response headers as one flat string per name, joining repeated values with ", ".
 pub fn flat_headers(headers: &Headers) -> Vec<(String, String)> {
     headers
         .iter()

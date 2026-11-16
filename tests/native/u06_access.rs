@@ -19,7 +19,7 @@
 //! 5. The wrappers cannot be built outside `security::access` — see the `compile_fail` doctests
 //!    on that module, and `wrapper_construction_is_module_private` below for the argument.
 //! 6. The full viewer × artifact × concealment and publisher × artifact decision matrices match
-//!    frozen values captured from the retired Node runtime.
+//!    the frozen access-policy values.
 
 use std::collections::BTreeMap;
 use std::sync::Mutex;
@@ -47,7 +47,7 @@ use axum::response::IntoResponse;
 const EXISTING_FOREIGN: &str = "acmeartifact";
 /// The probe id from every `nonexistent` step of the conformance case.
 const NONEXISTENT: &str = "zzzzzzzzzzzz";
-/// Ids the router reserves; `lib/app.js` maps them to `null` before the decision.
+/// Reserved ids resolve to no artifact before the access decision.
 const RESERVED_IDS: [&str; 6] = ["raw", "settings", "mcp", "s", "favicon.ico", "UPPERCASE1"];
 
 fn artifact(id: &str, org: &str, client_id: &str) -> ArtifactMeta {
@@ -454,7 +454,7 @@ fn the_ledger_of_artifact_scoped_surfaces_is_covered_by_one_gate() {
 }
 
 // ---------------------------------------------------------------------------
-// 2. Un-concealed mode (kept from the retired Node runtime) and the admin-role decision
+// 2. Un-concealed mode and the admin-role decision
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -489,7 +489,7 @@ fn revealed_mode_keeps_the_historical_statuses() {
 
 #[test]
 fn admin_only_settings_stay_a_role_answer_not_a_tenant_answer() {
-    // Node answers 403 (not 401) for an unsigned caller on the settings surface.
+    // An unsigned caller on the settings route receives 403, not 401.
     let unsigned_denial = AccessPolicy::admin_access(&unsigned()).unwrap_err();
     assert_eq!(
         unsigned_denial,
@@ -585,7 +585,7 @@ async fn the_gate_reads_only_metadata_before_deciding() {
         }
     }
 
-    // A reserved id short-circuits before the lookup, exactly like `lib/app.js:81`, and still
+    // A reserved id short-circuits before the lookup and still
     // produces the same concealed answer.
     for reserved in RESERVED_IDS {
         spy.reset();
@@ -740,8 +740,7 @@ fn a_publisher_admin_key_is_the_org_and_owns_every_tenant() {
         AppError::NotFound(unknown_artifact_message(NONEXISTENT))
     );
 
-    // A key that is merely flagged is NOT an admin: Node's publisher identity has no such flag,
-    // the org is the whole rule.
+    // A key flag alone does not grant admin access. The publisher org is the whole rule.
     let flagged = PublisherIdentity {
         ..publisher("acme-key", "acme")
     };
@@ -903,7 +902,6 @@ const FORBIDDEN: &str = "403 Forbidden";
 
 /// Per viewer: the admin-role decision, then `(revealed, concealed)` for each artifact in
 /// `MATRIX_ARTIFACTS` order. A decision is `ok` or `<status> <message>`.
-// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 #[rustfmt::skip]
 const VIEWER_MATRIX: [ViewerRow; 8] = [
     ("unsigned-null", "403 Not signed in",
@@ -930,7 +928,6 @@ const CANNOT_READ: &str = "Permission denied: this API key cannot read this arti
 /// Per publisher and artifact (in `MATRIX_ARTIFACTS` order): the read/write/delete
 /// capabilities as `rwd` flags (`-` = denied, empty for the absent artifact), then the
 /// concealed publisher-read decision.
-// Frozen vector: captured from the retired Node runtime at commit 7211de0.
 #[rustfmt::skip]
 const PUBLISHER_MATRIX: [(&str, [(&str, &str); 5]); 7] = [
     ("acme-author",

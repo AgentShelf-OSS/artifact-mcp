@@ -798,7 +798,7 @@ fn durations_follow_the_cloudflare_syntax() {
     }
 }
 
-/// Every case above, run through the former Node script and through the port.
+/// Replay each case through the current command and the optional script reference.
 #[test]
 fn node_parity_when_the_former_script_is_available() {
     let Some(dir) = std::env::var_os("XTASK_NODE_PARITY_DIR") else {

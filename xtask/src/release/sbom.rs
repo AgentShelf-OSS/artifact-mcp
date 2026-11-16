@@ -1,9 +1,8 @@
 //! `cargo xtask release source-sbom`, ported from `scripts/release/generate-source-sbom.mjs`.
 //!
-//! Writes a deterministic SPDX 2.3 source SBOM for the files committed at HEAD. The output is
-//! byte-identical to the Node script for the same arguments and tree. One check is new: the
-//! tracked files must match HEAD (`git status`), because the SBOM claims to describe that commit
-//! and the workflow now compiles this tool before it hashes the tree.
+//! Writes a deterministic SPDX 2.3 source SBOM for the files committed at HEAD.
+//! The tracked files must match HEAD (`git status`), because the SBOM claims to describe
+//! that commit and the workflow compiles this tool before it hashes the tree.
 
 use std::process::{Command, Stdio};
 

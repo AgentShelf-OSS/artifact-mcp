@@ -13,9 +13,10 @@
 //!
 //! # Not best-effort
 //!
-//! Unlike view analytics, the notification projection does **not** suppress failures. The retired Node twin built notification state outside its guarded per-org loop, so a failure failed the gallery request. Preserve that policy because an empty badge would silently hide feedback. These functions return `Result` instead of degrading like [`crate::persistence::views`].
+//! Unlike view analytics, the notification projection does **not** suppress failures. Preserve that policy because an empty badge would silently hide feedback. These functions return `Result` instead of degrading like [`crate::persistence::views`].
 //!
-//! The retired Node twin passed `@limit` to counting statements that did not use it. Its SQLite driver ignored the extra named value; rusqlite rejects unknown parameter names, so the count path binds only the parameters its statement declares. This preserves the frozen results.
+//! The count path binds only the parameters its statement declares. Binding an unused `@limit`
+//! would fail because rusqlite rejects unknown parameter names.
 
 use rusqlite::Connection;
 

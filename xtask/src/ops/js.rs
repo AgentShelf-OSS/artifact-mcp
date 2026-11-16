@@ -1,7 +1,7 @@
 //! JSON values with JavaScript semantics.
 //!
-//! The operator commands replace Node scripts whose request bodies and printed JSON other tools
-//! consume. To keep those bytes identical, this module models a parsed JSON value the way V8 does:
+//! Other tools consume the operator commands' request bodies and printed JSON.
+//! To keep those bytes stable, this module models a parsed JSON value the way V8 does:
 //! object keys keep insertion order, except that array-index keys ("0", "1", ...) come first in
 //! ascending order; a duplicate key keeps its first position and takes the last value; every
 //! number is an IEEE double printed like `Number.prototype.toString`. [`stringify()`] and

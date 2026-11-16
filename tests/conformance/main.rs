@@ -14,8 +14,7 @@
 //! only declared-volatile fields, compare per the case's declared modes, stop the server cleanly,
 //! then run post-state SQL / file / directory assertions. Every case gets its own data dir.
 //!
-//! The case and golden JSON formats are unchanged from the retired Node runner
-//! (`conformance/runner.mjs`); see `conformance/README.md`.
+//! The case and golden JSON formats are defined in `conformance/README.md`.
 
 mod comparators;
 mod http;
@@ -44,7 +43,7 @@ use server::Server;
 
 const REQUEST_TIMEOUT: Duration = Duration::from_secs(120);
 const VOLATILE: &str = "<volatile>";
-/// `Number.MAX_SAFE_INTEGER`; node:sqlite refuses to read larger integers as numbers.
+/// Largest exactly representable JavaScript integer. SQL golden values use this numeric range.
 const MAX_SAFE_INTEGER: u64 = (1 << 53) - 1;
 
 fn repo_root() -> PathBuf {
@@ -478,7 +477,7 @@ fn build_request(spec: Option<&Js>, symbols: &Obj) -> Result<BuiltRequest, Strin
         spec.get("rawBody")
             .map(|raw| subst_str(&to_js_string(raw), symbols).into_bytes())
     };
-    // node:http request helper: a payload gets a content-length unless the case set one.
+    // A payload gets a content-length unless the case set one.
     if let Some(body) = &body
         && !headers.contains_key("content-length")
     {
@@ -723,8 +722,8 @@ fn normalize_step(step: &Js, response: &http::Response, captures: &Obj) -> Resul
     Ok(Js::Obj(out))
 }
 
-/// Open the SQLite database a case left behind, configured as `node:sqlite` opens it (foreign keys
-/// enforced, double-quoted string literals rejected) with a 5 s busy timeout. The file must
+/// Open the SQLite database a case left behind, with foreign keys enforced
+/// and double-quoted string literals rejected with a 5 s busy timeout. The file must
 /// already exist: the server under test creates it, never this harness.
 fn open_database(path: &Path, read_only: bool) -> Result<Connection, String> {
     if !path.exists() {
@@ -746,7 +745,7 @@ fn open_database(path: &Path, read_only: bool) -> Result<Connection, String> {
     Ok(connection)
 }
 
-/// Rows as `node:sqlite` returns them from `statement.all()`.
+/// SQL rows converted to the JSON value shapes used by the committed goldens.
 fn query_rows(connection: &Connection, query: &str) -> Result<Vec<Obj>, String> {
     let fail = |error: rusqlite::Error| format!("post-state SQL {query:?}: {error}");
     let mut statement = connection.prepare(query).map_err(fail)?;

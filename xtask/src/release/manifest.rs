@@ -1,8 +1,7 @@
 //! `cargo xtask release manifest`, ported from `scripts/release/generate-manifest.mjs`.
 //!
 //! Builds `release-manifest.json` from arguments only, so ambient CI variables cannot become
-//! unrecorded release inputs. The output is byte-identical to the Node script for the same
-//! arguments and files.
+//! unrecorded release inputs. Output bytes are deterministic for the same arguments and files.
 
 use super::js::{self, Js};
 use super::{Failure, finish, format, parse_pairs, resolve, sha256_hex, wants_help, write_output};
@@ -98,7 +97,7 @@ fn generate(args: &[String]) -> std::result::Result<(), Failure> {
         .zip(["--schema-min", "--schema-current", "--schema-max"])
     {
         let parsed = js::string_to_number(arg(key));
-        // `parsed < 0` is false for -0, which Node accepted and wrote as 0.
+        // `parsed < 0` is false for -0, so negative zero is accepted and written as 0.
         if !js::is_safe_integer_number(parsed) || parsed < 0.0 {
             return Err(Failure::Usage(format!(
                 "{key} must be a non-negative integer"

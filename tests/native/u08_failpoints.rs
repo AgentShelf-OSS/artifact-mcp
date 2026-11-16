@@ -3,9 +3,7 @@
 //!
 //! Two flavours are injected at each boundary:
 //!
-//! * [`ScriptedFaults::fail_once`] — an in-process error, so the operation's compensation runs
-//!   as the retired Node runtime's `catch` blocks did ([lib/store.js:222-227],
-//!   [lib/store.js:429-437], [lib/store.js:640-643]).
+//! * [`ScriptedFaults::fail_once`] — an in-process error, so the operation's compensation runs.
 //! * [`ScriptedFaults::crash_once`] — the process died at that boundary, so **nothing**
 //!   compensates. The surviving on-disk and database state is then handed to
 //!   `audit_storage(clean_transient = true)`, which is exactly what the binary runs at startup
@@ -581,10 +579,9 @@ async fn update_compensation_restores_the_previous_revision_exactly() {
         );
 
         if point == FaultPoint::UpdateCommitTransaction {
-            // The metadata transaction throwing is the one path Node does not wrap in a `catch`
-            // ([lib/store.js:406-415] sits outside the try), so the staged body is left for
-            // startup reconciliation. It is unreferenced — the installed body already matches the
-            // committed digest — so it is discarded, not installed.
+            // A metadata transaction failure leaves the staged body for startup reconciliation.
+            // It is unreferenced because the installed body already matches the committed digest,
+            // so reconciliation discards it rather than installing it.
             assert_eq!(
                 fixture.staging_entries().len(),
                 1,

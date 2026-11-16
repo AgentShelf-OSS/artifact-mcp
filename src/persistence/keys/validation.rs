@@ -48,8 +48,8 @@ pub fn is_valid_client_id(value: &str) -> bool {
 
 /// `/^[a-z0-9][a-z0-9._-]{0,40}$/i`
 ///
-/// Identical to `orgs::is_valid_org_name`; both files carry the same regex and both are ported
-/// against their own source line.
+/// Identical to `orgs::is_valid_org_name`; key organizations and registered organizations
+/// must accept the same names.
 #[must_use]
 pub fn is_valid_key_org(value: &str) -> bool {
     let mut characters = value.chars();

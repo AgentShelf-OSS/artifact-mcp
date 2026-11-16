@@ -1,6 +1,6 @@
 //! Canonical body and bundle digests.
 //!
-//! Frozen digest algorithm, originally used by the retired Node twin:
+//! Frozen digest algorithm for persisted body hashes:
 //!
 //! ```text
 //! function sha256(content) {

@@ -80,7 +80,7 @@ fn bodies(rows: Vec<Feedback>) -> Vec<String> {
 
 #[test]
 fn feedback_ids_are_16_symbols_of_the_frozen_lowercase_alphabet() {
-    // Unlike artifact ids, this alphabet keeps `l` and `o` [lib/feedback.js:10].
+    // Unlike artifact ids, this alphabet keeps `l` and `o`.
     assert_eq!(FEEDBACK_ID_LENGTH, 16);
     assert_eq!(FEEDBACK_ID_ALPHABET, "0123456789abcdefghijklmnopqrstuvwxyz");
     let ids = NanoIdSource::default();
@@ -135,7 +135,7 @@ fn body_is_trimmed_and_bounded_by_feedback_max_body() {
     assert_eq!(stored.anchor_page, None);
 
     // Boundary: exactly the limit passes, one more fails, and the limit is measured *after*
-    // trimming [lib/feedback.js:85-87].
+    // trimming.
     let at_limit = "x".repeat(usize::try_from(MAX_BODY).expect("fits"));
     assert!(add(&submission(&at_limit), MAX_BODY).is_ok());
     assert_eq!(
@@ -167,9 +167,8 @@ fn a_body_over_the_schema_bound_is_a_validation_error_not_an_internal_one() {
     // `FEEDBACK_MAX_BODY` is an environment knob, but the `feedback` table carries its own
     // `CHECK (length(trim(body)) BETWEEN 1 AND 4000)` from migration 5. Configure the knob above
     // the schema bound and the insert is rejected by SQLite instead of by the length guard.
-    // Node's route surfaces that thrown `SqliteError` as a 400 with SQLite's own message
-    // [lib/app.js:599-601], so the port maps a constraint violation to `Validation`, not to the
-    // 500 that a naive "any SQL error is infrastructure" mapping would produce.
+    // The route returns a 400 with SQLite's own message, so a constraint violation maps
+    // to `Validation`. Treating every SQL error as infrastructure would instead return 500.
     let body = submission(&"x".repeat(4_001));
     let error = feedback::add(
         &conn,
@@ -241,7 +240,7 @@ fn replies_are_one_level_deep_and_scoped_to_their_parents_artifact() {
     let empty_parent = add(&artifact, &reply_to(&FeedbackId::from(""))).expect("add");
     assert_eq!(empty_parent.parent_id, None);
 
-    // A reply silently drops any anchor and page it was given [lib/feedback.js:106-107].
+    // A reply silently drops any anchor and page it was given.
     let mut anchored_reply = reply_to(&parent.id);
     anchored_reply.anchor = Some(point(0.5, 0.5));
     anchored_reply.anchor_path = Some("#heading".to_owned());
@@ -380,7 +379,7 @@ fn anchor_validation_matrix() {
         );
     }
 
-    // An over-hanging box is trimmed to the edge rather than rejected [lib/feedback.js:28-31].
+    // An over-hanging box is trimmed to the edge rather than rejected.
     let trimmed = feedback::normalize_anchor(Some(&boxed(0.8, 0.9, 0.5, 0.5)), None)
         .expect("an over-hanging box is trimmed");
     assert!((trimmed.anchor_w.expect("w") - 0.2).abs() < 1e-9);
@@ -618,7 +617,7 @@ fn an_anchor_page_is_persisted_only_for_anchored_top_level_feedback() {
     assert_eq!(stored.anchor_path.as_deref(), Some("#section-2"));
 
     // Without an anchor the page is dropped even when the caller supplies one — the store's own
-    // guard, independent of the route's validation [lib/feedback.js:106].
+    // guard, independent of the route's validation.
     let unanchored = submission("unanchored");
     let stored = feedback::add(
         &conn,
@@ -713,7 +712,7 @@ fn viewer_mutations_check_artifact_scope_before_ownership() {
     let stranger = EmailAddress::from("stranger@example.com");
 
     // Wrong artifact, wrong org, and a missing id all produce the *same* 404, so a feedback id is
-    // not a cross-tenant existence oracle [lib/app.js:624-626].
+    // not a cross-tenant existence oracle.
     for wrong in [
         scope(&elsewhere, &org_id, &mine.id),
         scope(&artifact, &org("globex"), &mine.id),
@@ -851,7 +850,7 @@ fn listings_put_open_items_first_in_their_frozen_order() {
             "old resolved"
         ]
     );
-    // `listAll(artifactId)` is the thread order, not the firehose order [lib/feedback.js:154].
+    // `listAll(artifactId)` is the thread order, not the firehose order.
     assert_eq!(
         bodies(feedback::list_all(&conn, Some(&artifact)).expect("list all for artifact")),
         ["old open", "new open", "old resolved", "new resolved"]
@@ -931,9 +930,8 @@ fn a_non_admin_key_never_sees_the_new_tenants_feedback_after_a_move() {
     .expect("add");
     assert_eq!(before.org, org_id);
 
-    // `moveArtifactToOrg` moves the artifact and its feedback but keeps `client_id`
-    // [lib/store.js:469-478], so the org filter is the only thing between the old key and the new
-    // tenant's bodies, anchors, and verified viewer emails.
+    // Moving an artifact also moves its feedback but keeps `client_id`. The org filter
+    // prevents the old key from reading the new tenant's bodies, anchors, and viewer emails.
     let transaction = conn.transaction().expect("begin");
     transaction
         .execute_batch("PRAGMA defer_foreign_keys = ON")
@@ -972,7 +970,6 @@ fn a_non_admin_key_never_sees_the_new_tenants_feedback_after_a_move() {
 /// `len` disagree with both on several of these inputs.
 #[test]
 fn body_trim_and_length_match_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     // (input, input.trim(), input.trim().length)
     let cases: [(&str, &str, usize); 12] = [
         ("  hello  ", "hello", 5),
@@ -1002,7 +999,6 @@ fn body_trim_and_length_match_the_frozen_node_vector() {
 /// submission is wrong in two ways at once.
 #[test]
 fn submissions_persist_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let fixture = Fixture::new("u11-frozen-rows");
     let conn = fixture.conn();
     let artifact = fixture.seed_artifact("frozen000001", ORG, CLIENT);

@@ -1,9 +1,8 @@
 //! U09 publisher-key persistence: validation, uniqueness, revocation, the `ARTIFACT_API_KEYS`
 //! bootstrap matrix, and the guarantee that a raw secret never reaches storage, logs, or errors.
 //!
-//! Behaviour ported from the retired Node runtime's `lib/keys.js` and `seedKeysFromEnv`
-//! ([lib/db.js:30-59]). `seeded_rows_and_hashes_match_the_frozen_node_vector` pins the persisted
-//! `api_keys` rows that runtime wrote, hashes included.
+//! `seeded_rows_and_hashes_match_the_frozen_node_vector` pins the persisted
+//! `api_keys` row format, hashes included.
 
 use std::sync::Arc;
 
@@ -262,7 +261,7 @@ fn revokes_once_and_never_matches_an_untrimmed_id() {
     let conn = db.conn();
     keys::create_key(&conn, &request("pub", "acme", ""), &random()).expect("create");
 
-    // `revokeKey` passes the id through untrimmed. [lib/keys.js:44]
+    // `revokeKey` passes the id through untrimmed.
     assert!(!keys::revoke_key(&conn, " pub ").expect("revoke"));
     assert!(!keys::revoke_key(&conn, "missing").expect("revoke"));
     assert!(keys::revoke_key(&conn, "pub").expect("revoke"));
@@ -376,7 +375,7 @@ fn seeds_three_part_two_part_and_colon_bearing_entries() {
     assert_eq!(
         seeded_rows(&conn),
         [
-            // Each part is trimmed before the secret is rejoined on ":". [lib/db.js:41-44]
+            // Each part is trimmed before the secret is rejoined on ":".
             ("empty".to_owned(), "default".to_owned(), hash_of("s4")),
             ("full".to_owned(), "acme".to_owned(), hash_of("s1")),
             ("short".to_owned(), "default".to_owned(), hash_of("s2")),
@@ -413,7 +412,7 @@ fn seeding_never_touches_an_existing_row() {
     let before = seeded_rows(&conn);
 
     // Same client id, different org and secret: `ON CONFLICT(client_id) DO NOTHING` means the
-    // Settings-managed (and revoked) row stays authoritative. [lib/db.js:28-29]
+    // Settings-managed (and revoked) row stays authoritative.
     assert_eq!(
         keys::seed_keys_from_env(&conn, "pub:other:brand-new").expect("seed"),
         0
@@ -432,10 +431,9 @@ fn seeding_never_touches_an_existing_row() {
 /// The `ARTIFACT_API_KEYS` seeding matrix, replayed in order, and the exact rows it persists.
 ///
 /// The hashes are literal so a change to the seed parser or to the hash encoding cannot pass by
-/// agreeing with itself: a row the retired runtime seeded must keep authenticating.
+/// agreeing with itself: an existing seeded row must keep authenticating.
 #[test]
 fn seeded_rows_and_hashes_match_the_frozen_node_vector() {
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let db = TestDb::new("u09-seed-frozen");
     let conn = db.conn();
 

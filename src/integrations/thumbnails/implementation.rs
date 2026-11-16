@@ -18,8 +18,8 @@
 //!   unable to fail because of a preview;
 //! * a disabled renderer short-circuits to `None` before any network or filesystem work.
 //!
-//! This preserves the retired Node twin's best-effort preview behavior. Notifications are
-//! delivered without a preview on failure, and a failed startup audit does not prevent startup.
+//! Preview generation is best-effort. Notifications are delivered without a preview on failure, and
+//! a failed startup audit does not prevent startup.
 //!
 //! # Atomicity
 //!
@@ -114,8 +114,7 @@ pub fn valid_png(value: &[u8], max_bytes: u64) -> bool {
 /// 2. `for (const char of org)` iterates **code points**, but `char.charCodeAt(0)` then reads
 ///    only the **first UTF-16 code unit** of each one. For an astral character the trailing
 ///    surrogate is silently dropped: `"🎉"` contributes `0xD83C` alone. Iterating
-///    `str::encode_utf16` instead would feed both surrogates in and produce a different hue
-///    frozen from the retired Node runtime in
+///    `str::encode_utf16` instead would feed both surrogates in and change the hue pinned in
 ///    `tests/native/u16_thumbnails.rs` (`the_placeholder_matches_the_frozen_node_bytes`).
 #[must_use]
 pub fn safe_color(accent: Option<&str>, org: &str) -> String {
@@ -149,7 +148,7 @@ pub fn safe_color(accent: Option<&str>, org: &str) -> String {
 /// Build the thumbnail placeholder SVG.
 ///
 /// The SVG served whenever no PNG exists: renderer disabled, render still queued, or a bundle
-/// (which is never rendered). Preserves the retired Node twin's frozen bytes, newlines included; the
+/// (which is never rendered). The bytes are frozen, newlines included; the
 /// only interpolated values are the two frozen labels and a [`safe_color`] output, so nothing
 /// caller-controlled reaches the markup.
 #[must_use]

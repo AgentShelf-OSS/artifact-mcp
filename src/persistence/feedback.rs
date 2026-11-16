@@ -4,7 +4,7 @@
 //!
 //! # What is reproduced exactly
 //!
-//! * **Error strings and their evaluation order.** Check the body, then the reply parent, and only then normalize the anchor. The retired Node twin normalized the anchor while building the insert arguments, after both guards had passed. A submission that is empty *and* carries a broken anchor must therefore report the frozen empty-body message.
+//! * **Error strings and their evaluation order.** Check the body, then the reply parent, and only then normalize the anchor. A submission that is empty *and* carries a broken anchor must therefore report the frozen empty-body message.
 //! * **JavaScript string semantics.** `String.prototype.trim` and `String.prototype.length` are not Rust's: JS trims `U+FEFF` but not `U+0085`, and counts UTF-16 code units, so one emoji costs two characters of `FEEDBACK_MAX_BODY`. See [`js_trim`] and [`utf16_len`].
 //! * **SQL result ordering.** Every listing keeps the frozen `ORDER BY`: unresolved before resolved, then the per-listing tiebreak. HTTP/MCP conformance compares ordered JSON arrays, so a reordering is a visible break.
 //! * **Thread cascade.** `parent_id TEXT REFERENCES feedback(id) ON DELETE CASCADE` (migration 13) deletes replies with their parent — which only holds because `foreign_keys = ON` is one of the six pragmas verified on every connection.

@@ -2,8 +2,7 @@
 //!
 //! Covers credential extraction and precedence, the hash input, the derived admin flag, the
 //! invariant-1 org pinning matrix, and secret containment. Stored key hashes are pinned by a
-//! frozen vector captured from the retired Node runtime, because rows that runtime wrote must
-//! still authenticate.
+//! frozen vector, because existing stored keys must still authenticate.
 
 use std::sync::Arc;
 
@@ -17,8 +16,8 @@ use artifact_mcp::security::auth::{
 };
 use axum::http::{HeaderMap, HeaderName, HeaderValue};
 
-/// A directory holding exactly one active key, so "unknown" and "revoked" are indistinguishable
-/// from the authenticator's side — which is the property `lib/auth.js` relies on.
+/// A directory holding exactly one active key. Unknown and revoked credentials must
+/// produce the same authentication result.
 ///
 /// Its `Debug` redacts the secret. A derived one would leak it through
 /// `KeyAuthenticator`'s own derived `Debug`, which is exactly the failure the containment test
@@ -98,7 +97,7 @@ fn presented(pairs: &[(&str, &str)]) -> Option<String> {
 
 #[test]
 fn sha256_hex_is_lowercase_hex_of_the_utf8_bytes() {
-    // Published SHA-256 vectors; `lib/auth.js` hashes the same UTF-8 bytes.
+    // Published SHA-256 vectors pin the UTF-8 bytes used for credential hashing.
     assert_eq!(
         sha256_hex(""),
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
@@ -116,8 +115,7 @@ fn sha256_hex_is_lowercase_hex_of_the_utf8_bytes() {
 
 #[test]
 fn stored_key_hashes_match_the_retired_node_runtime() {
-    // `api_keys.key_hash` rows written by Node's `sha256Hex` must still match the request path.
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
+    // Stored `api_keys.key_hash` values must still match hashes computed from requests.
     for (secret, expected) in [
         (
             "s3cret-value",
@@ -142,7 +140,7 @@ fn stored_key_hashes_match_the_retired_node_runtime() {
 }
 
 // ---------------------------------------------------------------------------
-// Credential extraction — lib/auth.js:12-18
+// Credential extraction
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -172,8 +170,8 @@ fn bearer_header_is_matched_case_insensitively_and_trimmed() {
 
 #[test]
 fn a_matching_bearer_header_shadows_x_api_key_even_when_it_yields_nothing() {
-    // `bearer()` returns from the `if (m)` branch, so the fallback is unreachable behind a
-    // syntactically valid but empty Bearer value. [lib/auth.js:15]
+    // A matching Bearer header takes precedence over `x-api-key` even when its credential
+    // is empty, so the fallback cannot authenticate that request.
     assert_eq!(
         presented(&[("authorization", "Bearer    "), ("x-api-key", "fallback")]),
         None
@@ -286,7 +284,7 @@ async fn a_lookup_failure_is_not_downgraded_to_unauthorized() {
 }
 
 // ---------------------------------------------------------------------------
-// Admin derivation — lib/access.js:35
+// Admin derivation
 // ---------------------------------------------------------------------------
 
 fn identity(org: &str) -> PublisherIdentity {
@@ -317,7 +315,7 @@ fn admin_is_exactly_the_literal_org_admin() {
 }
 
 // ---------------------------------------------------------------------------
-// Invariant 1 — org pinning [lib/mcp.js:334-337,436-437]
+// Invariant 1 — org pinning
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -357,7 +355,7 @@ fn an_admin_key_targets_a_named_org_and_otherwise_falls_back() {
         OrgTarget::pinned(&admin, Some("  acme  ")).org(),
         &OrgId::from("acme")
     );
-    // A blank org is falsy in Node, so the key's own org wins — which is the literal `admin`.
+    // A blank org selects the key's own org, which is the literal `admin`.
     assert_eq!(OrgTarget::pinned(&admin, None).org(), &OrgId::from("admin"));
     assert_eq!(
         OrgTarget::pinned(&admin, Some("   ")).org(),

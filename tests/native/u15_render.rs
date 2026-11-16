@@ -358,7 +358,6 @@ fn viewer_shell_uses_the_single_js_encoder_and_exact_opaque_origin_sandbox() {
 #[test]
 fn fixed_clock_rendering_snapshot_matches_frozen_vectors() {
     let attack = "</script>\"&\u{2028}\u{2029}🎉";
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let sandbox = "allow-scripts allow-popups allow-forms allow-modals";
     let shell_src = "/raw/artifact1234?anchor=1&reader=1&v=deadbeefcafe";
     let viewer_literal = r#""\u003c/script\u003e\"\u0026\u2028\u2029🎉""#;

@@ -91,10 +91,10 @@ fn js_trim(value: &str) -> &str {
 /// Parse the optional webhook encryption key.
 ///
 /// Absent, or empty after trimming, yields `None` (the plaintext fallback). Otherwise the value
-/// must decode to exactly 32 bytes **and** re-encode to itself. The retired Node twin combined
-/// a lenient decoder with a re-encode guard to accept only canonical padded encodings.
+/// must decode to exactly 32 bytes **and** re-encode to itself. Only canonical padded encodings
+/// are accepted.
 /// `base64`'s `STANDARD` engine rejects non-canonical padding and non-zero trailing bits
-/// directly; the re-encode check retains the historical accepted key format explicitly.
+/// directly; the re-encode check retains the accepted stored key format explicitly.
 ///
 /// # Errors
 /// Returns [`AppError::Validation`] carrying [`INVALID_KEY_MESSAGE`] verbatim.
@@ -297,7 +297,7 @@ fn aead_failure(reason: &'static str) -> AppError {
 /// The three at-rest columns of `org_webhooks` as a single value.
 ///
 /// `url` is the *displayable* column: the masked form when encryption is on, and the real URL when
-/// the plaintext fallback is active, preserving the stored format from the retired Node twin.
+/// the plaintext fallback is active.
 #[derive(Clone, PartialEq, Eq)]
 pub struct StoredWebhookUrl {
     /// The `url` column: masked when `encrypted` is `Some`, verbatim otherwise.

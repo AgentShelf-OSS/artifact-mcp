@@ -170,8 +170,8 @@ pub fn unknown_artifact_message(id: &str) -> String {
 /// Whether a denial is allowed to reveal that the artifact exists.
 ///
 /// Every artifact-scoped human route uses [`Concealment::Conceal`].
-/// [`Concealment::Reveal`] retains the un-concealed decision from the retired Node twin;
-/// its behavior is pinned by frozen tests.
+/// [`Concealment::Reveal`] exposes the denial status and message;
+/// `tests/native/u06_access.rs` pins both reveal and conceal decisions.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Concealment {
     /// `{ conceal: true }` — foreign and missing answer identically.

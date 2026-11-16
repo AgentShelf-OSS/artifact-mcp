@@ -30,7 +30,6 @@ fn weak_etag_matches_the_frozen_express_etag_vectors() {
         "ETags hash UTF-8 bytes: \u{1f389}".as_bytes(),
         &[0, 1, 2, 127, 128, 254, 255],
     ];
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let expected = [
         "W/\"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk\"",
         "W/\"18-UaVUwJRaEdYpGlgIIEN1QooEbkw\"",
@@ -180,7 +179,7 @@ async fn etag_middleware_preserves_head_and_express_conditional_get_semantics() 
 
 #[tokio::test]
 async fn etag_middleware_passes_streamed_bodies_through_without_buffering() {
-    // A streamed body (NDJSON data, PCM speech) has no exact size. Express never ETags a stream,
+    // A streamed body (NDJSON data, PCM speech) has no exact size. Streams receive no ETag,
     // and buffering one would hold every byte until the upstream finishes.
     async fn first_chunk_then_wait(content_type: &'static str) -> Response {
         let chunks = futures_util::stream::once(async {

@@ -26,7 +26,7 @@ cargo xtask publish-data-artifact --mcp https://your-host/mcp \
 Set ARTIFACT_MCP_API_KEY through your secret manager. Optional --org selects an \
 organization for an admin key; --artifact-id updates an existing artifact.";
 
-/// Parsed flags (Node `util.parseArgs` with these string options and boolean `--help`).
+/// Parsed string flags and the boolean `--help` option.
 #[derive(Debug, Default)]
 struct Values {
     mcp: Option<String>,
@@ -91,7 +91,7 @@ fn parse_args(args: &[String]) -> Result<Values, String> {
             continue;
         }
         if arg.len() > 2 && arg.starts_with("--") {
-            // Node looks for `=` from index 3 (`arg.includes('=', 3)`), so `--=x` is a name.
+            // Search for `=` from index 3, so `--=x` is an option name rather than an assignment.
             if let Some(equals) = arg.match_indices('=').map(|(at, _)| at).find(|at| *at >= 3) {
                 let name = &arg[2..equals];
                 tokens.push(Token::Option {

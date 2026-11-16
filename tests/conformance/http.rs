@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright 2026 Neil Blackman
 //
-// A minimal HTTP/1.1 client that behaves like the `node:http` request the goldens were recorded
-// with.
+// A minimal HTTP/1.1 client that preserves the request and response shapes in the goldens.
 //
 // The request-target is sent VERBATIM. It is deliberately NOT run through a URL parser, which
 // would collapse dot-segments and percent-decode `%2e`; that normalization would silently defuse
 // the bundle path-traversal cases before they ever reach the server.
 //
-// The request headers match what `node:http` sends: the case headers, then `Host`, then
+// The frozen request header order is: the case headers, then `Host`, then
 // `Connection: keep-alive`, and `Transfer-Encoding: chunked` (with an empty chunked body) for a
-// body-less POST, PUT or PATCH. Response headers are folded with the `node:http` duplicate rules
-// and decoded as Latin-1, as `IncomingMessage.headers` does.
+// body-less POST, PUT or PATCH. Response headers use the duplicate rules below
+// and are decoded as Latin-1 to match the golden header values.
 
 use std::io::{BufRead, BufReader, Write};
 use std::net::{Shutdown, TcpStream};
@@ -28,7 +27,7 @@ pub enum HeaderValue {
 #[derive(Clone, Debug, Default)]
 pub struct Headers(Vec<(String, HeaderValue)>);
 
-/// Duplicates of these response headers are dropped (the first value wins) by `node:http`.
+/// Duplicates of these response headers are dropped. The frozen goldens keep the first value.
 const SINGLE_VALUE_HEADERS: [&str; 18] = [
     "age",
     "authorization",
@@ -98,7 +97,7 @@ pub struct Request<'a> {
     pub body: Option<&'a [u8]>,
 }
 
-/// Methods for which `node:http` does not default to chunked encoding.
+/// Methods for which the conformance client does not default to chunked encoding.
 const NO_DEFAULT_BODY: [&str; 6] = ["GET", "HEAD", "DELETE", "OPTIONS", "TRACE", "CONNECT"];
 
 fn latin1(text: &str, what: &str) -> Result<Vec<u8>, String> {
@@ -170,7 +169,7 @@ fn encode(port: u16, request: &Request<'_>) -> Result<(Vec<u8>, String), String>
 
 /// Send one request on a fresh connection and read one response.
 ///
-/// The request is written from a second thread while the response is read, as `node:http` does,
+/// The request is written from a second thread while the response is read,
 /// so a server that answers (for example `413`) before it has read a large body is still observed.
 pub fn send(port: u16, request: &Request<'_>, timeout: Duration) -> Result<Response, String> {
     let (bytes, method) = encode(port, request)?;
@@ -234,7 +233,7 @@ fn read_response(reader: &mut impl BufRead, head_request: bool) -> Result<Respon
                     String::from_utf8_lossy(&line)
                 )
             })?;
-            // node:http decodes header text as Latin-1 and trims surrounding whitespace.
+            // Decode header text as Latin-1 and trim surrounding whitespace to match the goldens.
             let name: String = line[..colon]
                 .iter()
                 .map(|byte| char::from(*byte).to_ascii_lowercase())

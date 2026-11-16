@@ -1,4 +1,4 @@
-//! Regression coverage for the coordinated Node/Rust security wave 2 changes.
+//! Regression coverage for the security wave 2 changes.
 
 use std::{
     collections::BTreeSet,

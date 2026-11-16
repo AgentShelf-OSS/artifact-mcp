@@ -404,8 +404,8 @@ fn loopback_http_switch_is_ignored_when_oauth_is_disabled() {
     assert!(!config.oauth.allow_loopback_http);
 }
 
-/// The HTTPS-only OAuth URL policy for both URL settings. The expected verdicts are the ones the
-/// retired Node runtime's `oauthConfigFromEnv` reached for the same matrix.
+/// The HTTPS-only OAuth URL policy for both URL settings. The matrix pins which URL
+/// shapes are accepted before OAuth configuration is used.
 #[test]
 fn oauth_url_policy_for_both_settings() {
     let mut cases = Vec::new();

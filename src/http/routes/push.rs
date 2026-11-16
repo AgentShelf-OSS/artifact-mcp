@@ -115,7 +115,7 @@ async fn manifest() -> Response {
 /// authorization, admin handling, and concealed `404` ([`authorize`]). Public shares get no
 /// per-artifact manifest. Object keys are sorted recursively (`serde_json::Map` is ordered by
 /// key, and `sort_all_objects` keeps that true under `preserve_order`) and the JSON is compact,
-/// preserving the frozen manifest bytes from the retired Node twin.
+/// preserving the frozen manifest bytes checked by conformance.
 async fn artifact_manifest(
     State(deps): State<AppDeps>,
     Path(id): Path<String>,

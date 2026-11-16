@@ -16,8 +16,8 @@
 //!
 //! `Cf-Access-Jwt-Assertion` is preferred; the `CF_Authorization` cookie is the fallback. The
 //! header wins *even when it is unusable*: a present-but-garbage header is used and fails,
-//! and the cookie is never consulted. This preserves the retired Node twin's precedence. That is
-//! load-bearing: `access_retry.rs` exists precisely because Cloudflare sometimes sends the cookie
+//! and the cookie is never consulted. This precedence matters: `access_retry.rs` exists precisely
+//! because Cloudflare sometimes sends the cookie
 //! without the header.
 //!
 //! # Claim validation, with a 60-second leeway
@@ -146,7 +146,7 @@ impl fmt::Display for AccessToken {
 
 /// The first value of a header, or `""` when absent or not valid UTF-8.
 ///
-/// The original implementation normalises repeated headers to a single joined string and also
+/// The token-source contract normalises repeated headers to a single joined string and also
 /// guards with `Array.isArray(h) ? h[0] : h`; taking the first value reproduces that guard.
 fn first_header<'a>(headers: &'a HeaderMap, name: &str) -> &'a str {
     headers
@@ -365,10 +365,8 @@ fn decode_json_object(segment: &str) -> Option<Map<String, Value>> {
 ///
 /// # Two deliberate narrowings
 ///
-/// * **An object claim.** The retired Node twin carried `String({})`, `"[object Object]"`,
-///   through as a viewer email whose org resolved to `""`. Collapsing it to no identity is
-///   strictly more fail-closed, and Cloudflare Access cannot issue a JWT whose `email` claim is
-///   an object.
+/// * **An object claim.** An object resolves to no identity, rather than the string
+///   `"[object Object]"`. Cloudflare Access cannot issue an object-valued `email` claim.
 /// * **Float formatting.** `serde_json`'s rendering can differ from JavaScript's (`1.0` vs `1`).
 ///   No email claim is ever a float, and either rendering fails the subsequent org lookup
 ///   identically.

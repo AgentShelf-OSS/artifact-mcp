@@ -16,8 +16,8 @@
 //!
 //! The stored and public URL masks differ by one character:
 //!
-//! * `storedMaskUrl` — `{scheme}://{host}/…{last4}` — what is written to the `url` column when a row is encrypted. Already ported as [`mask_webhook_url`](crate::persistence::migrations::mask_webhook_url) and applied by [`WebhookUrlProtection::protect`].
-//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored `https://discord.com/…oken` renders as `https://discord.com…oken`. The admin UI depends on this frozen display format, originally produced by the retired Node twin.
+//! * `storedMaskUrl` — `{scheme}://{host}/…{last4}` — what is written to the `url` column when a row is encrypted. Computed by [`mask_webhook_url`](crate::persistence::migrations::mask_webhook_url) and applied by [`WebhookUrlProtection::protect`].
+//! * `maskUrl` — `{scheme}://{host}…{last4}` (no slash) — what [`WebhookRow::public`] shows. It is applied to whatever is in the `url` column, so an encrypted row is masked *twice*: the stored `https://discord.com/…oken` renders as `https://discord.com…oken`. The admin UI depends on this frozen display format.
 //!
 //! # Secret containment
 //!

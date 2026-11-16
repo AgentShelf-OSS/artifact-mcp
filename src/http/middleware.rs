@@ -44,7 +44,7 @@ pub struct AccessRetryState {
 /// it is an independent CSRF signal rather than a secret.
 pub const PORTAL_MUTATION_HEADER: &str = "x-artifact-mutation";
 const PORTAL_MUTATION_VALUE: &str = "1";
-// Preserve the frozen response bytes and key order inherited from the retired Express server.
+// Preserve the frozen response bytes and key order checked by HTTP conformance.
 // This response returns before the ordinary `express_etag` layer, so the gate installs the
 // same representation headers itself.
 const CSRF_FORBIDDEN_BODY: &[u8] = br#"{"error":"forbidden","code":"same_origin_required"}"#;
@@ -240,7 +240,7 @@ pub async fn access_session_retry(
     response
 }
 
-/// Add a body-derived weak ETag using the frozen format from the retired Express server.
+/// Add a body-derived weak ETag using the frozen HTTP contract format.
 ///
 /// The frozen HTTP contract leaves redirects, bodyless MCP responses, listener-level Access
 /// retry pages, and the final 404 handler untagged. Within the Axum router those paths are
@@ -350,8 +350,8 @@ fn response_is_fresh(
     else {
         return false;
     };
-    // The frozen contract inherited the retired Express server's `fresh` behavior without
-    // Last-Modified: any If-Modified-Since condition is stale even when the ETag matches.
+    // Without Last-Modified, any If-Modified-Since condition is stale even when the ETag matches.
+    // This is part of the frozen conditional-request contract.
     if request_headers.contains_key(header::IF_MODIFIED_SINCE) {
         return false;
     }
@@ -373,7 +373,7 @@ fn response_is_fresh(
     })
 }
 
-/// Frozen weak entity tag from the retired Express server: lowercase hexadecimal byte length,
+/// Frozen weak entity tag format: lowercase hexadecimal byte length,
 /// a dash, and the first 27 Base64 characters of SHA-1 over the exact response bytes.
 #[must_use]
 pub fn weak_etag(content: &[u8]) -> String {

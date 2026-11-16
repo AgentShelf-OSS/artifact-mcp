@@ -139,7 +139,7 @@ impl Fixture {
         read_names(&self.artifact_dir)
     }
 
-    /// Entries that are hidden staging/trash paths. [lib/store.js:694]
+    /// Entries that are hidden staging/trash paths.
     pub fn transient_entries(&self) -> Vec<String> {
         self.entries()
             .into_iter()
@@ -315,7 +315,7 @@ pub fn bundle_update(revision: u64, files: &[(&str, &str)], entry: Option<&str>)
     }
 }
 
-/// The SHA-256 hex digest of a single body's UTF-8 bytes. [lib/store.js:77-79]
+/// The SHA-256 hex digest of a single body's UTF-8 bytes.
 pub fn sha256_hex(content: &str) -> String {
     artifact_mcp::artifacts::digest::sha256_hex(content.as_bytes())
 }

@@ -1,6 +1,6 @@
 //! PBI-056 provider contract: the Rust worker builds Discord execution URLs and classifies Discord
 //! responses and transport faults exactly as the frozen vectors below require, without leaking
-//! webhook credentials. The vectors were captured from the retired Node runtime.
+//! webhook credentials.
 
 use std::collections::BTreeMap;
 
@@ -124,7 +124,6 @@ fn provider_contract_matches_frozen_urls_responses_and_faults() {
         ],
         "faults": ["invalid_secret", "decrypt_failed", "allowlist_rejected", "network", "timeout", "ambiguous"]
     });
-    // Frozen vector: captured from the retired Node runtime at commit 7211de0.
     let expected = json!({
         "urls": [
             {"ok": true, "url": "https://discord.com/api/webhooks/1/token?thread_id=34&with_components=true&wait=true"},

@@ -1,14 +1,14 @@
 //! `cargo xtask release verify-manifest <release-manifest.json>`, ported from
 //! `scripts/release/verify-manifest.mjs`.
 //!
-//! Accepts exactly the manifests the Node verifier accepted, with the same messages and exit
-//! codes (0 verified, 1 rejected), except in four places where this port is stricter:
+//! Manifest verification exits 0 for verified and 1 for rejected. Messages and accepted
+//! inputs follow the frozen release contract, with these strict validation rules:
 //!
-//! - `release.commit`, `image.digest` and each attestation `reference` must be JSON strings. The
-//!   Node verifier tested them with a regular expression, which converts an array such as
-//!   `["sha256:..."]` to its string and accepted it.
-//! - The attestation reference must name the repository literally; the Node expression left `.`
-//!   in the repository unescaped, so it matched any character.
+//! - `release.commit`, `image.digest` and each attestation `reference` must be JSON strings. An
+//!   array such as `["sha256:..."]` cannot stand in for a string through regular-expression
+//!   coercion.
+//! - The attestation reference must name the repository literally; `.` in
+//!   the repository must not match an arbitrary character.
 //! - The historical fixture preflight report is hashed and parsed from one read, so the parsed
 //!   report is always the hashed one.
 //! - JSON that `serde_json` rejects but `JSON.parse` accepts (unpaired UTF-16 surrogate escapes,

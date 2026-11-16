@@ -1,6 +1,6 @@
 //! Artifact input, bundle path, MIME, and limit validation.
 //!
-//! These rules preserve the frozen input contract, originally defined by the retired Node twin:
+//! These rules preserve the frozen input contract:
 //!
 //! - relative path sanitization
 //! - reserved artifact ids
@@ -36,8 +36,7 @@ pub const DIGEST_HEX_LENGTH: usize = 64;
 
 /// `RESERVED.has(id) || !/^[0-9a-z]{6,24}$/.test(id)`
 ///
-/// The retired Node twin's `RESERVED` set contained the empty string; an empty id fails the shape
-/// test, so `RESERVED_ARTIFACT_IDS` omits it without changing the answer.
+/// An empty id fails the shape test, so `RESERVED_ARTIFACT_IDS` need not include it.
 ///
 /// **Known divergence from the route table (compatibility constraint 1):** `thumbnails` and
 /// `notifications` are real top-level routes and are *not* reserved. Reproduced as-is.

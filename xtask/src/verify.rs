@@ -10,7 +10,7 @@
 //! * `artifacts.db`: the logical header fields, `integrity_check`, every `sqlite_master` row
 //!   (type, name, table, SQL text) in creation order, and every row of every table in rowid
 //!   order. SQL text that differs is accepted only when it is equal after whitespace runs are
-//!   collapsed (the Rust ledger re-indents some of Node's statements). Only columns whose
+//!   collapsed (ledger indentation can differ from committed fixtures). Only columns whose
 //!   `DEFAULT` reads the clock and that the generator does not write are masked, and only when
 //!   both values are `YYYY-MM-DD HH:MM:SS` timestamps.
 //!
@@ -55,9 +55,8 @@ pub const PROVENANCE_FIELDS: &[(&str, &str)] = &[
 ];
 
 /// `sqlite_master` objects in which a committed boundary differs from the final ledger because
-/// the fixture was frozen from a pre-release draft of that migration. The Node ledger at
-/// `7211de0` (the last Node generator) has the final DDL too, so it could not reproduce these
-/// objects either. Every other object of these cases is still compared, and the same objects in
+/// the fixture was frozen from a pre-release draft of that migration. Every other object of these
+/// cases is still compared, and the same objects in
 /// the next committed boundary (v32, v37) equal the generated ones.
 pub const FROZEN_DRAFT_DIVERGENCES: &[(&str, &str, &str)] = &[
     (
@@ -487,7 +486,7 @@ fn compare_database(
         if committed_row == generated_row {
             continue;
         }
-        // The Rust ledger keeps Node's statements but not always Node's indentation, so compare
+        // The ledger and committed fixtures can differ in SQL indentation, so compare
         // with whitespace runs collapsed, as `u03_support::normalize_sql` does.
         let (kind, name, table, sql) = committed_row;
         let (other_kind, other_name, other_table, other_sql) = generated_row;

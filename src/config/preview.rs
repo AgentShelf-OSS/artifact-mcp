@@ -151,10 +151,7 @@ fn renderer_endpoint(raw: &str) -> Result<String, AppError> {
         .map_err(|_| invalid("PREVIEW_RENDERER_URL", trimmed, "an http(s) URL"))
 }
 
-/// Parse the preview viewport.
-///
-/// The retired Node twin fell back to `1200x630` for malformed values; a present but
-/// malformed value fails closed here instead.
+/// Parse the preview viewport. A present but malformed value fails closed.
 fn parse_viewport(raw: Option<String>) -> Result<(u64, u64), AppError> {
     let Some(raw) = raw else {
         return Ok((
