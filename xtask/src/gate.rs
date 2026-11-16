@@ -78,6 +78,23 @@ fn commands(skip_browser: bool) -> Vec<Step> {
         if skip_browser && workspace == "browser-tests" {
             continue;
         }
+        if workspace == "browser-tests" {
+            // Needs the same release binary (`ARTIFACT_MCP_BIN`) as the browser tests.
+            steps.push(Step {
+                name: "main: release fixtures",
+                args: vec![
+                    "test",
+                    "-p",
+                    "xtask",
+                    "--test",
+                    "release_fixtures",
+                    "--locked",
+                    "--",
+                    "--ignored",
+                ],
+                env: vec![("CI", "1")],
+            });
+        }
         for (check, args) in [
             ("fmt", vec!["fmt", "--manifest-path", manifest, "--check"]),
             (
@@ -538,6 +555,7 @@ mod tests {
                 "CI=1 cargo clippy --manifest-path preview-renderer/Cargo.toml --all-targets --locked -- -D warnings",
                 "CI=1 cargo test --manifest-path preview-renderer/Cargo.toml --locked",
                 "CI=1 RUSTDOCFLAGS='-D warnings' cargo doc --manifest-path preview-renderer/Cargo.toml --no-deps --locked",
+                "CI=1 cargo test -p xtask --test release_fixtures --locked -- --ignored",
                 "CI=1 cargo fmt --manifest-path browser-tests/Cargo.toml --check",
                 "CI=1 cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings",
                 "CI=1 cargo test --manifest-path browser-tests/Cargo.toml --locked",

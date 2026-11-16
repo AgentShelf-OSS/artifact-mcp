@@ -150,6 +150,8 @@ jobs:
           unzip -q "$RUNNER_TEMP/chs.zip" -d "$RUNNER_TEMP"
           echo "CHROME_HEADLESS_SHELL=$RUNNER_TEMP/chrome-headless-shell-linux64/chrome-headless-shell" >> "$GITHUB_ENV"
           echo "ARTIFACT_MCP_BIN=$GITHUB_WORKSPACE/target/release/artifact-mcp" >> "$GITHUB_ENV"
+      - name: Verify committed fixtures against the release binary
+        run: cargo test -p xtask --test release_fixtures --locked -- --ignored
       - run: cargo fmt --manifest-path browser-tests/Cargo.toml --check
       - run: cargo clippy --manifest-path browser-tests/Cargo.toml --all-targets --locked -- -D warnings
       - run: cargo test --manifest-path browser-tests/Cargo.toml --locked

@@ -78,7 +78,17 @@ The application shell is trusted code. Published artifact code is untrusted. CSP
 ## Module map
 
 - `src/main.rs` — production composition entrypoint: configuration, adapters, startup reconciliation, health check, and listener.
+- `src/lib.rs` — library root that declares the application modules and exports the router composition seam.
 - `src/app.rs` — HTTP application module. `build_router()` takes `AppDeps` with production or test adapters and never binds a listener.
+- `src/adapters/` — production implementations of the application ports, wired to stores and integrations.
+- `src/data/` — tenant-scoped live-source registry, bindings, transport, events, and streams.
+- `src/error.rs` — domain, HTTP, and JSON-RPC error mappings.
+- `src/integrations/` — integration declarations for application services and provider adapters.
+- `src/model/` — domain model declarations.
+- `src/observability.rs` — privacy-safe, low-cardinality MCP telemetry.
+- `src/ops/` — operator commands for backup, backup verification, and Web Push keys.
+- `src/ports/` — object-safe application port interfaces.
+- `src/startup/` — ordered startup stages for the production binary.
 - `src/security/access.rs` — organization and administrator policy, including concealed-read decisions.
 - `src/security/auth.rs` / `src/security/identity.rs` — publisher-key authentication and Cloudflare viewer identity. These are security-critical modules.
 - `src/mcp/dispatch.rs` / `src/mcp/tool_defs.rs` / `src/mcp/validation.rs` — MCP method dispatch, declared tool schemas, and request validation.
