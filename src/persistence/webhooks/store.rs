@@ -87,13 +87,15 @@ impl WebhookStore {
         db::interact(&self.pool, move |conn| {
             create_in(
                 conn,
-                &org,
-                &id,
-                &url,
-                url_is_allowed,
-                &label,
-                &events,
-                &stored,
+                CreateWebhookRow {
+                    org: &org,
+                    id: &id,
+                    _url: &url,
+                    url_is_allowed,
+                    label: &label,
+                    events: &events,
+                    stored: &stored,
+                },
             )
         })
         .await
@@ -118,13 +120,15 @@ impl WebhookStore {
             mutate_in_transaction(conn, &audit_key, &audit, |tx| {
                 let row = create_in(
                     tx,
-                    &org,
-                    &id,
-                    &url,
-                    url_is_allowed,
-                    &label,
-                    &events,
-                    &stored,
+                    CreateWebhookRow {
+                        org: &org,
+                        id: &id,
+                        _url: &url,
+                        url_is_allowed,
+                        label: &label,
+                        events: &events,
+                        stored: &stored,
+                    },
                 )?;
                 Ok((
                     row,
@@ -318,17 +322,27 @@ impl WebhookStore {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn create_in(
-    conn: &Connection,
-    org: &str,
-    id: &WebhookId,
-    _url: &str,
+/// Prepared webhook row fields and the URL allowlist result, before database validation.
+struct CreateWebhookRow<'a> {
+    org: &'a str,
+    id: &'a WebhookId,
+    _url: &'a str,
     url_is_allowed: bool,
-    label: &str,
-    events: &str,
-    stored: &StoredWebhookUrl,
-) -> Result<WebhookSummary, AppError> {
+    label: &'a str,
+    events: &'a str,
+    stored: &'a StoredWebhookUrl,
+}
+
+fn create_in(conn: &Connection, row: CreateWebhookRow<'_>) -> Result<WebhookSummary, AppError> {
+    let CreateWebhookRow {
+        org,
+        id,
+        _url,
+        url_is_allowed,
+        label,
+        events,
+        stored,
+    } = row;
     // Preserve the frozen error order: unknown-organization first, then invalid-URL.
     if !org_exists(conn, org)? {
         return Err(AppError::Validation(format!(

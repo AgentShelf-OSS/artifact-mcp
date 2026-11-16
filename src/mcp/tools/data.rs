@@ -142,7 +142,7 @@ pub(crate) async fn set_artifact_reminder(
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
     use crate::{
-        integrations::push_runtime::ReminderInput,
+        integrations::push_runtime::{ReminderInput, ReminderRequest},
         model::push::{PUSH_DISABLED_MESSAGE, PushError, ReminderScope, valid_key},
     };
     let Some(push) = deps.push.clone() else {
@@ -167,20 +167,20 @@ pub(crate) async fn set_artifact_reminder(
         });
     }
     let saved = push
-        .set_reminder(
-            meta.id.0,
-            meta.org.0,
-            ReminderScope::Org,
-            String::new(),
-            key.to_owned(),
-            ReminderInput {
+        .set_reminder(ReminderRequest {
+            artifact_id: meta.id.0,
+            org: meta.org.0,
+            scope: ReminderScope::Org,
+            owner: String::new(),
+            key: key.to_owned(),
+            input: ReminderInput {
                 fire_at: arguments.get("fire_at"),
                 delay_seconds: arguments.get("delay_seconds"),
                 title: arguments.get("title"),
                 body: arguments.get("body"),
             },
-            format!("publisher:{}", auth.client_id.0),
-        )
+            created_by: format!("publisher:{}", auth.client_id.0),
+        })
         .await
         .map_err(|failure| match failure {
             PushError::BadKey => AppError::Validation(REMINDER_KEY_ERROR.to_owned()),

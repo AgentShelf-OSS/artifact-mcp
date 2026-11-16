@@ -498,7 +498,10 @@ impl OrgStore {
         .await
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Private audit wrapper forwards the organization value and mutation callback; operation and classification describe that callback's audit event."
+    )]
     async fn audited_org_value(
         &self,
         org: OrgId,
@@ -530,7 +533,10 @@ impl OrgStore {
         .await
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "Private audit wrapper forwards the organization value and removal callback; operation and classification describe the audit event emitted only when removal succeeds."
+    )]
     async fn audited_org_bool(
         &self,
         org: OrgId,
