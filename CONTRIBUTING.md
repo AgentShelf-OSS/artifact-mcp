@@ -42,7 +42,8 @@ It sets `CI=1` for both isolated workspaces so browser tests cannot silently ski
 Set `CHROME_HEADLESS_SHELL` to the pinned browser and `ARTIFACT_MCP_BIN` to a server binary
 built with `cargo build --release --locked` before running the full gate.
 `cargo xtask gate --dry-run` prints every command without running checks or requiring those variables.
-`cargo xtask gate --skip-browser` explicitly skips browser-tests; preview-renderer still needs Chrome
+`cargo xtask gate --skip-browser` explicitly skips browser-tests and the release-fixture test, which
+both need `ARTIFACT_MCP_BIN`; preview-renderer still needs Chrome
 and the unprivileged user namespaces required by CI. See `.github/workflows/ci.yml`.
 
 - `rust-toolchain.toml` pins the Rust toolchain. Repository tooling is `cargo xtask` (run
