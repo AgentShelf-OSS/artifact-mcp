@@ -31,9 +31,9 @@ mod tests {
         error::AppError,
         model::*,
         ports::{
-            AdminService, ArtifactService, BoxFuture, EngagementService, HealthProbe,
-            NotificationSink, PageRenderer, PreviewService, PublisherAuthenticator, ShareService,
-            ViewerIdentity, integrations::PreviewPriority,
+            AdminService, BoxFuture, EngagementService, HealthProbe, NotificationSink,
+            PageRenderer, PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
+            integrations::PreviewPriority,
         },
         render::view_models::{GalleryView, SettingsView, ShellView},
         security::access::{AuthorizedArtifact, OwnedArtifact},
@@ -60,158 +60,6 @@ mod tests {
             &'a self,
             _headers: &'a HeaderMap,
         ) -> BoxFuture<'a, Result<Viewer, AppError>> {
-            unavailable()
-        }
-    }
-
-    impl ArtifactService for DeterministicFake {
-        fn find_meta<'a>(
-            &'a self,
-            _id: &'a ArtifactId,
-        ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
-            unavailable()
-        }
-
-        fn publish(
-            &self,
-            _request: PublishArtifact,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
-            unavailable()
-        }
-
-        fn list_for_publisher<'a>(
-            &'a self,
-            _publisher: &'a PublisherIdentity,
-        ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-            unavailable()
-        }
-
-        fn list_org_artifacts<'a>(
-            &'a self,
-            _org: &'a OrgId,
-            _include_hidden: bool,
-        ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-            unavailable()
-        }
-
-        fn list_all_grouped_by_org(
-            &self,
-            _include_hidden: bool,
-        ) -> BoxFuture<'_, Result<Vec<OrgArtifacts>, AppError>> {
-            unavailable()
-        }
-
-        fn list_org_ids<'a>(
-            &'a self,
-            _org: &'a OrgId,
-            _include_hidden: bool,
-        ) -> BoxFuture<'a, Result<Vec<ArtifactId>, AppError>> {
-            unavailable()
-        }
-
-        fn read_body<'a>(
-            &'a self,
-            _artifact: &'a AuthorizedArtifact,
-        ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-            unavailable()
-        }
-
-        fn read_bundle_file<'a>(
-            &'a self,
-            _artifact: &'a AuthorizedArtifact,
-            _relative_path: &'a str,
-        ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-            unavailable()
-        }
-
-        fn read_revision_body<'a>(
-            &'a self,
-            _artifact: &'a AuthorizedArtifact,
-            _revision: u64,
-            _relative_path: Option<&'a str>,
-        ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-            unavailable()
-        }
-
-        fn list_bundle_files<'a>(
-            &'a self,
-            _artifact: &'a AuthorizedArtifact,
-            _revision: Option<u64>,
-        ) -> BoxFuture<'a, Result<Option<Vec<(String, u64)>>, AppError>> {
-            unavailable()
-        }
-
-        fn list_revisions<'a>(
-            &'a self,
-            _artifact: &'a AuthorizedArtifact,
-        ) -> BoxFuture<'a, Result<RevisionHistory, AppError>> {
-            unavailable()
-        }
-
-        fn update(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _update: ArtifactUpdate,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
-            unavailable()
-        }
-
-        fn restore(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _revision: u64,
-            _acting_client_id: Option<ClientId>,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
-            unavailable()
-        }
-
-        fn delete(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<bool, AppError>> {
-            unavailable()
-        }
-
-        fn set_category(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _category: String,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-            unavailable()
-        }
-
-        fn set_hidden(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _hidden: bool,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-            unavailable()
-        }
-
-        fn move_to_org(
-            &self,
-            _artifact: AuthorizedArtifact,
-            _target_org: OrgId,
-            _category: Option<String>,
-            _audit: crate::security::audit::MutationAudit,
-        ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-            unavailable()
-        }
-
-        fn audit_storage(
-            &self,
-            _clean_transient: bool,
-        ) -> BoxFuture<'_, Result<StorageAuditReport, AppError>> {
-            unavailable()
-        }
-
-        fn backfill_body_digests(&self) -> BoxFuture<'_, Result<DigestBackfillReport, AppError>> {
             unavailable()
         }
     }
@@ -674,7 +522,9 @@ mod tests {
             collections: Arc::new(crate::ports::collections::InertCollections),
             publisher_auth: fake.clone(),
             viewer_identity: fake.clone(),
-            artifacts: fake.clone(),
+            artifacts: Arc::new(crate::ports::testing::FakeArtifacts::with_error(|| {
+                AppError::Unavailable("not used by health test".into())
+            })),
             admin: fake.clone(),
             discussions: Arc::new(crate::ports::InertDiscussionService),
             engagement: fake.clone(),

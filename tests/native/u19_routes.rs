@@ -13,8 +13,8 @@ use artifact_mcp::{
     },
     model::*,
     ports::{
-        AdminService, ArtifactService, BoxFuture, EngagementService, HealthProbe, NotificationSink,
-        PageRenderer, PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
+        AdminService, BoxFuture, EngagementService, HealthProbe, NotificationSink, PageRenderer,
+        PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
         integrations::{HealthReport, PreviewPriority},
     },
     render::view_models::{GalleryView, SettingsView, ShellView},
@@ -118,205 +118,6 @@ impl ViewerIdentity for RouteHarness {
         self.record("resolve_viewer");
         let viewer = self.viewer.clone();
         Box::pin(async move { Ok(viewer) })
-    }
-}
-
-impl ArtifactService for RouteHarness {
-    fn find_meta<'a>(
-        &'a self,
-        _id: &'a ArtifactId,
-    ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
-        self.record("find_meta");
-        let meta = self.meta.clone();
-        Box::pin(async move { Ok(meta) })
-    }
-
-    fn publish(
-        &self,
-        _request: PublishArtifact,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
-        unavailable()
-    }
-
-    fn list_for_publisher<'a>(
-        &'a self,
-        _publisher: &'a PublisherIdentity,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-        unavailable()
-    }
-
-    fn list_org_artifacts<'a>(
-        &'a self,
-        _org: &'a OrgId,
-        _include_hidden: bool,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-        unavailable()
-    }
-
-    fn list_all_grouped_by_org(
-        &self,
-        _include_hidden: bool,
-    ) -> BoxFuture<'_, Result<Vec<OrgArtifacts>, AppError>> {
-        unavailable()
-    }
-
-    fn list_org_ids<'a>(
-        &'a self,
-        _org: &'a OrgId,
-        _include_hidden: bool,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactId>, AppError>> {
-        unavailable()
-    }
-
-    fn read_body<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        self.record("read_body");
-        unavailable()
-    }
-
-    fn read_bundle_file<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        _relative_path: &'a str,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        self.record("read_bundle_file");
-        unavailable()
-    }
-
-    fn read_revision_body<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        _revision: u64,
-        _relative_path: Option<&'a str>,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        self.record("read_revision_body");
-        unavailable()
-    }
-
-    fn list_bundle_files<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        _revision: Option<u64>,
-    ) -> BoxFuture<'a, Result<Option<Vec<(String, u64)>>, AppError>> {
-        self.record("list_bundle_files");
-        unavailable()
-    }
-
-    fn list_revisions<'a>(
-        &'a self,
-        artifact: &'a AuthorizedArtifact,
-    ) -> BoxFuture<'a, Result<RevisionHistory, AppError>> {
-        self.record("list_revisions");
-        let meta = artifact.meta().clone();
-        Box::pin(async move {
-            Ok(RevisionHistory {
-                current: meta.revision,
-                revisions: vec![ArtifactRevision {
-                    artifact_id: meta.id,
-                    org: meta.org,
-                    revision: 1,
-                    title: "Earlier".to_owned(),
-                    description: "Earlier description".to_owned(),
-                    category: "Archive".to_owned(),
-                    bytes: 21,
-                    is_bundle: false,
-                    entry: String::new(),
-                    body_sha256: "1".repeat(64),
-                    created_at: Timestamp("2026-07-19T00:00:00.000Z".to_owned()),
-                    client_id: None,
-                }],
-            })
-        })
-    }
-
-    fn update(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _update: ArtifactUpdate,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
-        unavailable()
-    }
-
-    fn restore(
-        &self,
-        artifact: AuthorizedArtifact,
-        revision: u64,
-        _acting_client_id: Option<ClientId>,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
-        self.record("restore");
-        let mut meta = artifact.into_meta();
-        meta.revision += 1;
-        Box::pin(async move {
-            Ok(RestoreArtifactResult {
-                meta,
-                restored_from: revision,
-            })
-        })
-    }
-
-    fn delete(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<bool, AppError>> {
-        self.record("delete");
-        Box::pin(async { Ok(true) })
-    }
-
-    fn set_category(
-        &self,
-        _artifact: AuthorizedArtifact,
-        category: String,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        self.record("set_category");
-        let mut meta = self.meta.clone().expect("configured meta");
-        meta.category = category;
-        Box::pin(async move { Ok(meta) })
-    }
-
-    fn set_hidden(
-        &self,
-        _artifact: AuthorizedArtifact,
-        hidden: bool,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        self.record("set_hidden");
-        let mut meta = self.meta.clone().expect("configured meta");
-        meta.hidden = hidden;
-        Box::pin(async move { Ok(meta) })
-    }
-
-    fn move_to_org(
-        &self,
-        artifact: AuthorizedArtifact,
-        target_org: OrgId,
-        category: Option<String>,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        self.record("move_to_org");
-        let mut meta = artifact.into_meta();
-        meta.org = target_org;
-        if let Some(category) = category {
-            meta.category = category;
-        }
-        Box::pin(async move { Ok(meta) })
-    }
-
-    fn audit_storage(
-        &self,
-        _clean_transient: bool,
-    ) -> BoxFuture<'_, Result<StorageAuditReport, AppError>> {
-        unavailable()
-    }
-
-    fn backfill_body_digests(&self) -> BoxFuture<'_, Result<DigestBackfillReport, AppError>> {
-        unavailable()
     }
 }
 
@@ -829,7 +630,7 @@ fn deps_with_config(harness: Arc<RouteHarness>, config: AppConfig) -> AppDeps {
         collections: Arc::new(artifact_mcp::ports::collections::InertCollections),
         publisher_auth: harness.clone(),
         viewer_identity: harness.clone(),
-        artifacts: harness.clone(),
+        artifacts: Arc::new(harness.artifacts()),
         admin: harness.clone(),
         discussions: Arc::new(artifact_mcp::ports::InertDiscussionService),
         engagement: harness.clone(),
@@ -2160,4 +1961,137 @@ async fn mcp_scope_and_operation_budget_precede_the_mutation_permit() {
         harness.calls().last().map(String::as_str),
         Some("resolve_feedback_as_publisher")
     );
+}
+
+// These scripts keep the cross-port call order and fixture-specific responses.
+
+impl RouteHarness {
+    // Metadata lookup deliberately ignores the requested ID. Mutations return changed copies without persisting them, as the frozen route vectors expect.
+    fn artifacts(&self) -> artifact_mcp::ports::testing::FakeArtifacts {
+        let mut fake = artifact_mcp::ports::testing::FakeArtifacts::with_error(|| {
+            AppError::Unavailable("unused U19 test capability".to_owned())
+        });
+        {
+            let fixture = self.clone();
+            fake.scripts.find_meta = Some(Box::new(move |_id| {
+                fixture.record("find_meta");
+                let meta = fixture.meta.clone();
+                Ok(meta)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_body = Some(Box::new(move |_artifact| {
+                fixture.record("read_body");
+                Err(AppError::Unavailable(
+                    "unused U19 test capability".to_owned(),
+                ))
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_bundle_file = Some(Box::new(move |_artifact, _relative_path| {
+                fixture.record("read_bundle_file");
+                Err(AppError::Unavailable(
+                    "unused U19 test capability".to_owned(),
+                ))
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_revision_body =
+                Some(Box::new(move |_artifact, _revision, _relative_path| {
+                    fixture.record("read_revision_body");
+                    Err(AppError::Unavailable(
+                        "unused U19 test capability".to_owned(),
+                    ))
+                }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.list_bundle_files = Some(Box::new(move |_artifact, _revision| {
+                fixture.record("list_bundle_files");
+                Err(AppError::Unavailable(
+                    "unused U19 test capability".to_owned(),
+                ))
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.list_revisions = Some(Box::new(move |artifact| {
+                fixture.record("list_revisions");
+                let meta = artifact.meta().clone();
+                Ok(RevisionHistory {
+                    current: meta.revision,
+                    revisions: vec![ArtifactRevision {
+                        artifact_id: meta.id,
+                        org: meta.org,
+                        revision: 1,
+                        title: "Earlier".to_owned(),
+                        description: "Earlier description".to_owned(),
+                        category: "Archive".to_owned(),
+                        bytes: 21,
+                        is_bundle: false,
+                        entry: String::new(),
+                        body_sha256: "1".repeat(64),
+                        created_at: Timestamp("2026-07-19T00:00:00.000Z".to_owned()),
+                        client_id: None,
+                    }],
+                })
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.restore = Some(Box::new(
+                move |artifact, revision, _acting_client_id, _audit| {
+                    fixture.record("restore");
+                    let mut meta = artifact.into_meta();
+                    meta.revision += 1;
+                    Ok(RestoreArtifactResult {
+                        meta,
+                        restored_from: revision,
+                    })
+                },
+            ));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.delete = Some(Box::new(move |_artifact, _audit| {
+                fixture.record("delete");
+                Ok(true)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.set_category = Some(Box::new(move |_artifact, category, _audit| {
+                fixture.record("set_category");
+                let mut meta = fixture.meta.clone().expect("configured meta");
+                meta.category = category;
+                Ok(meta)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.set_hidden = Some(Box::new(move |_artifact, hidden, _audit| {
+                fixture.record("set_hidden");
+                let mut meta = fixture.meta.clone().expect("configured meta");
+                meta.hidden = hidden;
+                Ok(meta)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.move_to_org =
+                Some(Box::new(move |artifact, target_org, category, _audit| {
+                    fixture.record("move_to_org");
+                    let mut meta = artifact.into_meta();
+                    meta.org = target_org;
+                    if let Some(category) = category {
+                        meta.category = category;
+                    }
+                    Ok(meta)
+                }));
+        }
+        fake
+    }
 }

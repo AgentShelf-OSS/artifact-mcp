@@ -29,3 +29,6 @@ pub use rendering::PageRenderer;
 
 /// Object-safe asynchronous return type used instead of an async-trait macro.
 pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+
+#[cfg(any(test, feature = "test-util"))]
+pub mod testing;
