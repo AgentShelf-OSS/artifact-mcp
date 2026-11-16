@@ -51,7 +51,7 @@ pub(crate) async fn set_category(
         .artifacts
         .set_category(owned.into_authorized(), category, audit)
         .await?;
-    let result = ArtifactPublicView::from_meta(&result, None);
+    let result = ArtifactPublicView::from_meta(&result);
     tool_result(object! {
         "id" => OrderedJson::string(id),
         "category" => OrderedJson::string(result.category),

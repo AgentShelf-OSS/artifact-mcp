@@ -57,7 +57,7 @@ pub(crate) async fn publish_artifact(
         )
         .await?;
     deps.delivery_wake.wake();
-    let view = ArtifactPublicView::from_meta(&published.meta, None);
+    let view = ArtifactPublicView::from_meta(&published.meta);
     tool_result(object! {
         "id" => OrderedJson::string(view.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &view.id)),
@@ -108,7 +108,7 @@ pub(crate) async fn publish_bundle(
         .await?;
     deps.delivery_wake.wake();
     let file_count = u64::try_from(published.file_count.unwrap_or(0)).unwrap_or(u64::MAX);
-    let view = ArtifactPublicView::from_meta(&published.meta, None);
+    let view = ArtifactPublicView::from_meta(&published.meta);
     tool_result(object! {
         "id" => OrderedJson::string(view.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &view.id)),
@@ -223,7 +223,7 @@ async fn keyed_create(
         )
         .await?;
     deps.delivery_wake.wake();
-    let meta = ArtifactPublicView::from_meta(&published.meta, None);
+    let meta = ArtifactPublicView::from(published.meta);
     let mut payload = vec![
         ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
         (
@@ -260,7 +260,7 @@ async fn keyed_update(
 ) -> Result<Value, McpError> {
     let id = existing.id.0.clone();
     let owned = AccessPolicy::authorize_publisher_write(auth, Some(existing), &id, "")?;
-    let pre = ArtifactPublicView::from_meta(owned.meta(), None);
+    let pre = owned.meta().clone();
     if pre.is_bundle != (kind == PublishKind::Bundle) {
         let message = if pre.is_bundle {
             format!(
@@ -305,7 +305,7 @@ async fn keyed_update(
         content: Some(content),
     };
     let result = run_update(owned, update, auth, deps).await?;
-    let meta = ArtifactPublicView::from_meta(&result.meta, None);
+    let meta = ArtifactPublicView::from(result.meta);
     let mut payload = vec![
         ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
         (

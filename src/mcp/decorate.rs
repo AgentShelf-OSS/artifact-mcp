@@ -156,7 +156,7 @@ fn insert_result_meta(result: &mut Value, key: &str, value: Value) {
 fn review_from_meta(meta: &ArtifactMeta, auth: &PublisherIdentity, deps: &AppDeps) -> Value {
     let can_manage = AccessPolicy::publisher_can_delete(auth, meta);
     let can_feedback = AccessPolicy::publisher_can_read(auth, meta);
-    let meta = ArtifactPublicView::from_meta(meta, None);
+    let meta = ArtifactPublicView::from_meta(meta);
     json!({
         "id": meta.id.0,
         "url": artifact_url(deps, &meta.id),

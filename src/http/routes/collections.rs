@@ -211,7 +211,7 @@ async fn projection(
                             .is_some_and(|e| e.eq_ignore_ascii_case(&actor.email))
                 })
                 .map(|a| {
-                    let view = crate::model::ArtifactPublicView::from_meta(&a, Some(&actor.email));
+                    let view = crate::model::ArtifactPublicView::from(a);
                     (view.id.0.clone(), view)
                 }),
         );
@@ -828,7 +828,7 @@ mod public_projection_tests {
         assert_eq!(
             preview_artifact(
                 "a",
-                Some(&crate::model::ArtifactPublicView::from_meta(&meta, None))
+                Some(&crate::model::ArtifactPublicView::from_meta(&meta))
             )
             .to_string(),
             r#"{"id":"a","thumbnail":"/thumbnails/a?v=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}"#
@@ -841,7 +841,7 @@ mod public_projection_tests {
         assert_eq!(
             preview_artifact(
                 "a",
-                Some(&crate::model::ArtifactPublicView::from_meta(&meta, None))
+                Some(&crate::model::ArtifactPublicView::from_meta(&meta))
             )
             .to_string(),
             r#"{"id":"a","thumbnail":"/thumbnails/a?v="}"#

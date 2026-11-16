@@ -31,8 +31,6 @@ pub struct CurrentArtifactPublicFields {
     /// Full digest for the existing thumbnail cache URLs and MCP preview-regeneration result.
     /// Collection previews keep an empty `?v=` when absent; never shorten this digest.
     pub content_digest: String,
-    /// Case-insensitive owner match for presentation/filtering, never an access grant.
-    pub is_owned_by_viewer: bool,
 }
 
 /// Retained revisions already expose a digest and an optional publisher ID through MCP.
@@ -44,19 +42,26 @@ pub struct RevisionArtifactPublicFields {
 }
 
 impl ArtifactPublicView {
-    /// Fields deliberately unavailable as raw current metadata in this projection.
+    /// `ArtifactMeta` fields this projection does not carry under their own name.
     ///
-    /// `owner_email` becomes only `is_owned_by_viewer`. Current `client_id` is not emitted
-    /// by metadata endpoints (the HTML templates have their own display contract).
-    /// `body_sha256` becomes only the explicitly selected cache/preview `content_digest`.
-    /// Retained revisions
-    /// have a separate, existing digest/client-ID contract, selected by `from_revision`.
-    pub const PRIVATE_META_FIELDS: &[&str] = &["client_id", "owner_email", "body_sha256"];
+    /// - `owner_email` and current `client_id` are withheld entirely. Metadata endpoints never
+    ///   emit them (the HTML templates have their own display contract).
+    /// - `body_sha256` is renamed: it leaves only as the explicitly selected cache/preview
+    ///   `content_digest`.
+    ///
+    /// Retained revisions have a separate, existing digest/client-ID contract (`from_revision`).
+    pub const WITHHELD_META_FIELDS: &[&str] = &["client_id", "owner_email", "body_sha256"];
 
-    /// Project authorized current metadata once. Pass a viewer email only for viewer output.
-    /// The exhaustive destructure forces a public/private decision for every added meta field.
+    /// Project borrowed current metadata. Prefer `From<ArtifactMeta>` when the caller owns it.
     #[must_use]
-    pub fn from_meta(meta: &ArtifactMeta, viewer_email: Option<&str>) -> Self {
+    pub fn from_meta(meta: &ArtifactMeta) -> Self {
+        Self::from(meta.clone())
+    }
+}
+
+impl From<ArtifactMeta> for ArtifactPublicView {
+    /// The exhaustive destructure forces a public or withheld decision for every added field.
+    fn from(meta: ArtifactMeta) -> Self {
         let ArtifactMeta {
             id,
             client_id: _,
@@ -67,7 +72,7 @@ impl ArtifactPublicView {
             created_at,
             updated_at,
             uploader_label,
-            owner_email,
+            owner_email: _,
             is_bundle,
             entry,
             revision,
@@ -77,36 +82,39 @@ impl ArtifactPublicView {
             artifact_key,
         } = meta;
         Self {
-            id: id.clone(),
-            org: org.clone(),
-            title: title.clone(),
-            description: description.clone(),
-            bytes: *bytes,
-            created_at: created_at.clone(),
-            is_bundle: *is_bundle,
-            entry: entry.clone(),
-            revision: *revision,
-            category: category.clone(),
+            id,
+            org,
+            title,
+            description,
+            bytes,
+            created_at,
+            is_bundle,
+            entry,
+            revision,
+            category,
             details: CurrentArtifactPublicFields {
-                updated_at: updated_at.clone(),
-                uploader_label: uploader_label.clone(),
-                hidden: *hidden,
-                artifact_key: artifact_key.clone(),
-                content_digest: body_sha256.clone(),
-                is_owned_by_viewer: viewer_email.is_some_and(|viewer| {
-                    owner_email
-                        .as_deref()
-                        .is_some_and(|owner| owner.eq_ignore_ascii_case(viewer))
-                }),
+                updated_at,
+                uploader_label,
+                hidden,
+                artifact_key,
+                content_digest: body_sha256,
             },
         }
     }
 }
 
 impl ArtifactPublicView<RevisionArtifactPublicFields> {
-    /// Project retained metadata without inventing values for current-only fields.
+    /// Project borrowed retained metadata. Prefer `From<ArtifactRevision>` when owned.
     #[must_use]
     pub fn from_revision(meta: &ArtifactRevision) -> Self {
+        Self::from(meta.clone())
+    }
+}
+
+impl From<ArtifactRevision> for ArtifactPublicView<RevisionArtifactPublicFields> {
+    /// Project retained metadata without inventing values for current-only fields. The
+    /// exhaustive destructure forces a decision for every added revision field.
+    fn from(meta: ArtifactRevision) -> Self {
         let ArtifactRevision {
             artifact_id,
             org,
@@ -122,19 +130,19 @@ impl ArtifactPublicView<RevisionArtifactPublicFields> {
             client_id,
         } = meta;
         Self {
-            id: artifact_id.clone(),
-            org: org.clone(),
-            title: title.clone(),
-            description: description.clone(),
-            bytes: *bytes,
-            created_at: created_at.clone(),
-            is_bundle: *is_bundle,
-            entry: entry.clone(),
-            revision: *revision,
-            category: category.clone(),
+            id: artifact_id,
+            org,
+            title,
+            description,
+            bytes,
+            created_at,
+            is_bundle,
+            entry,
+            revision,
+            category,
             details: RevisionArtifactPublicFields {
-                body_sha256: body_sha256.clone(),
-                client_id: client_id.clone(),
+                body_sha256,
+                client_id,
             },
         }
     }
@@ -167,7 +175,7 @@ mod tests {
             "hidden",
             "artifact_key",
         ];
-        expected.extend(ArtifactPublicView::PRIVATE_META_FIELDS);
+        expected.extend(ArtifactPublicView::WITHHELD_META_FIELDS);
         expected.sort_unstable();
         assert_eq!(
             actual
@@ -181,21 +189,12 @@ mod tests {
     }
 
     #[test]
-    fn public_projection_derives_ownership_without_retaining_email() {
+    fn public_projection_withholds_owner_email_and_client_id() {
         let mut meta = ArtifactMeta::fixture("a", "acme");
         meta.owner_email = Some("Owner@example.test".into());
-        let view = ArtifactPublicView::from_meta(&meta, Some("owner@EXAMPLE.test"));
-        assert!(view.details.is_owned_by_viewer);
-        assert!(!format!("{view:?}").contains("Owner@example.test"));
-        assert!(
-            !ArtifactPublicView::from_meta(&meta, None)
-                .details
-                .is_owned_by_viewer
-        );
-        assert!(
-            !ArtifactPublicView::from_meta(&meta, Some("other@example.test"))
-                .details
-                .is_owned_by_viewer
-        );
+        meta.client_id = "publisher-key-id".into();
+        let view = format!("{:?}", ArtifactPublicView::from(meta));
+        assert!(!view.contains("Owner@example.test"));
+        assert!(!view.contains("publisher-key-id"));
     }
 }

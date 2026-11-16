@@ -231,7 +231,7 @@ pub(crate) async fn patch_artifact(
         u64::try_from(edits.as_array().map_or(0, <[OrderedJson]>::len)).unwrap_or(u64::MAX);
     let unavailable = "Artifact not found or you are not authorized to update it";
     let owned = publisher_write(id, auth, deps).await?;
-    let pre = ArtifactPublicView::from_meta(owned.meta(), None);
+    let pre = owned.meta().clone();
     if expected_revision != pre.revision {
         return Err(AppError::Conflict(
             "Artifact changed during update; fetch its current revision and retry".to_owned(),
@@ -306,7 +306,7 @@ pub(crate) async fn patch_artifact(
         unavailable,
     )
     .await?;
-    let view = ArtifactPublicView::from_meta(&result.meta, None);
+    let view = ArtifactPublicView::from_meta(&result.meta);
     tool_result(object! {
         "id" => OrderedJson::string(view.id.0.clone()),
         "revision" => OrderedJson::number_u64(view.revision),
@@ -366,7 +366,7 @@ pub(crate) async fn update_artifact(
     let id = nonempty_protocol_string(arguments, "id")?;
     let discard_newer = discard_newer_argument(arguments)?;
     let owned = publisher_write(id, auth, deps).await?;
-    let pre = ArtifactPublicView::from_meta(owned.meta(), None);
+    let pre = owned.meta().clone();
     let expected_revision = match arguments.get("expected_revision") {
         Some(value) => positive_integer(value, "expected_revision")?,
         None => pre.revision,
@@ -430,7 +430,7 @@ pub(crate) async fn update_artifact(
         content,
     };
     let result = run_update(owned, update, auth, deps).await?;
-    let view = ArtifactPublicView::from_meta(&result.meta, None);
+    let view = ArtifactPublicView::from_meta(&result.meta);
     tool_result(with_warning(
         object! {
             "id" => OrderedJson::string(view.id.0.clone()),

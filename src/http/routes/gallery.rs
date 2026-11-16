@@ -269,7 +269,7 @@ pub(crate) fn library_body(
             let artifacts = items
                 .iter()
                 .map(|item| {
-                    let item = crate::model::ArtifactPublicView::from_meta(item, None);
+                    let item = crate::model::ArtifactPublicView::from_meta(item);
                     serde_json::json!({
                         "id": item.id.0,
                         "title": item.title,

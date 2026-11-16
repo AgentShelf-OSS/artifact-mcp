@@ -624,7 +624,7 @@ fn artifact_reference(
     meta: &crate::model::ArtifactMeta,
     config: &crate::config::AppConfig,
 ) -> Value {
-    let meta = crate::model::ArtifactPublicView::from_meta(meta, None);
+    let meta = crate::model::ArtifactPublicView::from_meta(meta);
     json!({"id":id,"title":meta.title,"url":config.artifact_url(&meta.id),"category":meta.category})
 }
 

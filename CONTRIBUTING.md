@@ -77,8 +77,10 @@ its contract needs it.
 - Add the field and its test default to `ArtifactMeta` and `ArtifactMeta::fixture` in
   `src/model/artifact.rs`. Add it to `ArtifactRevision` there if revisions retain it.
 - Classify the field in `src/model/artifact_public_view.rs`: add a public field to
-  `ArtifactPublicView` or its detail types, or add its name to `PRIVATE_META_FIELDS`.
-  Update the exhaustive constructors and classification test. Never retain `owner_email`.
+  `ArtifactPublicView` or its detail types, or add its name to `WITHHELD_META_FIELDS`.
+  Update the exhaustive `From<ArtifactMeta>` destructure and the classification test. A new
+  `ArtifactRevision` field needs the same decision in `From<ArtifactRevision>`, which has no
+  classification test. Never carry `owner_email` into the view.
   Each projection below must explicitly opt into fields from this view; review its key order,
   names, value types, and omission rules before changing its contract.
 - Update `META_COLUMNS` and `meta_from_row` in `src/persistence/artifact_rows.rs`, including the

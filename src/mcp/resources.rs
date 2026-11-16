@@ -175,7 +175,7 @@ async fn read_resource(
         return read_thumbnail_resource(uri, &artifact, current, deps).await;
     }
 
-    let current = ArtifactPublicView::from_meta(&current, None);
+    let current = ArtifactPublicView::from_meta(&current);
     let (revision, is_bundle, entry, bytes, historical) =
         resolve_resource_version(&target, &artifact, &current, deps).await?;
     let (mime_type, text, content_bytes) = read_resource_content(
@@ -231,7 +231,7 @@ async fn read_thumbnail_resource(
         |png| ("image/png", png),
     );
     let byte_count = bytes.len();
-    let current = ArtifactPublicView::from_meta(&current, None);
+    let current = ArtifactPublicView::from_meta(&current);
     Ok(json!({
             "contents": [{
                 "uri": uri,
@@ -378,7 +378,7 @@ async fn read_resource_content(
 }
 
 fn resource_metadata(meta: &ArtifactMeta) -> Value {
-    let meta = ArtifactPublicView::from_meta(meta, None);
+    let meta = ArtifactPublicView::from_meta(meta);
     let name = if meta.title.trim().is_empty() {
         meta.id.0.clone()
     } else {

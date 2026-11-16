@@ -553,7 +553,7 @@ async fn regenerate(
             "Preview renderer did not produce a valid PNG".to_owned(),
         ));
     }
-    let view = ArtifactPublicView::from_meta(&meta, None);
+    let view = ArtifactPublicView::from_meta(&meta);
     Ok(tool_result(
         artifact_id,
         true,

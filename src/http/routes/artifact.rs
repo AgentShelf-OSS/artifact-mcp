@@ -228,7 +228,7 @@ async fn set_category(
     match deps.artifacts.set_category(artifact, category, audit).await {
         Ok(meta) => Json(CategoryResponse {
             id,
-            category: ArtifactPublicView::from_meta(&meta, None).category,
+            category: meta.category,
         })
         .into_response(),
         Err(error) => error.into_response(),
@@ -283,7 +283,7 @@ async fn set_visibility(
     {
         Ok(meta) => Json(VisibilityResponse {
             id,
-            hidden: ArtifactPublicView::from_meta(&meta, None).details.hidden,
+            hidden: meta.hidden,
         })
         .into_response(),
         Err(error) => error.into_response(),
@@ -432,7 +432,7 @@ struct RevisionResponse {
 
 impl From<ArtifactRevision> for RevisionResponse {
     fn from(revision: ArtifactRevision) -> Self {
-        let revision = ArtifactPublicView::from_revision(&revision);
+        let revision = ArtifactPublicView::from(revision);
         Self {
             artifact_id: revision.id,
             org: revision.org,
@@ -513,7 +513,7 @@ async fn restore(
             deps.delivery_wake.wake();
             Json(RestoreResponse {
                 id,
-                revision: ArtifactPublicView::from_meta(&result.meta, None).revision,
+                revision: result.meta.revision,
                 restored_from: result.restored_from,
             })
             .into_response()
@@ -642,7 +642,7 @@ async fn move_artifact(
     };
     match result {
         Ok(meta) => {
-            let view = ArtifactPublicView::from_meta(&meta, None);
+            let view = ArtifactPublicView::from_meta(&meta);
             Json(MoveResponse {
                 id,
                 org: view.org,

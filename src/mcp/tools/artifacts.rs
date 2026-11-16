@@ -88,7 +88,7 @@ pub(crate) async fn list_artifacts(
     let artifacts = rows
         .into_iter()
         .map(|row| {
-            let row = ArtifactPublicView::from_meta(&row, None);
+            let row = ArtifactPublicView::from(row);
             let artifact_key = row.details.artifact_key.clone();
             let entry = object! {
                 "id" => OrderedJson::string(row.id.0.clone()),
@@ -125,7 +125,7 @@ pub(crate) async fn read_artifact(
 
     // Invariant 3: authorize the metadata before any body, history, or bundle-directory read.
     let owned = publisher_read(id, auth, deps).await?;
-    let current = ArtifactPublicView::from_meta(owned.meta(), None);
+    let current = ArtifactPublicView::from_meta(owned.meta());
     let artifact_key = current.details.artifact_key.clone();
     let artifact = owned.into_authorized();
 
@@ -378,7 +378,7 @@ pub(crate) async fn set_visibility(
             MutationAudit::publisher(auth)?,
         )
         .await?;
-    let result = ArtifactPublicView::from_meta(&result, None);
+    let result = ArtifactPublicView::from_meta(&result);
     tool_result(object! {
         "id" => OrderedJson::string(result.id.0),
         "hidden" => OrderedJson::Bool(result.details.hidden),
@@ -469,7 +469,7 @@ pub(crate) async fn restore_artifact(
         Err(error) => return Err(error.into()),
     };
     deps.delivery_wake.wake();
-    let view = ArtifactPublicView::from_meta(&result.meta, None);
+    let view = ArtifactPublicView::from_meta(&result.meta);
     tool_result(object! {
         "id" => OrderedJson::string(view.id.0.clone()),
         "url" => OrderedJson::string(artifact_url(deps, &view.id)),
