@@ -598,7 +598,6 @@ fn human_size(bytes: u64) -> String {
     if bytes < 1024 {
         return bytes.to_string();
     }
-    #[allow(clippy::cast_precision_loss)]
     let mut value = bytes as f64 / 1024.0;
     let mut unit = 0;
     loop {

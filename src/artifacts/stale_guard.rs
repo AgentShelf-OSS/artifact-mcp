@@ -179,7 +179,6 @@ pub fn evaluate(
     let newer: DigestSet = current.difference(base_set).copied().collect();
     let lost = newer.iter().filter(|digest| !new.contains(*digest)).count();
     let (newer, lost) = (count(newer.len()), count(lost));
-    #[allow(clippy::cast_precision_loss)]
     let stale =
         lost >= thresholds.min_segments && (lost as f64) >= thresholds.min_share * (newer as f64);
     Evaluation {

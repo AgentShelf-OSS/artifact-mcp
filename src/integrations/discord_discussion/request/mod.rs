@@ -269,7 +269,7 @@ fn discussion_request_inner(
     webhook_url: &str,
     webhook_ref: String,
     operation: DiscussionOperation,
-    #[allow(unused_variables)] test_origin: Option<&str>,
+    test_origin: Option<&str>,
 ) -> Result<DiscussionRequest, TerminalReason> {
     if !valid_webhook_ref(&webhook_ref) {
         return Err(TerminalReason::InvalidSecret);
