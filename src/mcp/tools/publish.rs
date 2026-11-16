@@ -11,7 +11,9 @@ use crate::{
         protocol::OrderedJson,
         shape::{artifact_url, object, tool_result},
     },
-    model::{ArtifactContent, ArtifactMeta, ArtifactUpdate, OrgId, PublisherIdentity},
+    model::{
+        ArtifactContent, ArtifactMeta, ArtifactPublicView, ArtifactUpdate, OrgId, PublisherIdentity,
+    },
     security::{access::AccessPolicy, audit::MutationAudit},
 };
 
@@ -55,12 +57,13 @@ pub(crate) async fn publish_artifact(
         )
         .await?;
     deps.delivery_wake.wake();
+    let view = ArtifactPublicView::from_meta(&published.meta, None);
     tool_result(object! {
-        "id" => OrderedJson::string(published.meta.id.0.clone()),
-        "url" => OrderedJson::string(artifact_url(deps, &published.meta.id)),
+        "id" => OrderedJson::string(view.id.0.clone()),
+        "url" => OrderedJson::string(artifact_url(deps, &view.id)),
         "org" => OrderedJson::string(target_org.0),
-        "bytes" => OrderedJson::number_u64(published.meta.bytes),
-        "category" => OrderedJson::string(published.meta.category),
+        "bytes" => OrderedJson::number_u64(view.bytes),
+        "category" => OrderedJson::string(view.category),
     })
 }
 
@@ -105,14 +108,15 @@ pub(crate) async fn publish_bundle(
         .await?;
     deps.delivery_wake.wake();
     let file_count = u64::try_from(published.file_count.unwrap_or(0)).unwrap_or(u64::MAX);
+    let view = ArtifactPublicView::from_meta(&published.meta, None);
     tool_result(object! {
-        "id" => OrderedJson::string(published.meta.id.0.clone()),
-        "url" => OrderedJson::string(artifact_url(deps, &published.meta.id)),
+        "id" => OrderedJson::string(view.id.0.clone()),
+        "url" => OrderedJson::string(artifact_url(deps, &view.id)),
         "org" => OrderedJson::string(target_org.0),
-        "entry" => OrderedJson::string(published.meta.entry.clone()),
+        "entry" => OrderedJson::string(view.entry.clone()),
         "files" => OrderedJson::number_u64(file_count),
-        "bytes" => OrderedJson::number_u64(published.meta.bytes),
-        "category" => OrderedJson::string(published.meta.category),
+        "bytes" => OrderedJson::number_u64(view.bytes),
+        "category" => OrderedJson::string(view.category),
     })
 }
 
@@ -219,7 +223,7 @@ async fn keyed_create(
         )
         .await?;
     deps.delivery_wake.wake();
-    let meta = published.meta;
+    let meta = ArtifactPublicView::from_meta(&published.meta, None);
     let mut payload = vec![
         ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
         (
@@ -256,7 +260,7 @@ async fn keyed_update(
 ) -> Result<Value, McpError> {
     let id = existing.id.0.clone();
     let owned = AccessPolicy::authorize_publisher_write(auth, Some(existing), &id, "")?;
-    let pre = owned.meta().clone();
+    let pre = ArtifactPublicView::from_meta(owned.meta(), None);
     if pre.is_bundle != (kind == PublishKind::Bundle) {
         let message = if pre.is_bundle {
             format!(
@@ -301,7 +305,7 @@ async fn keyed_update(
         content: Some(content),
     };
     let result = run_update(owned, update, auth, deps).await?;
-    let meta = result.meta;
+    let meta = ArtifactPublicView::from_meta(&result.meta, None);
     let mut payload = vec![
         ("id".to_owned(), OrderedJson::string(meta.id.0.clone())),
         (

@@ -16,7 +16,7 @@ use crate::{
             with_artifact_key,
         },
     },
-    model::PublisherIdentity,
+    model::{ArtifactPublicView, PublisherIdentity},
     security::{
         access::{AccessPolicy, ListScope},
         audit::MutationAudit,
@@ -88,7 +88,8 @@ pub(crate) async fn list_artifacts(
     let artifacts = rows
         .into_iter()
         .map(|row| {
-            let artifact_key = row.artifact_key.clone();
+            let row = ArtifactPublicView::from_meta(&row, None);
+            let artifact_key = row.details.artifact_key.clone();
             let entry = object! {
                 "id" => OrderedJson::string(row.id.0.clone()),
                 "url" => OrderedJson::string(artifact_url(deps, &row.id)),
@@ -98,12 +99,12 @@ pub(crate) async fn list_artifacts(
                 "org" => OrderedJson::string(row.org.0),
                 "category" => OrderedJson::string(row.category),
                 "revision" => OrderedJson::number_u64(row.revision),
-                "updated_at" => OrderedJson::string(row.updated_at.0),
+                "updated_at" => OrderedJson::string(row.details.updated_at.0),
                 "bytes" => OrderedJson::number_u64(row.bytes),
                 "is_bundle" => OrderedJson::number_i64(i64::from(row.is_bundle)),
                 "entry" => OrderedJson::string(row.entry),
-                "hidden" => OrderedJson::number_i64(i64::from(row.hidden)),
-                "uploader_label" => OrderedJson::string(row.uploader_label),
+                "hidden" => OrderedJson::number_i64(i64::from(row.details.hidden)),
+                "uploader_label" => OrderedJson::string(row.details.uploader_label),
             };
             with_artifact_key(entry, artifact_key.as_deref())
         })
@@ -124,8 +125,8 @@ pub(crate) async fn read_artifact(
 
     // Invariant 3: authorize the metadata before any body, history, or bundle-directory read.
     let owned = publisher_read(id, auth, deps).await?;
-    let current = owned.meta().clone();
-    let artifact_key = current.artifact_key.clone();
+    let current = ArtifactPublicView::from_meta(owned.meta(), None);
+    let artifact_key = current.details.artifact_key.clone();
     let artifact = owned.into_authorized();
 
     let (historical, revision, is_bundle, entry, aggregate_bytes) =
@@ -309,7 +310,7 @@ async fn read_single_artifact_body(
 async fn resolve_read_artifact_version(
     requested_revision: Option<u64>,
     artifact: &crate::security::access::AuthorizedArtifact,
-    current: &crate::model::ArtifactMeta,
+    current: &ArtifactPublicView,
     deps: &AppDeps,
 ) -> Result<(Option<u64>, u64, bool, String, u64), McpError> {
     let historical = requested_revision.filter(|revision| *revision != current.revision);
@@ -320,6 +321,7 @@ async fn resolve_read_artifact_version(
             .into_iter()
             .find(|row| row.revision == wanted)
             .ok_or_else(|| AppError::NotFound(format!("No such revision: {wanted}")))?;
+        let selected = ArtifactPublicView::from_revision(&selected);
         (
             selected.revision,
             selected.is_bundle,
@@ -376,9 +378,10 @@ pub(crate) async fn set_visibility(
             MutationAudit::publisher(auth)?,
         )
         .await?;
+    let result = ArtifactPublicView::from_meta(&result, None);
     tool_result(object! {
         "id" => OrderedJson::string(result.id.0),
-        "hidden" => OrderedJson::Bool(result.hidden),
+        "hidden" => OrderedJson::Bool(result.details.hidden),
     })
 }
 
@@ -466,12 +469,13 @@ pub(crate) async fn restore_artifact(
         Err(error) => return Err(error.into()),
     };
     deps.delivery_wake.wake();
+    let view = ArtifactPublicView::from_meta(&result.meta, None);
     tool_result(object! {
-        "id" => OrderedJson::string(result.meta.id.0.clone()),
-        "url" => OrderedJson::string(artifact_url(deps, &result.meta.id)),
-        "revision" => OrderedJson::number_u64(result.meta.revision),
+        "id" => OrderedJson::string(view.id.0.clone()),
+        "url" => OrderedJson::string(artifact_url(deps, &view.id)),
+        "revision" => OrderedJson::number_u64(view.revision),
         "restoredFrom" => OrderedJson::number_u64(result.restored_from),
-        "bytes" => OrderedJson::number_u64(result.meta.bytes),
+        "bytes" => OrderedJson::number_u64(view.bytes),
     })
 }
 

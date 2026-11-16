@@ -325,7 +325,7 @@ async fn get(
             .find_meta(&ArtifactId::from(artifact_id.clone()))
             .await?
         {
-            artifacts.push(json!({"id":artifact_id,"title":meta.title,"url":deps.config.artifact_url(&meta.id),"category":meta.category}));
+            artifacts.push(artifact_reference(&artifact_id, &meta, &deps.config));
         }
     }
     artifacts.sort_by(|a, b| {
@@ -616,5 +616,34 @@ pub fn ordered_response(value: Value) -> OrderedJson {
             OrderedJson::Array(values.into_iter().map(ordered_response).collect())
         }
         other => serde_json::from_value(other).expect("JSON primitive"),
+    }
+}
+
+fn artifact_reference(
+    id: &str,
+    meta: &crate::model::ArtifactMeta,
+    config: &crate::config::AppConfig,
+) -> Value {
+    let meta = crate::model::ArtifactPublicView::from_meta(meta, None);
+    json!({"id":id,"title":meta.title,"url":config.artifact_url(&meta.id),"category":meta.category})
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    use super::*;
+
+    #[test]
+    fn public_projection_collection_reference_bytes() {
+        let mut meta = crate::model::ArtifactMeta::fixture("a", "acme");
+        meta.title = "A \"title\"".into();
+        meta.category = "Reports".into();
+        let config = crate::config::AppConfig {
+            public_base_url: "https://example.test".into(),
+            ..crate::config::AppConfig::defaults()
+        };
+        assert_eq!(
+            artifact_reference("a", &meta, &config).to_string(),
+            r#"{"category":"Reports","id":"a","title":"A \"title\"","url":"https://example.test/a"}"#
+        );
     }
 }

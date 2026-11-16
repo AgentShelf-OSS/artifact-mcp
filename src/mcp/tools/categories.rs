@@ -11,7 +11,7 @@ use crate::{
         protocol::OrderedJson,
         shape::{object, tool_result},
     },
-    model::PublisherIdentity,
+    model::{ArtifactPublicView, PublisherIdentity},
     security::audit::MutationAudit,
 };
 
@@ -51,6 +51,7 @@ pub(crate) async fn set_category(
         .artifacts
         .set_category(owned.into_authorized(), category, audit)
         .await?;
+    let result = ArtifactPublicView::from_meta(&result, None);
     tool_result(object! {
         "id" => OrderedJson::string(id),
         "category" => OrderedJson::string(result.category),

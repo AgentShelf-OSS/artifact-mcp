@@ -5,7 +5,10 @@ use serde_json::{Value, json};
 use crate::{
     AppDeps,
     error::{JsonRpcError, McpError},
-    model::{ArtifactId, ArtifactRevision, Feedback, PublicShare, Timestamp, ViewerView},
+    model::{
+        ArtifactId, ArtifactPublicView, ArtifactRevision, Feedback, PublicShare, Timestamp,
+        ViewerView,
+    },
 };
 
 use super::protocol::OrderedJson;
@@ -41,6 +44,7 @@ pub(crate) fn tool_result(payload: OrderedJson) -> Result<Value, McpError> {
 }
 
 pub(crate) fn revision_json(revision: &ArtifactRevision) -> OrderedJson {
+    let revision = ArtifactPublicView::from_revision(revision);
     object! {
         "revision" => OrderedJson::number_u64(revision.revision),
         "title" => OrderedJson::string(revision.title.clone()),
@@ -49,9 +53,9 @@ pub(crate) fn revision_json(revision: &ArtifactRevision) -> OrderedJson {
         "bytes" => OrderedJson::number_u64(revision.bytes),
         "is_bundle" => OrderedJson::number_i64(i64::from(revision.is_bundle)),
         "entry" => OrderedJson::string(revision.entry.clone()),
-        "body_sha256" => OrderedJson::string(revision.body_sha256.clone()),
+        "body_sha256" => OrderedJson::string(revision.details.body_sha256.clone()),
         "created_at" => OrderedJson::string(revision.created_at.0.clone()),
-        "client_id" => optional_string_value(revision.client_id.as_ref().map(|id| id.0.clone())),
+        "client_id" => optional_string_value(revision.details.client_id.as_ref().map(|id| id.0.clone())),
     }
 }
 
@@ -154,5 +158,38 @@ pub(crate) fn javascript_string(value: &OrderedJson) -> String {
             .collect::<Vec<_>>()
             .join(","),
         OrderedJson::Object(_) => "[object Object]".to_owned(),
+    }
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    use super::*;
+
+    #[test]
+    fn public_projection_mcp_revision_bytes() {
+        let mut revision = ArtifactRevision {
+            artifact_id: "a".into(),
+            org: "acme".into(),
+            revision: 2,
+            title: "Title".into(),
+            description: "Description".into(),
+            category: "Reports".into(),
+            bytes: 23,
+            is_bundle: true,
+            entry: "index.html".into(),
+            body_sha256: "0123456789abcdef".repeat(4),
+            created_at: Timestamp("created".into()),
+            client_id: Some("publisher".into()),
+        };
+        assert_eq!(
+            revision_json(&revision).to_json_string().unwrap(),
+            r#"{"revision":2,"title":"Title","description":"Description","category":"Reports","bytes":23,"is_bundle":1,"entry":"index.html","body_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","created_at":"created","client_id":"publisher"}"#
+        );
+        revision.client_id = None;
+        revision.is_bundle = false;
+        assert_eq!(
+            revision_json(&revision).to_json_string().unwrap(),
+            r#"{"revision":2,"title":"Title","description":"Description","category":"Reports","bytes":23,"is_bundle":0,"entry":"index.html","body_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","created_at":"created","client_id":null}"#
+        );
     }
 }

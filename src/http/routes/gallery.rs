@@ -266,18 +266,22 @@ pub(crate) fn library_body(
                     .then_with(|| a.id.0.cmp(&b.id.0))
             });
             items.truncate(LIBRARY_LIMIT);
-            serde_json::json!({
-                "org": section.org.0,
-                "color": library_color(colors, &section.org),
-                "artifacts": items
-                    .iter()
-                    .map(|item| serde_json::json!({
+            let artifacts = items
+                .iter()
+                .map(|item| {
+                    let item = crate::model::ArtifactPublicView::from_meta(item, None);
+                    serde_json::json!({
                         "id": item.id.0,
                         "title": item.title,
                         "category": item.category,
-                        "updated_at": item.updated_at.0,
-                    }))
-                    .collect::<Vec<_>>(),
+                        "updated_at": item.details.updated_at.0,
+                    })
+                })
+                .collect::<Vec<_>>();
+            serde_json::json!({
+                "org": section.org.0,
+                "color": library_color(colors, &section.org),
+                "artifacts": artifacts,
             })
         })
         .collect::<Vec<_>>();
@@ -584,5 +588,21 @@ mod library_tests {
         );
         assert_eq!(body["orgs"][0]["color"], serde_json::Value::Null);
         assert_eq!(body["orgs"][0]["artifacts"].as_array().unwrap().len(), 200);
+    }
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    #[test]
+    fn public_projection_library_bytes() {
+        let colors = std::collections::BTreeMap::new();
+        let sections = vec![crate::model::OrgArtifacts {
+            org: "acme".into(),
+            items: vec![crate::model::ArtifactMeta::fixture("a", "acme")],
+        }];
+        assert_eq!(
+            super::library_body(sections, &colors).to_string(),
+            r#"{"orgs":[{"artifacts":[{"category":"","id":"a","title":"Artifact","updated_at":""}],"color":null,"org":"acme"}]}"#
+        );
     }
 }

@@ -210,7 +210,10 @@ async fn projection(
                             .as_deref()
                             .is_some_and(|e| e.eq_ignore_ascii_case(&actor.email))
                 })
-                .map(|a| (a.id.0.clone(), a)),
+                .map(|a| {
+                    let view = crate::model::ArtifactPublicView::from_meta(&a, Some(&actor.email));
+                    (view.id.0.clone(), view)
+                }),
         );
     }
     let mut collected = std::collections::HashSet::new();
@@ -232,7 +235,10 @@ async fn projection(
                 .take(3usize.saturating_sub(preview_ids.len()))
                 .cloned(),
         );
-        let previews = preview_ids.iter().map(|id| json!({"id":id,"thumbnail":format!("/thumbnails/{}?v={}",id,visible.get(id).map(|a|a.body_sha256.clone()).unwrap_or_default())})).collect::<Vec<_>>();
+        let previews = preview_ids
+            .iter()
+            .map(|id| preview_artifact(id, visible.get(id)))
+            .collect::<Vec<_>>();
         projected.push(json!({"id":row.id,"org":row.org,"name":row.name,"description":row.description,"color":row.color.filter(|color|!color.is_empty()),"createdBy":row.created_by,"editable":actor.is_admin || (row.created_by_kind == "email" && row.created_by.eq_ignore_ascii_case(&actor.email)),"artifactCount":ids.len(),"artifactIds":ids,"coverArtifactId":cover,"previewArtifacts":previews}));
     }
     Ok(
@@ -804,4 +810,41 @@ fn unique_ids(ids: Vec<String>) -> Vec<String> {
 
 async fn collection_not_found() -> Response {
     collection_error(AppError::ConcealedNotFound)
+}
+
+// Keep the empty-version query parameter for artifacts with no digest.
+fn preview_artifact(id: &str, meta: Option<&crate::model::ArtifactPublicView>) -> Value {
+    json!({"id":id,"thumbnail":format!("/thumbnails/{}?v={}",id,meta.map(|a|a.details.content_digest.clone()).unwrap_or_default())})
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    use super::*;
+
+    #[test]
+    fn public_projection_preview_bytes() {
+        let mut meta = crate::model::ArtifactMeta::fixture("a", "acme");
+        meta.body_sha256 = "0123456789abcdef".repeat(4);
+        assert_eq!(
+            preview_artifact(
+                "a",
+                Some(&crate::model::ArtifactPublicView::from_meta(&meta, None))
+            )
+            .to_string(),
+            r#"{"id":"a","thumbnail":"/thumbnails/a?v=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}"#
+        );
+        assert_eq!(
+            preview_artifact("a", None).to_string(),
+            r#"{"id":"a","thumbnail":"/thumbnails/a?v="}"#
+        );
+        meta.body_sha256.clear();
+        assert_eq!(
+            preview_artifact(
+                "a",
+                Some(&crate::model::ArtifactPublicView::from_meta(&meta, None))
+            )
+            .to_string(),
+            r#"{"id":"a","thumbnail":"/thumbnails/a?v="}"#
+        );
+    }
 }

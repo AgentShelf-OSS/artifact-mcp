@@ -19,7 +19,7 @@ use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use crate::{
     AppDeps,
     error::{AppError, JsonRpcError, McpError},
-    model::{ArtifactId, ClientId, OrgId, PublisherIdentity},
+    model::{ArtifactId, ArtifactPublicView, ClientId, OrgId, PublisherIdentity},
     ports::integrations::PreviewPriority,
     security::access::AccessPolicy,
 };
@@ -553,7 +553,13 @@ async fn regenerate(
             "Preview renderer did not produce a valid PNG".to_owned(),
         ));
     }
-    Ok(tool_result(artifact_id, true, &meta.body_sha256, None))
+    let view = ArtifactPublicView::from_meta(&meta, None);
+    Ok(tool_result(
+        artifact_id,
+        true,
+        &view.details.content_digest,
+        None,
+    ))
 }
 
 async fn preview_source(
@@ -635,6 +641,22 @@ fn task_io_error(operation: &'static str, error: impl std::fmt::Display) -> AppE
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn public_projection_preview_digest_bytes() {
+        let digest = "0123456789abcdef".repeat(4);
+        let result = tool_result("a", true, &digest, None);
+        assert_eq!(
+            result["content"][0]["text"].as_str().unwrap(),
+            r#"{"digest":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef","id":"a","regenerated":true}"#
+        );
+        assert_eq!(
+            tool_result("a", false, "", Some("reason"))["content"][0]["text"]
+                .as_str()
+                .unwrap(),
+            r#"{"digest":"","id":"a","reason":"reason","regenerated":false}"#
+        );
+    }
 
     #[tokio::test]
     async fn task_state_round_trips_and_terminal_transitions_are_monotonic() {

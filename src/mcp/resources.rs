@@ -10,7 +10,7 @@ use crate::{
     AppDeps,
     artifacts::validation::sanitize_relative_path,
     error::{AppError, JsonRpcError, McpError},
-    model::{ArtifactFile, ArtifactId, ArtifactMeta, PublisherIdentity},
+    model::{ArtifactFile, ArtifactId, ArtifactMeta, ArtifactPublicView, PublisherIdentity},
     security::access::{AccessPolicy, ListScope},
 };
 
@@ -36,7 +36,7 @@ struct ResourceTarget {
 struct ResourceContentInput<'a> {
     target: &'a ResourceTarget,
     artifact: &'a crate::security::access::AuthorizedArtifact,
-    current: &'a ArtifactMeta,
+    current: &'a ArtifactPublicView,
     revision: u64,
     is_bundle: bool,
     entry: String,
@@ -175,6 +175,7 @@ async fn read_resource(
         return read_thumbnail_resource(uri, &artifact, current, deps).await;
     }
 
+    let current = ArtifactPublicView::from_meta(&current, None);
     let (revision, is_bundle, entry, bytes, historical) =
         resolve_resource_version(&target, &artifact, &current, deps).await?;
     let (mime_type, text, content_bytes) = read_resource_content(
@@ -230,6 +231,7 @@ async fn read_thumbnail_resource(
         |png| ("image/png", png),
     );
     let byte_count = bytes.len();
+    let current = ArtifactPublicView::from_meta(&current, None);
     Ok(json!({
             "contents": [{
                 "uri": uri,
@@ -250,7 +252,7 @@ async fn read_thumbnail_resource(
 async fn resolve_resource_version(
     target: &ResourceTarget,
     artifact: &crate::security::access::AuthorizedArtifact,
-    current: &ArtifactMeta,
+    current: &ArtifactPublicView,
     deps: &AppDeps,
 ) -> Result<(u64, bool, String, u64, Option<u64>), McpError> {
     let historical = target
@@ -269,6 +271,7 @@ async fn resolve_resource_version(
             .ok_or_else(|| {
                 JsonRpcError::InvalidParams(format!("No such artifact revision: {revision}"))
             })?;
+        let selected = ArtifactPublicView::from_revision(&selected);
         (
             selected.revision,
             selected.is_bundle,
@@ -375,6 +378,7 @@ async fn read_resource_content(
 }
 
 fn resource_metadata(meta: &ArtifactMeta) -> Value {
+    let meta = ArtifactPublicView::from_meta(meta, None);
     let name = if meta.title.trim().is_empty() {
         meta.id.0.clone()
     } else {
@@ -393,8 +397,8 @@ fn resource_metadata(meta: &ArtifactMeta) -> Value {
         "_meta": {
             "com.agentshelf.artifact-mcp/org": meta.org.0,
             "com.agentshelf.artifact-mcp/revision": meta.revision,
-            "com.agentshelf.artifact-mcp/hidden": meta.hidden,
-            "com.agentshelf.artifact-mcp/updatedAt": meta.updated_at.0
+            "com.agentshelf.artifact-mcp/hidden": meta.details.hidden,
+            "com.agentshelf.artifact-mcp/updatedAt": meta.details.updated_at.0
         }
     })
 }
@@ -605,5 +609,29 @@ mod tests {
             content_type: "text/plain".to_owned(),
         };
         assert!(bounded_text(oversized).is_err());
+    }
+}
+
+#[cfg(test)]
+mod public_projection_tests {
+    use super::*;
+
+    #[test]
+    fn public_projection_resource_metadata_bytes() {
+        let mut meta = ArtifactMeta::fixture("a", "acme");
+        meta.title = " ".into();
+        meta.updated_at = crate::model::Timestamp("updated".into());
+        meta.hidden = true;
+        assert_eq!(
+            resource_metadata(&meta).to_string(),
+            r#"{"_meta":{"com.agentshelf.artifact-mcp/hidden":true,"com.agentshelf.artifact-mcp/org":"acme","com.agentshelf.artifact-mcp/revision":1,"com.agentshelf.artifact-mcp/updatedAt":"updated"},"description":"","mimeType":"text/html","name":"a","title":" ","uri":"artifact://a"}"#
+        );
+        meta.title = "Bundle".into();
+        meta.is_bundle = true;
+        meta.hidden = false;
+        assert_eq!(
+            resource_metadata(&meta).to_string(),
+            r#"{"_meta":{"com.agentshelf.artifact-mcp/hidden":false,"com.agentshelf.artifact-mcp/org":"acme","com.agentshelf.artifact-mcp/revision":1,"com.agentshelf.artifact-mcp/updatedAt":"updated"},"description":"","mimeType":"application/vnd.artifact-mcp.bundle+json","name":"Bundle","title":"Bundle","uri":"artifact://a"}"#
+        );
     }
 }
