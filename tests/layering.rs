@@ -3,33 +3,7 @@ use std::fs;
 use std::path::Path;
 
 // Exceptions must name the file and dependency, and explain why the edge remains.
-const ALLOWLIST: &[(&str, &str, &str)] = &[
-    (
-        "src/mcp/tools/data.rs",
-        "persistence",
-        "Data tools still use push persistence types.",
-    ),
-    (
-        "src/http/routes/state.rs",
-        "persistence",
-        "State routes still use persistence types.",
-    ),
-    (
-        "src/http/routes/push.rs",
-        "persistence",
-        "Push routes still use persistence types.",
-    ),
-    (
-        "src/http/routes/feedback.rs",
-        "persistence",
-        "Feedback routes still use persistence types.",
-    ),
-    (
-        "src/http/routes/admin/organizations.rs",
-        "persistence",
-        "Organization name normalization has not yet moved behind a port.",
-    ),
-];
+const ALLOWLIST: &[(&str, &str, &str)] = &[];
 
 // Replace comments and literals with spaces so tokens on either side stay separate.
 fn code_only(source: &str) -> String {

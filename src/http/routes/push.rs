@@ -29,7 +29,7 @@ use crate::{
     integrations::push_runtime::{PushService, ReminderInput},
     mcp::protocol::OrderedJson,
     model::Viewer,
-    persistence::push::{self, PushError, ReminderScope},
+    model::push::{self, PushError, ReminderScope},
     render::portal::{artifact_install_name, artifact_install_short_name},
 };
 

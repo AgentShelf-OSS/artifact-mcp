@@ -18,14 +18,14 @@ use crate::{
     error::AppError,
     http::artifact_response::is_html_content_type,
     mcp::protocol::OrderedJson,
-    model::{
-        ArtifactId, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor, FeedbackId, OrgId,
-        SubmitFeedback, Timestamp,
-    },
-    persistence::feedback::{
+    model::feedback::{
         ANCHOR_NOT_OBJECT_MESSAGE, ANCHOR_PAGE_MISSING_MESSAGE, ANCHOR_PAGE_NOT_BUNDLE_MESSAGE,
         ANCHOR_PAGE_REQUIRED_MESSAGE, ANCHOR_PAGE_UNANCHORED_MESSAGE, ANCHOR_POINT_MESSAGE,
         validate_anchor_page,
+    },
+    model::{
+        ArtifactId, Feedback, FeedbackAnchor, FeedbackAnchorV2, FeedbackAuthor, FeedbackId, OrgId,
+        SubmitFeedback, Timestamp,
     },
 };
 

@@ -55,3 +55,14 @@ pub enum StateError {
     #[error("too many state keys")]
     TooManyKeys,
 }
+
+/// Maximum viewer-state key length in bytes.
+pub const MAX_KEY_BYTES: usize = 64;
+
+pub fn valid_key(key: &str) -> bool {
+    !key.is_empty()
+        && key.len() <= MAX_KEY_BYTES
+        && key
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+}

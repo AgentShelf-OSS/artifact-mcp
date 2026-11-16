@@ -4,37 +4,7 @@ use crate::error::AppError;
 // Shared JavaScript string semantics
 // ---------------------------------------------------------------------------
 
-/// The exact set matched by JavaScript's `\s` and stripped by `String.prototype.trim`.
-///
-/// ECMA-262 defines both as `WhiteSpace ∪ LineTerminator`. This is **not** Rust's
-/// `char::is_whitespace` (Unicode `White_Space`): it includes U+FEFF (`<ZWNBSP>`) and excludes
-/// U+0085 (`<NEL>`). Getting this wrong changes which inputs normalize to the empty string.
-#[must_use]
-pub fn is_js_whitespace(value: char) -> bool {
-    matches!(
-        value,
-        '\u{9}'          // <TAB>
-            | '\u{b}'    // <VT>
-            | '\u{c}'    // <FF>
-            | '\u{20}'   // <SP>
-            | '\u{a0}'   // <NBSP>
-            | '\u{feff}' // <ZWNBSP>
-            | '\u{a}'    // <LF>
-            | '\u{d}'    // <CR>
-            | '\u{2028}' // <LS>
-            | '\u{2029}' // <PS>
-    ) || matches!(
-        value,
-        // <USP>: the Unicode `Space_Separator` category, minus U+0020/U+00A0 above.
-        '\u{1680}' | '\u{2000}'..='\u{200a}' | '\u{202f}' | '\u{205f}' | '\u{3000}'
-    )
-}
-
-/// `String.prototype.trim()`.
-#[must_use]
-pub fn js_trim(value: &str) -> &str {
-    value.trim_matches(is_js_whitespace)
-}
+pub use crate::model::orgs::{is_js_whitespace, js_trim};
 
 /// Length of `value` in UTF-16 code units, which is what JavaScript's `.length` reports.
 #[must_use]
