@@ -58,6 +58,8 @@ and the unprivileged user namespaces required by CI. See `.github/workflows/ci.y
   test adapters passed to `build_router()` through `AppDeps`.
 - Add or update tests for any behavior change. Prefer the deterministic adapters in `tests/native/`
   over anything that needs real sockets or a real Cloudflare.
+- For an `ArtifactService` dependency in a test, use `ports::testing::FakeArtifacts` (`test-util`):
+  seed rows, script a method, and read `calls()`. Do not write another `impl ArtifactService`.
 - Schema changes go through a new versioned migration in `src/persistence/migrations.rs`
   (append-only; never edit a shipped migration).
 - A change to HTTP or MCP behavior can change a conformance golden. Record it with

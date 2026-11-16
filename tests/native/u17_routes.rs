@@ -12,7 +12,7 @@ use artifact_mcp::{
     http::artifact_response::{ANCHOR_BRIDGE_MARKER, DOCUMENT_SANDBOX},
     model::*,
     ports::{
-        AdminService, ArtifactDiscussionView, ArtifactService, BoxFuture, DiscussionConnectionView,
+        AdminService, ArtifactDiscussionView, BoxFuture, DiscussionConnectionView,
         DiscussionModeRequest, DiscussionService, EngagementService, HealthProbe, NotificationSink,
         PageRenderer, PreviewService, PublisherAuthenticator, ShareService, ViewerIdentity,
         integrations::{HealthReport, PreviewPriority},
@@ -290,183 +290,6 @@ impl PublisherAuthenticator for Fake {
         &'a self,
         _headers: &'a HeaderMap,
     ) -> BoxFuture<'a, Result<PublisherIdentity, AppError>> {
-        unused()
-    }
-}
-
-impl ArtifactService for Fake {
-    fn find_meta<'a>(
-        &'a self,
-        id: &'a ArtifactId,
-    ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
-        Box::pin(async move {
-            let meta = self.lock().meta.clone().filter(|meta| meta.id == *id);
-            self.operation("artifacts.find_meta", meta)
-        })
-    }
-
-    fn publish(
-        &self,
-        _request: PublishArtifact,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
-        unused()
-    }
-
-    fn list_for_publisher<'a>(
-        &'a self,
-        _publisher: &'a PublisherIdentity,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-        unused()
-    }
-
-    fn list_org_artifacts<'a>(
-        &'a self,
-        _org: &'a OrgId,
-        _include_hidden: bool,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
-        Box::pin(async move {
-            let rows = self.lock().org_artifacts.clone();
-            self.operation("artifacts.list_org_artifacts", rows)
-        })
-    }
-
-    fn list_all_grouped_by_org(
-        &self,
-        _include_hidden: bool,
-    ) -> BoxFuture<'_, Result<Vec<OrgArtifacts>, AppError>> {
-        Box::pin(async move {
-            let rows = self.lock().grouped.clone();
-            self.operation("artifacts.list_all_grouped", rows)
-        })
-    }
-
-    fn list_org_ids<'a>(
-        &'a self,
-        _org: &'a OrgId,
-        _include_hidden: bool,
-    ) -> BoxFuture<'a, Result<Vec<ArtifactId>, AppError>> {
-        Box::pin(async move {
-            let ids = self.lock().org_ids.clone();
-            self.operation("artifacts.list_org_ids", ids)
-        })
-    }
-
-    fn read_body<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        Box::pin(async move {
-            let body = self.lock().body.clone();
-            self.operation("artifacts.read_body", body)
-        })
-    }
-
-    fn read_bundle_file<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        relative_path: &'a str,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        Box::pin(async move {
-            let file = self.lock().bundle_files.get(relative_path).cloned();
-            self.operation(&format!("artifacts.read_bundle:{relative_path}"), file)
-        })
-    }
-
-    fn read_revision_body<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        revision: u64,
-        relative_path: Option<&'a str>,
-    ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
-        Box::pin(async move {
-            let key = (revision, relative_path.map(ToOwned::to_owned));
-            let file = self.lock().revision_files.get(&key).cloned();
-            self.operation(
-                &format!("artifacts.read_revision:{revision}:{relative_path:?}"),
-                file,
-            )
-        })
-    }
-
-    fn list_bundle_files<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-        _revision: Option<u64>,
-    ) -> BoxFuture<'a, Result<Option<Vec<(String, u64)>>, AppError>> {
-        unused()
-    }
-
-    fn list_revisions<'a>(
-        &'a self,
-        _artifact: &'a AuthorizedArtifact,
-    ) -> BoxFuture<'a, Result<RevisionHistory, AppError>> {
-        unused()
-    }
-
-    fn update(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _update: ArtifactUpdate,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
-        unused()
-    }
-
-    fn restore(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _revision: u64,
-        _acting_client_id: Option<ClientId>,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
-        unused()
-    }
-
-    fn delete(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<bool, AppError>> {
-        unused()
-    }
-
-    fn set_category(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _category: String,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        unused()
-    }
-
-    fn set_hidden(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _hidden: bool,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        unused()
-    }
-
-    fn move_to_org(
-        &self,
-        _artifact: AuthorizedArtifact,
-        _target_org: OrgId,
-        _category: Option<String>,
-        _audit: artifact_mcp::security::audit::MutationAudit,
-    ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
-        unused()
-    }
-
-    fn audit_storage(
-        &self,
-        _clean_transient: bool,
-    ) -> BoxFuture<'_, Result<StorageAuditReport, AppError>> {
-        unused()
-    }
-
-    fn backfill_body_digests(&self) -> BoxFuture<'_, Result<DigestBackfillReport, AppError>> {
         unused()
     }
 }
@@ -991,7 +814,7 @@ fn deps_with_config(fake: &Fake, config: AppConfig) -> AppDeps {
         collections: Arc::new(artifact_mcp::ports::collections::InertCollections),
         publisher_auth: fake.clone(),
         viewer_identity: fake.clone(),
-        artifacts: fake.clone(),
+        artifacts: Arc::new(fake.artifacts()),
         admin: fake.clone(),
         discussions: fake.clone(),
         engagement: fake.clone(),
@@ -2107,4 +1930,71 @@ async fn investigation_action_reaches_only_literal_ticket_worker_path() {
         .unwrap();
     assert_eq!(result.status(), StatusCode::ACCEPTED);
     task.abort();
+}
+
+// These scripts keep the cross-port call order and fixture-specific responses.
+
+impl Fake {
+    // The prepared list rows deliberately ignore org/hidden filters, to test route projection
+    // and registry order.
+    fn artifacts(&self) -> artifact_mcp::ports::testing::FakeArtifacts {
+        let mut fake = artifact_mcp::ports::testing::FakeArtifacts::with_error(|| {
+            AppError::Unavailable("unused fake operation".to_owned())
+        });
+        {
+            let fixture = self.clone();
+            fake.scripts.find_meta = Some(Box::new(move |id| {
+                let meta = fixture.lock().meta.clone().filter(|meta| meta.id == *id);
+                fixture.operation("artifacts.find_meta", meta)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.list_org_artifacts = Some(Box::new(move |_org, _include_hidden| {
+                let rows = fixture.lock().org_artifacts.clone();
+                fixture.operation("artifacts.list_org_artifacts", rows)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.list_all_grouped_by_org = Some(Box::new(move |_include_hidden| {
+                let rows = fixture.lock().grouped.clone();
+                fixture.operation("artifacts.list_all_grouped", rows)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.list_org_ids = Some(Box::new(move |_org, _include_hidden| {
+                let ids = fixture.lock().org_ids.clone();
+                fixture.operation("artifacts.list_org_ids", ids)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_body = Some(Box::new(move |_artifact| {
+                let body = fixture.lock().body.clone();
+                fixture.operation("artifacts.read_body", body)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_bundle_file = Some(Box::new(move |_artifact, relative_path| {
+                let file = fixture.lock().bundle_files.get(relative_path).cloned();
+                fixture.operation(&format!("artifacts.read_bundle:{relative_path}"), file)
+            }));
+        }
+        {
+            let fixture = self.clone();
+            fake.scripts.read_revision_body =
+                Some(Box::new(move |_artifact, revision, relative_path| {
+                    let key = (revision, relative_path.map(ToOwned::to_owned));
+                    let file = fixture.lock().revision_files.get(&key).cloned();
+                    fixture.operation(
+                        &format!("artifacts.read_revision:{revision}:{relative_path:?}"),
+                        file,
+                    )
+                }));
+        }
+        fake
+    }
 }
