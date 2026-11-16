@@ -354,7 +354,10 @@ async fn mcp_tcp_drain_preserves_oversize_and_parse_error_wire_contracts() {
     let mut config = config_for(temp.path());
     config.seed_keys = SeedKeys::parse("publisher:acme:owner-secret");
     config.body.mcp_json = 128;
-    config.ingress.read_timeout_ms = 1_000;
+    // The drain deadline is this read timeout. The slow upload below takes under 0.2 s on an idle
+    // host but can take more than 1 s under a loaded full-suite run (#177), so allow 10 s. The
+    // old early-return bug still fails at once: it closes before the second write.
+    config.ingress.read_timeout_ms = 10_000;
     let ingress = config.ingress.clone();
 
     runtime::run_with_bind(config, Arc::new(Recorder::default()), move |_host, _port, router| async move {
