@@ -1,7 +1,11 @@
-# ADR-0026: Separate origin for untrusted artifact content
+# 26. Separate origin for untrusted artifact content
 
-- Status: Proposed
-- Date: 2026-11-15
+Date: 2026-11-15
+
+## Status
+
+Proposed
+
 - Issue: [#71](https://github.com/AgentShelf-OSS/artifact-mcp/issues/71)
 - Builds on: ADR-0003, ADR-0007, ADR-0009, ADR-0011, ADR-0016, ADR-0017 and ADR-0018
 - Changes on acceptance: ADR-0003 delivery location and ADR-0018's single-origin deployment assumption
@@ -24,10 +28,11 @@ per-organization MCP endpoints are deployment constraints supplied with this tas
 documentation was reviewed; Cloudflare account settings and the Android repository were not
 inspected live.
 
-Issue retrieval is an evidence limit. `gh issue view 71 --repo AgentShelf-OSS/artifact-mcp` could
-not read its denied config path. An empty config had no authentication. The GitHub connector
-was unavailable, and a public API request failed DNS resolution. The owner must reconcile this
-proposal with the issue body and comments before acceptance.
+This record was checked against the body of issue #71 on 2026-11-15. It answers the issue's design
+gate: the origin/access matrix (Delivery today), the hostname versus registrable-domain and
+shared versus per-artifact matrix (Options), content authorization (Read-grant contract), and
+migration and rollback (Phase 6). The issue's Node/Rust parity validation step no longer applies
+after ADR-0024. Its file references to `lib/artifact-http.js` point at the retired Node tree.
 
 ### Terms
 
@@ -496,6 +501,9 @@ Observe aggregate grant failures, host refusals, expired reads and content load 
 add artifact IDs, grants or viewer identities as metric labels. There is no silent fallback to
 same-origin content when DNS, Access bypass or grant delivery fails.
 
+Plan the routing cutover and its rollback under issue #54, and check the topology against the
+homelab routing playbooks before any route changes. Deployment stays an owner-run operation.
+
 Rollback is an explicit restart in `legacy` mode. It restores the old delivery security posture,
 not equivalent isolation. Keep content routes available only for already issued grants until
 their maximum expiry, then disable the wildcard route if required. Do not reuse a long-lived
@@ -531,5 +539,4 @@ viewer shell intentionally grants to it.
 4. Decide whether public shares must remain embeddable by third-party sites. Separately decide
    whether to remove `allow-forms` or add `form-action 'none'`, and whether current popup and
    third-party presentation-host allowances are still needed. These change artifact behavior.
-5. Confirm the pilot deployment, its owner and the legacy-mode retirement gate. Reconcile this
-   ADR with issue #71's body/comments once GitHub access is available.
+5. Confirm the pilot deployment, its owner and the legacy-mode retirement gate.
