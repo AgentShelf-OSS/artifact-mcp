@@ -143,7 +143,7 @@ pub(crate) async fn set_artifact_reminder(
 ) -> Result<Value, McpError> {
     use crate::{
         integrations::push_runtime::ReminderInput,
-        persistence::push::{PUSH_DISABLED_MESSAGE, PushError, ReminderScope, valid_key},
+        model::push::{PUSH_DISABLED_MESSAGE, PushError, ReminderScope, valid_key},
     };
     let Some(push) = deps.push.clone() else {
         return Err(AppError::Validation(PUSH_DISABLED_MESSAGE.to_owned()).into());

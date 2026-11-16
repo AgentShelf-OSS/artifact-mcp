@@ -150,7 +150,7 @@ pub(super) async fn add_email_member(
             let Some(value) = value.as_str() else {
                 return (StatusCode::BAD_REQUEST, Json(serde_json::json!({"error":"display_name must be a single line of at most 40 characters."}))).into_response();
             };
-            match crate::persistence::orgs::normalize_display_name(value) {
+            match crate::model::orgs::normalize_display_name(value) {
                 Ok(name) => Some(name),
                 Err(error) => return error.into_response(),
             }

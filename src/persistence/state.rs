@@ -211,13 +211,8 @@ pub fn delete(
     .map_err(|error| crate::error::internal("delete", error))
 }
 
-pub fn valid_key(key: &str) -> bool {
-    !key.is_empty()
-        && key.len() <= MAX_KEY_BYTES
-        && key
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
-}
+// Compatibility path: these rules live in `model::state`. New code imports them from there.
+pub use crate::model::state::valid_key;
 
 pub async fn list_pooled(
     pool: &DbPool,

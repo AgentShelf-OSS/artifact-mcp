@@ -4,15 +4,6 @@ use super::*;
 // Reminders
 // ---------------------------------------------------------------------------
 
-/// `owner` column: `''` for org scope, the lowercased email for viewer scope.
-#[must_use]
-pub fn reminder_owner(scope: ReminderScope, viewer_email: Option<&str>) -> String {
-    match scope {
-        ReminderScope::Org => String::new(),
-        ReminderScope::Viewer => viewer_email.map(normalize_email).unwrap_or_default(),
-    }
-}
-
 /// One armed reminder as listed to a viewer.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct ReminderRecord {

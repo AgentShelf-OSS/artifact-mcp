@@ -13,11 +13,11 @@
 //!
 //! Viewer mutations are guarded twice: reject a feedback row belonging to a different artifact or org, then reject a different viewer. [`delete_as_viewer`] and [`resolve_as_viewer`] take the artifact scope as an argument and apply both checks in that order, so a route cannot lose half of the check and turn a feedback id into a cross-tenant oracle.
 
-mod anchors;
 mod reads;
 mod sql;
 mod writes;
 
-pub use anchors::*;
+// Compatibility path: these rules live in `model::feedback`. New code imports them from there.
+pub use crate::model::feedback::*;
 pub use reads::*;
 pub use writes::*;

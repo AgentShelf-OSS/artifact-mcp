@@ -4,8 +4,11 @@ pub mod admin;
 pub mod artifact;
 pub mod discord;
 pub mod engagement;
+pub mod feedback;
 pub mod identity;
 pub mod json;
+pub mod orgs;
+pub mod push;
 pub mod rendering;
 pub mod state;
 

@@ -15,7 +15,7 @@ use crate::{
     http::routes::artifact::{authorize, json_error, parse_json_request},
     mcp::protocol::OrderedJson,
     model::EmailAddress,
-    persistence::state::{self, StateError, StateScope, StateValue},
+    model::state::{self, StateError, StateScope, StateValue},
     ports::state::StateAudience,
     security::audit::{AuditRequestId, MutationAudit},
 };

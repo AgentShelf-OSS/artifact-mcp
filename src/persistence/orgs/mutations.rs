@@ -286,14 +286,8 @@ pub fn add_email_member_with_name(
     Ok(email)
 }
 
-pub fn normalize_display_name(value: &str) -> Result<String, AppError> {
-    if value.chars().any(char::is_control) || js_trim(value).chars().count() > 40 {
-        return Err(AppError::Validation(
-            "display_name must be a single line of at most 40 characters.".into(),
-        ));
-    }
-    Ok(js_trim(value).to_owned())
-}
+// Compatibility path: these rules live in `model::orgs`. New code imports them from there.
+pub use crate::model::orgs::normalize_display_name;
 
 pub fn email_display_name(conn: &Connection, email: &str) -> Result<Option<String>, AppError> {
     conn.query_row(

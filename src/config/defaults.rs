@@ -36,7 +36,7 @@ pub const DEFAULT_REACTION_JSON_LIMIT: u64 = 8 * 1024;
 pub const DEFAULT_FEEDBACK_JSON_LIMIT: u64 = 16 * 1024;
 /// Viewer-state mutation envelope limit. Values have a separate 256 KiB serialized cap.
 pub const DEFAULT_STATE_JSON_LIMIT: u64 = 256 * 1024 + 1024;
-pub const STATE_MAX_KEY_BYTES: usize = 64;
+pub use crate::model::state::MAX_KEY_BYTES as STATE_MAX_KEY_BYTES;
 pub const STATE_MAX_VALUE_BYTES: usize = 256 * 1024;
 pub const STATE_MAX_KEYS: i64 = 64;
 /// Category JSON body limit, defaulting to 8 KiB.
