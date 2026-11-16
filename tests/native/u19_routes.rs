@@ -1966,7 +1966,8 @@ async fn mcp_scope_and_operation_budget_precede_the_mutation_permit() {
 // These scripts keep the cross-port call order and fixture-specific responses.
 
 impl RouteHarness {
-    // Metadata lookup deliberately ignores the requested ID. Mutations return changed copies without persisting them, as the frozen route vectors expect.
+    // Metadata lookup deliberately ignores the requested ID. Mutations return changed copies
+    // without persisting them, as the frozen route vectors expect.
     fn artifacts(&self) -> artifact_mcp::ports::testing::FakeArtifacts {
         let mut fake = artifact_mcp::ports::testing::FakeArtifacts::with_error(|| {
             AppError::Unavailable("unused U19 test capability".to_owned())

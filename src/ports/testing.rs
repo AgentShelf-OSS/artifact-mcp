@@ -22,6 +22,8 @@ pub type Script<F> = Option<Box<F>>;
 pub struct ArtifactScripts {
     pub find_meta:
         Script<dyn Fn(&ArtifactId) -> Result<Option<ArtifactMeta>, AppError> + Send + Sync>,
+    pub find_meta_by_key:
+        Script<dyn Fn(&OrgId, &str) -> Result<Option<ArtifactMeta>, AppError> + Send + Sync>,
     pub publish: Script<
         dyn Fn(PublishArtifact, MutationAudit) -> Result<PublishedArtifact, AppError> + Send + Sync,
     >,
@@ -99,7 +101,13 @@ pub struct ArtifactScripts {
 /// In-memory metadata/body reads plus configurable scripts and an ordered method-name log.
 /// This fake does not model persistence, authorization, lifecycle cleanup, or transactions.
 /// Mutations are refused unless scripted; scripts decide whether to change their own state.
-/// The trait's default key lookup and thumbnail behavior are retained.
+/// Unscripted `find_meta_by_key` reports no match, as the trait default does.
+/// `read_current_thumbnail` keeps the trait default and is not recorded in [`Self::calls`].
+///
+/// Unscripted reads have three states:
+/// - Nothing seeded ([`Self::default`]): `find_meta` returns the default error.
+/// - At least one row seeded: `find_meta` returns the row, or `Ok(None)` for an unknown ID.
+/// - `read_body` returns a seeded body, or the default error when that row has no body.
 ///
 /// To inject an error, set `fake.scripts.delete = Some(Box::new(|_, _| Err(AppError::Internal)))`.
 /// Closures may capture shared state for repeatable failures, queued results, or cross-port logs.
@@ -126,6 +134,7 @@ impl Default for FakeArtifacts {
 
 impl FakeArtifacts {
     /// Seed metadata. All other unscripted capabilities still refuse calls.
+    #[must_use]
     pub fn with(meta: ArtifactMeta) -> Self {
         let mut fake = Self::default();
         fake.seed(meta, None);
@@ -143,6 +152,7 @@ impl FakeArtifacts {
     }
 
     /// Select the error returned by unscripted capabilities.
+    #[must_use]
     pub fn with_error(error: fn() -> AppError) -> Self {
         Self {
             error,
@@ -151,6 +161,7 @@ impl FakeArtifacts {
     }
 
     /// The method names called so far, in call order.
+    #[must_use]
     pub fn calls(&self) -> Vec<&'static str> {
         self.calls
             .lock()
@@ -188,6 +199,20 @@ impl ArtifactService for FakeArtifacts {
                     .as_ref()
                     .map(|metas| metas.get(id).cloned())
                     .ok_or_else(self.error)
+            }
+        })
+    }
+
+    fn find_meta_by_key<'a>(
+        &'a self,
+        org: &'a OrgId,
+        artifact_key: &'a str,
+    ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
+        self.record("find_meta_by_key");
+        Box::pin(async move {
+            match &self.scripts.find_meta_by_key {
+                Some(script) => script(org, artifact_key),
+                None => Ok(None),
             }
         })
     }
@@ -274,11 +299,11 @@ impl ArtifactService for FakeArtifacts {
             if let Some(script) = &self.scripts.read_body {
                 script(artifact)
             } else {
-                if self.bodies.contains_key(&artifact.meta().id) {
-                    Ok(self.bodies.get(&artifact.meta().id).cloned())
-                } else {
-                    Err((self.error)())
-                }
+                self.bodies
+                    .get(&artifact.meta().id)
+                    .cloned()
+                    .map(Some)
+                    .ok_or_else(self.error)
             }
         })
     }

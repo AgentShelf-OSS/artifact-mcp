@@ -1935,7 +1935,8 @@ async fn investigation_action_reaches_only_literal_ticket_worker_path() {
 // These scripts keep the cross-port call order and fixture-specific responses.
 
 impl Fake {
-    // The prepared list rows deliberately ignore org/hidden filters to test route projection and registry order.
+    // The prepared list rows deliberately ignore org/hidden filters, to test route projection
+    // and registry order.
     fn artifacts(&self) -> artifact_mcp::ports::testing::FakeArtifacts {
         let mut fake = artifact_mcp::ports::testing::FakeArtifacts::with_error(|| {
             AppError::Unavailable("unused fake operation".to_owned())
