@@ -36,6 +36,8 @@ hex = "0.4"
 # and p256 0.13 (RUSTSEC-2023-0071, RUSTSEC-2026-0387).
 jsonwebtoken = { version = "11", features = ["aws_lc_rs"] }
 ipnet = "2"
+# Global allocator for the server binary; see ADR 0025 and src/startup/allocator.rs.
+mimalloc = "0.1.52"
 nanoid = "0.5"
 p256 = { version = "0.14", default-features = false, features = ["arithmetic", "ecdh", "ecdsa", "std"] }
 r2d2 = "0.8"
