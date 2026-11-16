@@ -204,7 +204,10 @@ fn runtime_router(deps: AppDeps) -> Router {
 }
 
 #[tracing::instrument(skip_all)]
-#[allow(dead_code)] // exercised by the listener-free native runtime tests
+#[allow(
+    dead_code,
+    reason = "unused in the binary; tests/native/u20_runtime.rs includes this file with #[path] and calls it, so #[expect] would be unfulfilled there"
+)]
 pub(crate) async fn run_with_bind<B, F>(
     config: AppConfig,
     observer: Arc<dyn StartupObserver>,
@@ -265,7 +268,10 @@ async fn serve_listener(
 /// Serve an already-bound listener until the supplied shutdown future resolves. Keeping this
 /// seam separate lets the runtime test exercise Hyper's actual header deadline and connection
 /// permits without binding a process-wide signal handler.
-#[allow(dead_code)] // exercised by the listener-free native runtime tests
+#[allow(
+    dead_code,
+    reason = "unused in the binary; tests/native/u20_runtime.rs includes this file with #[path] and calls it, so #[expect] would be unfulfilled there"
+)]
 pub(crate) async fn serve_listener_with_shutdown<F>(
     listener: TcpListener,
     router: Router,

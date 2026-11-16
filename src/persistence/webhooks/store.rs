@@ -90,7 +90,6 @@ impl WebhookStore {
                 CreateWebhookRow {
                     org: &org,
                     id: &id,
-                    _url: &url,
                     url_is_allowed,
                     label: &label,
                     events: &events,
@@ -123,7 +122,6 @@ impl WebhookStore {
                     CreateWebhookRow {
                         org: &org,
                         id: &id,
-                        _url: &url,
                         url_is_allowed,
                         label: &label,
                         events: &events,
@@ -326,7 +324,6 @@ impl WebhookStore {
 struct CreateWebhookRow<'a> {
     org: &'a str,
     id: &'a WebhookId,
-    _url: &'a str,
     url_is_allowed: bool,
     label: &'a str,
     events: &'a str,
@@ -337,7 +334,6 @@ fn create_in(conn: &Connection, row: CreateWebhookRow<'_>) -> Result<WebhookSumm
     let CreateWebhookRow {
         org,
         id,
-        _url,
         url_is_allowed,
         label,
         events,
