@@ -12,7 +12,8 @@ use std::{collections::BTreeMap, sync::Mutex};
 pub type Script<F> = Option<Box<F>>;
 
 /// Optional method scripts. Missing scripts use seeded reads or the fake's default error.
-/// Scripts run when the returned future is polled, after the call is recorded.
+/// A call is recorded when the method is called, even if its future is dropped unpolled.
+/// Scripts run later, when the returned future is polled.
 #[derive(Default)]
 #[expect(
     clippy::type_complexity,
@@ -149,6 +150,7 @@ impl FakeArtifacts {
         }
     }
 
+    /// The method names called so far, in call order.
     pub fn calls(&self) -> Vec<&'static str> {
         self.calls
             .lock()
@@ -156,6 +158,7 @@ impl FakeArtifacts {
             .clone()
     }
 
+    /// Clear the recorded calls. Seeds, scripts and the default error are kept.
     pub fn reset(&self) {
         self.calls
             .lock()
@@ -176,8 +179,8 @@ impl ArtifactService for FakeArtifacts {
         &'a self,
         id: &'a ArtifactId,
     ) -> BoxFuture<'a, Result<Option<ArtifactMeta>, AppError>> {
+        self.record("find_meta");
         Box::pin(async move {
-            self.record("find_meta");
             if let Some(script) = &self.scripts.find_meta {
                 script(id)
             } else {
@@ -194,8 +197,8 @@ impl ArtifactService for FakeArtifacts {
         request: PublishArtifact,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<PublishedArtifact, AppError>> {
+        self.record("publish");
         Box::pin(async move {
-            self.record("publish");
             if let Some(script) = &self.scripts.publish {
                 script(request, audit)
             } else {
@@ -208,8 +211,8 @@ impl ArtifactService for FakeArtifacts {
         &'a self,
         publisher: &'a PublisherIdentity,
     ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
+        self.record("list_for_publisher");
         Box::pin(async move {
-            self.record("list_for_publisher");
             if let Some(script) = &self.scripts.list_for_publisher {
                 script(publisher)
             } else {
@@ -223,8 +226,8 @@ impl ArtifactService for FakeArtifacts {
         org: &'a OrgId,
         include_hidden: bool,
     ) -> BoxFuture<'a, Result<Vec<ArtifactMeta>, AppError>> {
+        self.record("list_org_artifacts");
         Box::pin(async move {
-            self.record("list_org_artifacts");
             if let Some(script) = &self.scripts.list_org_artifacts {
                 script(org, include_hidden)
             } else {
@@ -237,8 +240,8 @@ impl ArtifactService for FakeArtifacts {
         &self,
         include_hidden: bool,
     ) -> BoxFuture<'_, Result<Vec<OrgArtifacts>, AppError>> {
+        self.record("list_all_grouped_by_org");
         Box::pin(async move {
-            self.record("list_all_grouped_by_org");
             if let Some(script) = &self.scripts.list_all_grouped_by_org {
                 script(include_hidden)
             } else {
@@ -252,8 +255,8 @@ impl ArtifactService for FakeArtifacts {
         org: &'a OrgId,
         include_hidden: bool,
     ) -> BoxFuture<'a, Result<Vec<ArtifactId>, AppError>> {
+        self.record("list_org_ids");
         Box::pin(async move {
-            self.record("list_org_ids");
             if let Some(script) = &self.scripts.list_org_ids {
                 script(org, include_hidden)
             } else {
@@ -266,8 +269,8 @@ impl ArtifactService for FakeArtifacts {
         &'a self,
         artifact: &'a AuthorizedArtifact,
     ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
+        self.record("read_body");
         Box::pin(async move {
-            self.record("read_body");
             if let Some(script) = &self.scripts.read_body {
                 script(artifact)
             } else {
@@ -285,8 +288,8 @@ impl ArtifactService for FakeArtifacts {
         artifact: &'a AuthorizedArtifact,
         relative_path: &'a str,
     ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
+        self.record("read_bundle_file");
         Box::pin(async move {
-            self.record("read_bundle_file");
             if let Some(script) = &self.scripts.read_bundle_file {
                 script(artifact, relative_path)
             } else {
@@ -301,8 +304,8 @@ impl ArtifactService for FakeArtifacts {
         revision: u64,
         relative_path: Option<&'a str>,
     ) -> BoxFuture<'a, Result<Option<ArtifactFile>, AppError>> {
+        self.record("read_revision_body");
         Box::pin(async move {
-            self.record("read_revision_body");
             if let Some(script) = &self.scripts.read_revision_body {
                 script(artifact, revision, relative_path)
             } else {
@@ -316,8 +319,8 @@ impl ArtifactService for FakeArtifacts {
         artifact: &'a AuthorizedArtifact,
         revision: Option<u64>,
     ) -> BoxFuture<'a, Result<Option<BundleFileListing>, AppError>> {
+        self.record("list_bundle_files");
         Box::pin(async move {
-            self.record("list_bundle_files");
             if let Some(script) = &self.scripts.list_bundle_files {
                 script(artifact, revision)
             } else {
@@ -330,8 +333,8 @@ impl ArtifactService for FakeArtifacts {
         &'a self,
         artifact: &'a AuthorizedArtifact,
     ) -> BoxFuture<'a, Result<RevisionHistory, AppError>> {
+        self.record("list_revisions");
         Box::pin(async move {
-            self.record("list_revisions");
             if let Some(script) = &self.scripts.list_revisions {
                 script(artifact)
             } else {
@@ -346,8 +349,8 @@ impl ArtifactService for FakeArtifacts {
         update: ArtifactUpdate,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<UpdateArtifactResult, AppError>> {
+        self.record("update");
         Box::pin(async move {
-            self.record("update");
             if let Some(script) = &self.scripts.update {
                 script(artifact, update, audit)
             } else {
@@ -363,8 +366,8 @@ impl ArtifactService for FakeArtifacts {
         acting_client_id: Option<ClientId>,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<RestoreArtifactResult, AppError>> {
+        self.record("restore");
         Box::pin(async move {
-            self.record("restore");
             if let Some(script) = &self.scripts.restore {
                 script(artifact, revision, acting_client_id, audit)
             } else {
@@ -378,8 +381,8 @@ impl ArtifactService for FakeArtifacts {
         artifact: AuthorizedArtifact,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<bool, AppError>> {
+        self.record("delete");
         Box::pin(async move {
-            self.record("delete");
             if let Some(script) = &self.scripts.delete {
                 script(artifact, audit)
             } else {
@@ -394,8 +397,8 @@ impl ArtifactService for FakeArtifacts {
         category: String,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
+        self.record("set_category");
         Box::pin(async move {
-            self.record("set_category");
             if let Some(script) = &self.scripts.set_category {
                 script(artifact, category, audit)
             } else {
@@ -410,8 +413,8 @@ impl ArtifactService for FakeArtifacts {
         hidden: bool,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
+        self.record("set_hidden");
         Box::pin(async move {
-            self.record("set_hidden");
             if let Some(script) = &self.scripts.set_hidden {
                 script(artifact, hidden, audit)
             } else {
@@ -427,8 +430,8 @@ impl ArtifactService for FakeArtifacts {
         category: Option<String>,
         audit: MutationAudit,
     ) -> BoxFuture<'_, Result<ArtifactMeta, AppError>> {
+        self.record("move_to_org");
         Box::pin(async move {
-            self.record("move_to_org");
             if let Some(script) = &self.scripts.move_to_org {
                 script(artifact, target_org, category, audit)
             } else {
@@ -441,8 +444,8 @@ impl ArtifactService for FakeArtifacts {
         &self,
         clean_transient: bool,
     ) -> BoxFuture<'_, Result<StorageAuditReport, AppError>> {
+        self.record("audit_storage");
         Box::pin(async move {
-            self.record("audit_storage");
             if let Some(script) = &self.scripts.audit_storage {
                 script(clean_transient)
             } else {
@@ -452,8 +455,8 @@ impl ArtifactService for FakeArtifacts {
     }
 
     fn backfill_body_digests(&self) -> BoxFuture<'_, Result<DigestBackfillReport, AppError>> {
+        self.record("backfill_body_digests");
         Box::pin(async move {
-            self.record("backfill_body_digests");
             if let Some(script) = &self.scripts.backfill_body_digests {
                 script()
             } else {
