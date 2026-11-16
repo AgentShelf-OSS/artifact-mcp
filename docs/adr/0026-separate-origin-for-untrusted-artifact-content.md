@@ -527,16 +527,33 @@ CSP form/popup hardening and general broker lifecycle work remain valuable. Neit
 split nor a signed URL prevents a hostile artifact from misusing the data and operations the
 viewer shell intentionally grants to it.
 
-## Owner decisions before acceptance
+## Owner decisions
 
-1. Approve the dedicated registrable domain and wildcard operations cost. Confirm per-artifact
-   hosts rather than the weaker per-org grouping.
-2. Accept a five-minute bearer read window and the stated sign-out/membership revocation delay,
-   or require revocable server-side grants. Confirm that explicit reload for expired lazy assets
-   is acceptable; a seamless long-lived bundle session needs a separately designed renewal flow.
-3. Approve the Public Suffix List dependency or maintained-list policy. Set the minimum Android
-   WebView/app version and require the external app validation before rollout.
-4. Decide whether public shares must remain embeddable by third-party sites. Separately decide
-   whether to remove `allow-forms` or add `form-action 'none'`, and whether current popup and
-   third-party presentation-host allowances are still needed. These change artifact behavior.
-5. Confirm the pilot deployment, its owner and the legacy-mode retirement gate.
+Recorded 2026-11-16. The status stays Proposed until decision 1 names the content domain.
+
+Viewers keep the same URLs. `https://<app>/<id>` viewer links, the gallery, MCP endpoints and the
+library do not change. Application `/raw/...` and `/s/<token>` links stay valid and redirect to
+the content host (Phase 2). Only the bytes inside the artifact frame load from the content domain.
+
+1. **Content domain: open.** Use per-artifact hosts (`a-<id>.<content-domain>`), one level under
+   the apex, so the free Cloudflare Universal SSL wildcard covers them. The domain must not be the
+   application's domain or a business domain. The preferred choice is a new domain used only for
+   artifact content. A domain that already hosts other apps is acceptable only if the owner accepts
+   that those apps become same-site with artifact content.
+2. **Grants: accepted.** Stateless five-minute bearer read grants, with a configurable hard
+   maximum of ten minutes. The sign-out and membership-revocation delay is bounded by that
+   lifetime. Public shares are checked against live share state on every request. An expired
+   bundle view offers an explicit "Reload artifact" control.
+3. **Site check and Android: accepted.** Ship a pinned Public Suffix List snapshot, used only by a
+   startup check that refuses a content domain that is same-site with the application origin.
+   The minimum Android app version is the first release that supports content hosts. Rollout
+   waits for validation on the owner's phone and Android Auto.
+4. **Framing and forms: accepted.**
+   - (a) Third-party sites may not embed public shares. Content responses send `frame-ancestors`
+     limited to the application origin. Share links still open directly in a browser tab. Allowing
+     third-party embedding is a later, separate decision.
+   - (b) Keep `allow-forms`, so forms handled in script keep working, and add `form-action 'none'`
+     to `DOCUMENT_SANDBOX`, so a form cannot submit data to another site.
+   - Popup and presentation-host allowances stay as they are until a separate review.
+5. **Pilot: accepted.** Pilot isolated mode on the homelab deployment, including the Android app.
+   Retire legacy mode after four weeks of clean operation in isolated mode.
