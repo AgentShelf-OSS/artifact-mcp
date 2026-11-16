@@ -1,3 +1,5 @@
+//! Shared reply validators (keys, text, hashes, counts, timestamps) and the base reply check.
+
 use serde_json::Value;
 
 use super::ActionError;

@@ -1,3 +1,5 @@
+//! Investigation action replies: the advisory result plus run metadata, source IDs and ticket paths.
+
 use serde_json::Value;
 
 use super::{

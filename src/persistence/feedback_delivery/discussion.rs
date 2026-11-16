@@ -1,3 +1,5 @@
+//! Discussion delivery planning: feedback messages, markers and tombstones, with thread names and event IDs.
+
 use rusqlite::{Transaction, params};
 
 use crate::{

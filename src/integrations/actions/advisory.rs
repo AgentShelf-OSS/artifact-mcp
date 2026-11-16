@@ -1,3 +1,5 @@
+//! Advisory action replies: the result shape every advisory worker must return.
+
 use serde_json::Value;
 
 use super::{

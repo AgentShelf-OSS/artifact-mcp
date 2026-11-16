@@ -1,3 +1,5 @@
+//! Notification fan-out planning for feedback events, with stable event IDs.
+
 use rusqlite::{Transaction, params};
 
 use crate::{
