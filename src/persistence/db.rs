@@ -45,6 +45,16 @@ pub const POOL_MAX_SIZE: u32 = 4;
 /// Maximum time a caller waits for a pooled connection (blueprint A4).
 pub const POOL_CHECKOUT_TIMEOUT: Duration = Duration::from_secs(5);
 
+/// Maximum time [`Database`] waits for the pool's eager connections while it builds the pool.
+///
+/// Production uses the checkout timeout. Test builds allow longer, because a full test run opens
+/// hundreds of databases at once and a loaded host can then take more than 5 s for the four
+/// connections (#180). Checkout keeps [`POOL_CHECKOUT_TIMEOUT`] in every build.
+#[cfg(not(any(test, feature = "test-util")))]
+const POOL_BUILD_TIMEOUT: Duration = POOL_CHECKOUT_TIMEOUT;
+#[cfg(any(test, feature = "test-util"))]
+const POOL_BUILD_TIMEOUT: Duration = Duration::from_secs(60);
+
 /// Every pragma this process pins explicitly, with the value it must read back as.
 ///
 /// These are asserted on the bootstrap connection *and* on every pooled connection; library
@@ -289,7 +299,7 @@ fn build_pool(db_path: &Path) -> Result<DbPool, AppError> {
     });
     r2d2::Pool::builder()
         .max_size(POOL_MAX_SIZE)
-        .connection_timeout(POOL_CHECKOUT_TIMEOUT)
+        .connection_timeout(POOL_BUILD_TIMEOUT)
         .build(manager)
         .map_err(|error| unavailable("build connection pool", &error))
 }
@@ -302,7 +312,7 @@ fn build_pool(db_path: &Path) -> Result<DbPool, AppError> {
 /// Returns [`AppError::Unavailable`] when the pool cannot hand out a connection in time. The
 /// message is deliberately generic; the underlying cause is logged, never returned.
 pub fn checkout(pool: &DbPool) -> Result<DbConnection, AppError> {
-    pool.get().map_err(|error| {
+    pool.get_timeout(POOL_CHECKOUT_TIMEOUT).map_err(|error| {
         tracing::error!(error = %error, "database connection checkout failed");
         AppError::Unavailable("database unavailable".to_owned())
     })
