@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-09
-- **Amended:** 2026-07-22 (PBI-040)
+- **Amended:** 2026-07-22 (PBI-040); 2026-11-22 (egress limits stated, shell frame policy)
 
 ## Context
 
@@ -85,3 +85,39 @@ independent control.
 - Every response path carries one byte-identical Node/Rust CSP value, frozen by native, parity, and
   conformance coverage.
 - CSP and opaque-origin sandboxing reduce risk but do not make artifact code trustworthy.
+
+## Amendment 2026-11-22: what the policy does not stop
+
+The title and the first consequence above say more than the policy delivers. A review on
+2026-11-22 tested the exact `DOCUMENT_SANDBOX` value in Chrome 157 with local listeners.
+
+| Channel | Result |
+| --- | --- |
+| `fetch`, XHR, WebSocket, EventSource, `sendBeacon` | Blocked by `connect-src 'none'`. |
+| WebRTC (`RTCPeerConnection` with a `stun:` or `turn:` server) | **Not blocked.** STUN binding requests reached the listener from a top-level `/raw` document and from the shell's sandboxed iframe. Adding the CSP `webrtc 'block'` directive changed nothing in that browser. The page chooses the server address and port, and a TURN username or a DNS label can carry data. |
+| The frame navigating itself to another origin | Not blocked by this policy or by the iframe `sandbox` attribute. Blocked in the viewer shell since this amendment (see below). Still possible for a top-level `/raw` document. |
+| Popups (`allow-popups`), form submission (`allow-forms`, no `form-action`) | Not blocked. |
+| Requests to `cdn.jsdelivr.net`, `fonts.googleapis.com`, `fonts.gstatic.com` | Allowed by design; the request URL can carry data. |
+
+So artifact code **can** send data out. No response header closes the WebRTC channel today. The
+rule that follows is about what reaches the artifact, not about the sandbox: everything a shell
+broker returns to an artifact (viewer state, live-data results, the viewer handle and display name,
+a position after consent) must be treated as visible to that artifact's publisher. ADR-0026 does
+not change this.
+
+### Shell frame policy
+
+The viewer shell response now carries `Content-Security-Policy: frame-src 'self'`. The embedding
+document's `frame-src` applies to every navigation of its frames, whoever starts it. Tested in the
+same browser: with the header, a navigation of the artifact frame to another origin sent no
+request; navigation between bundle pages still worked.
+
+This matters because the shell brokers identify their peer by window, not by document. Before the
+header, an artifact could navigate its frame to a page on another origin. That page had no CSP at
+all, kept the artifact's broker access, and inherited any consent the viewer had remembered.
+
+### Consent is bound to a version
+
+"Always allow" for location, background location and notifications was remembered per artifact id.
+It is now remembered for one body digest. A later revision is different code, possibly from a
+different publisher key, and asks again.

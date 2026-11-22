@@ -107,6 +107,10 @@ a demonstrated cookie theft or CSRF bypass.
 | 7: high impact, configuration dependent | Cache confusion or poisoning. An edge cache that ignores private/no-store, mixes hosts, strips query parameters, or drops policy headers can expose one tenant's content to another viewer or serve the wrong representation. Correct existing private caching and authorization prevent this; a shared hostname alone is not proof of a poisoning exploit. | Reduces trusted/untrusted cache overlap. Signed delivery URLs introduce a new secret and cache key. Require no shared caching initially, distinct host keys and full policy headers on 304 and error responses. |
 | 8: high impact, low likelihood today | Service-worker persistence. An opaque document cannot register a service worker. `worker-src` does not grant registration authority. An uploaded script's default worker scope is also path-limited; raw delivery does not grant `Service-Worker-Allowed: /`. The trusted root worker currently has no fetch interception. A future origin or scope mistake could change those facts. | Even a content-origin worker cannot control application-origin pages. Reject service-worker script requests on the content router and never serve the trusted root worker there. |
 
+Added 2026-11-22: rank 1 omits WebRTC, which the artifact CSP does not block; see the amendment to
+ADR-0003. Rank 5's navigation case is closed for the viewer shell by `frame-src 'self'` on the
+shell response; the stale-reply case within one origin remains.
+
 CPU, memory, deceptive content and browser engine vulnerabilities remain risks on any origin.
 Downloaded HTML can execute outside server policy when opened elsewhere; response headers do not
 travel with the downloaded file. Server-side renderer isolation remains a separate requirement.

@@ -2,8 +2,10 @@
 
 Publish HTML once, then deliver current JSON data without rewriting the artifact. An artifact can
 combine several APIs through named bindings. The authenticated viewer shell owns one event stream
-and passes data into its sandboxed iframe. Artifact code keeps its opaque origin and has no network
-access. See [ADR-0009](adr/0009-live-data-via-named-sources-and-shell-broker.md) and
+and passes data into its sandboxed iframe. Artifact code keeps its opaque origin and cannot call
+`fetch`, XHR or WebSocket. It can still send data out in other ways (see the 2026-11-22 amendment to
+[ADR-0003](adr/0003-sandbox-untrusted-artifact-html.md)), so bind a source to an artifact only when
+its publisher may see that data. See [ADR-0009](adr/0009-live-data-via-named-sources-and-shell-broker.md) and
 [issue #58](https://github.com/AgentShelf-OSS/artifact-mcp/issues/58).
 
 ```mermaid
