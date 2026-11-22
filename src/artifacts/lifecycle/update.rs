@@ -114,24 +114,32 @@ impl StoreContext {
             },
         ) {
             Ok(committed) => committed,
-            Err(error) => {
-                // Fanout/capacity errors occur before the metadata transaction commits and can
-                // be proven by the still-prepared intent.  A commit error is ambiguous: retain
-                // the intent, metadata, staging and blocked rows for reconciliation instead.
-                if matches!(
-                    &error,
-                    AppError::RateLimited
-                        | AppError::PayloadTooLarge
-                        | AppError::Validation(_)
-                        | AppError::Conflict(_)
-                ) && durability_intent_state(conn, &intent_id)?.as_deref() == Some("prepared")
-                {
+            Err(interrupt) => {
+                // The intent advances to `metadata_committed` in the same transaction as the
+                // guarded UPDATE. An intent that still reads `prepared` therefore proves that
+                // the metadata did not advance, whatever failed: a full outbox, a busy or full
+                // database, an audit reservation. Release the intent and the staged body then.
+                // A retained intent conceals the artifact from every read (`load_meta`) until
+                // the next startup audit.
+                //
+                // Retain everything when the state is anything else or cannot be read, and when
+                // the fault models a crash: reconciliation owns those cases.
+                let still_prepared = matches!(
+                    durability_intent_state(conn, &intent_id),
+                    Ok(Some(state)) if state == "prepared"
+                );
+                if interrupt.compensate && still_prepared {
                     if let Some(path) = &staged {
                         safe_remove(path);
                     }
-                    finish_durability_intent(conn, &intent_id)?;
+                    if let Err(error) = finish_durability_intent(conn, &intent_id) {
+                        tracing::warn!(
+                            %error,
+                            "update aborted before commit but its durability intent was not released"
+                        );
+                    }
                 }
-                return Err(error);
+                return Err(interrupt.error);
             }
         };
         if !committed {
@@ -376,13 +384,13 @@ impl StoreContext {
 
     /// The metadata transaction: guarded UPDATE plus the OUTGOING revision row, atomically.
     ///
-    /// The guard pins `client_id` and `org` to the values read at the start of the operation, so
-    /// a concurrent re-tenant or delete turns into a conflict instead of a lost update.
+    /// The guard pins `client_id` and `org` to the values that `update_locked` read under the
+    /// lifecycle gate. It does not compare them with the caller's earlier authorization.
     fn commit_update(
         &self,
         conn: &mut Connection,
         commit: UpdateCommitInput<'_>,
-    ) -> Result<bool, AppError> {
+    ) -> Result<bool, Interrupt> {
         let UpdateCommitInput {
             meta,
             expected_revision,
@@ -455,11 +463,13 @@ impl StoreContext {
             )
             .map_err(|error| sql_error("advance update durability intent", &error))?;
         if changes != 1 {
-            return Err(AppError::Internal);
+            return Err(AppError::Internal.into());
         }
         // A fault here drops the transaction unread, which is exactly what a crash before COMMIT
-        // leaves behind.
-        self.bare_fault(FaultPoint::UpdateCommitTransaction)?;
+        // leaves behind. The caller compensates only for the in-process flavour.
+        self.faults
+            .check(FaultPoint::UpdateCommitTransaction)
+            .map_err(Interrupt::from)?;
         transaction
             .commit()
             .map_err(|error| sql_error("commit update transaction", &error))?;
