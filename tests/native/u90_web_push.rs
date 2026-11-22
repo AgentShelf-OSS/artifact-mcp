@@ -1467,6 +1467,82 @@ async fn sweeper_asks_the_directory_for_each_recipients_current_org() {
 }
 
 #[test]
+fn a_sweep_defers_a_reminder_whose_recipient_was_not_confirmed() {
+    use push::ReminderScope::Org;
+    // The confirmed set comes from a refresh that ran before the sweep transaction. A reminder
+    // can become due, or a viewer can opt in, in between. The sweep must not send to such a
+    // recipient on the organization stored on the subscription.
+    let dir = TempDataDir::new("push-confirmed");
+    let pool = pool(&dir);
+    let mut conn = db::checkout(&pool).unwrap();
+    let browser = Browser::new(12);
+    for (id, artifact, org, email) in [
+        ("s-known", "art-acme", "acme", "known@acme.test"),
+        ("s-late", "art-beta", "beta", "late@beta.test"),
+    ] {
+        subscribe(
+            &mut conn,
+            id,
+            org,
+            email,
+            &format!("https://push.test/{id}"),
+            &browser,
+        );
+        push::opt_in(&conn, artifact, org, email, "t").unwrap();
+    }
+    arm(
+        &mut conn,
+        "art-acme",
+        "acme",
+        Org,
+        "",
+        "acme-due",
+        NOW - 1_000,
+    );
+    arm(
+        &mut conn,
+        "art-beta",
+        "beta",
+        Org,
+        "",
+        "beta-due",
+        NOW - 1_000,
+    );
+    let armed = |conn: &Connection| -> i64 {
+        conn.query_row(
+            "SELECT COUNT(*) FROM artifact_reminders WHERE state = 'armed'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap()
+    };
+
+    let confirmed = std::collections::BTreeSet::from(["known@acme.test".to_owned()]);
+    let report =
+        push::sweep_due_confirmed(&mut conn, NOW, "https://a.test", Some(&confirmed)).unwrap();
+    assert_eq!(
+        (report.fired, report.deliveries, report.deferred),
+        (1, 1, 1),
+        "the confirmed recipient is served and the other reminder waits"
+    );
+    assert_eq!(armed(&conn), 1, "the deferred reminder stays armed");
+
+    // The next tick confirms the second viewer and sweeps the deferred reminder.
+    assert_eq!(
+        push::due_recipient_emails(&conn, NOW).unwrap(),
+        ["late@beta.test"]
+    );
+    let confirmed = std::collections::BTreeSet::from(["late@beta.test".to_owned()]);
+    let report =
+        push::sweep_due_confirmed(&mut conn, NOW, "https://a.test", Some(&confirmed)).unwrap();
+    assert_eq!(
+        (report.fired, report.deliveries, report.deferred),
+        (1, 1, 0)
+    );
+    assert_eq!(armed(&conn), 0);
+}
+
+#[test]
 fn sweeper_follows_the_artifacts_current_org_and_includes_admins() {
     use push::ReminderScope::{Org, Viewer};
     let dir = TempDataDir::new("push-move");

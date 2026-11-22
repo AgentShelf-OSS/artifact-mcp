@@ -307,7 +307,9 @@ Sweeper: a tokio task started next to the delivery runtime when the feature is e
    Before this transaction, the sweeper asks the identity directory for the current org of every opted-in viewer
    of an artifact with a due reminder, and moves that viewer's subscriptions onto it. A viewer who was removed from
    the organization, or who is no longer an administrator, therefore stops qualifying without making another
-   request. If the directory lookup fails, the sweep is skipped and runs again on the next tick.
+   request. If the directory lookup fails, the sweep is skipped and runs again on the next tick. Inside the
+   transaction, a reminder with a recipient that was not confirmed in this tick stays `armed` and is swept again on
+   the next one.
    - `org` scope: `artifact_push_optins` rows for the artifact, joined to each opted-in viewer's qualifying
      `push_subscriptions`.
    - `viewer` scope: the owner's opt-in row (required) and the owner's qualifying subscriptions.

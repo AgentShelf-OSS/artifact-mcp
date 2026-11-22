@@ -7,7 +7,7 @@
 //! the sweeper queues deliveries). Delivery is at least once.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{
         Arc, Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
@@ -417,6 +417,7 @@ impl PushService {
     /// Move the subscriptions of every viewer who could receive a due reminder onto that
     /// viewer's current organization. A subscription that changes organization also loses its
     /// pending deliveries (`refresh_subscription_org`).
+    /// Returns the viewers it refreshed. The sweep treats only those as confirmed.
     ///
     /// # Errors
     /// A directory or database failure. The caller then skips the sweep, so a reminder waits
@@ -425,19 +426,22 @@ impl PushService {
         &self,
         directory: &dyn ViewerOrgDirectory,
         now: i64,
-    ) -> Result<(), AppError> {
+    ) -> Result<BTreeSet<String>, AppError> {
         let emails = db::interact(&self.pool, move |conn| {
             push::due_recipient_emails(conn, now)
         })
         .await?;
+        let mut confirmed = BTreeSet::new();
         for email in emails {
             let org = directory.current_org(&email).await?;
+            let viewer = email.clone();
             db::interact(&self.pool, move |conn| {
-                push::refresh_subscription_org(conn, &email, &org.0)
+                push::refresh_subscription_org(conn, &viewer, &org.0)
             })
             .await?;
+            confirmed.insert(email);
         }
-        Ok(())
+        Ok(confirmed)
     }
 
     /// The VAPID application-server key the browser subscribes with.
@@ -684,13 +688,26 @@ impl PushService {
     /// [`AppError::Internal`] when the transaction fails; nothing is committed.
     pub async fn sweep_once(&self) -> Result<SweepReport, AppError> {
         let now = self.now_ms();
-        if let Some(directory) = self.recipient_directory.get() {
-            self.refresh_due_recipient_orgs(directory.as_ref(), now)
-                .await?;
-        }
+        let confirmed = match self.recipient_directory.get() {
+            Some(directory) => Some(
+                self.refresh_due_recipient_orgs(directory.as_ref(), now)
+                    .await?,
+            ),
+            None => None,
+        };
         let base = self.public_base_url.clone();
-        let report =
-            db::interact(&self.pool, move |conn| push::sweep_due(conn, now, &base)).await?;
+        let report = db::interact(&self.pool, move |conn| {
+            push::sweep_due_confirmed(conn, now, &base, confirmed.as_ref())
+        })
+        .await?;
+        if report.deferred > 0 {
+            // Not an error: a reminder became due, or a viewer opted in, after the refresh. The
+            // next tick refreshes those recipients and sweeps the reminder.
+            tracing::info!(
+                deferred = report.deferred,
+                "push reminders deferred until their recipients are confirmed"
+            );
+        }
         PushTelemetry::add(&self.telemetry.counters.reminders_fired, report.fired);
         PushTelemetry::add(&self.telemetry.counters.reminders_stale, report.stale);
         if report.deliveries > 0 {
