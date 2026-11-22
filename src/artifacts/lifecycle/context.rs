@@ -51,7 +51,7 @@ impl StoreContext {
         intent_id: &str,
     ) -> Result<(), AppError> {
         let envelope = self.delivery_envelope(meta, event.clone())?;
-        outbox_fanout::fanout_in_transaction(
+        match outbox_fanout::fanout_in_transaction(
             transaction,
             &envelope,
             &meta.org,
@@ -59,8 +59,23 @@ impl StoreContext {
             Some(intent_id.to_owned()),
             SystemClock.now_unix_millis(),
             || self.ids.webhook_id().map(|id| id.0),
-        )
-        .map(|_| ())
+        ) {
+            Ok(_) => Ok(()),
+            // The queue caps bound notification backlog. They must not decide whether an artifact
+            // can be published, updated, restored or deleted: one unreachable webhook would then
+            // stop its organization, and ten such organizations would stop every tenant. The
+            // cap check runs before any row is inserted, so nothing was enqueued for this event.
+            // The notification is dropped and the artifact operation continues.
+            Err(AppError::RateLimited) => {
+                tracing::warn!(
+                    tenant = %meta.org.0,
+                    event = crate::persistence::webhooks::event_name(&event),
+                    "webhook delivery queue is full; the notification for this artifact event was dropped"
+                );
+                Ok(())
+            }
+            Err(error) => Err(error),
+        }
     }
 
     pub(super) fn audit_event(

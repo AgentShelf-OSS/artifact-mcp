@@ -10,7 +10,6 @@ use std::sync::Arc;
 use artifact_mcp::{
     artifacts::lifecycle::{ArtifactStore, FaultPoint, ScriptedFaults},
     config::{SequentialIdSource, StorageLimits},
-    error::AppError,
     persistence::outbox::{self, EnqueueDelivery},
     ports::ArtifactService as _,
 };
@@ -286,51 +285,53 @@ fn fill_tenant_capacity(fixture: &Fixture) {
 }
 
 #[tokio::test]
-async fn fanout_capacity_rejection_rolls_back_publish_and_update_cleanup() {
-    let publish = Fixture::new("u56-publish-capacity-rollback");
-    subscribe(&publish, "publish-capacity");
-    fill_tenant_capacity(&publish);
-    assert_eq!(
-        publish
-            .try_publish(artifact_mcp::model::ArtifactContent::SingleHtml(
-                NEW.to_owned()
-            ))
-            .await
-            .expect_err("queue capacity rejects publish"),
-        AppError::RateLimited
-    );
-    assert_eq!(publish.count("SELECT COUNT(*) FROM artifacts"), 0);
-    assert_eq!(
-        publish.count("SELECT COUNT(*) FROM artifact_durability_intents"),
-        0
-    );
-    assert_eq!(
-        publish.count("SELECT COUNT(*) FROM provider_delivery_outbox"),
-        1_000
-    );
-    assert!(publish.staging_entries().is_empty());
+async fn a_full_delivery_queue_drops_the_notification_and_keeps_the_artifact_operation() {
+    // The queue caps bound the notification backlog. They used to fail the artifact operation
+    // too, so one unreachable webhook could stop its organization from publishing, updating,
+    // restoring or deleting. The notification is now dropped and the operation completes.
+    let fixture = Fixture::new("u56-capacity-keeps-lifecycle");
+    subscribe(&fixture, "capacity-subscriber");
+    fill_tenant_capacity(&fixture);
+    let assert_queue_untouched = |fixture: &Fixture, step: &str| {
+        assert_eq!(
+            fixture.count("SELECT COUNT(*) FROM provider_delivery_outbox"),
+            1_000,
+            "{step}: nothing is enqueued while the queue is full"
+        );
+        assert_eq!(
+            fixture.count("SELECT COUNT(*) FROM artifact_durability_intents"),
+            0,
+            "{step}: the operation finishes its durability intent"
+        );
+        assert!(fixture.staging_entries().is_empty(), "{step}");
+    };
 
-    let update = Fixture::new("u56-update-capacity-rollback");
-    let existing = update.publish_single(OLD).await;
-    subscribe(&update, "update-capacity");
-    fill_tenant_capacity(&update);
-    assert_eq!(
-        update
+    let published = fixture
+        .try_publish(artifact_mcp::model::ArtifactContent::SingleHtml(
+            OLD.to_owned(),
+        ))
+        .await
+        .expect("publish succeeds while the delivery queue is full")
+        .meta;
+    assert_eq!(fixture.body_on_disk(&published).as_deref(), Some(OLD));
+    assert_queue_untouched(&fixture, "publish");
+
+    let updated = fixture
+        .store
+        .update_for(&published, html_update(1, NEW), mutation_audit())
+        .await
+        .expect("update succeeds while the delivery queue is full");
+    assert_eq!(updated.meta.revision, 2);
+    assert_eq!(fixture.body_on_disk(&published).as_deref(), Some(NEW));
+    assert_queue_untouched(&fixture, "update");
+
+    assert!(
+        fixture
             .store
-            .update_for(&existing, html_update(1, NEW), mutation_audit())
+            .delete_for(&updated.meta, mutation_audit())
             .await
-            .expect_err("queue capacity rejects update"),
-        AppError::RateLimited
+            .expect("delete succeeds while the delivery queue is full")
     );
-    assert_eq!(update.reload(&existing).expect("original row").revision, 1);
-    assert_eq!(update.body_on_disk(&existing).as_deref(), Some(OLD));
-    assert_eq!(
-        update.count("SELECT COUNT(*) FROM artifact_durability_intents"),
-        0
-    );
-    assert_eq!(
-        update.count("SELECT COUNT(*) FROM provider_delivery_outbox"),
-        1_000
-    );
-    assert!(update.staging_entries().is_empty());
+    assert_eq!(fixture.count("SELECT COUNT(*) FROM artifacts"), 0);
+    assert_queue_untouched(&fixture, "delete");
 }
