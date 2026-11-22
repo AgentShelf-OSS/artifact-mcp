@@ -45,7 +45,7 @@ pub use limits::{BodyLimits, StorageLimits};
 pub use oauth::OAuthConfig;
 pub use preview::PreviewConfig;
 pub use random::{OsRandom, RandomSource};
-pub use seed_keys::{SeedKey, SeedKeys};
+pub use seed_keys::{SeedKey, SeedKeys, is_placeholder_key_secret};
 pub use stale_guard::{
     DEFAULT_STALE_GUARD_MIN_SEGMENTS, DEFAULT_STALE_GUARD_MIN_SHARE, StaleGuardConfig,
     StaleGuardMode,

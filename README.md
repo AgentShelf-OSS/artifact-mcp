@@ -97,7 +97,7 @@ cp .env.example .env
 Set a long bootstrap key in `.env`:
 
 ```dotenv
-ARTIFACT_API_KEYS=agent1:local:REPLACE_WITH_A_LONG_RANDOM_SECRET
+ARTIFACT_API_KEYS=agent1:local:REPLACE_WITH_LONG_RANDOM_SECRET
 ```
 
 For a loopback-only local gallery, set `TRUST_ACCESS_HEADERS=1`. Never use that setting on a
@@ -110,7 +110,7 @@ docker compose up -d --build
 Publish a first artifact:
 
 ```bash
-export KEY=REPLACE_WITH_A_LONG_RANDOM_SECRET
+export KEY=REPLACE_WITH_LONG_RANDOM_SECRET
 curl -H "Authorization: Bearer $KEY" -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"publish_artifact",
        "arguments":{"html":"<h1>hi</h1>","title":"Demo","description":"first artifact"}}}' \

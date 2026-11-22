@@ -157,3 +157,56 @@ fn path_tokens_handle_locations_and_globs() {
     assert!(!path_exists(&repo_root(), "tests/no-such-directory/*.rs"));
     assert_eq!(strip_line_suffix("src/lib.rs:bad"), "src/lib.rs:bad");
 }
+
+fn collect_markdown(dir: &Path, files: &mut Vec<PathBuf>) {
+    for entry in fs::read_dir(dir).expect("read documentation directory") {
+        let path = entry.expect("documentation directory entry").path();
+        if path.is_dir() {
+            collect_markdown(&path, files);
+        } else if path.extension().and_then(|value| value.to_str()) == Some("md") {
+            files.push(path);
+        }
+    }
+}
+
+/// `/mcp` is reachable without Cloudflare Access. A documented `ARTIFACT_API_KEYS` example that
+/// the server would seed is therefore a published credential for anyone who copies it unchanged.
+#[test]
+fn documented_seed_key_examples_never_seed_a_live_key() {
+    let root = repo_root();
+    let mut files = vec![
+        root.join("README.md"),
+        root.join("GETTING_STARTED.md"),
+        root.join(".env.example"),
+    ];
+    collect_markdown(&root.join("docs"), &mut files);
+    let mut examples = 0_usize;
+    let mut violations = Vec::new();
+    for file in files {
+        let text = fs::read_to_string(&file).expect("read documentation file");
+        for (index, line) in text.lines().enumerate() {
+            let Some((_, rest)) = line.split_once("ARTIFACT_API_KEYS=") else {
+                continue;
+            };
+            let value = rest
+                .split(|character: char| character.is_whitespace() || character == '`')
+                .next()
+                .unwrap_or_default()
+                .trim_matches(['"', '\'']);
+            if value.is_empty() {
+                continue;
+            }
+            examples += 1;
+            let parsed = artifact_mcp::config::SeedKeys::parse(value);
+            if !parsed.entries.is_empty() {
+                violations.push(format!(
+                    "{}:{} documents a seed entry that the server would accept",
+                    file.strip_prefix(&root).unwrap_or(&file).display(),
+                    index + 1
+                ));
+            }
+        }
+    }
+    assert!(examples > 0, "no ARTIFACT_API_KEYS example was found");
+    assert!(violations.is_empty(), "{}", violations.join("\n"));
+}

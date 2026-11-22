@@ -396,11 +396,24 @@ fn refuses_documented_placeholder_secrets() {
         seeded_rows(&conn),
         [("c".to_owned(), "acme".to_owned(), hash_of("real-secret"))]
     );
-    // The refusal is by exact value: a placeholder embedded in a longer secret still seeds.
+    // `CHANGE_ME` is refused by exact value: embedded in a longer secret it still seeds.
     assert_eq!(
         keys::seed_keys_from_env(&conn, "d:acme:CHANGE_ME_NOW").expect("seed"),
         1
     );
+    // Every documentation placeholder starts with `REPLACE_WITH`, so a reworded one is refused
+    // too. The README once printed the first value below, which the exact list did not hold.
+    for raw in [
+        "e:acme:REPLACE_WITH_A_LONG_RANDOM_SECRET",
+        "f:acme:REPLACE_WITH_",
+        "g:REPLACE_WITH_YOUR_SECRET",
+    ] {
+        assert_eq!(
+            keys::seed_keys_from_env(&conn, raw).expect("seed"),
+            0,
+            "{raw} must not seed a live key"
+        );
+    }
 }
 
 #[test]
