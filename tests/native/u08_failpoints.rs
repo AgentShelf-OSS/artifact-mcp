@@ -578,33 +578,37 @@ async fn update_compensation_restores_the_previous_revision_exactly() {
             "{context}: the snapshot is moved back out of history"
         );
 
-        if point == FaultPoint::UpdateCommitTransaction {
-            // A metadata transaction failure leaves the staged body for startup reconciliation.
-            // It is unreferenced because the installed body already matches the committed digest,
-            // so reconciliation discards it rather than installing it.
-            assert_eq!(
-                fixture.staging_entries().len(),
-                1,
-                "{context}: the staged body survives for reconciliation"
-            );
-            let report = fixture
-                .store
-                .audit_storage(true)
-                .await
-                .expect("startup audit runs");
-            assert!(
-                report.recovered_paths.is_empty(),
-                "{context}: an uncommitted staged body is never installed: {report:?}"
-            );
-            assert_eq!(
-                fixture.body_on_disk(&meta).as_deref(),
-                Some(OLD),
-                "{context}"
-            );
-        }
+        // An in-process failure must not leave the artifact concealed. `load_meta` hides every
+        // artifact that still has a durability intent, and only the startup audit clears one, so
+        // a retained intent would answer "not found" to every reader until the next restart.
+        assert_eq!(
+            fixture.count("SELECT COUNT(*) FROM artifact_durability_intents"),
+            0,
+            "{context}: the aborted update releases its durability intent"
+        );
+        let visible = fixture
+            .store
+            .find_meta(&meta.id)
+            .await
+            .unwrap_or_else(|error| panic!("{context}: {error:?}"))
+            .unwrap_or_else(|| panic!("{context}: the artifact is still readable"));
+        assert_eq!(visible.revision, 1, "{context}");
+        let retried = fixture
+            .store
+            .update_for(&visible, html_update(1, NEW), mutation_audit())
+            .await
+            .unwrap_or_else(|error| {
+                panic!("{context}: a retry succeeds without a restart: {error:?}")
+            });
+        assert_eq!(retried.meta.revision, 2, "{context}");
+        assert_eq!(
+            fixture.body_on_disk(&meta).as_deref(),
+            Some(NEW),
+            "{context}: the retried update installs the new body"
+        );
         assert!(
             fixture.transient_entries().is_empty(),
-            "{context}: no staged body outlives reconciliation, found {:?}",
+            "{context}: no staged body outlives the operation, found {:?}",
             fixture.entries()
         );
         assert_audit_converges(&fixture, &context).await;

@@ -13,6 +13,29 @@ fn key() -> [u8; 32] {
     [7; 32]
 }
 
+#[test]
+fn folded_identifiers_always_pass_identifier_admission() {
+    for (raw, folded) in [
+        ("publisher-1", "publisher-1"),
+        ("Agent1", "agent1"),
+        ("  Acme.Corp_2  ", "acme.corp_2"),
+        ("odd id!", "odd_id_"),
+        ("käse", "k__se"),
+        ("", ""),
+    ] {
+        assert_eq!(folded_identifier(raw), folded, "fold {raw:?}");
+        assert_eq!(
+            super::encoding::id(&folded_identifier(raw), false).as_deref(),
+            Ok(folded),
+            "{raw:?} folds into the admitted grammar"
+        );
+    }
+    let long = "A".repeat(500);
+    let folded = folded_identifier(&long);
+    assert_eq!(folded.len(), 100);
+    assert!(super::encoding::id(&folded, true).is_ok());
+}
+
 fn ledger() -> Connection {
     let mut conn = Connection::open_in_memory().expect("memory db");
     crate::persistence::migrations::apply(

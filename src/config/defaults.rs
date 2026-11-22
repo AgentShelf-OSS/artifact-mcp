@@ -98,8 +98,13 @@ pub const MAX_PREVIEW_RENDERER_TOKEN_BYTES: usize = 4096;
 /// Default maximum preview PNG size in bytes.
 pub const DEFAULT_PREVIEW_MAX_PNG_BYTES: u64 = 7_500_000;
 
-/// Documented placeholder secrets excluded from bootstrap key insertion.
+/// Documented placeholder secrets excluded from bootstrap key insertion, matched exactly.
 pub const PLACEHOLDER_KEY_SECRETS: [&str; 2] = ["CHANGE_ME", "REPLACE_WITH_LONG_RANDOM_SECRET"];
+/// Every placeholder in the documentation and `.env.example` starts with this text. A secret that
+/// starts with it is refused whatever follows, so a reworded placeholder cannot seed a live key.
+pub const PLACEHOLDER_KEY_SECRET_PREFIX: &str = "REPLACE_WITH";
+/// A seeded secret shorter than this is reported at startup. Generated keys have 48 characters.
+pub const SEED_KEY_SECRET_WARN_BYTES: usize = 20;
 
 /// Back-compat org for a two-part `ARTIFACT_API_KEYS` entry
 pub const DEFAULT_SEED_KEY_ORG: &str = "default";

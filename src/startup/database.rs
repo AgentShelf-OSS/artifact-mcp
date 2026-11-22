@@ -3,7 +3,7 @@
 use std::sync::Arc;
 
 use crate::{
-    config::{AppConfig, SeedKeys},
+    config::{AppConfig, SEED_KEY_SECRET_WARN_BYTES, SeedKeys},
     error::AppError,
     persistence::{
         db::{self, Database, DbPool},
@@ -11,7 +11,7 @@ use crate::{
         migrations::{self, MigrationContext},
     },
     security::{
-        audit::{AuditEvent, MutationAudit, parse_hmac_key},
+        audit::{AuditEvent, MutationAudit, folded_identifier, parse_hmac_key},
         crypto::{WebhookUrlProtection, warn_if_webhook_encryption_disabled},
     },
 };
@@ -145,6 +145,26 @@ async fn seed_configured_keys(
             client_id = %client_id,
             "ignoring placeholder publisher key secret"
         );
+    }
+    for entry in &seed_keys.entries {
+        // Seed entries are not validated, so report the shapes that cause trouble later. Neither
+        // warning carries the secret.
+        if folded_identifier(&entry.client_id.0) != entry.client_id.0
+            || folded_identifier(&entry.org.0) != entry.org.0
+        {
+            tracing::warn!(
+                client_id = %entry.client_id,
+                "seeded publisher key id or organization is not a lowercase identifier; \
+                 registered organizations are lowercase and audit records use the folded form"
+            );
+        }
+        if entry.secret.expose().len() < SEED_KEY_SECRET_WARN_BYTES {
+            tracing::warn!(
+                client_id = %entry.client_id,
+                minimum_bytes = SEED_KEY_SECRET_WARN_BYTES,
+                "seeded publisher key secret is short; use a long random value"
+            );
+        }
     }
     let pool = pool.clone();
     db::interact(&pool, move |conn| {

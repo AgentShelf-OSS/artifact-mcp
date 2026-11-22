@@ -10,8 +10,8 @@ use crate::persistence::orgs::{js_trim, truncate_utf16};
 
 use super::validation::{
     DEFAULT_SEED_ORG, INVALID_CLIENT_ID_MESSAGE, INVALID_KEY_ROLE_MESSAGE, INVALID_ORG_MESSAGE,
-    KEY_LABEL_MAX_LENGTH, PLACEHOLDER_SECRETS, database_failure, duplicate_key_message,
-    generate_secret, is_valid_client_id, is_valid_key_org, key_hash,
+    KEY_LABEL_MAX_LENGTH, database_failure, duplicate_key_message, generate_secret,
+    is_valid_client_id, is_valid_key_org, key_hash,
 };
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,7 @@ pub fn seed_keys_from_env(conn: &Connection, raw: &str) -> Result<u64, AppError>
         if client_id.is_empty() || secret.is_empty() {
             continue;
         }
-        if PLACEHOLDER_SECRETS.contains(&secret.as_str()) {
+        if crate::config::is_placeholder_key_secret(&secret) {
             // Preserve the warning wording without logging the secret.
             tracing::warn!(
                 "[artifact-mcp] ignoring placeholder key secret for \"{client_id}\" — set a real ARTIFACT_API_KEYS value"

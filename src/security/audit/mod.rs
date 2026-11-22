@@ -31,6 +31,7 @@ pub use access::AuditAccess;
 pub use append::{append_in_transaction, mutate_in_transaction};
 pub use attribution::{AuditRequestId, MutationAudit, with_mcp_request_id};
 pub use chain::{initialize_head, parse_hmac_key};
+pub use encoding::folded_identifier;
 pub use query::{
     AuditExport, AuditExportQuery, AuditPage, AuditQuery, export_authorized, query_authorized,
     query_tenant,

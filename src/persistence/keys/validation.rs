@@ -22,9 +22,6 @@ pub const KEY_ORG_MAX_LENGTH: usize = 41;
 /// Org assigned to a two-part `clientId:secret` seed entry
 pub const DEFAULT_SEED_ORG: &str = "default";
 
-/// Secrets that are never seeded, because they are printed in `.env.example` and the README.
-pub const PLACEHOLDER_SECRETS: [&str; 2] = ["CHANGE_ME", "REPLACE_WITH_LONG_RANDOM_SECRET"];
-
 /// `Name must be 2–41 characters: …`. The dash is U+2013 (EN DASH).
 pub const INVALID_CLIENT_ID_MESSAGE: &str =
     "Name must be 2–41 characters: letters, numbers, dot, dash, underscore.";

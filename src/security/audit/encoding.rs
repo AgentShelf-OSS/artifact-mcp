@@ -19,10 +19,39 @@ pub(super) struct ReceiptMacInput<'a> {
     pub(super) canonical_version: i64,
 }
 
+/// Longest identifier, in bytes, that [`id`] admits.
+const MAX_ID_BYTES: usize = 100;
+
+/// Fold an operator-chosen entity name into the ledger identifier grammar: `[a-z0-9._-]`, at most
+/// 100 bytes.
+///
+/// A publisher key id, and the organization it belongs to, may hold ASCII uppercase. A key seeded
+/// from `ARTIFACT_API_KEYS` is not validated at all. A security mutation on such an entity must
+/// still append its ledger event: the append shares the mutation's transaction, so a rejected
+/// identifier would roll the mutation back and leave, for example, a key that can never be
+/// revoked.
+///
+/// ASCII letters are lowercased, every other byte outside the grammar becomes `_`, and the result
+/// is cut to the grammar's length limit. The fold is lossy on purpose: two names that differ only
+/// in folded bytes share one ledger identifier.
+#[must_use]
+pub fn folded_identifier(value: &str) -> String {
+    value
+        .trim()
+        .bytes()
+        .take(MAX_ID_BYTES)
+        .map(|byte| match byte {
+            b'A'..=b'Z' => char::from(byte.to_ascii_lowercase()),
+            b'a'..=b'z' | b'0'..=b'9' | b'.' | b'_' | b'-' => char::from(byte),
+            _ => '_',
+        })
+        .collect()
+}
+
 pub(super) fn id(value: &str, required: bool) -> Result<String, AppError> {
     let value = value.trim();
     if (required && value.is_empty())
-        || value.len() > 100
+        || value.len() > MAX_ID_BYTES
         || !value.bytes().all(|b| {
             b.is_ascii_lowercase() || b.is_ascii_digit() || matches!(b, b'.' | b'_' | b'-')
         })

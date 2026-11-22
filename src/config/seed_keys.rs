@@ -3,9 +3,19 @@
 use crate::model::{ClientId, OrgId};
 
 use super::{
-    defaults::{DEFAULT_SEED_KEY_ORG, PLACEHOLDER_KEY_SECRETS},
+    defaults::{DEFAULT_SEED_KEY_ORG, PLACEHOLDER_KEY_SECRET_PREFIX, PLACEHOLDER_KEY_SECRETS},
     env::Secret,
 };
+
+/// Whether `secret` is a documentation placeholder that must never become a live publisher key.
+///
+/// `/mcp` is reachable without Cloudflare Access, so a key seeded from a published example string
+/// is a public credential. `CHANGE_ME` is matched exactly, as before. Anything that starts with
+/// `REPLACE_WITH` is refused.
+#[must_use]
+pub fn is_placeholder_key_secret(secret: &str) -> bool {
+    PLACEHOLDER_KEY_SECRETS.contains(&secret) || secret.starts_with(PLACEHOLDER_KEY_SECRET_PREFIX)
+}
 
 /// One parsed `ARTIFACT_API_KEYS` entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -47,7 +57,7 @@ impl SeedKeys {
             if client_id.is_empty() || secret.is_empty() {
                 continue;
             }
-            if PLACEHOLDER_KEY_SECRETS.contains(&secret.as_str()) {
+            if is_placeholder_key_secret(&secret) {
                 parsed.ignored_placeholders.push(ClientId::from(client_id));
                 continue;
             }
