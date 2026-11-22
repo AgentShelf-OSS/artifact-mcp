@@ -174,6 +174,69 @@ fn audit_accepts_only_the_persisted_webhook_id_shape() {
 }
 
 #[tokio::test]
+async fn seeded_keys_outside_the_audit_grammar_stay_revocable() {
+    // `ARTIFACT_API_KEYS` entries are not validated, so a seeded id or organization can hold
+    // bytes the ledger identifier grammar refuses. The revocation and its ledger event share one
+    // transaction: a refused identifier used to roll the revocation back, and the key could then
+    // only be removed by editing SQLite.
+    let db = TestDb::new("u58-seeded-key-revoke");
+    seed_and_seal(&db, Some("acme"));
+    {
+        let conn = db.conn();
+        assert_eq!(
+            artifact_mcp::persistence::keys::seed_keys_from_env(
+                &conn,
+                "Agent1:acme:probe-secret-1,agent2:Acme:probe-secret-2,odd id!:acme:probe-secret-3",
+            )
+            .expect("seed"),
+            3
+        );
+    }
+    let store = KeyStore::with_random(
+        db.pool().clone(),
+        Arc::new(SeededRandom::new(0x5800_0000_0000_0003)),
+    );
+    for client_id in ["Agent1", "agent2", "odd id!"] {
+        assert!(
+            store
+                .revoke_key_audited(ClientId(client_id.to_owned()), admin_audit(), AUDIT_KEY)
+                .await
+                .unwrap_or_else(|error| panic!("revoke {client_id}: {error:?}")),
+            "{client_id} is revoked"
+        );
+        let active: i64 = db
+            .conn()
+            .query_row(
+                "SELECT count(*) FROM api_keys WHERE client_id = ?1 AND revoked_at IS NULL",
+                [client_id],
+                |row| row.get(0),
+            )
+            .expect("count active keys");
+        assert_eq!(active, 0, "{client_id} is no longer active");
+    }
+    let rows = audit_rows(&db);
+    let recorded = rows
+        .iter()
+        .map(|row| {
+            (
+                row.operation.as_str(),
+                row.tenant.as_str(),
+                row.target_id.as_str(),
+            )
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(
+        recorded,
+        [
+            ("key.revoke", "acme", "agent1"),
+            ("key.revoke", "acme", "agent2"),
+            ("key.revoke", "acme", "odd_id_"),
+        ],
+        "the ledger records the folded identifiers"
+    );
+}
+
+#[tokio::test]
 async fn key_mutations_are_atomic_target_scoped_redacted_and_noop_safe() {
     let db = TestDb::new("u58-key-audit");
     seed_and_seal(&db, Some("acme"));

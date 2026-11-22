@@ -7,7 +7,7 @@ use super::{
 };
 use crate::{
     data::error::interact,
-    security::audit::{AuditEvent, MutationAudit, append_in_transaction},
+    security::audit::{AuditEvent, MutationAudit, append_in_transaction, folded_identifier},
 };
 use rusqlite::{OptionalExtension, TransactionBehavior};
 use serde_json::{Value, json};
@@ -47,7 +47,7 @@ impl DataBroker {
         let event = AuditEvent {
             operation: operation.into(),
             target_type: "data_source".into(),
-            target_id: id.into(),
+            target_id: folded_identifier(id),
             result: result.into(),
             classification: "admin".into(),
             revision,
@@ -189,7 +189,7 @@ impl DataBroker {
             let event = AuditEvent {
                 operation: "data_source.create".into(),
                 target_type: "data_source".into(),
-                target_id: id.clone(),
+                target_id: folded_identifier(&id),
                 result: "success".into(),
                 classification: "admin".into(),
                 revision: Some(1),
@@ -282,7 +282,7 @@ impl DataBroker {
             let event = AuditEvent {
                 operation: "data_source.update".into(),
                 target_type: "data_source".into(),
-                target_id: id_owned.clone(),
+                target_id: folded_identifier(&id_owned),
                 result: "success".into(),
                 classification: "admin".into(),
                 revision: Some(version + 1),
@@ -344,7 +344,7 @@ impl DataBroker {
                 }
                 .into(),
                 target_type: "data_source".into(),
-                target_id: id_owned.clone(),
+                target_id: folded_identifier(&id_owned),
                 result: "success".into(),
                 classification: "admin".into(),
                 revision: Some(expected + 1),
@@ -411,7 +411,7 @@ impl DataBroker {
             let event = AuditEvent {
                 operation: "data_source.delete".into(),
                 target_type: "data_source".into(),
-                target_id: id_owned.clone(),
+                target_id: folded_identifier(&id_owned),
                 result: "success".into(),
                 classification: "admin".into(),
                 revision: Some(expected),

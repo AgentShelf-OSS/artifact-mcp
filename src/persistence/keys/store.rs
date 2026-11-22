@@ -9,7 +9,7 @@ use crate::model::{
     PublisherKeySummary, UpdatePublisherKey, UpdatedPublisherKey,
 };
 use crate::persistence::db::{self, DbPool};
-use crate::security::audit::{AuditEvent, MutationAudit};
+use crate::security::audit::{AuditEvent, MutationAudit, folded_identifier};
 
 use super::operations::{
     backfill_key_owner, backfill_key_owner_in_transaction, create_key, list_keys,
@@ -79,11 +79,11 @@ impl KeyStore {
                 .transaction_with_behavior(TransactionBehavior::Immediate)
                 .map_err(|error| crate::error::internal("create key audited", error))?;
             let created = create_key(&tx, &request, random.as_ref())?;
-            let audit = audit.for_target_tenant(&created.org.0)?;
+            let audit = audit.for_target_tenant(&folded_identifier(&created.org.0))?;
             let event = AuditEvent {
                 operation: "key.create".to_owned(),
                 target_type: "publisher_key".to_owned(),
-                target_id: created.client_id.0.clone(),
+                target_id: folded_identifier(&created.client_id.0),
                 result: "success".to_owned(),
                 classification: "credential_created".to_owned(),
                 revision: None,
@@ -143,12 +143,12 @@ impl KeyStore {
             let event = AuditEvent {
                 operation: "key.revoke".to_owned(),
                 target_type: "publisher_key".to_owned(),
-                target_id: client_id.0.clone(),
+                target_id: folded_identifier(&client_id.0),
                 result: "success".to_owned(),
                 classification: "credential_revoked".to_owned(),
                 revision: None,
             };
-            let audit = audit.for_target_tenant(&org)?;
+            let audit = audit.for_target_tenant(&folded_identifier(&org))?;
             crate::security::audit::append_in_transaction(
                 &tx,
                 &audit_key,
@@ -194,12 +194,12 @@ impl KeyStore {
                 let event = AuditEvent {
                     operation: "key.update".to_owned(),
                     target_type: "publisher_key".to_owned(),
-                    target_id: client_id.0.clone(),
+                    target_id: folded_identifier(&client_id.0),
                     result: "success".to_owned(),
                     classification: "credential_metadata_updated".to_owned(),
                     revision: None,
                 };
-                let audit = audit.for_target_tenant(&updated.org.0)?;
+                let audit = audit.for_target_tenant(&folded_identifier(&updated.org.0))?;
                 crate::security::audit::append_in_transaction(
                     &tx,
                     &audit_key,
@@ -276,12 +276,12 @@ impl KeyStore {
             let event = AuditEvent {
                 operation: "key.owner.set".to_owned(),
                 target_type: "publisher_key".to_owned(),
-                target_id: client_id.0.clone(),
+                target_id: folded_identifier(&client_id.0),
                 result: "success".to_owned(),
                 classification: "owner_assignment".to_owned(),
                 revision: None,
             };
-            let audit = audit.for_target_tenant(&updated.org.0)?;
+            let audit = audit.for_target_tenant(&folded_identifier(&updated.org.0))?;
             crate::security::audit::append_in_transaction(
                 &tx,
                 &audit_key,
@@ -334,11 +334,11 @@ impl KeyStore {
                     .map_err(|error| crate::error::internal("backfill key owner audited", error))?;
                 return Ok(Some(result));
             }
-            let audit = audit.for_target_tenant(&result.org.0)?;
+            let audit = audit.for_target_tenant(&folded_identifier(&result.org.0))?;
             let event = AuditEvent {
                 operation: "key.owner.backfill".to_owned(),
                 target_type: "publisher_key".to_owned(),
-                target_id: client_id.0.clone(),
+                target_id: folded_identifier(&client_id.0),
                 result: "success".to_owned(),
                 classification: "owner_backfill_confirmed".to_owned(),
                 revision: None,
