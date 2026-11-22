@@ -20,36 +20,20 @@ impl StoreContext {
 
     /// `update({ … })`
     ///
-    /// `expected_revision` is already resolved by the caller: it substitutes `meta.revision`
-    /// when the client omitted it, and the frozen
-    /// [`ArtifactUpdate`] has no "absent" state.
-    pub(super) fn update_sync(
-        &self,
-        conn: &mut Connection,
-        id: &str,
-        expected_revision: u64,
-        update: &ArtifactUpdate,
-        audit: &MutationAudit,
-        operation: &str,
-    ) -> Result<UpdateArtifactResult, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|error| crate::error::internal("lock artifact lifecycle for update", error))?;
-        self.update_locked(conn, id, expected_revision, update, audit, operation)
-    }
-
-    /// Update while the caller already owns the lifecycle write gate. Restore uses this to keep
-    /// the source revision's metadata/body read and its replay as one linearized operation.
+    /// `update.expected_revision` is already resolved by the caller: it substitutes
+    /// `meta.revision` when the client omitted it, and the frozen [`ArtifactUpdate`] has no
+    /// "absent" state. Restore calls this directly, under the same gate, to keep the source
+    /// revision's metadata/body read and its replay as one linearized operation.
     pub(super) fn update_locked(
         &self,
+        _gate: &WriteGate<'_>,
         conn: &mut Connection,
         id: &str,
-        expected_revision: u64,
         update: &ArtifactUpdate,
         audit: &MutationAudit,
         operation: &str,
     ) -> Result<UpdateArtifactResult, AppError> {
+        let expected_revision = update.expected_revision;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };

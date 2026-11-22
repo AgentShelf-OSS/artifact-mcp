@@ -10,13 +10,11 @@ impl StoreContext {
     /// `publish` / `publishBundle`
     pub(super) fn publish_sync(
         &self,
+        _gate: &WriteGate<'_>,
         conn: &mut Connection,
         request: PublishArtifact,
         audit: MutationAudit,
     ) -> Result<PublishedArtifact, AppError> {
-        let _gate = self.lifecycle_gate.write().map_err(|error| {
-            crate::error::internal("lock artifact lifecycle for publish", error)
-        })?;
         let prepared = self.prepare_publish(&request.content)?;
         // A publisher administrator may select a tenant other than its own.  Audit under the
         // artifact's persisted/target tenant while preserving the verified actor identity.

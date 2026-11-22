@@ -12,16 +12,13 @@ impl StoreContext {
     /// `update` snapshots the *current* revision first, so a restore is itself undoable.
     pub(super) fn restore_sync(
         &self,
+        gate: &WriteGate<'_>,
         conn: &mut Connection,
         id: &str,
         revision: u64,
         acting_client_id: Option<ClientId>,
         audit: MutationAudit,
     ) -> Result<RestoreArtifactResult, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|error| crate::error::internal("lock artifact lifecycle for trash", error))?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };
@@ -60,8 +57,7 @@ impl StoreContext {
             category: Some(row.category.clone()),
             content: Some(content),
         };
-        let result =
-            self.update_locked(conn, id, meta.revision, &update, &audit, "artifact.restore")?;
+        let result = self.update_locked(gate, conn, id, &update, &audit, "artifact.restore")?;
         Ok(RestoreArtifactResult {
             meta: result.meta,
             restored_from: row.revision,
@@ -75,14 +71,11 @@ impl StoreContext {
     /// `removeById(id, …)`
     pub(super) fn delete_sync(
         &self,
+        _gate: &WriteGate<'_>,
         conn: &mut Connection,
         id: &str,
         audit: MutationAudit,
     ) -> Result<bool, AppError> {
-        let _gate = self
-            .lifecycle_gate
-            .write()
-            .map_err(|error| crate::error::internal("lock artifact lifecycle for trash", error))?;
         let Some(meta) = load_meta(conn, id)? else {
             return Ok(false);
         };

@@ -333,12 +333,27 @@ where
     T: Send + 'static,
 {
     let pool = pool.clone();
-    tokio::task::spawn_blocking(move || {
+    run_blocking(move || {
         let mut conn = checkout(&pool)?;
         work(&mut conn)
     })
     .await
-    .map_err(|error| {
+}
+
+/// Runs `work` on the blocking pool with no connection checked out.
+///
+/// For work that must take another lock before it holds a pooled connection: the closure calls
+/// [`checkout`] itself, after the lock. [`interact`] is this function with the checkout first.
+///
+/// # Errors
+/// Propagates the closure's [`AppError`], or [`AppError::Internal`] when the blocking task
+/// panicked or was cancelled.
+pub(crate) async fn run_blocking<T, F>(work: F) -> Result<T, AppError>
+where
+    F: FnOnce() -> Result<T, AppError> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(work).await.map_err(|error| {
         tracing::error!(error = %error, "database blocking task failed");
         AppError::Internal
     })?
