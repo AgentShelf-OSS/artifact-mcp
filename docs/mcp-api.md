@@ -68,10 +68,10 @@ for required claims and scopes.
 | `delete_artifact(id)` | Delete an artifact and its related state. |
 | `list_revisions(id)` | List retained revision history. |
 | `restore_artifact(id, revision)` | Restore a retained body as a new revision. |
-| `create_share(id, expires)` | Create an unlisted public link with optional expiry. |
-| `list_shares(id)` | List active public links for an artifact. |
-| `revoke_share(token)` | Revoke a public link immediately. |
-| `artifact_stats(id)` | Return views, unique viewers, and the authorized named-viewer list. |
+| `create_share(id, expires)` | Create an unlisted public link. `expires` is required: `24h`, `never`, or a future ISO date. Needs the owning key or an administrator key. |
+| `list_shares(id)` | List active public links, with their tokens, for an artifact the key can read. Reader and collaborator keys can read every artifact in their organization. |
+| `revoke_share(token)` | Revoke a public link immediately. Needs write access to its artifact. |
+| `artifact_stats(id)` | Return views, unique viewers, and the named-viewer list for an artifact the key can read. |
 | `list_feedback(id?)` | List threaded viewer feedback and anchor evidence. |
 | `resolve_feedback(feedback_id)` | Mark a feedback thread resolved. |
 | `reopen_feedback(feedback_id)` | Reopen a resolved feedback thread. |

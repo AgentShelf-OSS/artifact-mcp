@@ -82,15 +82,22 @@
     loadShares();
   }
 
+  // The server accepts "never", "24h" or a future ISO date for `expires`.
+  var SHARE_EXPIRY_MS = { "1h": 3600000, "1d": 86400000, "7d": 604800000 };
+  function shareExpires(choice) {
+    var duration = SHARE_EXPIRY_MS[choice];
+    return duration ? new Date(Date.now() + duration).toISOString() : "never";
+  }
+
   if (shareForm) {
     shareForm.addEventListener("submit", function (event) {
       event.preventDefault();
       var submit = shareForm.querySelector('button[type="submit"]');
       submit.disabled = true;
-      jsonRequest("/" + shareArtifactId + "/shares", {
+      jsonRequest("/" + shareArtifactId + "/share", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ expires: shareExpiry.value || null }),
+        body: JSON.stringify({ expires: shareExpires(shareExpiry.value) }),
       }).then(function () {
         shareExpiry.value = "";
         toast("Public link created");

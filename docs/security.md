@@ -64,9 +64,18 @@ Unknown, expired, and revoked tokens return the same 404 response. Shared artifa
 the viewer shell, feedback bridge, analytics, or mutation routes and include
 `X-Robots-Tag: noindex`.
 
-Named viewer lists are available only to administrators and the artifact's owning publisher. They
-never cross organizations. Administrative and owner views do not count toward ordinary audience
-analytics.
+A share link takes an artifact outside its organization, and the token is a bearer credential. In
+the browser, only the artifact's owner or an administrator can create, list, or revoke its links.
+This is the same rule as Hide, Show, and Delete. Other members of the organization get `403`, and
+the Share control is not shown to them. Hiding an artifact does not revoke its links.
+
+Publisher keys follow their role. `create_share` needs the owning key or an administrator key, and
+`revoke_share` needs write access. `list_shares` and `artifact_stats` need read access only:
+reader and collaborator keys, and OAuth tokens with the `artifacts:read` scope, receive the live
+share tokens and the named viewer list for every artifact in their organization. Author keys
+receive them for their own artifacts. Give a read key only to an agent that may hold those
+tokens. Named viewer lists never cross organizations. Administrative and owner views do not count
+toward ordinary audience analytics.
 
 ## Webhooks and Discord
 

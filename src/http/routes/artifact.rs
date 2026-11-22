@@ -317,6 +317,9 @@ async fn create_share(
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = require_share_manager(&viewer, &artifact) {
+        return error.into_response();
+    }
     let request = CreateShare {
         created_by: viewer
             .email
@@ -361,13 +364,28 @@ async fn list_shares(
     Path(id): Path<String>,
     headers: HeaderMap,
 ) -> Response {
-    let (artifact, _viewer) = match authorize(&deps, &headers, &id).await {
+    let (artifact, viewer) = match authorize(&deps, &headers, &id).await {
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = require_share_manager(&viewer, &artifact) {
+        return error.into_response();
+    }
     match deps.shares.list(&artifact).await {
         Ok(shares) => Json(SharesResponse { shares }).into_response(),
         Err(error) => error.into_response(),
+    }
+}
+
+/// A public link takes an artifact outside the organization, and its token is a bearer
+/// credential. Creating, listing and revoking links therefore use the same
+/// administrator-or-immutable-owner policy as Hide and Delete. `authorize` has already produced
+/// the concealed answer for another organization's artifact, so this refusal discloses nothing.
+fn require_share_manager(viewer: &Viewer, artifact: &AuthorizedArtifact) -> Result<(), AppError> {
+    if AccessPolicy::viewer_can_manage_artifact(viewer, artifact.meta()) {
+        Ok(())
+    } else {
+        Err(AppError::Forbidden(FORBIDDEN_MESSAGE.to_owned()))
     }
 }
 
@@ -387,6 +405,9 @@ async fn revoke_share(
         Ok(allowed) => allowed,
         Err(error) => return error.into_response(),
     };
+    if let Err(error) = require_share_manager(&viewer, &artifact) {
+        return error.into_response();
+    }
     match deps
         .shares
         .revoke(

@@ -83,18 +83,26 @@ mod portal_characterization_tests {
             },
         );
 
+        // Public links follow the Hide/Delete policy. The member in this fixture owns the
+        // artifact; a member who does not own it gets no Share button.
+        // The marker ends in the first rendered attribute so it cannot match the client-side
+        // card template that `collections.js` carries in the same page.
+        const SHARE_BUTTON: &str = r#"<button class="act share" data-action="share" type="button" aria-label="Share Title"#;
+        let member_html = renderer.gallery(&member).expect("member gallery");
+        let admin_html = renderer.gallery(&admin).expect("admin gallery");
+        let mut colleague = member.clone();
+        colleague.viewer.email = Some(EmailAddress::from("colleague@example.test"));
+        let colleague_html = renderer.gallery(&colleague).expect("colleague gallery");
+        assert!(member_html.contains(SHARE_BUTTON));
+        assert!(admin_html.contains(SHARE_BUTTON));
+        assert!(!colleague_html.contains(SHARE_BUTTON));
         assert_eq!(
-            digest(
-                renderer
-                    .gallery(&member)
-                    .expect("member gallery")
-                    .as_bytes()
-            ),
-            "d350cce59a34df9868dbe3a1ae28d48f1dcf36fc2de693033aed09c60f341692"
+            digest(member_html.as_bytes()),
+            "8fc4fc1984ba2e72eca59ab6a9df5191870000a19497a85c992e2e5c96b0b17a"
         );
         assert_eq!(
             digest(renderer.gallery(&admin).expect("admin gallery").as_bytes()),
-            "5978cbed43831c1633687b4bd69014cf73e947dc7c2fadfcd4dafe3da078c1a5"
+            "44d3dab9241a7e85690fe11e2afc693b984fda0c86aaa9aad194f34f6a88de11"
         );
     }
 
@@ -139,6 +147,13 @@ mod portal_characterization_tests {
             external_edited_at: None,
             external_deleted_at: None,
         };
+        let colleague = Viewer {
+            email: Some(EmailAddress::from("colleague@example.test")),
+            ..viewer.clone()
+        };
+        let colleague_artifact =
+            AccessPolicy::authorize_viewer(&colleague, Some(authorized.meta().clone()))
+                .expect("authorized colleague fixture");
         let view = ShellView {
             artifact: authorized,
             navigation: crate::render::view_models::ArtifactNavigation {
@@ -163,9 +178,26 @@ mod portal_characterization_tests {
             org_accent: Some("#123456".to_owned()),
             cast_enabled: true,
         };
+        // The owner sees the Share control and tab. For a member who does not own the artifact
+        // the control stays in the document, hidden, because the reader controls anchor on it,
+        // and the Share tab is not rendered.
+        const HIDDEN_SHARE_TOGGLE: &str = r#"data-inspector-open="share" type="button" aria-controls="vinspector" aria-expanded="false" hidden>"#;
+        const SHARE_TAB: &str = r#"id="tab-share""#;
+        let shell_html = renderer.shell(&view).expect("bundle shell");
+        assert!(!shell_html.contains(HIDDEN_SHARE_TOGGLE));
+        assert!(shell_html.contains(SHARE_TAB));
+        let colleague_html = renderer
+            .shell(&ShellView {
+                artifact: colleague_artifact,
+                viewer: colleague,
+                ..view.clone()
+            })
+            .expect("colleague shell");
+        assert!(colleague_html.contains(HIDDEN_SHARE_TOGGLE));
+        assert!(!colleague_html.contains(SHARE_TAB));
         assert_eq!(
-            digest(renderer.shell(&view).expect("bundle shell").as_bytes()),
-            "6cad743e072916125926f938e85ec07c30028358cd729141cd00409155a5cfa8"
+            digest(shell_html.as_bytes()),
+            "0b52c7515cca946b521db90de5f40cea1121bd7bf1a0b6253984b873bdfc4386"
         );
     }
 }

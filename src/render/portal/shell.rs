@@ -132,6 +132,8 @@ pub(super) fn shell_template<'a>(
         viewer_is_admin: view.viewer.is_admin,
         state_enabled: !viewer_email.is_empty(),
         can_delete: AccessPolicy::viewer_can_manage_artifact(&view.viewer, meta),
+        // Public links follow the Hide/Delete policy (`require_share_manager`).
+        can_share: AccessPolicy::viewer_can_manage_artifact(&view.viewer, meta),
         feedback_literal: js_literal(&feedback_json),
         title_literal: js_literal(&meta.title),
         bytes: meta.bytes,

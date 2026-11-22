@@ -146,6 +146,10 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
     expect(&owner_card)
         .to_have_attribute("data-owned", "1")
         .await?;
+    // Public links follow the Hide/Delete policy: the owner has the Share control.
+    expect(&owner_card.locator(r#"[data-action="share"]"#))
+        .to_have_count(1)
+        .await?;
     // Hide and Show live in the card's More menu.
     expect(&owner_card.locator(r#"[data-action="visibility"]"#))
         .to_have_count(1)
@@ -241,6 +245,30 @@ async fn owner_controls(t: Ctx) -> Result<(), Error> {
         )
         .await?;
     assert_eq!(denied.status, 403);
+    // A member who does not own the artifact gets no Share control, and the share routes
+    // refuse that member.
+    expect(&non_owner_card.locator(r#"[data-action="share"]"#))
+        .to_have_count(0)
+        .await?;
+    let member_request = t.request_as(&Identity::email(&member_email));
+    let mutation_headers = [
+        ("content-type", "application/json"),
+        ("X-Artifact-Mutation", "1"),
+        ("Sec-Fetch-Site", "same-origin"),
+    ];
+    let share_denied = member_request
+        .send(
+            "POST",
+            &format!("{}/{id}/share", t.base_url()),
+            Some(Body::Json(json!({"expires": "never"}))),
+            &mutation_headers,
+        )
+        .await?;
+    assert_eq!(share_denied.status, 403, "{}", share_denied.text());
+    let list_denied = member_request
+        .get(&format!("{}/{id}/shares", t.base_url()))
+        .await?;
+    assert_eq!(list_denied.status, 403);
     non_owner.close().await;
     owner.close().await;
 

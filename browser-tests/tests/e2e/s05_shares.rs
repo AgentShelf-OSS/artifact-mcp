@@ -18,6 +18,11 @@ pub fn cases() -> Vec<Case> {
         e2e_case!(SPEC, "rejects an invalid expiry", invalid_expiry),
         e2e_case!(
             SPEC,
+            "the gallery Share dialog creates, lists and revokes a link",
+            gallery_share_dialog
+        ),
+        e2e_case!(
+            SPEC,
             "public shares preserve HTML and do not enable state for unsigned or signed-in visitors",
             public_share_html
         ),
@@ -106,6 +111,72 @@ async fn invalid_expiry(t: Ctx) -> Result<(), Error> {
         )
         .await?;
     assert_eq!(response.status, 400);
+    Ok(())
+}
+
+/// The card's Share dialog once posted to a route that does not exist, with expiry values the
+/// server refuses, so it could never create a link. No test submitted the form.
+async fn gallery_share_dialog(t: Ctx) -> Result<(), Error> {
+    let key = t.publisher_key().await?;
+    let artifact = t
+        .publish(
+            &key,
+            &format!("PW ShareDialog {}", t.org),
+            "<!doctype html><h1>dialog</h1>",
+            None,
+        )
+        .await?;
+    let id = artifact["id"].as_str().unwrap_or("").to_owned();
+
+    let page = t.page().await?;
+    page.goto(&format!("{}/", t.base_url())).await?;
+    let card = page.locator(&format!(r#"[data-id="{id}"]"#));
+    card.locator(r#"[data-action="share"]"#).click().await?;
+    let dialog = page.locator("#share-dialog");
+    expect(&dialog).to_be_visible().await?;
+    expect(&dialog.locator("#share-list"))
+        .to_contain_text("No active public links.")
+        .await?;
+
+    // A timed link, then a link with no expiry.
+    for (choice, rows) in [("1d", 1), ("", 2)] {
+        dialog
+            .locator("#share-expiry")
+            .select_option(&[choice])
+            .await?;
+        let path = format!("/{id}/share");
+        let created = page.wait_for_response(move |response| {
+            response.url.ends_with(&path) && response.request.method == "POST"
+        });
+        dialog
+            .locator(r#"#share-form button[type="submit"]"#)
+            .click()
+            .await?;
+        assert_eq!(created.await?.status, 200, "expiry choice {choice:?}");
+        expect(&dialog.locator(".share-row"))
+            .to_have_count(rows)
+            .await?;
+    }
+    let listed = t.request().get(&format!("/{id}/shares")).await?.json();
+    let shares = listed["shares"].as_array().cloned().unwrap_or_default();
+    assert_eq!(shares.len(), 2, "{listed}");
+    assert_eq!(
+        shares
+            .iter()
+            .filter(|share| share["expires_at"].is_null())
+            .count(),
+        1,
+        "one link has no expiry and one expires: {listed}"
+    );
+
+    dialog
+        .locator(".share-row .revoke-share")
+        .first()
+        .click()
+        .await?;
+    expect(&dialog.locator(".share-row"))
+        .to_have_count(1)
+        .await?;
     Ok(())
 }
 
