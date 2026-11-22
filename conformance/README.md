@@ -172,6 +172,13 @@ it means a change in bytes.
   is therefore circular by construction: it freezes whatever the server does today. Record
   only to adopt an intended behavior change, and review the golden diff as that change.
 - **`CONFORMANCE_RECORD=1` is forbidden in CI.** CI only replays the goldens.
+- **A golden change needs a label.** `.github/workflows/contract-guard.yml` fails a pull request
+  that changes `conformance/goldens/`, `conformance/mcp.tool-output-schemas.json`,
+  `conformance/collection-tool-definitions.json` or `src/mcp/frozen_tools.json` unless it has the
+  `contract-change` label. A maintainer adds the label after reading the diff.
+- **Goldens do not hold the release version.** Steps that return `serverInfo` list `version` in
+  `volatileFields`, so a version bump re-records nothing. `initialize_reports_the_package_version`
+  in `tests/native/u25_api_key_capabilities.rs` pins the value instead.
 - Recording is refused for any case whose runtime assertions fail, so a broken state can
   never be frozen as "expected".
 - A golden diff is a **contract change**. Regenerating a golden to make a build pass is only

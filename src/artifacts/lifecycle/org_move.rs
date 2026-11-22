@@ -10,15 +10,13 @@ impl StoreContext {
     /// `client_id` deliberately stays put so the old org-locked key can no longer update it.
     pub(super) fn move_to_org_sync(
         &self,
+        _gate: &WriteGate<'_>,
         conn: &mut Connection,
         id: &str,
         target_org: &str,
         category: Option<&str>,
         audit: MutationAudit,
     ) -> Result<ArtifactMeta, AppError> {
-        let _gate = self.lifecycle_gate.write().map_err(|error| {
-            crate::error::internal("lock artifact lifecycle for org move", error)
-        })?;
         let Some(meta) = load_meta(conn, id)? else {
             return Err(AppError::NotFound("not_found".to_owned()));
         };

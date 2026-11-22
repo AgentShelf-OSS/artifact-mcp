@@ -64,7 +64,8 @@ and the unprivileged user namespaces required by CI. See `.github/workflows/ci.y
   (append-only; never edit a shipped migration).
 - A change to HTTP or MCP behavior can change a conformance golden. Record it with
   `CONFORMANCE_RECORD=1 cargo test --test conformance` and review the golden diff as a contract
-  change.
+  change. CI fails a pull request that changes a golden or the frozen tool definitions until a
+  maintainer adds the `contract-change` label.
 - A new migration needs a boundary fixture: `cargo xtask historical-fixture` adds it.
 
 ## Add an artifact metadata field

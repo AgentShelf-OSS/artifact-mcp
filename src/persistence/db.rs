@@ -333,12 +333,27 @@ where
     T: Send + 'static,
 {
     let pool = pool.clone();
-    tokio::task::spawn_blocking(move || {
+    run_blocking(move || {
         let mut conn = checkout(&pool)?;
         work(&mut conn)
     })
     .await
-    .map_err(|error| {
+}
+
+/// Runs `work` on the blocking pool with no connection checked out.
+///
+/// For work that must take another lock before it holds a pooled connection: the closure calls
+/// [`checkout`] itself, after the lock. [`interact`] is this function with the checkout first.
+///
+/// # Errors
+/// Propagates the closure's [`AppError`], or [`AppError::Internal`] when the blocking task
+/// panicked or was cancelled.
+pub(crate) async fn run_blocking<T, F>(work: F) -> Result<T, AppError>
+where
+    F: FnOnce() -> Result<T, AppError> + Send + 'static,
+    T: Send + 'static,
+{
+    tokio::task::spawn_blocking(work).await.map_err(|error| {
         tracing::error!(error = %error, "database blocking task failed");
         AppError::Internal
     })?
@@ -387,6 +402,29 @@ mod tests {
         migrations::migrate_through(&mut conn, &MigrationContext::from_env(), 1).unwrap();
         assert!(Database::connect_existing(&fixture.0).is_err());
         assert_eq!(migrations::current_version(&conn).unwrap(), 1);
+    }
+
+    #[test]
+    fn startup_refuses_a_database_migrated_by_a_newer_release() {
+        // The rollback case: the previous binary is started on an upgraded data directory.
+        let fixture = Fixture::new();
+        drop(Database::open_at(&fixture.0).unwrap());
+        let conn = open_bootstrap_connection(&database_path(&fixture.0)).unwrap();
+        conn.execute(
+            "INSERT INTO schema_migrations (version, name) VALUES (?1, 'from-a-newer-release')",
+            [migrations::LATEST_SCHEMA_VERSION + 1],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = Database::open_at(&fixture.0).expect_err("a newer schema is refused");
+        let AppError::Unavailable(message) = error else {
+            panic!("unexpected error: {error:?}");
+        };
+        assert!(
+            message.contains("is newer than this release supports"),
+            "{message}"
+        );
     }
 
     #[test]

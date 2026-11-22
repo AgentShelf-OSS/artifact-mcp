@@ -18,10 +18,7 @@ impl ArtifactStore {
     ) -> Result<Option<ArtifactFile>, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| {
-            let _gate = context.lifecycle_gate.read().map_err(|error| {
-                crate::error::internal("lock artifact lifecycle for api", error)
-            })?;
+        self.with_read_gate(move |conn| {
             // Authorization may have resolved just before a lifecycle marker was created. Recheck
             // in the same blocking closure immediately before filesystem access.
             if load_meta(conn, &id)?.is_none() {
@@ -48,10 +45,7 @@ impl ArtifactStore {
         let context = self.context();
         let meta = meta.clone();
         let relative_path = relative_path.to_owned();
-        db::interact(&self.pool, move |conn| {
-            let _gate = context.lifecycle_gate.read().map_err(|error| {
-                crate::error::internal("lock artifact lifecycle for api", error)
-            })?;
+        self.with_read_gate(move |conn| {
             if load_meta(conn, &meta.id.0)?.is_none() {
                 return Ok(None);
             }
@@ -86,10 +80,7 @@ impl ArtifactStore {
         let context = self.context();
         let id = meta.id.0.clone();
         let relative_path = relative_path.map(ToOwned::to_owned);
-        db::interact(&self.pool, move |conn| {
-            let _gate = context.lifecycle_gate.read().map_err(|error| {
-                crate::error::internal("lock artifact lifecycle for api", error)
-            })?;
+        self.with_read_gate(move |conn| {
             if load_meta(conn, &id)?.is_none() {
                 return Ok(None);
             }
@@ -123,10 +114,7 @@ impl ArtifactStore {
         let context = self.context();
         let id = meta.id.0.clone();
         let is_bundle = meta.is_bundle;
-        db::interact(&self.pool, move |conn| {
-            let _gate = context.lifecycle_gate.read().map_err(|error| {
-                crate::error::internal("lock artifact lifecycle for api", error)
-            })?;
+        self.with_read_gate(move |conn| {
             if load_meta(conn, &id)?.is_none() {
                 return Ok(None);
             }
@@ -162,10 +150,7 @@ impl ArtifactStore {
     ) -> Result<RevisionHistory, AppError> {
         let context = self.context();
         let meta = meta.clone();
-        db::interact(&self.pool, move |conn| {
-            let _gate = context.lifecycle_gate.read().map_err(|error| {
-                crate::error::internal("lock artifact lifecycle for api", error)
-            })?;
+        self.with_read_gate(move |conn| {
             if load_meta(conn, &meta.id.0)?.is_none() {
                 return Err(AppError::ConcealedNotFound);
             }
@@ -187,17 +172,11 @@ impl ArtifactStore {
     ) -> Result<UpdateArtifactResult, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        let updated = db::interact(&self.pool, move |conn| {
-            context.update_sync(
-                conn,
-                &id,
-                update.expected_revision,
-                &update,
-                &audit,
-                "artifact.update",
-            )
-        })
-        .await?;
+        let updated = self
+            .with_write_gate(move |gate, conn| {
+                context.update_locked(gate, conn, &id, &update, &audit, "artifact.update")
+            })
+            .await?;
         if updated.changed {
             self.schedule_preview(updated.meta.clone());
         }
@@ -218,10 +197,11 @@ impl ArtifactStore {
     ) -> Result<RestoreArtifactResult, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        let restored = db::interact(&self.pool, move |conn| {
-            context.restore_sync(conn, &id, revision, acting_client_id, audit)
-        })
-        .await?;
+        let restored = self
+            .with_write_gate(move |gate, conn| {
+                context.restore_sync(gate, conn, &id, revision, acting_client_id, audit)
+            })
+            .await?;
         self.schedule_preview(restored.meta.clone());
         Ok(restored)
     }
@@ -237,10 +217,8 @@ impl ArtifactStore {
     ) -> Result<bool, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| {
-            context.delete_sync(conn, &id, audit)
-        })
-        .await
+        self.with_write_gate(move |gate, conn| context.delete_sync(gate, conn, &id, audit))
+            .await
     }
 
     /// `setCategory(id, category)`
@@ -256,8 +234,8 @@ impl ArtifactStore {
         let context = self.context();
         let id = meta.id.0.clone();
         let category = category.to_owned();
-        db::interact(&self.pool, move |conn| {
-            context.set_category_sync(conn, &id, &category, audit)
+        self.with_write_gate(move |gate, conn| {
+            context.set_category_sync(gate, conn, &id, &category, audit)
         })
         .await
     }
@@ -274,8 +252,8 @@ impl ArtifactStore {
     ) -> Result<ArtifactMeta, AppError> {
         let context = self.context();
         let id = meta.id.0.clone();
-        db::interact(&self.pool, move |conn| {
-            context.set_hidden_sync(conn, &id, hidden, audit)
+        self.with_write_gate(move |gate, conn| {
+            context.set_hidden_sync(gate, conn, &id, hidden, audit)
         })
         .await
     }
@@ -296,8 +274,8 @@ impl ArtifactStore {
         let id = meta.id.0.clone();
         let target_org = target_org.to_owned();
         let category = category.map(ToOwned::to_owned);
-        db::interact(&self.pool, move |conn| {
-            context.move_to_org_sync(conn, &id, &target_org, category.as_deref(), audit)
+        self.with_write_gate(move |gate, conn| {
+            context.move_to_org_sync(gate, conn, &id, &target_org, category.as_deref(), audit)
         })
         .await
     }

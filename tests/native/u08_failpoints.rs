@@ -1127,6 +1127,80 @@ async fn both_recovery_passes_retain_metadata_only_intents_without_a_valid_outgo
 }
 
 #[tokio::test]
+async fn readers_waiting_on_the_lifecycle_gate_hold_no_pooled_connection() {
+    // The lifecycle gate is process-wide and the pool is small. A reader used to check out a
+    // connection and then wait on the gate, so a few readers behind one slow write left no
+    // connection for the gallery, the workers or the health probe: they failed with
+    // `Unavailable` after the checkout timeout. The gate is now taken before the connection.
+    use artifact_mcp::persistence::db::{self, POOL_MAX_SIZE};
+
+    let blocker = Arc::new(BlockingUpdateFault::new());
+    let fixture = Fixture::with_custom_injector("gate-before-connection", blocker.clone());
+    let meta = fixture.publish_single(OLD).await;
+
+    // Hold an update inside the write gate.
+    blocker.arm();
+    let updating_store = fixture.store.clone();
+    let updating_meta = meta.clone();
+    let update = tokio::spawn(async move {
+        updating_store
+            .update_for(&updating_meta, html_update(1, NEW), mutation_audit())
+            .await
+    });
+    let entered = blocker.entered.clone();
+    tokio::task::spawn_blocking(move || entered.wait())
+        .await
+        .expect("the update holds the write gate");
+
+    // More readers than the pool has connections all wait on the gate.
+    let readers = (0..POOL_MAX_SIZE + 2)
+        .map(|_| {
+            let store = fixture.store.clone();
+            let meta = meta.clone();
+            tokio::spawn(async move { store.read_body_for(&meta).await })
+        })
+        .collect::<Vec<_>>();
+    tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+    let readers_waited = readers.iter().all(|reader| !reader.is_finished());
+
+    // An unrelated database user still gets a connection at once.
+    let unrelated = db::interact(&fixture.pool, |conn| {
+        conn.query_row("SELECT COUNT(*) FROM artifacts", [], |row| {
+            row.get::<_, i64>(0)
+        })
+        .map_err(|_| AppError::Internal)
+    })
+    .await;
+
+    // Release the update before any assertion. A failed assertion with the update still parked
+    // at its barrier would leave a blocking task that the runtime waits for, and the test would
+    // hang instead of failing.
+    let release = blocker.release.clone();
+    tokio::task::spawn_blocking(move || release.wait())
+        .await
+        .expect("release the update");
+    let updated = update.await.expect("update task");
+    let mut reads = Vec::new();
+    for reader in readers {
+        reads.push(reader.await.expect("reader task"));
+    }
+
+    assert!(readers_waited, "body reads wait for the writer");
+    assert_eq!(
+        unrelated,
+        Ok(1),
+        "waiting readers must not hold the pooled connections"
+    );
+    assert_eq!(updated.expect("update").meta.revision, 2);
+    for read in reads {
+        assert!(
+            read.expect("read after the update").is_some(),
+            "every waiting reader completes once the writer is done"
+        );
+    }
+}
+
+#[tokio::test]
 async fn restore_linearizes_its_history_read_and_replay_against_a_concurrent_update() {
     // Revision 1 is retained when revision 2 replaces its body. Pause restore at the first
     // mutating point of its replay, after it has read revision 1. A stale update must remain

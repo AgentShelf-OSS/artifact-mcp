@@ -116,7 +116,21 @@ pub struct StoreContext {
     /// Linearizes body/history reads against lifecycle mutations. Authorization remains at the
     /// route boundary; this lock only ensures an already-authorized read cannot interleave a
     /// ready-to-pending transition and then touch a different body generation.
+    ///
+    /// Lock order: this gate first, then a pooled connection. The gate is process-wide and a
+    /// write can hold it for the length of a staged write and its `fsync`s. A caller that held a
+    /// connection while it waited here would pin one of the few pooled connections for that
+    /// time, and a handful of waiting readers would leave none for the rest of the application.
+    /// Only [`ArtifactStore::with_read_gate`] and [`ArtifactStore::with_write_gate`] take it.
     lifecycle_gate: RwLock<()>,
+}
+
+/// Proof that the caller holds the lifecycle gate for writing.
+///
+/// Every mutating `*_sync` function takes one, and only [`ArtifactStore::with_write_gate`] makes
+/// one, so a mutation that skips the gate does not compile.
+pub(super) struct WriteGate<'a> {
+    _guard: std::sync::RwLockWriteGuard<'a, ()>,
 }
 
 /// The SQLite + filesystem [`ArtifactService`], mirroring `createArtifactStore`.
@@ -296,6 +310,51 @@ impl ArtifactStore {
 
     fn context(&self) -> Arc<StoreContext> {
         Arc::clone(&self.context)
+    }
+
+    /// Run blocking read work with the lifecycle gate held for reading.
+    ///
+    /// The gate is taken before the connection is checked out; see the lock order on
+    /// `StoreContext::lifecycle_gate`.
+    async fn with_read_gate<T, F>(&self, work: F) -> Result<T, AppError>
+    where
+        F: FnOnce(&mut Connection) -> Result<T, AppError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let context = self.context();
+        let pool = self.pool.clone();
+        db::run_blocking(move || {
+            let _gate = context.lifecycle_gate.read().map_err(|error| {
+                crate::error::internal("lock artifact lifecycle for read", error)
+            })?;
+            let mut conn = db::checkout(&pool)?;
+            work(&mut conn)
+        })
+        .await
+    }
+
+    /// Run a blocking lifecycle mutation with the lifecycle gate held for writing.
+    ///
+    /// The gate is taken before the connection is checked out; see the lock order on
+    /// `StoreContext::lifecycle_gate`. The closure receives the [`WriteGate`] that the mutating
+    /// `*_sync` functions require.
+    async fn with_write_gate<T, F>(&self, work: F) -> Result<T, AppError>
+    where
+        F: FnOnce(&WriteGate<'_>, &mut Connection) -> Result<T, AppError> + Send + 'static,
+        T: Send + 'static,
+    {
+        let context = self.context();
+        let pool = self.pool.clone();
+        db::run_blocking(move || {
+            let gate = WriteGate {
+                _guard: context.lifecycle_gate.write().map_err(|error| {
+                    crate::error::internal("lock artifact lifecycle for write", error)
+                })?,
+            };
+            let mut conn = db::checkout(&pool)?;
+            work(&gate, &mut conn)
+        })
+        .await
     }
 
     fn schedule_preview(&self, meta: ArtifactMeta) {

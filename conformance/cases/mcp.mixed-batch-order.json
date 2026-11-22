@@ -15,7 +15,7 @@
           { "jsonrpc": "2.0", "id": 2, "method": "ping" }
         ]
       },
-      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+      "expect": { "status": 200, "body": { "mode": "canonical-json", "volatileFields": ["version"] } }
     }
   ]
 }

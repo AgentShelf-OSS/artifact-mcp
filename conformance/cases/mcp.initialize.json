@@ -11,7 +11,7 @@
         "headers": { "authorization": "Bearer ${key_acme}", "content-type": "application/json" },
         "json": { "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": { "protocolVersion": "2025-06-18" } }
       },
-      "expect": { "status": 200, "body": { "mode": "canonical-json" } }
+      "expect": { "status": 200, "body": { "mode": "canonical-json", "volatileFields": ["version"] } }
     }
   ]
 }

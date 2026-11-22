@@ -44,10 +44,9 @@ impl ArtifactService for ArtifactStore {
         let context = self.context();
         let store = self.clone();
         Box::pin(async move {
-            let published = db::interact(&self.pool, move |conn| {
-                context.publish_sync(conn, request, audit)
-            })
-            .await?;
+            let published = self
+                .with_write_gate(move |gate, conn| context.publish_sync(gate, conn, request, audit))
+                .await?;
             store.schedule_preview(published.meta.clone());
             Ok(published)
         })
@@ -193,16 +192,12 @@ impl ArtifactService for ArtifactStore {
         digest: &'a str,
         previews: Arc<dyn crate::ports::PreviewService>,
     ) -> BoxFuture<'a, Result<Option<Vec<u8>>, AppError>> {
-        let context = self.context();
         let id = artifact.meta().id.0.clone();
         let digest = digest.to_owned();
         let authorized_org = artifact.meta().org.clone();
         let authorized_client_id = artifact.meta().client_id.clone();
         Box::pin(async move {
-            db::interact(&self.pool, move |conn| {
-                let _gate = context.lifecycle_gate.read().map_err(|error| {
-                    crate::error::internal("lock artifact lifecycle for service", error)
-                })?;
+            self.with_read_gate(move |conn| {
                 let Some(current) = load_meta(conn, &id)? else {
                     return Ok(None);
                 };
@@ -324,10 +319,7 @@ impl ArtifactService for ArtifactStore {
     ) -> BoxFuture<'_, Result<StorageAuditReport, AppError>> {
         let context = self.context();
         Box::pin(async move {
-            db::interact(&self.pool, move |conn| {
-                let _gate = context.lifecycle_gate.write().map_err(|error| {
-                    crate::error::internal("lock artifact lifecycle for service", error)
-                })?;
+            self.with_write_gate(move |_gate, conn| {
                 reconciliation::audit_storage(
                     conn,
                     &context.artifact_dir,
@@ -343,10 +335,7 @@ impl ArtifactService for ArtifactStore {
     fn backfill_body_digests(&self) -> BoxFuture<'_, Result<DigestBackfillReport, AppError>> {
         let context = self.context();
         Box::pin(async move {
-            db::interact(&self.pool, move |conn| {
-                let _gate = context.lifecycle_gate.write().map_err(|error| {
-                    crate::error::internal("lock artifact lifecycle for service", error)
-                })?;
+            self.with_write_gate(move |_gate, conn| {
                 reconciliation::backfill_body_digests(
                     conn,
                     &context.artifact_dir,
