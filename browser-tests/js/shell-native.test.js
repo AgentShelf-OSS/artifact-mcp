@@ -13,10 +13,10 @@ function fakeHost() {
   return { host, sent, reply: message => host.listener({ data: JSON.stringify({ v: 1, ...message }) }) };
 }
 
-function harness({ host = null, enabled = true, answer = "always", entries = new Map() } = {}) {
+function harness({ host = null, enabled = true, answer = "always", entries = new Map(), consentVersion = "digest-1" } = {}) {
   const messages = [], asks = [], timers = [], frame = {};
   const broker = createBroker({
-    enabled, artifactId: "trip", origin: "https://artifacts.example", host: () => host, frame: () => frame,
+    enabled, artifactId: "trip", consentVersion, origin: "https://artifacts.example", host: () => host, frame: () => frame,
     storage: { getItem: k => entries.get(k) ?? null, setItem: (k, v) => entries.set(k, v), removeItem: k => entries.delete(k) },
     post: m => messages.push(JSON.parse(JSON.stringify(m))), setTimer: (fn) => timers.push(fn),
     ask: kind => { asks.push(kind); return answer; },
@@ -68,7 +68,19 @@ test("geotrigger items are validated, consented once, and relayed cleaned", asyn
   assert.deepEqual(h.asks, ["location"]);
   await h.send({ type: "audio:geotrigger", requestId: "r4", items: [story] });
   assert.deepEqual(h.asks, ["location"], "always-allow is remembered per artifact");
-  assert.equal(h.entries.get("artifact-native:trip:location"), "allow");
+  assert.equal(h.entries.get("artifact-native:trip:location"), "allow:digest-1");
+});
+
+test("remembered native consent covers one artifact version only", async () => {
+  // Background location and notifications are remembered for one body digest. A later revision,
+  // or a value stored by an older build, asks again.
+  for (const stored of ["allow:digest-1", "allow"]) {
+    const h = await readyHarness({ answer: "deny", consentVersion: "digest-2", entries: new Map([["artifact-native:trip:location", stored]]) });
+    const before = h.f.sent.length;
+    await h.send({ type: "geo:watch", requestId: "w1", intervalMs: 60000 });
+    assert.deepEqual(h.asks, ["location"], stored + ": the viewer is asked again");
+    assert.equal(h.f.sent.length, before, stored + ": nothing reaches the host without a new answer");
+  }
 });
 
 test("declined consent never reaches the host", async () => {

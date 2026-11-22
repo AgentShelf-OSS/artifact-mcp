@@ -3,12 +3,13 @@
   function createNativeBroker(options) {
     var host=null,ready=false,capabilities=[],helloSent=false,artifactListening=false,pendingPlayed=[],waiters=[];
     var idPattern=/^[A-Za-z0-9._:-]{1,64}(?![\s\S])/,artifact=String(options.artifactId||'');
-    var consentPrefix='artifact-native:'+artifact+':';
+    // Remembered consent is bound to one version of the artifact, as in the geo broker.
+    var consentPrefix='artifact-native:'+artifact+':',consentValue='allow:'+String(options.consentVersion||'');
     function send(type,fields){options.post(Object.assign({type:type},fields||{}));}
     // The app rejects unknown fields; hello carries only v and type (ADR-0018 protocol v1).
     function toHost(message){if(!host)return false;try{host.postMessage(JSON.stringify(message.type==='hello'?{v:1,type:'hello'}:Object.assign({v:1,artifactId:artifact},message)));return true;}catch(_){return false;}}
-    function allowed(kind){try{return options.storage.getItem(consentPrefix+kind)==='allow';}catch(_){return false;}}
-    function remember(kind){try{options.storage.setItem(consentPrefix+kind,'allow');}catch(_){}}
+    function allowed(kind){try{return options.storage.getItem(consentPrefix+kind)===consentValue;}catch(_){return false;}}
+    function remember(kind){try{options.storage.setItem(consentPrefix+kind,consentValue);}catch(_){}}
     function forget(kind){try{options.storage.removeItem(consentPrefix+kind);}catch(_){}}
     function consent(kind){if(allowed(kind))return Promise.resolve(true);return Promise.resolve().then(function(){return options.ask(kind);}).then(function(answer){if(answer==='always')remember(kind);return answer==='always'||answer==='once';},function(){return false;});}
     function str(value,max){return typeof value==='string'&&value.length>0&&value.length<=max;}
