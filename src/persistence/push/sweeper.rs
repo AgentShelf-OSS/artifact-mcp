@@ -31,6 +31,34 @@ const ORG_RECIPIENTS_SQL: &str = "SELECT s.id FROM artifact_push_optins o JOIN a
 /// Viewer-scope recipients: the owner's opt-in (required) and the owner's eligible subscriptions.
 const VIEWER_RECIPIENTS_SQL: &str = "SELECT s.id FROM artifact_push_optins o JOIN artifacts a ON a.id = o.artifact_id JOIN push_subscriptions s ON s.viewer_email = o.viewer_email AND (s.org = a.org OR s.org = 'admin') WHERE o.artifact_id = ? AND o.viewer_email = ? ORDER BY s.created_at, s.rowid";
 
+/// Most recipients whose organization is refreshed before one sweep.
+const DUE_RECIPIENT_LIMIT: i64 = 2_000;
+
+/// The opted-in viewers, with at least one subscription, of every artifact that has a due armed
+/// reminder. [`sweep_due`] selects recipients by the organization stored on each subscription, so
+/// the caller refreshes that column for these viewers first.
+///
+/// # Errors
+/// [`AppError::Internal`] when SQLite fails.
+pub fn due_recipient_emails(conn: &Connection, now_ms: i64) -> Result<Vec<String>, AppError> {
+    let mut statement = conn
+        .prepare_cached(
+            "SELECT DISTINCT o.viewer_email FROM artifact_reminders r \
+             JOIN artifact_push_optins o ON o.artifact_id = r.artifact_id \
+             WHERE r.state = 'armed' AND r.fire_at <= ?1 \
+               AND EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.viewer_email = o.viewer_email) \
+             ORDER BY o.viewer_email LIMIT ?2",
+        )
+        .map_err(db_error)?;
+    statement
+        .query_map(params![now_ms, DUE_RECIPIENT_LIMIT], |row| {
+            row.get::<_, String>(0)
+        })
+        .map_err(db_error)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(db_error)
+}
+
 /// Claim up to [`SWEEP_BATCH`] due reminders, expand each into one delivery per recipient
 /// subscription, and mark them fired, all in one `BEGIN IMMEDIATE` transaction.
 ///

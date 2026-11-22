@@ -1314,6 +1314,158 @@ async fn disabled_feature_conceals_every_route_but_config() {
     .unwrap();
 }
 
+/// A scripted [`ViewerOrgDirectory`]: an email maps to an organization, or the lookup fails.
+struct ScriptedOrgs(std::collections::BTreeMap<&'static str, Option<&'static str>>);
+
+impl artifact_mcp::ports::ViewerOrgDirectory for ScriptedOrgs {
+    fn current_org<'a>(
+        &'a self,
+        email: &'a str,
+    ) -> artifact_mcp::ports::BoxFuture<
+        'a,
+        Result<artifact_mcp::model::OrgId, artifact_mcp::error::AppError>,
+    > {
+        Box::pin(async move {
+            match self.0.get(email) {
+                Some(Some(org)) => Ok(artifact_mcp::model::OrgId::from(*org)),
+                Some(None) => Err(artifact_mcp::error::AppError::Unavailable(
+                    "directory unavailable".to_owned(),
+                )),
+                None => panic!("unexpected directory lookup for {email}"),
+            }
+        })
+    }
+}
+
+fn pending_recipients(pool: &DbPool) -> Vec<(String, String)> {
+    let conn = db::checkout(pool).unwrap();
+    let mut statement = conn
+        .prepare(
+            "SELECT reminder_key, subscription_id FROM push_deliveries \
+             WHERE state = 'pending' ORDER BY reminder_key, subscription_id",
+        )
+        .unwrap();
+    statement
+        .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+        .unwrap()
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap()
+}
+
+#[tokio::test]
+async fn sweeper_asks_the_directory_for_each_recipients_current_org() {
+    use push::ReminderScope::Org;
+    // A subscription stores the organization its viewer had when a push route last ran. A viewer
+    // who is removed from the organization, or loses administrator status, makes no further
+    // request, so the sweeper must not trust that column.
+    let seed = |label: &str| {
+        let dir = TempDataDir::new(label);
+        let pool = pool(&dir);
+        let browser = Browser::new(11);
+        let mut conn = db::checkout(&pool).unwrap();
+        for (id, org, email) in [
+            ("s-stays", "acme", "stays@acme.test"),
+            ("s-left", "acme", "left@acme.test"),
+            ("s-demoted", "admin", "demoted@acme.test"),
+        ] {
+            subscribe(
+                &mut conn,
+                id,
+                org,
+                email,
+                &format!("https://push.test/{id}"),
+                &browser,
+            );
+            push::opt_in(&conn, "art-acme", org, email, "t").unwrap();
+        }
+        // The former administrator also opted in to another organization's artifact.
+        push::opt_in(&conn, "art-beta", "admin", "demoted@acme.test", "t").unwrap();
+        arm(
+            &mut conn,
+            "art-acme",
+            "acme",
+            Org,
+            "",
+            "acme-due",
+            NOW - 1_000,
+        );
+        arm(
+            &mut conn,
+            "art-beta",
+            "beta",
+            Org,
+            "",
+            "beta-due",
+            NOW - 1_000,
+        );
+        drop(conn);
+        let service = PushService::with_clock(
+            &enabled_config(dir.path()),
+            pool.clone(),
+            Arc::new(FixedClock::from_millis(NOW)),
+        )
+        .unwrap()
+        .expect("enabled");
+        (dir, pool, service)
+    };
+
+    // Without a directory the stored column decides, as before.
+    let (_dir, pool, service) = seed("push-recheck-stored");
+    service.sweep_once().await.expect("sweep");
+    assert_eq!(
+        pending_recipients(&pool),
+        [
+            ("acme-due".to_owned(), "s-demoted".to_owned()),
+            ("acme-due".to_owned(), "s-left".to_owned()),
+            ("acme-due".to_owned(), "s-stays".to_owned()),
+            ("beta-due".to_owned(), "s-demoted".to_owned()),
+        ]
+    );
+
+    // With the directory: one viewer left the organization (the bare-domain fallback) and one
+    // lost administrator status and is now an ordinary member.
+    let (_dir, pool, service) = seed("push-recheck-directory");
+    service.set_recipient_directory(Arc::new(ScriptedOrgs(
+        [
+            ("stays@acme.test", Some("acme")),
+            ("left@acme.test", Some("acme.test")),
+            ("demoted@acme.test", Some("acme")),
+        ]
+        .into(),
+    )));
+    service.sweep_once().await.expect("sweep");
+    assert_eq!(
+        pending_recipients(&pool),
+        [
+            ("acme-due".to_owned(), "s-demoted".to_owned()),
+            ("acme-due".to_owned(), "s-stays".to_owned()),
+        ],
+        "the removed member gets nothing, and the former administrator only its own organization"
+    );
+
+    // A failed lookup skips the sweep: the reminders stay armed for the next tick.
+    let (_dir, pool, service) = seed("push-recheck-unavailable");
+    service.set_recipient_directory(Arc::new(ScriptedOrgs(
+        [
+            ("stays@acme.test", Some("acme")),
+            ("left@acme.test", None),
+            ("demoted@acme.test", Some("acme")),
+        ]
+        .into(),
+    )));
+    assert!(service.sweep_once().await.is_err());
+    assert!(pending_recipients(&pool).is_empty());
+    let armed: i64 = db::checkout(&pool)
+        .unwrap()
+        .query_row(
+            "SELECT COUNT(*) FROM artifact_reminders WHERE state = 'armed'",
+            [],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(armed, 2);
+}
+
 #[test]
 fn sweeper_follows_the_artifacts_current_org_and_includes_admins() {
     use push::ReminderScope::{Org, Viewer};

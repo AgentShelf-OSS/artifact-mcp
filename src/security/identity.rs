@@ -55,7 +55,7 @@ use crate::{
     config::{AccessConfig, AccessIdentityMode, AppConfig, Clock, SystemClock},
     error::AppError,
     model::{EmailAddress, OrgId, Viewer},
-    ports::{BoxFuture, ViewerIdentity},
+    ports::{BoxFuture, ViewerIdentity, ViewerOrgDirectory},
     security::{
         auth::ADMIN_ORG,
         jwks::{JwksProvider, StaticJwks},
@@ -623,6 +623,12 @@ impl AccessViewerIdentity {
             ),
             AccessIdentityMode::Disabled => None,
         }
+    }
+}
+
+impl ViewerOrgDirectory for AccessViewerIdentity {
+    fn current_org<'a>(&'a self, email: &'a str) -> BoxFuture<'a, Result<OrgId, AppError>> {
+        Box::pin(async move { self.org_for_email(email).await.map(|(org, _is_admin)| org) })
     }
 }
 

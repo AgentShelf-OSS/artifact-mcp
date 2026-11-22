@@ -134,7 +134,14 @@ async fn bootstrap(
     // storage reconciliation, digest recovery, and preview cache reconciliation have finished.
     let stores = IntegrationStores::open(&config, &pool, &ids, &protection);
     let notifications = startup::notification_sink(&stores, &content)?;
-    let workers = startup::start_background_workers(&config, &pool, &stores, &content, audit_key)?;
+    let workers = startup::start_background_workers(
+        &config,
+        &pool,
+        &stores,
+        &content,
+        audit_key,
+        Arc::clone(&auth.viewer_orgs),
+    )?;
     observer.stage(StartupStage::DeliveryWorkersStarted);
 
     // Stage 5: port adapters.
