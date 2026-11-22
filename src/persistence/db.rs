@@ -390,6 +390,29 @@ mod tests {
     }
 
     #[test]
+    fn startup_refuses_a_database_migrated_by_a_newer_release() {
+        // The rollback case: the previous binary is started on an upgraded data directory.
+        let fixture = Fixture::new();
+        drop(Database::open_at(&fixture.0).unwrap());
+        let conn = open_bootstrap_connection(&database_path(&fixture.0)).unwrap();
+        conn.execute(
+            "INSERT INTO schema_migrations (version, name) VALUES (?1, 'from-a-newer-release')",
+            [migrations::LATEST_SCHEMA_VERSION + 1],
+        )
+        .unwrap();
+        drop(conn);
+
+        let error = Database::open_at(&fixture.0).expect_err("a newer schema is refused");
+        let AppError::Unavailable(message) = error else {
+            panic!("unexpected error: {error:?}");
+        };
+        assert!(
+            message.contains("is newer than this release supports"),
+            "{message}"
+        );
+    }
+
+    #[test]
     fn existing_connector_accepts_the_current_database_without_seeding() {
         let fixture = Fixture::new();
         let original = Database::open_at(&fixture.0).unwrap();

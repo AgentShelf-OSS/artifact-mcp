@@ -331,7 +331,9 @@ pub fn apply(
 /// # Errors
 ///
 /// Returns an `SQLITE_RANGE` failure, before it touches the database, when `target_version` is
-/// negative or newer than [`LATEST_SCHEMA_VERSION`]. Other errors come from SQLite.
+/// negative or newer than [`LATEST_SCHEMA_VERSION`]. Returns an `SQLITE_SCHEMA` failure, also
+/// before it touches the database, when the ledger already records a version newer than
+/// [`LATEST_SCHEMA_VERSION`]. Other errors come from SQLite.
 pub fn migrate_through(
     conn: &mut Connection,
     ctx: &MigrationContext,
@@ -342,6 +344,23 @@ pub fn migrate_through(
             rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_RANGE),
             Some(format!(
                 "unsupported schema version {target_version}; expected 0..={LATEST_SCHEMA_VERSION}"
+            )),
+        ));
+    }
+    // A database that a newer release has migrated holds tables, columns and constraints this
+    // release does not know. Running on it can fail at an arbitrary later write, or write rows the
+    // newer release then reads wrongly. This is the rollback case: an operator starts the previous
+    // binary on the upgraded data directory. Refuse before anything is created or changed.
+    if let Some(newer) = applied_versions(conn)?
+        .into_iter()
+        .find(|version| *version > LATEST_SCHEMA_VERSION)
+    {
+        return Err(rusqlite::Error::SqliteFailure(
+            rusqlite::ffi::Error::new(rusqlite::ffi::SQLITE_SCHEMA),
+            Some(format!(
+                "database schema version {newer} is newer than this release supports \
+                 ({LATEST_SCHEMA_VERSION}); start the release that migrated it, or restore a \
+                 backup taken before that upgrade"
             )),
         ));
     }
@@ -483,6 +502,38 @@ mod tests {
             );
             assert!(schema_text(&conn).is_empty(), "version {version}");
         }
+    }
+
+    #[test]
+    fn a_database_from_a_newer_release_is_refused_without_being_touched() {
+        let ctx = MigrationContext::empty();
+        let mut conn = Connection::open_in_memory().expect("open in-memory database");
+        apply(&mut conn, &ctx).expect("migrate to this release");
+        conn.execute(
+            "INSERT INTO schema_migrations (version, name) VALUES (?1, 'from-a-newer-release')",
+            [LATEST_SCHEMA_VERSION + 1],
+        )
+        .expect("record a newer migration");
+        let before = schema_text(&conn);
+
+        for target in [LATEST_SCHEMA_VERSION, 0] {
+            let error = migrate_through(&mut conn, &ctx, target).expect_err("newer schema");
+            assert_eq!(
+                error.sqlite_error_code(),
+                Some(rusqlite::ErrorCode::SchemaChanged),
+                "target {target}"
+            );
+            let message = error.to_string();
+            assert!(
+                message.contains(&format!(
+                    "schema version {} is newer than this release supports ({LATEST_SCHEMA_VERSION})",
+                    LATEST_SCHEMA_VERSION + 1
+                )),
+                "{message}"
+            );
+        }
+        assert_eq!(schema_text(&conn), before, "the schema is unchanged");
+        assert_eq!(current_version(&conn), Ok(LATEST_SCHEMA_VERSION + 1));
     }
 
     #[test]
