@@ -7,7 +7,7 @@ use crate::{
     config::{AccessIdentityMode, AppConfig},
     error::AppError,
     persistence::db::DbPool,
-    ports::{PublisherAuthenticator, ViewerIdentity},
+    ports::{PublisherAuthenticator, ViewerIdentity, ViewerOrgDirectory},
     security::{
         auth::KeyAuthenticator,
         identity::AccessViewerIdentity,
@@ -20,6 +20,8 @@ use crate::{
 pub struct Authentication {
     pub publisher_auth: Arc<dyn PublisherAuthenticator>,
     pub viewer_identity: Arc<dyn ViewerIdentity>,
+    /// The same resolver, for background work that has an email address and no request.
+    pub viewer_orgs: Arc<dyn ViewerOrgDirectory>,
 }
 
 /// Build the MCP publisher authenticator and the viewer identity resolver.
@@ -42,11 +44,13 @@ pub fn authentication(config: &Arc<AppConfig>, pool: &DbPool) -> Result<Authenti
         api_keys_enabled = config.oauth.api_keys_enabled,
         "MCP publisher authentication ready"
     );
-    let viewer_identity: Arc<dyn ViewerIdentity> = Arc::new(AccessViewerIdentity::new(
+    let access_identity = Arc::new(AccessViewerIdentity::new(
         Arc::clone(config),
         configured_jwks(config)?,
         directories,
     ));
+    let viewer_identity: Arc<dyn ViewerIdentity> = access_identity.clone();
+    let viewer_orgs: Arc<dyn ViewerOrgDirectory> = access_identity;
     tracing::info!(
         identity_mode = %config.access.identity_mode(),
         "viewer identity mode ready"
@@ -54,6 +58,7 @@ pub fn authentication(config: &Arc<AppConfig>, pool: &DbPool) -> Result<Authenti
     Ok(Authentication {
         publisher_auth,
         viewer_identity,
+        viewer_orgs,
     })
 }
 

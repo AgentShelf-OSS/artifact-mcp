@@ -115,7 +115,7 @@
               </div>
               <div class="actions">
                 <button class="act save{% if card.favorite %} active{% endif %}" data-action="favorite" type="button" title="{% if card.favorite %}Remove from favorites{% else %}Save to favorites{% endif %}" aria-pressed="{% if card.favorite %}true{% else %}false{% endif %}" aria-label="{% if card.favorite %}Remove{% else %}Save{% endif %} {{ card.title }} {% if card.favorite %}from{% else %}to{% endif %} favorites">{{ icons.heart }}<span>{% if card.favorite %}Favorited{% else %}Favorite{% endif %}</span></button>
-                <button class="act share" data-action="share" type="button" aria-label="Share {{ card.title }}" title="Share">{{ icons.share }}<span>Share</span></button>
+                {% if card.show_share %}<button class="act share" data-action="share" type="button" aria-label="Share {{ card.title }}" title="Share">{{ icons.share }}<span>Share</span></button>{% endif %}
                 <button class="act icon-act more" data-action="more" type="button" aria-label="More actions for {{ card.title }}" title="More actions" aria-expanded="false" aria-controls="card-menu-{{ card.id }}">{{ icons.more }}</button>
                 <div class="card-menu" id="card-menu-{{ card.id }}" data-ui="card-menu" hidden>
                   <p class="menu-heading" aria-hidden="true" data-title="{{ card.title }}"></p>

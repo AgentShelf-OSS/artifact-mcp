@@ -577,6 +577,25 @@ mod tests {
     }
 
     #[test]
+    fn accepts_the_value_the_gallery_share_dialog_sends() {
+        // `assets/portal/06-share-delete.js` sends `new Date(...).toISOString()` for a timed link
+        // and "never" otherwise. It once sent "1h", "1d", "7d" and null, which this function
+        // refuses.
+        let clock = FixedClock::default();
+        assert_eq!(
+            expiry_for(&clock, "2026-01-01T01:00:00.000Z"),
+            Ok(Some("2026-01-01T01:00:00.000Z".to_owned()))
+        );
+        for refused in ["1h", "1d", "7d", "null", ""] {
+            assert_eq!(
+                expiry_for(&clock, refused),
+                Err(AppError::Validation(EXPIRES_FORMAT_MESSAGE.to_owned())),
+                "{refused:?}"
+            );
+        }
+    }
+
+    #[test]
     fn renders_the_javascript_iso_shape() {
         assert_eq!(render_iso(0).as_deref(), Ok("1970-01-01T00:00:00.000Z"));
         assert_eq!(

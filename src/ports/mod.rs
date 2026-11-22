@@ -23,7 +23,7 @@ pub use discussions::{
     OrganizationThreadingView,
 };
 pub use engagement::{EngagementService, ShareService};
-pub use identity::{PublisherAuthenticator, ViewerIdentity};
+pub use identity::{PublisherAuthenticator, ViewerIdentity, ViewerOrgDirectory};
 pub use integrations::{HealthProbe, NotificationSink, PreviewService};
 pub use rendering::PageRenderer;
 

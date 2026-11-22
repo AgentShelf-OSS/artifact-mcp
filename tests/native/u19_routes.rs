@@ -1038,6 +1038,11 @@ async fn category_registration_audit_failure_is_an_explicit_mcp_error_before_ret
 
 #[tokio::test]
 async fn share_routes_use_the_share_service_and_node_response_shapes() {
+    // The viewer owns the artifact. Create, list and revoke need the owner or an administrator.
+    let meta = |org: &str| ArtifactMeta {
+        owner_email: Some("viewer@example.test".to_owned()),
+        ..meta(org)
+    };
     let create = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
     let response = build_router(deps(create.clone()))
         .oneshot(
@@ -1097,6 +1102,82 @@ async fn share_routes_use_the_share_service_and_node_response_shapes() {
         revoke.calls(),
         ["resolve_viewer", "find_meta", "revoke_share"]
     );
+}
+
+#[tokio::test]
+async fn share_routes_need_the_artifact_owner_or_an_administrator() {
+    // A public link takes an artifact outside the organization and its token is a bearer
+    // credential, so a member who does not own the artifact may not create, list or revoke one.
+    let owned_by_someone_else = || ArtifactMeta {
+        owner_email: Some("owner@example.test".to_owned()),
+        ..meta("acme")
+    };
+    let requests = || {
+        [
+            (
+                "POST",
+                "/abc123def456/share",
+                Some(r#"{"expires":"never"}"#),
+            ),
+            ("GET", "/abc123def456/shares", None),
+            ("DELETE", "/abc123def456/shares/share-token", None),
+        ]
+    };
+    let send = |harness: Arc<RouteHarness>,
+                method: &'static str,
+                uri: &'static str,
+                body: Option<&'static str>| async move {
+        let mut request = Request::builder().method(method).uri(uri);
+        if body.is_some() {
+            request = request.header("content-type", "application/json");
+        }
+        build_router(deps(harness))
+            .oneshot(
+                request
+                    .body(body.map_or_else(Body::empty, Body::from))
+                    .expect("request"),
+            )
+            .await
+            .expect("router response")
+    };
+
+    for (method, uri, request_body) in requests() {
+        // Same organization, not the owner: refused after the concealed lookup, before the
+        // share service runs.
+        let member = Arc::new(RouteHarness::new(
+            viewer("acme", false),
+            Some(owned_by_someone_else()),
+        ));
+        let response = send(member.clone(), method, uri, request_body).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {uri}");
+        assert_eq!(body(response).await, br#"{"error":"Forbidden"}"#);
+        assert_eq!(
+            member.calls(),
+            ["resolve_viewer", "find_meta"],
+            "{method} {uri}"
+        );
+
+        // A legacy artifact without an owner is administrator-only.
+        let legacy = Arc::new(RouteHarness::new(viewer("acme", false), Some(meta("acme"))));
+        let response = send(legacy, method, uri, request_body).await;
+        assert_eq!(response.status(), StatusCode::FORBIDDEN, "{method} {uri}");
+
+        // Another organization still gets the concealed answer, not a refusal.
+        let foreign = Arc::new(RouteHarness::new(
+            viewer("beta", false),
+            Some(owned_by_someone_else()),
+        ));
+        let response = send(foreign, method, uri, request_body).await;
+        assert_eq!(response.status(), StatusCode::NOT_FOUND, "{method} {uri}");
+
+        // An administrator may manage links for any artifact.
+        let admin = Arc::new(RouteHarness::new(
+            viewer("admin", true),
+            Some(owned_by_someone_else()),
+        ));
+        let response = send(admin, method, uri, request_body).await;
+        assert_eq!(response.status(), StatusCode::OK, "{method} {uri}");
+    }
 }
 
 #[tokio::test]
@@ -1434,9 +1515,12 @@ fn frozen_action_route_results() -> serde_json::Value {
         "visibility": {"status": 403, "body": {"error": "Forbidden"}},
         "moveCrossOrg": {"status": 404, "body": {"error": "Not found"}},
         "moveSameOrg": {"status": 403, "body": {"error": "Admins only"}},
-        "shareCreate": {"status": 200, "body": {"token": "share-token", "expires_at": null, "url": "http://localhost:3480/s/share-token"}},
-        "shareList": {"status": 200, "body": {"shares": [{"token": "share-token", "expires_at": null, "created_at": "2026-07-20 00:00:00", "created_by": "viewer@example.test"}]}},
-        "shareRevoke": {"status": 200, "body": {"token": "share-token", "revoked": true}},
+        // Public links follow the Hide/Delete policy: this viewer is neither the owner nor an
+        // administrator. The owner's responses are pinned by
+        // `share_routes_use_the_share_service_and_node_response_shapes`.
+        "shareCreate": {"status": 403, "body": {"error": "Forbidden"}},
+        "shareList": {"status": 403, "body": {"error": "Forbidden"}},
+        "shareRevoke": {"status": 403, "body": {"error": "Forbidden"}},
         "feedbackList": {"status": 200, "body": [{"id": "feedback-id", "artifact_id": "abc123def456", "org": "acme", "viewer_email": "viewer@example.test", "body": "Note", "artifact_revision": 2, "created_at": "2026-07-21 00:00:00", "resolved_at": null, "resolved_by": null, "parent_id": null, "anchor_path": null, "anchor_x": null, "anchor_y": null, "anchor_w": null, "anchor_h": null, "anchor_approx": 0, "anchor_page": null, "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null, "anchor_version": 0, "author": {"source": "artifact", "viewer_email": "viewer@example.test"}}]},
         "feedbackCreate": {"status": 201, "body": {"id": "feedback-id", "artifact_id": "abc123def456", "viewer_email": "viewer@example.test", "author": {"source": "artifact", "viewer_email": "viewer@example.test"}, "body": "Note", "parent_id": null, "anchor_path": null, "anchor_x": null, "anchor_y": null, "anchor_w": null, "anchor_h": null, "anchor_approx": 0, "anchor_page": null, "anchor_kind": null, "anchor_node_id": null, "anchor_quote": null, "anchor_version": 0, "artifact_revision": 2, "created_at": "2026-07-21 00:00:00"}},
         "feedbackDelete": {"status": 200, "body": {"id": "feedback-id", "deleted": true}},

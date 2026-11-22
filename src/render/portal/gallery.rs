@@ -327,6 +327,8 @@ pub(super) fn card_template(
         },
         is_owned_by_viewer,
         show_visibility: can_manage,
+        // Public links follow the Hide/Delete policy (`require_share_manager`).
+        show_share: can_manage,
         show_delete: can_manage,
         category: category.clone(),
         has_category: !category.is_empty(),

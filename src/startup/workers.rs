@@ -24,7 +24,7 @@ use crate::{
         discord_organization::OrganizationDiscordStore, discussions::DiscussionStore,
         outbox::OutboxRepository, webhooks::WebhookStore,
     },
-    ports::NotificationSink,
+    ports::{NotificationSink, ViewerOrgDirectory},
     security::crypto::WebhookUrlProtection,
 };
 
@@ -129,6 +129,7 @@ pub fn start_background_workers(
     stores: &IntegrationStores,
     content: &ContentStores,
     audit_key: [u8; 32],
+    viewer_orgs: Arc<dyn ViewerOrgDirectory>,
 ) -> Result<StartedWorkers, AppError> {
     let delivery_telemetry = DeliveryTelemetry::default();
     let worker_discussions: Arc<dyn WorkerDiscussions> = stores.discussions.clone();
@@ -161,6 +162,8 @@ pub fn start_background_workers(
     let push_service = PushService::from_config(config, pool.clone())?;
     let push_runtime = match &push_service {
         Some(service) => {
+            // Set before the sweeper starts, so no reminder fires on a stored organization.
+            service.set_recipient_directory(viewer_orgs);
             tracing::info!("web push reminders enabled");
             Some(PushRuntime::start(
                 Arc::clone(service),

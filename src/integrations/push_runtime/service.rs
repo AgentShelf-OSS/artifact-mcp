@@ -7,9 +7,9 @@
 //! the sweeper queues deliveries). Delivery is at least once.
 
 use std::{
-    collections::HashMap,
+    collections::{BTreeSet, HashMap},
     sync::{
-        Arc, Mutex,
+        Arc, Mutex, OnceLock,
         atomic::{AtomicU64, Ordering},
     },
     time::Duration,
@@ -30,7 +30,7 @@ use crate::{
             ReminderWrite, RetryOutcome, SweepReport,
         },
     },
-    ports::BoxFuture,
+    ports::{BoxFuture, ViewerOrgDirectory},
     security::crypto::WebhookCipher,
 };
 
@@ -338,6 +338,8 @@ pub struct PushService {
     pub(super) telemetry: PushTelemetry,
     jwt_cache: Mutex<HashMap<String, (String, i64)>>,
     last_prune_ms: Mutex<Option<i64>>,
+    /// Resolves each recipient's current organization before a sweep. Production always sets it.
+    recipient_directory: OnceLock<Arc<dyn ViewerOrgDirectory>>,
 }
 
 impl std::fmt::Debug for PushService {
@@ -397,7 +399,49 @@ impl PushService {
             telemetry: PushTelemetry::default(),
             jwt_cache: Mutex::new(HashMap::new()),
             last_prune_ms: Mutex::new(None),
+            recipient_directory: OnceLock::new(),
         })))
+    }
+
+    /// Give the sweeper the directory that says which organization a viewer belongs to now.
+    ///
+    /// A subscription stores the organization its viewer had when a push route last ran. Without
+    /// this directory the sweeper trusts that column, and a viewer who was removed from the
+    /// organization, or who lost administrator status, keeps receiving reminders. The first call
+    /// wins; later calls are ignored.
+    pub fn set_recipient_directory(&self, directory: Arc<dyn ViewerOrgDirectory>) {
+        // A second call is ignored on purpose: the directory is fixed for the process lifetime.
+        let _ = self.recipient_directory.set(directory);
+    }
+
+    /// Move the subscriptions of every viewer who could receive a due reminder onto that
+    /// viewer's current organization. A subscription that changes organization also loses its
+    /// pending deliveries (`refresh_subscription_org`).
+    /// Returns the viewers it refreshed. The sweep treats only those as confirmed.
+    ///
+    /// # Errors
+    /// A directory or database failure. The caller then skips the sweep, so a reminder waits
+    /// for the next tick and is never sent on a stale organization.
+    async fn refresh_due_recipient_orgs(
+        &self,
+        directory: &dyn ViewerOrgDirectory,
+        now: i64,
+    ) -> Result<BTreeSet<String>, AppError> {
+        let emails = db::interact(&self.pool, move |conn| {
+            push::due_recipient_emails(conn, now)
+        })
+        .await?;
+        let mut confirmed = BTreeSet::new();
+        for email in emails {
+            let org = directory.current_org(&email).await?;
+            let viewer = email.clone();
+            db::interact(&self.pool, move |conn| {
+                push::refresh_subscription_org(conn, &viewer, &org.0)
+            })
+            .await?;
+            confirmed.insert(email);
+        }
+        Ok(confirmed)
     }
 
     /// The VAPID application-server key the browser subscribes with.
@@ -644,9 +688,26 @@ impl PushService {
     /// [`AppError::Internal`] when the transaction fails; nothing is committed.
     pub async fn sweep_once(&self) -> Result<SweepReport, AppError> {
         let now = self.now_ms();
+        let confirmed = match self.recipient_directory.get() {
+            Some(directory) => Some(
+                self.refresh_due_recipient_orgs(directory.as_ref(), now)
+                    .await?,
+            ),
+            None => None,
+        };
         let base = self.public_base_url.clone();
-        let report =
-            db::interact(&self.pool, move |conn| push::sweep_due(conn, now, &base)).await?;
+        let report = db::interact(&self.pool, move |conn| {
+            push::sweep_due_confirmed(conn, now, &base, confirmed.as_ref())
+        })
+        .await?;
+        if report.deferred > 0 {
+            // Not an error: a reminder became due, or a viewer opted in, after the refresh. The
+            // next tick refreshes those recipients and sweeps the reminder.
+            tracing::info!(
+                deferred = report.deferred,
+                "push reminders deferred until their recipients are confirmed"
+            );
+        }
         PushTelemetry::add(&self.telemetry.counters.reminders_fired, report.fired);
         PushTelemetry::add(&self.telemetry.counters.reminders_stale, report.stale);
         if report.deliveries > 0 {

@@ -10,6 +10,13 @@ as `dead_letter`. If the process or network fails after Discord may have accepte
 before Artifact MCP persists its result, a retry can create a second Discord message. Such rows
 carry explicit duplicate-risk state. Never describe this integration as exactly-once.
 
+The queue is capped at 1,000 active rows for one organization and 10,000 in total. When a cap is
+reached, an artifact publish, update, restore, or delete still completes. Its Discord notification
+is dropped, and the server logs `webhook delivery queue is full` with the organization and the
+event name. A queue at its cap means a webhook has been failing for some time: follow
+[Dead letter](#dead-letter) for that webhook. Feedback and discussion deliveries are not dropped;
+those requests are refused with `429` while the queue is full.
+
 ## Metrics
 
 `GET /metrics` exposes only aggregate, low-cardinality delivery telemetry. It does not label

@@ -171,7 +171,7 @@
         if (canonical) return Object.assign({}, known, { title: (canonical.querySelector(".card-title") || {}).textContent || known.title, org: canonical.dataset.org || known.org, category: canonical.dataset.category || known.category, description: (canonical.querySelector(".desc") || {}).textContent || known.description, favorite: canonical.dataset.fav === "1", hidden: canonical.dataset.hidden === "1" });
         return known;
       }
-      if (canonical) return { id: id, title: (canonical.querySelector(".card-title") || {}).textContent || "Artifact", org: canonical.dataset.org, category: canonical.dataset.category, description: (canonical.querySelector(".desc") || {}).textContent || "", thumbnailSrc: (canonical.querySelector(".pv") || {}).src || "", favorite: canonical.dataset.fav === "1", hidden: canonical.dataset.hidden === "1", showDelete: !!canonical.querySelector('[data-action="delete"]') };
+      if (canonical) return { id: id, title: (canonical.querySelector(".card-title") || {}).textContent || "Artifact", org: canonical.dataset.org, category: canonical.dataset.category, description: (canonical.querySelector(".desc") || {}).textContent || "", thumbnailSrc: (canonical.querySelector(".pv") || {}).src || "", favorite: canonical.dataset.fav === "1", hidden: canonical.dataset.hidden === "1", showShare: !!canonical.querySelector('[data-action="share"]'), showDelete: !!canonical.querySelector('[data-action="delete"]') };
       var knownArtifact = artifactById(id);
       return knownArtifact || { id: id, title: "Artifact " + id };
     });
@@ -291,7 +291,7 @@
     var src = a.thumbnailSrc || a.thumbnail_src || a.thumbnail || "";
     var actions = '<div class="actions collection-actions">' +
       '<button class="act save" data-action="favorite" type="button" aria-label="Save ' + escapeHtml(a.title) + '">Save</button>' +
-      '<button class="act share" data-action="share" type="button" aria-label="Share ' + escapeHtml(a.title) + '">Share</button>' +
+      (a.showShare ? '<button class="act share" data-action="share" type="button" aria-label="Share ' + escapeHtml(a.title) + '">Share</button>' : "") +
       '<button class="act icon-act more" data-action="more" type="button" aria-label="More actions for ' + escapeHtml(a.title) + '" aria-expanded="false">…</button>' +
       '<div class="card-menu" data-ui="card-menu" hidden>' +
       folderFieldMarkup(a.id) +

@@ -22,17 +22,46 @@ pub struct SweepReport {
     pub stale: u64,
     /// `push_deliveries` rows queued.
     pub deliveries: u64,
+    /// Due reminders left armed because a recipient's organization was not confirmed in this
+    /// tick. They are swept again on the next one.
+    pub deferred: u64,
 }
 
 /// Org-scope recipients: every opted-in viewer's subscriptions whose organization is the artifact's
 /// *current* organization, or the administrator tenant. Joining `artifacts` makes an artifact move
 /// take effect immediately, whatever org the reminder or opt-in row recorded.
-const ORG_RECIPIENTS_SQL: &str = "SELECT s.id FROM artifact_push_optins o JOIN artifacts a ON a.id = o.artifact_id JOIN push_subscriptions s ON s.viewer_email = o.viewer_email AND (s.org = a.org OR s.org = 'admin') WHERE o.artifact_id = ? ORDER BY s.created_at, s.rowid";
+const ORG_RECIPIENTS_SQL: &str = "SELECT s.id, s.viewer_email FROM artifact_push_optins o JOIN artifacts a ON a.id = o.artifact_id JOIN push_subscriptions s ON s.viewer_email = o.viewer_email AND (s.org = a.org OR s.org = 'admin') WHERE o.artifact_id = ? ORDER BY s.created_at, s.rowid";
 /// Viewer-scope recipients: the owner's opt-in (required) and the owner's eligible subscriptions.
-const VIEWER_RECIPIENTS_SQL: &str = "SELECT s.id FROM artifact_push_optins o JOIN artifacts a ON a.id = o.artifact_id JOIN push_subscriptions s ON s.viewer_email = o.viewer_email AND (s.org = a.org OR s.org = 'admin') WHERE o.artifact_id = ? AND o.viewer_email = ? ORDER BY s.created_at, s.rowid";
+const VIEWER_RECIPIENTS_SQL: &str = "SELECT s.id, s.viewer_email FROM artifact_push_optins o JOIN artifacts a ON a.id = o.artifact_id JOIN push_subscriptions s ON s.viewer_email = o.viewer_email AND (s.org = a.org OR s.org = 'admin') WHERE o.artifact_id = ? AND o.viewer_email = ? ORDER BY s.created_at, s.rowid";
 
-/// Claim up to [`SWEEP_BATCH`] due reminders, expand each into one delivery per recipient
-/// subscription, and mark them fired, all in one `BEGIN IMMEDIATE` transaction.
+/// The opted-in viewers, with at least one subscription, of the artifacts in the batch that
+/// [`sweep_due_confirmed`] claims for the same `now_ms`. The sweep selects recipients by the
+/// organization stored on each subscription, so the caller refreshes that column for these
+/// viewers first and then passes them to the sweep as the confirmed set.
+///
+/// # Errors
+/// [`AppError::Internal`] when SQLite fails.
+pub fn due_recipient_emails(conn: &Connection, now_ms: i64) -> Result<Vec<String>, AppError> {
+    let mut statement = conn
+        .prepare_cached(
+            "SELECT DISTINCT o.viewer_email FROM ( \
+                 SELECT artifact_id FROM artifact_reminders \
+                 WHERE state = 'armed' AND fire_at <= ?1 \
+                 ORDER BY fire_at, artifact_id, key LIMIT ?2 \
+             ) r \
+             JOIN artifact_push_optins o ON o.artifact_id = r.artifact_id \
+             WHERE EXISTS (SELECT 1 FROM push_subscriptions s WHERE s.viewer_email = o.viewer_email) \
+             ORDER BY o.viewer_email",
+        )
+        .map_err(db_error)?;
+    statement
+        .query_map(params![now_ms, SWEEP_BATCH], |row| row.get::<_, String>(0))
+        .map_err(db_error)?
+        .collect::<rusqlite::Result<Vec<_>>>()
+        .map_err(db_error)
+}
+
+/// [`sweep_due_confirmed`] that trusts the organization stored on every subscription.
 ///
 /// # Errors
 /// [`AppError::Internal`] when SQLite or payload encoding fails; nothing is committed.
@@ -40,6 +69,28 @@ pub fn sweep_due(
     conn: &mut Connection,
     now_ms: i64,
     public_base_url: &str,
+) -> Result<SweepReport, AppError> {
+    sweep_due_confirmed(conn, now_ms, public_base_url, None)
+}
+
+/// Claim up to [`SWEEP_BATCH`] due reminders, expand each into one delivery per recipient
+/// subscription, and mark them fired, all in one `BEGIN IMMEDIATE` transaction.
+///
+///
+/// `confirmed`, when present, is the set of viewer emails whose subscription organization was
+/// refreshed from the identity directory in this tick. A reminder with a recipient outside that
+/// set is left armed and counted as deferred: it is never sent on an unconfirmed organization,
+/// and the next tick refreshes its recipients and sweeps it again. Reminders can become due, and
+/// viewers can opt in, between the refresh and this transaction, so the set is checked here and
+/// not assumed to cover the batch.
+///
+/// # Errors
+/// [`AppError::Internal`] when SQLite or payload encoding fails; nothing is committed.
+pub fn sweep_due_confirmed(
+    conn: &mut Connection,
+    now_ms: i64,
+    public_base_url: &str,
+    confirmed: Option<&std::collections::BTreeSet<String>>,
 ) -> Result<SweepReport, AppError> {
     let now_text = crate::config::format_sqlite_datetime(now_ms.div_euclid(1000));
     let base = public_base_url.trim_end_matches('/');
@@ -69,19 +120,29 @@ pub fn sweep_due(
     let mut report = SweepReport::default();
     for (artifact_id, scope, owner, key, _recorded_org, fire_at, title, body) in due {
         if now_ms.saturating_sub(fire_at) <= STALE_AFTER_MS {
+            let recipient =
+                |row: &rusqlite::Row<'_>| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?));
             let recipients = if scope == "viewer" {
                 let mut stmt = tx.prepare_cached(VIEWER_RECIPIENTS_SQL).map_err(db_error)?;
-                stmt.query_map(params![artifact_id, owner], |row| row.get::<_, String>(0))
+                stmt.query_map(params![artifact_id, owner], recipient)
                     .map_err(db_error)?
                     .collect::<rusqlite::Result<Vec<_>>>()
                     .map_err(db_error)?
             } else {
                 let mut stmt = tx.prepare_cached(ORG_RECIPIENTS_SQL).map_err(db_error)?;
-                stmt.query_map([&artifact_id], |row| row.get::<_, String>(0))
+                stmt.query_map([&artifact_id], recipient)
                     .map_err(db_error)?
                     .collect::<rusqlite::Result<Vec<_>>>()
                     .map_err(db_error)?
             };
+            if let Some(confirmed) = confirmed
+                && recipients
+                    .iter()
+                    .any(|(_, viewer_email)| !confirmed.contains(viewer_email))
+            {
+                report.deferred += 1;
+                continue;
+            }
             let payload = serde_json::to_string(&PushPayload {
                 title,
                 body,
@@ -89,7 +150,7 @@ pub fn sweep_due(
                 tag: format!("{artifact_id}:{key}"),
             })
             .map_err(|error| crate::error::internal("sweep due", error))?;
-            for subscription in &recipients {
+            for (subscription, _viewer_email) in &recipients {
                 tx.execute(
                     "INSERT INTO push_deliveries (subscription_id, artifact_id, reminder_key, payload, state, attempts, next_attempt_at, expires_at, created_at, updated_at) VALUES (?, ?, ?, ?, 'pending', 0, ?, ?, ?, ?)",
                     params![subscription, artifact_id, key, payload, now_ms, now_ms + DELIVERY_TTL_MS, now_text, now_text],
