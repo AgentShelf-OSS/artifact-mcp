@@ -220,7 +220,7 @@
             "_meta": {
               "io.modelcontextprotocol/serverInfo": {
                 "name": "artifact-mcp",
-                "version": "1.32.0"
+                "version": "<volatile>"
               }
             },
             "content": [
@@ -249,7 +249,7 @@
             "_meta": {
               "io.modelcontextprotocol/serverInfo": {
                 "name": "artifact-mcp",
-                "version": "1.32.0"
+                "version": "<volatile>"
               }
             },
             "content": [
@@ -278,7 +278,7 @@
             "_meta": {
               "io.modelcontextprotocol/serverInfo": {
                 "name": "artifact-mcp",
-                "version": "1.32.0"
+                "version": "<volatile>"
               }
             },
             "content": [

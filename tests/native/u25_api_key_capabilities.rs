@@ -131,6 +131,50 @@ enum Outcome {
 }
 
 #[tokio::test]
+async fn initialize_reports_the_package_version() {
+    // The conformance goldens mask `serverInfo.version`, so a release bump does not re-record
+    // them. This test is what pins the value.
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            let response = router
+                .clone()
+                .oneshot(
+                    Request::post("/mcp")
+                        .header("authorization", "Bearer author-secret")
+                        .header("content-type", "application/json")
+                        .body(Body::from(
+                            json!({
+                                "jsonrpc": "2.0",
+                                "id": 1,
+                                "method": "initialize",
+                                "params": { "protocolVersion": "2025-06-18" }
+                            })
+                            .to_string(),
+                        ))
+                        .expect("initialize request"),
+                )
+                .await
+                .expect("initialize response");
+            assert_eq!(response.status(), 200);
+            let bytes = to_bytes(response.into_body(), usize::MAX)
+                .await
+                .expect("read initialize response");
+            let reply: Value = serde_json::from_slice(&bytes).expect("initialize JSON");
+            assert_eq!(
+                reply["result"]["serverInfo"],
+                json!({ "name": "artifact-mcp", "version": env!("CARGO_PKG_VERSION") })
+            );
+            Ok(())
+        },
+    )
+    .await
+    .expect("initialize runtime");
+}
+
+#[tokio::test]
 async fn set_data_bindings_writes_a_ledger_event() {
     // A binding grants an artifact's code access to a server-credentialed source. The browser
     // route for the same change is audited; the MCP tool was not.

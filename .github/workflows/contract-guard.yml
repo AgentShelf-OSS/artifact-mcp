@@ -1,0 +1,44 @@
+name: Contract guard
+
+# The conformance goldens and the frozen MCP tool definitions are recorded from this server, so a
+# re-record freezes whatever the server does today. Nothing else checks that a re-record was
+# intended. This workflow fails a pull request that changes a recorded contract unless the pull
+# request carries the `contract-change` label, which a maintainer adds after reading the diff.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  recorded-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Recorded contracts change only in a labelled pull request
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+          LABELLED: ${{ contains(github.event.pull_request.labels.*.name, 'contract-change') }}
+        run: |
+          changed="$(git diff --name-only "$BASE...$HEAD" -- \
+            conformance/goldens \
+            conformance/mcp.tool-output-schemas.json \
+            conformance/collection-tool-definitions.json \
+            src/mcp/frozen_tools.json)"
+          if [ -z "$changed" ]; then
+            echo "No recorded contract changed."
+            exit 0
+          fi
+          echo "Recorded contracts changed:"
+          printf '%s\n' "$changed" | sed 's/^/  /'
+          if [ "$LABELLED" = "true" ]; then
+            echo "The pull request has the contract-change label."
+            exit 0
+          fi
+          echo "::error::A recorded contract changed. Review the diff as a contract change, then add the 'contract-change' label to this pull request."
+          exit 1

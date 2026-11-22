@@ -478,7 +478,8 @@
       "expect": {
         "status": 200,
         "body": {
-          "mode": "canonical-json"
+          "mode": "canonical-json",
+          "volatileFields": ["version"]
         }
       }
     },
@@ -515,7 +516,8 @@
       "expect": {
         "status": 200,
         "body": {
-          "mode": "canonical-json"
+          "mode": "canonical-json",
+          "volatileFields": ["version"]
         }
       }
     },
@@ -552,7 +554,8 @@
       "expect": {
         "status": 200,
         "body": {
-          "mode": "canonical-json"
+          "mode": "canonical-json",
+          "volatileFields": ["version"]
         }
       }
     },
