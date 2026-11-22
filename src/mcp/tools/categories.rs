@@ -7,7 +7,7 @@ use crate::{
     artifacts::lifecycle::normalize_category,
     error::McpError,
     mcp::{
-        args::{category_org, publisher_write, required_string},
+        args::{category_org, ensure_can_publish, publisher_write, required_string},
         protocol::OrderedJson,
         shape::{object, tool_result},
     },
@@ -63,6 +63,7 @@ pub(crate) async fn create_category(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
+    ensure_can_publish(auth)?;
     let org = category_org(arguments, auth)?;
     let name = deps
         .admin
@@ -83,6 +84,7 @@ pub(crate) async fn delete_category(
     auth: &PublisherIdentity,
     deps: &AppDeps,
 ) -> Result<Value, McpError> {
+    ensure_can_publish(auth)?;
     let org = category_org(arguments, auth)?;
     let name = required_string(arguments, "name")?;
     let removed = deps

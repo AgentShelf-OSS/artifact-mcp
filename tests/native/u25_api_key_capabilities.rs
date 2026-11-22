@@ -131,6 +131,91 @@ enum Outcome {
 }
 
 #[tokio::test]
+async fn reader_keys_cannot_change_the_category_registry() {
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            {
+                let conn = Connection::open(db::database_path(temp.path()))
+                    .expect("open production database");
+                conn.execute("INSERT OR IGNORE INTO orgs (name) VALUES ('acme')", [])
+                    .expect("register the organization");
+                conn.execute(
+                    "UPDATE api_keys SET role = 'reader' WHERE client_id = 'role-reader'",
+                    [],
+                )
+                .expect("assign reader role");
+            }
+            let categories = || {
+                let conn = Connection::open(db::database_path(temp.path()))
+                    .expect("open production database");
+                let mut statement = conn
+                    .prepare("SELECT name FROM org_categories WHERE org = 'acme' ORDER BY name")
+                    .expect("prepare categories");
+                statement
+                    .query_map([], |row| row.get::<_, String>(0))
+                    .expect("query categories")
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("read categories")
+            };
+
+            let created = call(
+                &router,
+                "author-secret",
+                1,
+                "create_category",
+                json!({ "name": "Reports" }),
+            )
+            .await;
+            assert_eq!(structured(&created)["name"], "Reports");
+
+            // A reader key cannot publish, so it cannot edit the registry that publishing uses.
+            for (request_id, tool, name) in [
+                (2, "create_category", "Planted"),
+                (3, "delete_category", "Reports"),
+            ] {
+                let refused = call(
+                    &router,
+                    "reader-secret",
+                    request_id,
+                    tool,
+                    json!({ "name": name }),
+                )
+                .await;
+                assert_eq!(
+                    error_text(&refused),
+                    PUBLISH_PERMISSION_ERROR,
+                    "{tool} with a reader key"
+                );
+            }
+            assert_eq!(categories(), ["Reports"], "the registry is unchanged");
+
+            let listed = call(&router, "reader-secret", 4, "list_categories", json!({})).await;
+            assert!(
+                listed["result"]["isError"].as_bool() != Some(true),
+                "a reader key still lists categories: {listed}"
+            );
+
+            let removed = call(
+                &router,
+                "author-secret",
+                5,
+                "delete_category",
+                json!({ "name": "Reports" }),
+            )
+            .await;
+            assert_eq!(structured(&removed)["removed"], true);
+            assert!(categories().is_empty());
+            Ok(())
+        },
+    )
+    .await
+    .expect("category role matrix runtime");
+}
+
+#[tokio::test]
 async fn role_matrix_and_revision_attribution_work_on_production_adapters() {
     let temp = TempDir::new();
     runtime::run_with_bind(
