@@ -944,6 +944,39 @@ async fn snapshot(fake: &Fake, method: Method, uri: &str) -> (StatusCode, Header
     (status, headers, body)
 }
 
+#[tokio::test]
+async fn viewer_shell_limits_its_frame_to_this_origin() {
+    // The artifact frame may navigate itself. A page from another origin would have ordinary
+    // network access and would keep the artifact's broker access, because the shell identifies
+    // its peer by window. The shell document's `frame-src` stops that navigation.
+    let (status, headers, _) = snapshot(&Fake::standard(), Method::GET, &format!("/{ID}")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(
+        headers
+            .get("content-security-policy")
+            .and_then(|value| value.to_str().ok()),
+        Some("frame-src 'self'"),
+        "the shell carries only the frame policy"
+    );
+    assert_eq!(
+        headers
+            .get("cache-control")
+            .and_then(|value| value.to_str().ok()),
+        Some("no-store")
+    );
+
+    // Artifact bytes keep their own sandbox policy, and other trusted pages are unchanged.
+    let (_, raw_headers, _) = snapshot(&Fake::standard(), Method::GET, &format!("/raw/{ID}")).await;
+    assert!(
+        raw_headers
+            .get("content-security-policy")
+            .and_then(|value| value.to_str().ok())
+            .is_some_and(|value| value.starts_with("sandbox ")),
+    );
+    let (_, gallery_headers, _) = snapshot(&Fake::standard(), Method::GET, "/").await;
+    assert!(gallery_headers.get("content-security-policy").is_none());
+}
+
 async fn render_cast_shell(fake: &Fake, config: AppConfig, uri: &str) -> (StatusCode, String) {
     let mut dependencies = deps_with_config(fake, config);
     dependencies.pages = Arc::new(

@@ -37,6 +37,16 @@ another organization updates the artifact and all child rows atomically.
 Every raw artifact and public share response carries a CSP sandbox without `allow-same-origin`.
 This rule also covers SVG, XML, and downloaded content, so uploaded code runs in a null origin.
 
+The same policy denies `fetch`, XHR, WebSocket, EventSource, and beacons. It is not full network
+isolation. WebRTC, popups, form submission, and requests to the allowed presentation hosts can
+still carry data out of an artifact, and no response header closes the WebRTC channel in current
+browsers. Treat everything the viewer shell gives an artifact (viewer state, live data, the viewer
+handle and display name, a position after consent) as visible to the artifact's publisher.
+
+The viewer shell sends `Content-Security-Policy: frame-src 'self'`, so the artifact frame cannot
+navigate to another origin and hand its broker access to a page with no policy. Remembered consent
+for location and notifications covers one version of an artifact; a new revision asks again.
+
 The trusted viewer shell does not read the artifact iframe DOM. Point and region feedback uses a
 fixed server-owned bridge injected only into the `?anchor=1` representation. The parent validates
 the sending frame and a message type allowlist, then treats all anchor data as untrusted. Ordinary

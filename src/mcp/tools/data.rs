@@ -12,6 +12,7 @@ use crate::{
     },
     model::PublisherIdentity,
     ports::data::DataError,
+    security::audit::MutationAudit,
 };
 
 pub(crate) async fn list_data_sources(
@@ -60,8 +61,13 @@ pub(crate) async fn data_bindings(
     let manifest: crate::data::BindingManifest =
         serde_json::from_value(serde_json::json!({"bindings": raw}))
             .map_err(|_| AppError::Validation("bad_params".into()))?;
+    // A binding grants the artifact's code access to a server-credentialed source, so the change
+    // is a security event. The browser route for the same change is audited; this one was not.
+    // The tenant comes from the stored artifact, so an administrator key acting on another
+    // organization's artifact is filed under that organization.
+    let audit = MutationAudit::publisher(auth)?.for_affected_tenant(&authorized.meta().org);
     deps.data
-        .set_bindings(id, manifest.clone(), &authorized.meta().org.0)
+        .set_bindings_audited(id, manifest.clone(), &authorized.meta().org.0, audit)
         .await
         .map_err(data_error)?;
     let bindings = serde_json::to_value(manifest.bindings)

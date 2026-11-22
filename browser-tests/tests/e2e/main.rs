@@ -30,6 +30,7 @@ mod s15_mcp_collections;
 mod s16_folder_create_preview;
 mod s17_shared_confirmations;
 mod s18_web_performance;
+mod s19_egress;
 
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -54,6 +55,7 @@ fn main() -> ExitCode {
         s16_folder_create_preview::cases(),
         s17_shared_confirmations::cases(),
         s18_web_performance::cases(),
+        s19_egress::cases(),
     ]
     .concat();
     browser_tests::e2e::main(

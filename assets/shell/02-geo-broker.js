@@ -1,11 +1,15 @@
   // Location stays behind a consent the viewer gives in the shell for each artifact, because the
   // browser's own permission covers the whole origin and therefore every artifact on it.
   function createViewerGeoBroker(options) {
-    var consentKey='artifact-geo:'+options.artifactId,busy=false,asking=false,lastAt=-Infinity;
+    // "Always allow" is remembered for one version of the artifact (its body digest). A later
+    // revision is different code, possibly from a different publisher, so the viewer is asked
+    // again. The stored value is the version, so one key per artifact never accumulates, and an
+    // older build's plain 'allow' no longer matches.
+    var consentKey='artifact-geo:'+options.artifactId,consentValue='allow:'+String(options.consentVersion||''),busy=false,asking=false,lastAt=-Infinity;
     var idPattern=/^[A-Za-z0-9._:-]{1,64}(?![\s\S])/;
     function send(type,fields){options.post(Object.assign({type:type},fields));}
-    function remembered(){try{return options.storage.getItem(consentKey)==='allow';}catch(_){return false;}}
-    function remember(){try{options.storage.setItem(consentKey,'allow');}catch(_){}}
+    function remembered(){try{return options.storage.getItem(consentKey)===consentValue;}catch(_){return false;}}
+    function remember(){try{options.storage.setItem(consentKey,consentValue);}catch(_){}}
     function forget(){try{options.storage.removeItem(consentKey);}catch(_){}}
     function ready(){send('geo:ready',{supported:!!options.geolocation,remembered:remembered()});}
     function locate(id,high){

@@ -6,14 +6,14 @@ const end = shell.indexOf("  // End viewer geolocation broker.", start);
 const createBroker = runInNewContext(shell.slice(start, end) + "\ncreateViewerGeoBroker", {});
 const settle = async () => { for (let i = 0; i < 20; i++) await Promise.resolve(); };
 
-function harness({ enabled = true, supported = true, answer = "once", entries = new Map() } = {}) {
+function harness({ enabled = true, supported = true, answer = "once", entries = new Map(), consentVersion = "digest-1" } = {}) {
   let now = 10_000;
   const messages = [], asks = [], lookups = [], frame = {};
   const geolocation = supported ? {
     getCurrentPosition: (ok, fail, opts) => lookups.push({ ok, fail, opts }),
   } : null;
   const broker = createBroker({
-    enabled, artifactId: "artifact", geolocation, now: () => now, frame: () => frame,
+    enabled, artifactId: "artifact", consentVersion, geolocation, now: () => now, frame: () => frame,
     storage: { getItem: k => entries.get(k) ?? null, setItem: (k, v) => entries.set(k, v), removeItem: k => entries.delete(k) },
     post: message => messages.push(JSON.parse(JSON.stringify(message))),
     ask: () => { asks.push(1); return answer; },
@@ -35,7 +35,7 @@ test("ignores other frames and non-geo messages", async () => {
 });
 
 test("hello reports support and remembered consent", async () => {
-  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow"]]) });
+  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow:digest-1"]]) });
   await h.send({ type: "geo:hello" });
   assert.deepEqual(h.messages, [{ type: "geo:ready", supported: true, remembered: true }]);
 });
@@ -53,11 +53,29 @@ test("asks once, then returns the position to the frame", async () => {
   assert.equal(h.asks.length, 2, "allow once does not persist");
 });
 
+test("remembered consent covers one artifact version only", async () => {
+  // "Always allow" given to one body digest must not carry to a later revision, which is
+  // different code and may come from a different publisher. A value stored by an older build
+  // (plain "allow") is not honoured either.
+  for (const stored of ["allow:digest-1", "allow"]) {
+    const h = harness({ entries: new Map([["artifact-geo:artifact", stored]]), consentVersion: "digest-2", answer: "deny" });
+    await h.send({ type: "geo:hello" });
+    assert.deepEqual(h.messages.at(-1), { type: "geo:ready", supported: true, remembered: false }, stored);
+    await h.send({ type: "geo:request", requestId: "r1" });
+    assert.equal(h.asks.length, 1, stored + ": the viewer is asked again");
+    assert.equal(h.lookups.length, 0, stored + ": no position is read without a new answer");
+  }
+  const again = harness({ entries: new Map([["artifact-geo:artifact", "allow:digest-1"]]), consentVersion: "digest-2", answer: "always" });
+  await again.send({ type: "geo:request", requestId: "r1" });
+  again.fix(0, 1, 2);
+  assert.equal(again.entries.get("artifact-geo:artifact"), "allow:digest-2", "one key per artifact, replaced");
+});
+
 test("always allow persists per artifact and skips the prompt", async () => {
   const h = harness({ answer: "always" });
   await h.send({ type: "geo:request", requestId: "r1" });
   h.fix(0, 1, 2);
-  assert.equal(h.entries.get("artifact-geo:artifact"), "allow");
+  assert.equal(h.entries.get("artifact-geo:artifact"), "allow:digest-1");
   h.tick(2000);
   await h.send({ type: "geo:request", requestId: "r2" });
   assert.equal(h.asks.length, 1);
@@ -72,7 +90,7 @@ test("declining never touches the browser API", async () => {
 });
 
 test("browser denial forgets stored consent", async () => {
-  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow"]]) });
+  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow:digest-1"]]) });
   await h.send({ type: "geo:request", requestId: "r1" });
   h.deny(0, 1);
   assert.deepEqual(h.messages.at(-1), { type: "geo:error", requestId: "r1", reason: "denied" });
@@ -80,7 +98,7 @@ test("browser denial forgets stored consent", async () => {
 });
 
 test("rejects concurrent, rapid, malformed and unsupported requests", async () => {
-  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow"]]) });
+  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow:digest-1"]]) });
   await h.send({ type: "geo:request", requestId: "r1" });
   await h.send({ type: "geo:request", requestId: "r2" });
   assert.deepEqual(h.messages.at(-1), { type: "geo:error", requestId: "r2", reason: "busy" });
@@ -98,7 +116,7 @@ test("rejects concurrent, rapid, malformed and unsupported requests", async () =
 });
 
 test("forget clears consent", async () => {
-  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow"]]) });
+  const h = harness({ entries: new Map([["artifact-geo:artifact", "allow:digest-1"]]) });
   await h.send({ type: "geo:forget" });
   assert.deepEqual(h.messages.at(-1), { type: "geo:ready", supported: true, remembered: false });
 });

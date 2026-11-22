@@ -131,6 +131,83 @@ enum Outcome {
 }
 
 #[tokio::test]
+async fn set_data_bindings_writes_a_ledger_event() {
+    // A binding grants an artifact's code access to a server-credentialed source. The browser
+    // route for the same change is audited; the MCP tool was not.
+    let temp = TempDir::new();
+    runtime::run_with_bind(
+        config_for(temp.path()),
+        Arc::new(Observer),
+        |_host, _port, router| async move {
+            let id = publish(&router, "author-secret", 1, "bound").await;
+            let events = || {
+                let conn = Connection::open(db::database_path(temp.path()))
+                    .expect("open production database");
+                let mut statement = conn
+                    .prepare(
+                        "SELECT tenant, actor_type, actor_id, target_type, target_id, result \
+                         FROM security_audit_events WHERE operation = 'data_bindings.update' \
+                         ORDER BY sequence",
+                    )
+                    .expect("prepare audit rows");
+                statement
+                    .query_map([], |row| {
+                        Ok([
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                            row.get::<_, String>(5)?,
+                        ])
+                    })
+                    .expect("query audit rows")
+                    .collect::<Result<Vec<_>, _>>()
+                    .expect("read audit rows")
+            };
+            assert!(events().is_empty());
+
+            let set = call(
+                &router,
+                "author-secret",
+                2,
+                "set_data_bindings",
+                json!({ "id": id, "bindings": {} }),
+            )
+            .await;
+            assert_eq!(structured(&set)["id"], id.as_str(), "{set}");
+            assert_eq!(
+                events(),
+                [[
+                    "acme".to_owned(),
+                    "api_key".to_owned(),
+                    "role-author".to_owned(),
+                    "artifact".to_owned(),
+                    id.clone(),
+                    "success".to_owned(),
+                ]]
+            );
+
+            // A refused call writes nothing: this key cannot write a colleague's artifact.
+            let colleague = publish(&router, "colleague-secret", 3, "colleague").await;
+            let refused = call(
+                &router,
+                "author-secret",
+                4,
+                "set_data_bindings",
+                json!({ "id": colleague, "bindings": {} }),
+            )
+            .await;
+            assert_eq!(error_text(&refused), WRITE_PERMISSION_ERROR);
+            assert_eq!(events().len(), 1);
+            Ok(())
+        },
+    )
+    .await
+    .expect("bindings audit runtime");
+}
+
+#[tokio::test]
 async fn reader_keys_cannot_change_the_category_registry() {
     let temp = TempDir::new();
     runtime::run_with_bind(

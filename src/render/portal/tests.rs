@@ -197,7 +197,7 @@ mod portal_characterization_tests {
         assert!(!colleague_html.contains(SHARE_TAB));
         assert_eq!(
             digest(shell_html.as_bytes()),
-            "0b52c7515cca946b521db90de5f40cea1121bd7bf1a0b6253984b873bdfc4386"
+            "5e0a7cd0256ded6b2a4104f6a2dc1bb3d74d2c946ed667239b074ad0562e1a8a"
         );
     }
 }

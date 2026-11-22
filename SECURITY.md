@@ -24,7 +24,10 @@ and a fix or mitigation will be coordinated before public disclosure.
   `127.0.0.0/8`, or `::1` hosts for local development. It never permits LAN or public HTTP
   endpoints. See [configuration and migration guidance](docs/configuration.md#oauth).
 - **Untrusted artifact content** is served with a CSP sandbox (no `allow-same-origin`)
-  on every raw/download/share response, so it runs in a null origin. In addition, every
+  on every raw/download/share response, so it runs in a null origin. The policy blocks
+  `fetch`/XHR/WebSocket, but it is **not** full network isolation: WebRTC, popups, forms and the
+  allowed presentation hosts can still carry data out. Data that the viewer shell hands to an
+  artifact is visible to that artifact's publisher. In addition, every
   cookie-authenticated portal mutation requires a first-party `X-Artifact-Mutation: 1` header and
   same-origin browser metadata (or a canonical `Origin` fallback). This closes the otherwise
   possible artifact-iframe → administrator-action forgery: sandboxed artifact JavaScript can issue
@@ -35,8 +38,9 @@ and a fix or mitigation will be coordinated before public disclosure.
   They rely on a Cloudflare Access **Bypass** on `/s/*`.
 - **Webhooks** are validated to the Discord host (no SSRF to arbitrary hosts) and
   delivered fire-and-forget without following redirects.
-- **Not included:** content scanning, rate limiting, and a physically separate
-  raw-content origin. Run the service on a dedicated hostname.
+- **Not included:** content scanning and a physically separate raw-content origin. Run the
+  service on a dedicated hostname. Request admission limits are described in
+  [docs/ops/ingress-controls.md](docs/ops/ingress-controls.md).
 
 ## Dependencies
 

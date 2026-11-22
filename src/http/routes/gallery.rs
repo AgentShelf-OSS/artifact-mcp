@@ -50,6 +50,19 @@ pub(crate) async fn resolve_page_artifact(
     Ok((viewer, artifact))
 }
 
+/// The viewer shell's only frame is the artifact, and it may load only this origin.
+///
+/// The frame's `sandbox` attribute does not stop the artifact from navigating its own frame. A
+/// page from another origin would not carry the artifact response's CSP, so it would have
+/// ordinary network access, and the shell brokers identify their peer by window, not by
+/// document: that page would keep the artifact's broker access. The embedding document's
+/// `frame-src` applies to every navigation of the frame, whoever starts it, so the request is
+/// never sent. Bundle pages and retained revisions are same-origin and still load.
+///
+/// The policy has no other directive on purpose: it must not change how the shell's own scripts
+/// and styles load.
+pub(crate) const SHELL_FRAME_POLICY: &str = "frame-src 'self'";
+
 /// Render the existing HTML not-found page for every page-shaped concealed response.
 pub(crate) fn page_error_response(deps: &AppDeps, error: AppError) -> Response {
     if error == AppError::ConcealedNotFound {
@@ -446,7 +459,12 @@ async fn shell_result(
         org_accent,
         cast_enabled,
     })?;
-    Ok(html_response(StatusCode::OK, body, true))
+    let mut response = html_response(StatusCode::OK, body, true);
+    response.headers_mut().insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static(SHELL_FRAME_POLICY),
+    );
+    Ok(response)
 }
 
 async fn record_shell_view(deps: &AppDeps, artifact: &AuthorizedArtifact, viewer: &Viewer) {
